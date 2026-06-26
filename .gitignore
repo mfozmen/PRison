@@ -43,3 +43,6 @@ next-env.d.ts
 
 # superpowers scratch directory (not to be committed)
 .superpowers/
+
+# ui-ux-pro-max-cli bulk install (skill templates, not project code)
+.claude/

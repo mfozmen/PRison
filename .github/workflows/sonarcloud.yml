@@ -1,0 +1,27 @@
+name: SonarCloud
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  sonarcloud:
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Full history lets SonarCloud assign issues to the right commits.
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install -g npm@latest
+      - run: npm ci
+      - run: npm run test:cov
+      # Skips cleanly until SONAR_TOKEN is configured, so PRs are not blocked
+      # by a missing secret before the SonarCloud project is connected.
+      - name: SonarCloud Scan
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@v6

@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Generated test coverage output.
     "coverage/**",
+    // ui-ux-pro-max-cli bulk install — not project source, excluded from git.
+    ".claude/**",
   ]),
 ]);
 

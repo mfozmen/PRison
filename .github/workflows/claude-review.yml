@@ -28,6 +28,15 @@ jobs:
           prompt: |
             Review this pull request for bugs, security issues, performance
             problems, and adherence to the project's conventions (TypeScript,
-            English-only code and copy, TDD with real assertions). Post concise
-            inline comments on concrete issues only. If the change looks good,
-            say so briefly. Do not nitpick style that the linter already enforces.
+            English-only code and copy, TDD with real assertions).
+
+            Always leave a visible review on the PR:
+            - Post specific, concrete problems as inline comments on the lines
+              they affect.
+            - Then ALWAYS post exactly one short summary comment on the PR, even
+              when the change is clean — briefly state what you checked and that
+              it looks good. The `gh` CLI is authenticated; find the PR number
+              from the GitHub context (e.g. `gh pr view --json number`) and use
+              `gh pr comment <number> --body "..."`.
+
+            Do not nitpick style that the linter already enforces.

@@ -27,4 +27,21 @@ describe("PrList", () => {
     );
     expect(screen.getAllByTestId("row")).toHaveLength(3);
   });
+
+  it("uses keyExtractor when provided", () => {
+    const items = ["alpha", "beta", "gamma"];
+    render(
+      <PrList
+        title="Stuck PRs"
+        items={items}
+        emptyMessage="No stuck PRs right now."
+        renderRow={(item) => <div data-testid="row">{item}</div>}
+        keyExtractor={(item) => item}
+      />,
+    );
+    expect(screen.getAllByTestId("row")).toHaveLength(3);
+    expect(screen.getByText("alpha")).toBeInTheDocument();
+    expect(screen.getByText("beta")).toBeInTheDocument();
+    expect(screen.getByText("gamma")).toBeInTheDocument();
+  });
 });

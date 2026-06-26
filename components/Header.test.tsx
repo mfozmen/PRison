@@ -55,4 +55,16 @@ describe("Header", () => {
     expect(screen.getByText("acme")).toBeInTheDocument();
     expect(screen.getByText("beta")).toBeInTheDocument();
   });
+
+  it("renders 'there' as fallback when login is empty", () => {
+    render(
+      <Header
+        orgs={orgs}
+        selectedOrg="acme"
+        onOrgChange={() => {}}
+        login=""
+      />,
+    );
+    expect(screen.getByText(/Welcome, there/)).toBeInTheDocument();
+  });
 });

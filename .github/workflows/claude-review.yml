@@ -25,6 +25,10 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Allow the gh calls the prompt uses to post the summary comment;
+          # without this the action denies them and the summary never lands.
+          claude_args: |
+            --allowedTools "Bash(gh pr view:*),Bash(gh pr comment:*)"
           prompt: |
             Review this pull request for bugs, security issues, performance
             problems, and adherence to the project's conventions (TypeScript,

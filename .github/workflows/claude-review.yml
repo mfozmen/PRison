@@ -5,6 +5,8 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  # claude-code-action authenticates via OIDC and needs this.
+  id-token: write
 jobs:
   claude-review:
     runs-on: ubuntu-latest

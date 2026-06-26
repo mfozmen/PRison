@@ -196,6 +196,22 @@ describe("parseStuckPrs", () => {
     expect(prs).toHaveLength(1);
     expect(prs[0].id).toBe("15");
   });
+
+  it("uses '' for repo when repository is null (transferred/deleted repo)", () => {
+    const rawNullRepo = {
+      search: { nodes: [
+        { id: "16", title: "null-repo", url: "u16", number: 16,
+          repository: null,
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-09T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [{ conclusion: "FAILURE" }] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawNullRepo);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].repo).toBe("");
+  });
 });
 
 describe("parseReviewRequests", () => {
@@ -286,6 +302,22 @@ describe("parseReviewRequests", () => {
     };
     const reqs = parseReviewRequests(rawNoDates, "me"); // "me" not in timeline
     expect(reqs[0].requestedAt).toBe(""); // mine=undefined, updatedAt=undefined → ""
+  });
+
+  it("uses '' for repo when repository is null (transferred/deleted repo)", () => {
+    const rawNullRepo = {
+      search: { nodes: [
+        { id: "17", title: "null-repo", url: "u17", number: 17,
+          updatedAt: "2026-06-19T00:00:00Z",
+          repository: null,
+          author: { login: "carol" },
+          timelineItems: { nodes: [] },
+        },
+      ] },
+    };
+    const reqs = parseReviewRequests(rawNullRepo, "me");
+    expect(reqs).toHaveLength(1);
+    expect(reqs[0].repo).toBe("");
   });
 });
 

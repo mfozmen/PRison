@@ -69,7 +69,7 @@ export function parseStuckPrs(raw: any): StuckPr[] {
       }
       return {
         id: n.id, title: n.title, url: n.url, number: n.number,
-        repo: n.repository.nameWithOwner,
+        repo: n.repository?.nameWithOwner ?? "",
         failingChecks, pendingChecks,
         stuckSince: commit.pushedDate ?? commit.committedDate ?? "",
       } as StuckPr;
@@ -86,7 +86,7 @@ export function parseReviewRequests(raw: any, viewerLogin: string): ReviewReques
       );
       return {
         id: n.id, title: n.title, url: n.url, number: n.number,
-        repo: n.repository.nameWithOwner,
+        repo: n.repository?.nameWithOwner ?? "",
         author: n.author?.login ?? "unknown",
         requestedAt: mine?.createdAt ?? n.updatedAt ?? "",
       } as ReviewRequest;

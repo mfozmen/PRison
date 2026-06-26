@@ -297,4 +297,96 @@ describe("Dashboard", () => {
       ).toBeInTheDocument(),
     );
   });
+
+  it("shows org-fetch error notice when orgsError is true", () => {
+    render(
+      <Dashboard orgs={[]} login="testuser" orgsError={true} />,
+    );
+    expect(
+      screen.getByText(/couldn't load your organizations/i),
+    ).toBeInTheDocument();
+  });
+
+  it("does not show org-fetch error notice when orgsError is absent", () => {
+    render(
+      <Dashboard
+        orgs={[{ login: "acme", avatarUrl: "a" }]}
+        login="testuser"
+      />,
+    );
+    expect(
+      screen.queryByText(/couldn't load your organizations/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("encodes the org name in both fetch URLs", async () => {
+    const calls: string[] = [];
+    global.fetch = vi.fn((url: string) => {
+      calls.push(url);
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(url.includes("stuck") ? [STUCK_PR] : [REVIEW_PR]),
+      });
+    }) as unknown as typeof fetch;
+
+    // An org value with characters that must be percent-encoded in a query string.
+    render(
+      <Dashboard
+        orgs={[{ login: "a b&c", avatarUrl: "a" }]}
+        login="testuser"
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+    );
+
+    const encoded = encodeURIComponent("a b&c");
+    expect(
+      calls.some((u) => u === `/api/stuck-prs?org=${encoded}`),
+    ).toBe(true);
+    expect(
+      calls.some((u) => u === `/api/review-requests?org=${encoded}`),
+    ).toBe(true);
+    // The raw, unencoded org must never appear in a request URL.
+    expect(calls.some((u) => u.includes("a b&c"))).toBe(false);
+  });
+
+  it("shows loading indicator while fetch is in-flight and hides it after resolve", async () => {
+    let resolveStuck!: (val: unknown) => void;
+    let resolveReview!: (val: unknown) => void;
+
+    global.fetch = vi.fn((url: string) => {
+      if (url.includes("stuck")) {
+        return new Promise((resolve) => {
+          resolveStuck = resolve;
+        });
+      }
+      return new Promise((resolve) => {
+        resolveReview = resolve;
+      });
+    }) as unknown as typeof fetch;
+
+    render(
+      <Dashboard
+        orgs={[{ login: "acme", avatarUrl: "a" }]}
+        login="testuser"
+      />,
+    );
+
+    // Loading indicator appears while the async transition (fetch) is in-flight.
+    await waitFor(() =>
+      expect(screen.getByText(/loading/i)).toBeInTheDocument(),
+    );
+
+    // Resolve both fetches to complete the transition.
+    resolveStuck({ ok: true, json: () => Promise.resolve([STUCK_PR]) });
+    resolveReview({ ok: true, json: () => Promise.resolve([REVIEW_PR]) });
+
+    // Loading indicator disappears once the transition settles.
+    await waitFor(() =>
+      expect(screen.queryByText(/loading/i)).not.toBeInTheDocument(),
+    );
+  });
 });

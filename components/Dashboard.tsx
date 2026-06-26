@@ -11,9 +11,10 @@ import { Header } from "./Header";
 export interface DashboardProps {
   orgs: Org[];
   login: string;
+  orgsError?: boolean;
 }
 
-export function Dashboard({ orgs, login }: DashboardProps) {
+export function Dashboard({ orgs, login, orgsError }: DashboardProps) {
   // Initialize deterministically so the server render and the client's first
   // (hydration) render agree. The persisted value is applied after mount in the
   // hydrate effect below, avoiding a hydration mismatch on the controlled
@@ -25,7 +26,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [reviewReqs, setReviewReqs] = useState<ReviewRequest[]>([]);
   const [stuckError, setStuckError] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
 
   // Tracks the most recently requested org so stale in-flight responses (from a
   // prior selection) are discarded instead of overwriting the current org's data.
@@ -38,11 +39,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       // deferred transitions, satisfying the React Compiler's set-state-in-effect rule.
       startTransition(async () => {
         const [stuckResult, reviewResult] = await Promise.allSettled([
-          fetch(`/api/stuck-prs?org=${org}`).then((r) => {
+          fetch(`/api/stuck-prs?org=${encodeURIComponent(org)}`).then((r) => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             return r.json() as Promise<StuckPr[]>;
           }),
-          fetch(`/api/review-requests?org=${org}`).then((r) => {
+          fetch(`/api/review-requests?org=${encodeURIComponent(org)}`).then((r) => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             return r.json() as Promise<ReviewRequest[]>;
           }),
@@ -109,6 +110,16 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         login={login}
       />
       <main className="mx-auto w-full max-w-4xl flex-1 space-y-8 px-6 py-8">
+        {orgsError && (
+          <div className="rounded border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+            Couldn&apos;t load your organizations. Try reloading.
+          </div>
+        )}
+        {isPending && (
+          <p className="text-sm text-slate-500" aria-live="polite">
+            Loading&hellip;
+          </p>
+        )}
         {stuckError && (
           <div className="flex items-center justify-between rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             <span>{stuckError}</span>

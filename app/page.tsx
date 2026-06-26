@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import { getToken } from "next-auth/jwt";
 import { auth } from "@/auth";
 import { SignInButton } from "@/components/SignInButton";
@@ -18,17 +18,24 @@ export default async function Home() {
     );
   }
 
-  const cookieStore = await cookies();
-  const req = new Request("http://localhost", {
-    headers: { cookie: cookieStore.toString() },
+  const h = await headers();
+  const token = await getToken({
+    req: { headers: h },
+    secret: process.env.AUTH_SECRET,
   });
-  const token = await getToken({ req, secret: process.env.AUTH_SECRET });
 
-  const orgs: Org[] = token?.accessToken
-    ? await ghClient(token.accessToken)(ORGS_QUERY)
-        .then(parseOrgs)
-        .catch(() => [])
-    : [];
+  let orgs: Org[] = [];
+  let orgsError = false;
 
-  return <Dashboard orgs={orgs} login={session.login ?? "there"} />;
+  if (token?.accessToken) {
+    try {
+      orgs = await ghClient(token.accessToken)(ORGS_QUERY).then(parseOrgs);
+    } catch {
+      orgsError = true;
+    }
+  }
+
+  return (
+    <Dashboard orgs={orgs} login={session.login ?? "there"} orgsError={orgsError} />
+  );
 }

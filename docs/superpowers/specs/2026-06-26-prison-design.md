@@ -25,7 +25,9 @@ GitHub.
 
 ## 2. Non-goals (v1)
 
-- No write/mutating actions (no re-run checks, no approve/merge).
+- No write/mutating actions (no re-run checks, no approve/merge). The app may
+  *suggest* an action and deep-link to the right GitHub tab, but never performs
+  it — the user acts externally themselves.
 - No "all organizations at once" aggregate view — one org at a time.
 - No historical analytics, charts, or trend tracking.
 - No notifications, email, or background polling.
@@ -123,7 +125,12 @@ type ReviewRequest = {
   - green `< 1 day`, yellow `1–3 days`, red `> 3 days`.
 - Each row: title, repo `#number`, age badge, status detail
   (stuck list: "2 failing · 1 pending"; review list: author + "waiting Xd"),
-  and an **Open PR** button (links to `url`, opens GitHub).
+  an **Open PR** button (links to `url`, opens GitHub), and a **suggested action
+  hint** (read-only, advisory) that deep-links to the relevant GitHub tab:
+  - failing checks → "Re-run failed checks" → `<url>/checks`
+  - pending checks → "Investigate pending CI" → `<url>/checks`
+  - review request → "Review to unblock <author>" → `<url>/files`
+  The hint never triggers anything; the user performs the action externally.
 - Empty states: "No PRs stuck on checks 🎉" / "No PRs waiting on your review 🎉".
 
 ## 8. Org switcher (tenant-style)

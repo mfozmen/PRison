@@ -38,6 +38,12 @@ describe("GET /api/stuck-prs", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 400 when org contains invalid characters", async () => {
+    getTokenMock.mockResolvedValue({ accessToken: "t", login: "me" });
+    const res = await GET(req("http://x/api/stuck-prs?org=acme+repo%3Ax%2Fy"));
+    expect(res.status).toBe(400);
+  });
+
   it("returns parsed stuck PRs", async () => {
     getTokenMock.mockResolvedValue({ accessToken: "t", login: "me" });
     queryMock.mockResolvedValue({
@@ -72,5 +78,14 @@ describe("GET /api/stuck-prs", () => {
     const body = await res.json();
     expect(body).toHaveLength(1);
     expect(body[0].failingChecks).toBe(1);
+  });
+
+  it("returns 502 when GitHub API throws", async () => {
+    getTokenMock.mockResolvedValue({ accessToken: "t", login: "me" });
+    queryMock.mockRejectedValue(new Error("network error"));
+    const res = await GET(req("http://x/api/stuck-prs?org=acme"));
+    expect(res.status).toBe(502);
+    const body = await res.text();
+    expect(body).toBe("Upstream GitHub error");
   });
 });

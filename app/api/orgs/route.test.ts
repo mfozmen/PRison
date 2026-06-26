@@ -50,4 +50,13 @@ describe("GET /api/orgs", () => {
     expect(body[0].login).toBe("acme");
     expect(body[0].avatarUrl).toBe("https://example.com/avatar.png");
   });
+
+  it("returns 502 when GitHub API throws", async () => {
+    getTokenMock.mockResolvedValue({ accessToken: "t", login: "me" });
+    queryMock.mockRejectedValue(new Error("network error"));
+    const res = await GET(req("http://x/api/orgs"));
+    expect(res.status).toBe(502);
+    const body = await res.text();
+    expect(body).toBe("Upstream GitHub error");
+  });
 });

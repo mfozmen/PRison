@@ -5,6 +5,10 @@ import { ORGS_QUERY, parseOrgs } from "@/lib/github/queries";
 export async function GET(request: Request) {
   const token = await getToken({ req: request, secret: process.env.AUTH_SECRET });
   if (!token?.accessToken) return new Response("Unauthorized", { status: 401 });
-  const raw = await ghClient(token.accessToken)(ORGS_QUERY);
-  return Response.json(parseOrgs(raw));
+  try {
+    const raw = await ghClient(token.accessToken)(ORGS_QUERY);
+    return Response.json(parseOrgs(raw));
+  } catch {
+    return new Response("Upstream GitHub error", { status: 502 });
+  }
 }

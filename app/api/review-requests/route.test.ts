@@ -32,9 +32,21 @@ describe("GET /api/review-requests", () => {
     expect(res.status).toBe(401);
   });
 
+  it("returns 401 when token has no login", async () => {
+    getTokenMock.mockResolvedValue({ accessToken: "t" });
+    const res = await GET(req("http://x/api/review-requests?org=acme"));
+    expect(res.status).toBe(401);
+  });
+
   it("returns 400 when org is missing", async () => {
     getTokenMock.mockResolvedValue({ accessToken: "t", login: "me" });
     const res = await GET(req("http://x/api/review-requests"));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when org contains invalid characters", async () => {
+    getTokenMock.mockResolvedValue({ accessToken: "t", login: "me" });
+    const res = await GET(req("http://x/api/review-requests?org=acme+repo%3Ax%2Fy"));
     expect(res.status).toBe(400);
   });
 
@@ -69,5 +81,14 @@ describe("GET /api/review-requests", () => {
     expect(body).toHaveLength(1);
     expect(body[0].author).toBe("alice");
     expect(body[0].requestedAt).toBe("2026-06-21T00:00:00Z");
+  });
+
+  it("returns 502 when GitHub API throws", async () => {
+    getTokenMock.mockResolvedValue({ accessToken: "t", login: "me" });
+    queryMock.mockRejectedValue(new Error("network error"));
+    const res = await GET(req("http://x/api/review-requests?org=acme"));
+    expect(res.status).toBe(502);
+    const body = await res.text();
+    expect(body).toBe("Upstream GitHub error");
   });
 });

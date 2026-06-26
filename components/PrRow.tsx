@@ -28,7 +28,7 @@ export function PrRow({ title, repo, number, url, since, now, detail, suggestion
         <a
           href={url}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="rounded bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700"
         >
           Open PR
@@ -36,7 +36,7 @@ export function PrRow({ title, repo, number, url, since, now, detail, suggestion
         <a
           href={suggestion.href}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="text-xs text-slate-500 underline hover:text-indigo-600"
         >
           {suggestion.text}

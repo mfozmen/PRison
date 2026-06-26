@@ -40,6 +40,8 @@ describe("PrRow", () => {
     );
     const link = screen.getByRole("link", { name: /open pr/i });
     expect(link).toHaveAttribute("href", "https://github.com/org/repo/pull/42");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("renders suggestion text and href", () => {
@@ -59,6 +61,8 @@ describe("PrRow", () => {
       "href",
       "https://github.com/org/repo/pull/42/checks",
     );
+    expect(hint).toHaveAttribute("target", "_blank");
+    expect(hint).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("renders the optional detail slot when provided", () => {

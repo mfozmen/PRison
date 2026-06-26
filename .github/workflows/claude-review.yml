@@ -58,7 +58,7 @@ jobs:
           # top-level summary. Without these the agent analyzes but has no
           # permitted tool to publish (silent no-op).
           claude_args: |
-            --max-turns 25
+            --max-turns 40
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
           prompt: |
             You are reviewing this pull request as an ADVISORY reviewer for the

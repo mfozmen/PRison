@@ -1,0 +1,10 @@
+services:
+  prison:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      # Provide AUTH_SECRET via your shell or a .env file next to this compose
+      # file: AUTH_SECRET=$(openssl rand -base64 32)
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET (openssl rand -base64 32)}
+    restart: unless-stopped

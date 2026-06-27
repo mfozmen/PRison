@@ -1,0 +1,15 @@
+.git
+node_modules
+.next
+coverage
+.env*
+npm-debug.log*
+.superpowers
+.claude
+design-system
+docs
+**/*.test.ts
+**/*.test.tsx
+Dockerfile
+.dockerignore
+README.md

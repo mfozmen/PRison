@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useTransition } from "react";
 import type { Org, StuckPr, ReviewRequest } from "@/lib/types";
-import { sortByAgeAsc, ageBucket } from "@/lib/prioritize";
+import { sortByAgeAsc } from "@/lib/prioritize";
 import { suggestStuck, suggestReview } from "@/lib/suggest";
 import { PrList } from "./PrList";
 import { PrRow } from "./PrRow";
@@ -102,7 +102,7 @@ export function Dashboard({ orgs, login, orgsError }: DashboardProps) {
   const sortedReviews = sortByAgeAsc(reviewReqs, (req) => req.requestedAt);
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div className="flex min-h-screen flex-col bg-slate-900">
       <Header
         orgs={orgs}
         selectedOrg={selectedOrg}
@@ -111,21 +111,22 @@ export function Dashboard({ orgs, login, orgsError }: DashboardProps) {
       />
       <main className="mx-auto w-full max-w-4xl flex-1 space-y-8 px-6 py-8">
         {orgsError && (
-          <div className="rounded border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
             Couldn&apos;t load your organizations. Try reloading.
           </div>
         )}
         {isPending && (
-          <p className="text-sm text-slate-500" aria-live="polite">
+          <p className="flex items-center gap-2 text-sm text-slate-400" aria-live="polite">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
             Loading&hellip;
           </p>
         )}
         {stuckError && (
-          <div className="flex items-center justify-between rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="flex items-center justify-between rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
             <span>{stuckError}</span>
             <button
               onClick={() => fetchData(selectedOrg)}
-              className="ml-4 rounded bg-red-100 px-3 py-1 text-xs font-medium hover:bg-red-200"
+              className="ml-4 cursor-pointer rounded bg-red-500/20 px-3 py-1 text-xs font-medium text-red-200 transition-colors hover:bg-red-500/30"
             >
               Retry
             </button>
@@ -150,11 +151,11 @@ export function Dashboard({ orgs, login, orgsError }: DashboardProps) {
           )}
         />
         {reviewError && (
-          <div className="flex items-center justify-between rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="flex items-center justify-between rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
             <span>{reviewError}</span>
             <button
               onClick={() => fetchData(selectedOrg)}
-              className="ml-4 rounded bg-red-100 px-3 py-1 text-xs font-medium hover:bg-red-200"
+              className="ml-4 cursor-pointer rounded bg-red-500/20 px-3 py-1 text-xs font-medium text-red-200 transition-colors hover:bg-red-500/30"
             >
               Retry
             </button>
@@ -173,7 +174,7 @@ export function Dashboard({ orgs, login, orgsError }: DashboardProps) {
               url={req.url}
               since={req.requestedAt}
               now={new Date()}
-              detail={`${req.author} · ${ageBucket(req.requestedAt, new Date())} age`}
+              detail={`Requested by ${req.author}`}
               suggestion={suggestReview(req)}
             />
           )}

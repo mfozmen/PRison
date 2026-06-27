@@ -17,9 +17,18 @@ export function PrList<T>({
 }: PrListProps<T>) {
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+          {title}
+        </h2>
+        <span className="rounded-full bg-slate-800 px-2 py-0.5 font-mono text-xs tabular-nums text-slate-400 ring-1 ring-inset ring-slate-700">
+          {items.length}
+        </span>
+      </div>
       {items.length === 0 ? (
-        <p className="text-sm text-slate-500">{emptyMessage}</p>
+        <p className="rounded-lg border border-dashed border-slate-800 bg-slate-900/40 px-4 py-6 text-center text-sm text-slate-400">
+          {emptyMessage}
+        </p>
       ) : (
         <ul className="flex flex-col gap-2">
           {items.map((item, i) => (

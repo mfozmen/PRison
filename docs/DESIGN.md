@@ -1,49 +1,59 @@
 # PRison Design System
 
-Design tokens sourced via `ui-ux-pro-max-cli` (installed), refined with the task-6 fallback palette.
+Design system generated with the **ui-ux-pro-max** skill
+(`.claude/skills/ui-ux-pro-max/`). Full recommendation saved at
+`design-system/prison/MASTER.md`. Style: **Data-Dense Dashboard (dark)** with a
+green "run" accent — a developer/ops aesthetic that fits a PR + CI tool.
 
-## Palette
+## Palette (dark)
 
 | Token | Hex | Usage |
 |-------|-----|-------|
-| Background | `#f8fafc` (slate-50) | Page background |
-| Surface | `#ffffff` | Cards, panels |
-| Text Primary | `#0f172a` (slate-900) | Headings, body |
-| Text Secondary | `#64748b` (slate-500) | Labels, metadata |
-| Accent / Links | `#4f46e5` (indigo-600) | CTAs, links |
+| Canvas | `#0f172a` (slate-900) | App background |
+| Surface | `#1e293b` (slate-800) | Cards, header |
+| Surface-2 | `#243043` | Hover / inputs |
+| Edge | `#334155` (slate-700) | Borders |
+| Ink | `#f8fafc` (slate-50) | Primary text |
+| Ink muted | `#94a3b8` (slate-400) | Labels, metadata |
+| Accent | `#22c55e` (green-500) | Primary CTA ("Open PR"), links, "run" |
 
 ## Badge Colors (Age Buckets)
 
-| Bucket | Background | Text |
-|--------|-----------|------|
-| `fresh` | `bg-green-100` (`#dcfce7`) | `text-green-800` (`#166534`) |
-| `warning` | `bg-yellow-100` (`#fef9c3`) | `text-yellow-800` (`#854d0e`) |
-| `urgent` | `bg-red-100` (`#fee2e2`) | `text-red-800` (`#991b1b`) |
+Color-coded urgency with inset rings; `font-mono` + `tabular-nums`.
+
+| Bucket | Classes |
+|--------|---------|
+| `fresh` (< 1 day) | `bg-green-500/15 text-green-400 ring-green-500/30` |
+| `warning` (1–3 days) | `bg-amber-500/15 text-amber-400 ring-amber-500/30` |
+| `urgent` (> 3 days) | `bg-red-500/15 text-red-400 ring-red-500/30` |
 
 ## Font Pairing
 
-| Role | Family | Weights |
-|------|--------|---------|
-| Sans (UI) | Inter | 400, 500, 600, 700 |
-| Mono (code, IDs) | JetBrains Mono | 400, 500 |
+| Role | Family | Loaded via |
+|------|--------|-----------|
+| Sans (UI) | Fira Sans (400/500/600/700) | `next/font/google` in `app/layout.tsx` |
+| Mono (code, IDs, durations) | Fira Code | `next/font/google` |
 
-Source: Google Fonts (`@import url(...)` in `app/globals.css`)
+Exposed as `--font-fira-sans` / `--font-fira-code`, mapped to Tailwind's
+`--font-sans` / `--font-mono` in `app/globals.css`.
 
-## Spacing Scale
+## Spacing & motion
 
-Tailwind default — **4 px base unit** (0.25 rem). All spacing values are multiples of 4 px.
+- Tailwind default **4 px base unit**; section rhythm 8 / 12 / 32.
+- Transitions 150–300 ms; global `prefers-reduced-motion` clamp.
 
 ## CSS Custom Properties
 
-All tokens are defined as CSS custom properties in `app/globals.css` under `:root`:
+Defined in `app/globals.css` under `@theme`:
 
 ```css
---color-bg: #f8fafc;
---color-surface: #ffffff;
---color-text-primary: #0f172a;
---color-text-secondary: #64748b;
---color-accent: #4f46e5;
---font-sans: "Inter", ...;
---font-mono: "JetBrains Mono", ...;
---spacing-base: 4px;
+--color-canvas: #0f172a;
+--color-surface: #1e293b;
+--color-surface-2: #243043;
+--color-edge: #334155;
+--color-ink: #f8fafc;
+--color-ink-muted: #94a3b8;
+--color-accent: #22c55e;
+--font-sans: var(--font-fira-sans), ...;
+--font-mono: var(--font-fira-code), ...;
 ```

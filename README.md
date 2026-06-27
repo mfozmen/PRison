@@ -20,20 +20,9 @@ you to GitHub to act.
 ### Prerequisites
 
 - Node.js 20+
-- A GitHub Personal Access Token (steps below)
+- [`gh` CLI](https://cli.github.com/) installed and signed in — **recommended** (one click, no token needed), or a GitHub Personal Access Token as a fallback.
 
-### 1. Create a Personal Access Token
-
-1. Go to [github.com/settings/tokens](https://github.com/settings/tokens/new?scopes=read:org,repo&description=PRison) → **Generate new token (classic)**.
-2. Select the **`read:org`** and **`repo`** scopes.
-3. Generate it and copy the token.
-
-> [!NOTE]
-> If any of your organizations use SAML SSO, click **Configure SSO** on the token
-> and **Authorize** it for those orgs. This is self-service — no org owner
-> approval needed, because the token acts as you, not as a third-party app.
-
-### 2. Run it locally
+### 1. Run it locally
 
 ```sh
 npm install
@@ -41,8 +30,21 @@ cp .env.example .env.local        # set AUTH_SECRET: openssl rand -base64 32
 npm run dev                       # http://localhost:3000
 ```
 
-Open the app and paste your token. It's stored in an encrypted, httpOnly cookie
-and never reaches the browser.
+Open the app and click **Sign in with GitHub CLI** (recommended if `gh` is installed and signed in). The server reads your CLI token — nothing is stored in the browser.
+
+> [!WARNING]
+> `POST /api/token/cli` runs `gh auth token` on the server and mints a session from the host machine's GitHub credentials. PRison is designed to run on **your own machine** — do NOT expose a `gh`-authenticated instance on a reachable network without adding your own access control.
+
+If `gh` is not available (e.g. a Vercel deployment or a machine without the CLI), paste a Personal Access Token instead:
+
+1. Go to [github.com/settings/tokens](https://github.com/settings/tokens/new?scopes=read:org,repo&description=PRison) → **Generate new token (classic)**.
+2. Select the **`read:org`** and **`repo`** scopes, then generate and copy it.
+
+> [!NOTE]
+> For SAML SSO orgs, click **Configure SSO** on the token and **Authorize** it
+> for those orgs. This is self-service — no org owner approval needed.
+
+Tokens are stored in an encrypted, httpOnly cookie and never reach the browser.
 
 ## Run with Docker
 
@@ -65,9 +67,10 @@ or callback URLs needed.
 
 ## Usage
 
-Paste your token, then use the filter in the top-right to narrow to one
-organization (defaults to **All**). Click **Open PR** or a suggested-action link
-to jump to GitHub. **Sign Out** clears the stored token.
+Sign in with the GitHub CLI or paste a token, then use the filter in the
+top-right to narrow to one organization (defaults to **All**). Click **Open PR**
+or a suggested-action link to jump to GitHub. **Sign Out** clears the stored
+token.
 
 ## Documentation
 

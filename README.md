@@ -4,28 +4,38 @@
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=mfozmen_PRison&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=mfozmen_PRison)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=mfozmen_PRison&metric=coverage)](https://sonarcloud.io/summary/new_code?id=mfozmen_PRison)
 
-A read-only GitHub dashboard for one thing: seeing which pull requests need your
-attention, and for how long they've been waiting.
+A read-only GitHub dashboard that shows which pull requests need your attention,
+and for how long they've been waiting:
 
 - **Stuck on checks** — your open PRs whose checks are failing or pending, oldest first.
 - **Waiting on your review** — PRs you're blocking, oldest first.
 
-Scoped to one organization at a time. Read-only — each row deep-links you to GitHub to act.
+It's scoped to one organization at a time, and every row deep-links you straight
+to GitHub to act.
 
-## 1. Create a GitHub OAuth App
+## Getting started
 
-Sign-in uses a GitHub OAuth App (free, ~2 minutes):
+### Prerequisites
 
-1. **GitHub → Settings → Developer settings → OAuth Apps → New OAuth App**
-2. **Homepage URL:** `http://localhost:3000`
-3. **Authorization callback URL:** `http://localhost:3000/api/auth/callback/github`
-4. **Register**, then **Generate a new client secret**. Keep the **Client ID** and **Client Secret**.
+- Node.js 20+
+- A GitHub account
 
-Scopes are requested at sign-in as `read:org repo`. `repo` is needed because GitHub
-OAuth has no read-only scope for private-repo PRs; the token stays server-side (in the
-JWT) and is never sent to the browser.
+### 1. Create a GitHub OAuth App
 
-## 2. Configure and run
+Sign-in uses a GitHub OAuth App (free, about two minutes):
+
+1. Open **GitHub → Settings → Developer settings → OAuth Apps → New OAuth App**.
+2. Set **Homepage URL** to `http://localhost:3000`.
+3. Set **Authorization callback URL** to `http://localhost:3000/api/auth/callback/github`.
+4. Click **Register application**, then **Generate a new client secret**.
+5. Keep the **Client ID** and **Client Secret** — you'll need them next.
+
+> [!NOTE]
+> Sign-in requests the `read:org repo` scopes. `repo` is required because GitHub
+> OAuth has no read-only scope for private-repository PRs. The token is kept
+> server-side (in the session JWT) and is never sent to the browser.
+
+### 2. Run it locally
 
 ```sh
 npm install
@@ -35,29 +45,41 @@ cp .env.example .env.local
 Fill in `.env.local`:
 
 | Variable | Value |
-|---|---|
+| --- | --- |
 | `AUTH_GITHUB_ID` | OAuth App Client ID |
 | `AUTH_GITHUB_SECRET` | OAuth App Client Secret |
-| `AUTH_SECRET` | run `npx auth secret` (or `openssl rand -base64 32`) |
+| `AUTH_SECRET` | a random secret — run `npx auth secret` |
 | `AUTH_URL` | `http://localhost:3000` |
 
 ```sh
-npm run dev   # http://localhost:3000, then sign in with GitHub
+npm run dev
 ```
 
-## 3. Deploy (Vercel)
+Open `http://localhost:3000` and sign in with GitHub.
 
-Import the repo on the free [Vercel](https://vercel.com) tier, add the same four env
-vars (set `AUTH_URL` to your Vercel URL), and deploy. Then add a second **callback URL**
-to your OAuth App: `https://<your-app>.vercel.app/api/auth/callback/github`.
+## Deploying to Vercel
 
-No custom domain or paid plan needed.
+Deploy on the free [Vercel](https://vercel.com) tier — no custom domain or paid
+plan needed. Do this **after** you have it running locally:
 
-## Contributing
+1. Import the repository on Vercel (it auto-detects Next.js) and deploy once to
+   get your URL, e.g. `https://prison-yourname.vercel.app`.
+2. In the Vercel project, add the same four environment variables, setting
+   `AUTH_URL` to that deployment URL.
+3. Back in your GitHub OAuth App, add a second **Authorization callback URL**:
+   `https://prison-yourname.vercel.app/api/auth/callback/github`.
+4. Redeploy.
 
-PRs welcome — see **[CONTRIBUTING.md](CONTRIBUTING.md)** for conventions, the test
-commands, and the CI / SonarCloud / AI-review setup.
+## Usage
 
-## License
+Sign in, then pick an organization from the switcher in the top-right (your
+choice is remembered). The two lists update for that org; click **Open PR** or a
+suggested-action link to jump to GitHub.
 
-[MIT](LICENSE) © 2026 Mehmet Fahri Özmen
+## Documentation
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — conventions, tests, and CI setup
+- [docs/DESIGN.md](docs/DESIGN.md) — design system
+- [docs/UI-AUDIT.md](docs/UI-AUDIT.md) — UI/UX audit notes
+
+Licensed under [MIT](LICENSE).

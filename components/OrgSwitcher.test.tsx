@@ -9,11 +9,12 @@ const orgs: Org[] = [
 ];
 
 describe("OrgSwitcher", () => {
-  it("renders all org logins as options", () => {
+  it("renders an All option plus every org login", () => {
     render(<OrgSwitcher orgs={orgs} value="acme" onChange={() => {}} />);
     const select = screen.getByRole("combobox");
     const options = Array.from(select.querySelectorAll("option")).map((o) => o.value);
-    expect(options).toEqual(["acme", "widgets-inc"]);
+    expect(options).toEqual(["", "acme", "widgets-inc"]);
+    expect(screen.getByText("All organizations")).toBeInTheDocument();
   });
 
   it("calls onChange with the correct login when selection changes", () => {

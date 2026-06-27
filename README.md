@@ -10,71 +10,51 @@ and for how long they've been waiting:
 - **Stuck on checks** — your open PRs whose checks are failing or pending, oldest first.
 - **Waiting on your review** — PRs you're blocking, oldest first.
 
-It's scoped to one organization at a time, and every row deep-links you straight
-to GitHub to act.
+It spans every repo you can access — your personal account and all your
+organizations — with an optional per-org filter. PRison uses **your own access
+token**, so there's no third-party app to get approved, and every row deep-links
+you to GitHub to act.
 
 ## Getting started
 
 ### Prerequisites
 
 - Node.js 20+
-- A GitHub account
+- A GitHub Personal Access Token (steps below)
 
-### 1. Create a GitHub OAuth App
+### 1. Create a Personal Access Token
 
-Sign-in uses a GitHub OAuth App (free, about two minutes):
-
-1. Open **GitHub → Settings → Developer settings → OAuth Apps → New OAuth App**.
-2. Set **Homepage URL** to `http://localhost:3000`.
-3. Set **Authorization callback URL** to `http://localhost:3000/api/auth/callback/github`.
-4. Click **Register application**, then **Generate a new client secret**.
-5. Keep the **Client ID** and **Client Secret** — you'll need them next.
+1. Go to [github.com/settings/tokens](https://github.com/settings/tokens/new?scopes=read:org,repo&description=PRison) → **Generate new token (classic)**.
+2. Select the **`read:org`** and **`repo`** scopes.
+3. Generate it and copy the token.
 
 > [!NOTE]
-> Sign-in requests the `read:org repo` scopes. `repo` is required because GitHub
-> OAuth has no read-only scope for private-repository PRs. The token is kept
-> server-side (in the session JWT) and is never sent to the browser.
+> If any of your organizations use SAML SSO, click **Configure SSO** on the token
+> and **Authorize** it for those orgs. This is self-service — no org owner
+> approval needed, because the token acts as you, not as a third-party app.
 
 ### 2. Run it locally
 
 ```sh
 npm install
-cp .env.example .env.local
+cp .env.example .env.local        # set AUTH_SECRET: openssl rand -base64 32
+npm run dev                       # http://localhost:3000
 ```
 
-Fill in `.env.local`:
-
-| Variable | Value |
-| --- | --- |
-| `AUTH_GITHUB_ID` | OAuth App Client ID |
-| `AUTH_GITHUB_SECRET` | OAuth App Client Secret |
-| `AUTH_SECRET` | a random secret — run `npx auth secret` |
-| `AUTH_URL` | `http://localhost:3000` |
-
-```sh
-npm run dev
-```
-
-Open `http://localhost:3000` and sign in with GitHub.
+Open the app and paste your token. It's stored in an encrypted, httpOnly cookie
+and never reaches the browser.
 
 ## Deploying to Vercel
 
-Deploy on the free [Vercel](https://vercel.com) tier — no custom domain or paid
-plan needed. Do this **after** you have it running locally:
-
-1. Import the repository on Vercel (it auto-detects Next.js) and deploy once to
-   get your URL, e.g. `https://prison-yourname.vercel.app`.
-2. In the Vercel project, add the same four environment variables, setting
-   `AUTH_URL` to that deployment URL.
-3. Back in your GitHub OAuth App, add a second **Authorization callback URL**:
-   `https://prison-yourname.vercel.app/api/auth/callback/github`.
-4. Redeploy.
+Import the repo on the free [Vercel](https://vercel.com) tier, set `AUTH_SECRET`
+in the project's environment variables, and deploy. No custom domain, OAuth app,
+or callback URLs needed.
 
 ## Usage
 
-Sign in, then pick an organization from the switcher in the top-right (your
-choice is remembered). The two lists update for that org; click **Open PR** or a
-suggested-action link to jump to GitHub.
+Paste your token, then use the filter in the top-right to narrow to one
+organization (defaults to **All**). Click **Open PR** or a suggested-action link
+to jump to GitHub. **Sign Out** clears the stored token.
 
 ## Documentation
 

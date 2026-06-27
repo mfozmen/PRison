@@ -5,7 +5,7 @@ for contributing is low, but a few conventions keep the history clean.
 
 ## Tech stack
 
-Next.js (App Router) + TypeScript · NextAuth v5 (GitHub OAuth) ·
+Next.js (App Router) + TypeScript · GitHub Personal Access Token (encrypted cookie) ·
 `@octokit/graphql` · Tailwind CSS v4 · Vitest + Testing Library.
 
 Design tokens live in [`docs/DESIGN.md`](docs/DESIGN.md); UI audit notes in

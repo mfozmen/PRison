@@ -3,10 +3,15 @@
 // convert them to domain types as the first step.
 import type { Org, StuckPr, ReviewRequest } from "@/lib/types";
 
-export function searchQuery(kind: "author" | "review", org: string): string {
+// org is optional: when omitted, the search spans every repo the token can
+// see (the user's personal account plus all accessible organizations).
+export function searchQuery(kind: "author" | "review", org?: string): string {
   const who = kind === "author" ? "author:@me" : "review-requested:@me";
-  return `is:open is:pr ${who} org:${org}`;
+  const scope = org ? ` org:${org}` : "";
+  return `is:open is:pr ${who}${scope}`;
 }
+
+export const VIEWER_QUERY = `query { viewer { login } }`;
 
 export const ORGS_QUERY = `
   query { viewer { organizations(first: 100) { nodes { login avatarUrl } } } }`;

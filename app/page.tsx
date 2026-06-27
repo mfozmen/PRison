@@ -1,41 +1,29 @@
-import { headers } from "next/headers";
-import { getToken } from "next-auth/jwt";
-import { auth } from "@/auth";
-import { SignInButton } from "@/components/SignInButton";
+import { TokenForm } from "@/components/TokenForm";
 import { Dashboard } from "@/components/Dashboard";
 import { ghClient } from "@/lib/github/client";
 import { ORGS_QUERY, parseOrgs } from "@/lib/github/queries";
+import { readToken, readLogin } from "@/lib/session";
 import type { Org } from "@/lib/types";
 
 export default async function Home() {
-  const session = await auth();
+  const token = await readToken();
 
-  if (!session) {
+  if (!token) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <SignInButton />
-      </div>
+      <main className="flex min-h-screen items-center justify-center px-6">
+        <TokenForm />
+      </main>
     );
   }
 
-  const h = await headers();
-  const token = await getToken({
-    req: { headers: h },
-    secret: process.env.AUTH_SECRET,
-  });
-
+  // Organizations populate the optional filter only; the lists default to every
+  // repo the token can see, so a failed org fetch is not fatal.
   let orgs: Org[] = [];
-  let orgsError = false;
-
-  if (token?.accessToken) {
-    try {
-      orgs = await ghClient(token.accessToken)(ORGS_QUERY).then(parseOrgs);
-    } catch {
-      orgsError = true;
-    }
+  try {
+    orgs = await ghClient(token)(ORGS_QUERY).then(parseOrgs);
+  } catch {
+    orgs = [];
   }
 
-  return (
-    <Dashboard orgs={orgs} login={session.login ?? "there"} orgsError={orgsError} />
-  );
+  return <Dashboard orgs={orgs} login={(await readLogin()) ?? "there"} />;
 }

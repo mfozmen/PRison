@@ -1,8 +1,12 @@
 "use client";
 
-import { signOut } from "next-auth/react";
 import type { Org } from "@/lib/types";
 import { OrgSwitcher } from "./OrgSwitcher";
+
+async function signOut() {
+  await fetch("/api/token", { method: "DELETE" });
+  window.location.reload();
+}
 
 export interface HeaderProps {
   orgs: Org[];

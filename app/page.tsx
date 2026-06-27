@@ -1,6 +1,6 @@
 import { TokenForm } from "@/components/TokenForm";
 import { Dashboard } from "@/components/Dashboard";
-import { ghClient } from "@/lib/github/client";
+import { ghQuery } from "@/lib/github/client";
 import { ORGS_QUERY, parseOrgs } from "@/lib/github/queries";
 import { readToken, readLogin } from "@/lib/session";
 import type { Org } from "@/lib/types";
@@ -20,7 +20,7 @@ export default async function Home() {
   // repo the token can see, so a failed org fetch is not fatal.
   let orgs: Org[] = [];
   try {
-    orgs = await ghClient(token)(ORGS_QUERY).then(parseOrgs);
+    orgs = parseOrgs(await ghQuery(token, ORGS_QUERY));
   } catch {
     orgs = [];
   }

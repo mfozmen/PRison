@@ -8,6 +8,10 @@ describe("searchQuery", () => {
   it("scopes review search to the org", () => {
     expect(searchQuery("review", "acme")).toBe("is:open is:pr review-requested:@me org:acme");
   });
+  it("omits the org scope when no org is given (spans everything)", () => {
+    expect(searchQuery("author")).toBe("is:open is:pr author:@me");
+    expect(searchQuery("review", "")).toBe("is:open is:pr review-requested:@me");
+  });
 });
 
 describe("parseStuckPrs", () => {

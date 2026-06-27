@@ -10,7 +10,7 @@ vi.mock("@/lib/session", () => ({
   readToken: readTokenMock,
   readLogin: readLoginMock,
 }));
-vi.mock("@/lib/github/client", () => ({ ghClient: () => queryMock }));
+vi.mock("@/lib/github/client", () => ({ ghQuery: queryMock }));
 
 import { GET } from "./route";
 
@@ -75,7 +75,7 @@ describe("GET /api/review-requests", () => {
     const body = await res.json();
     expect(body).toHaveLength(1);
     expect(body[0].author).toBe("alice");
-    expect(queryMock.mock.calls[0][1].q).toBe(
+    expect(queryMock.mock.calls[0][2].q).toBe(
       "is:open is:pr review-requested:@me org:acme",
     );
   });
@@ -86,7 +86,7 @@ describe("GET /api/review-requests", () => {
     queryMock.mockResolvedValue(REVIEW_RAW);
     const res = await GET(req("http://x/api/review-requests"));
     expect(res.status).toBe(200);
-    expect(queryMock.mock.calls[0][1].q).toBe(
+    expect(queryMock.mock.calls[0][2].q).toBe(
       "is:open is:pr review-requested:@me",
     );
   });

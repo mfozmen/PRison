@@ -20,13 +20,13 @@ export const STUCK_PRS_QUERY = `
   query($q: String!) {
     search(query: $q, type: ISSUE, first: 50) {
       nodes { ... on PullRequest {
-        id title url number
+        id title url number isDraft
         repository { nameWithOwner }
         commits(last: 1) { nodes { commit {
           pushedDate committedDate
           statusCheckRollup { contexts(first: 100) { nodes {
-            ... on CheckRun { status conclusion }
-            ... on StatusContext { state }
+            ... on CheckRun { name status conclusion }
+            ... on StatusContext { context state }
           } } }
         } } }
       } }
@@ -37,7 +37,7 @@ export const REVIEW_REQUESTS_QUERY = `
   query($q: String!) {
     search(query: $q, type: ISSUE, first: 50) {
       nodes { ... on PullRequest {
-        id title url number updatedAt
+        id title url number isDraft updatedAt
         repository { nameWithOwner }
         author { login }
         timelineItems(itemTypes: [REVIEW_REQUESTED_EVENT], first: 100) {
@@ -67,15 +67,27 @@ export function parseStuckPrs(raw: any): StuckPr[] {
       const ctxs = commit.statusCheckRollup?.contexts?.nodes ?? [];
       let failingChecks = 0;
       let pendingChecks = 0;
+      const failing: string[] = [];
+      const pending: string[] = [];
       for (const c of ctxs) {
         const k = classify(c);
-        if (k === "failing") failingChecks++;
-        else if (k === "pending") pendingChecks++;
+        // Detect CheckRun vs StatusContext: CheckRun has a `name` property (even if undefined);
+        // use ctx.name !== undefined to distinguish. Otherwise treat as StatusContext (ctx.context).
+        const checkName: string | undefined =
+          c.name !== undefined ? (c.name || undefined) : (c.context || undefined);
+        if (k === "failing") {
+          failingChecks++;
+          if (checkName) failing.push(checkName);
+        } else if (k === "pending") {
+          pendingChecks++;
+          if (checkName) pending.push(checkName);
+        }
       }
       return {
         id: n.id, title: n.title, url: n.url, number: n.number,
         repo: n.repository?.nameWithOwner ?? "",
-        failingChecks, pendingChecks,
+        failingChecks, pendingChecks, failing, pending,
+        isDraft: n.isDraft ?? false,
         stuckSince: commit.pushedDate ?? commit.committedDate ?? "",
       } as StuckPr;
     })
@@ -94,6 +106,7 @@ export function parseReviewRequests(raw: any, viewerLogin: string): ReviewReques
         repo: n.repository?.nameWithOwner ?? "",
         author: n.author?.login ?? "unknown",
         requestedAt: mine?.createdAt ?? n.updatedAt ?? "",
+        isDraft: n.isDraft ?? false,
       } as ReviewRequest;
     });
 }

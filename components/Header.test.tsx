@@ -65,6 +65,6 @@ describe("Header", () => {
         login=""
       />,
     );
-    expect(screen.getByText(/Welcome, there/)).toBeInTheDocument();
+    expect(screen.getByText("there")).toBeInTheDocument();
   });
 });

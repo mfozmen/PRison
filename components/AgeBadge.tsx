@@ -1,9 +1,9 @@
 import { ageBucket } from "@/lib/prioritize";
 
 const COLORS = {
-  fresh: "bg-green-100 text-green-800",
-  warning: "bg-yellow-100 text-yellow-800",
-  urgent: "bg-red-100 text-red-800",
+  fresh: "bg-green-500/15 text-green-400 ring-green-500/30",
+  warning: "bg-amber-500/15 text-amber-400 ring-amber-500/30",
+  urgent: "bg-red-500/15 text-red-400 ring-red-500/30",
 } as const;
 
 function label(since: string, now: Date): string {
@@ -14,7 +14,10 @@ function label(since: string, now: Date): string {
 export function AgeBadge({ since, now }: { since: string; now: Date }) {
   const bucket = ageBucket(since, now);
   return (
-    <span data-bucket={bucket} className={`rounded px-2 py-0.5 text-xs ${COLORS[bucket]}`}>
+    <span
+      data-bucket={bucket}
+      className={`shrink-0 rounded px-2 py-0.5 font-mono text-xs tabular-nums ring-1 ring-inset ${COLORS[bucket]}`}
+    >
       {label(since, now)}
     </span>
   );

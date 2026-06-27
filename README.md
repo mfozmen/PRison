@@ -44,6 +44,19 @@ npm run dev                       # http://localhost:3000
 Open the app and paste your token. It's stored in an encrypted, httpOnly cookie
 and never reaches the browser.
 
+## Run with Docker
+
+```sh
+docker build -t prison .
+docker run -p 3000:3000 -e AUTH_SECRET="$(openssl rand -base64 32)" prison
+```
+
+Or with Compose (set `AUTH_SECRET` in your shell or a `.env` file first):
+
+```sh
+AUTH_SECRET="$(openssl rand -base64 32)" docker compose up --build
+```
+
 ## Deploying to Vercel
 
 Import the repo on the free [Vercel](https://vercel.com) tier, set `AUTH_SECRET`

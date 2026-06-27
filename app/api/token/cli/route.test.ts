@@ -49,6 +49,7 @@ describe("POST /api/token/cli", () => {
     queryMock.mockResolvedValue({ viewer: {} });
     const res = await POST();
     expect(res.status).toBe(401);
+    expect(setSessionMock).not.toHaveBeenCalled();
   });
 
   it("returns 401 when the GitHub call throws", async () => {

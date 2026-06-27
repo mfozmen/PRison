@@ -32,6 +32,9 @@ npm run dev                       # http://localhost:3000
 
 Open the app and click **Sign in with GitHub CLI** (recommended if `gh` is installed and signed in). The server reads your CLI token — nothing is stored in the browser.
 
+> [!WARNING]
+> `POST /api/token/cli` runs `gh auth token` on the server and mints a session from the host machine's GitHub credentials. PRison is designed to run on **your own machine** — do NOT expose a `gh`-authenticated instance on a reachable network without adding your own access control.
+
 If `gh` is not available (e.g. a Vercel deployment or a machine without the CLI), paste a Personal Access Token instead:
 
 1. Go to [github.com/settings/tokens](https://github.com/settings/tokens/new?scopes=read:org,repo&description=PRison) → **Generate new token (classic)**.

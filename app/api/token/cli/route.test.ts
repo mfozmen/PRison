@@ -26,10 +26,20 @@ beforeEach(() => {
   process.env.AUTH_SECRET = "test-secret-aaaaaaaaaaaaaaaaaaaaaa";
 });
 
+const local = () => new Request("http://localhost:3000/api/token/cli", { method: "POST" });
+
 describe("POST /api/token/cli", () => {
+  it("returns 403 from a non-loopback host", async () => {
+    const res = await POST(
+      new Request("http://prison.example.com/api/token/cli", { method: "POST" }),
+    );
+    expect(res.status).toBe(403);
+    expect(execFileMock).not.toHaveBeenCalled();
+  });
+
   it("returns 503 when gh CLI is not available", async () => {
     execFileMock.mockRejectedValue(new Error("spawn gh ENOENT"));
-    const res = await POST();
+    const res = await POST(local());
     expect(res.status).toBe(503);
     const body = await res.text();
     expect(body).toContain("not available or not signed in");
@@ -37,7 +47,7 @@ describe("POST /api/token/cli", () => {
 
   it("returns 503 when gh CLI exits cleanly but yields an empty token", async () => {
     execFileMock.mockResolvedValue({ stdout: "  \n" });
-    const res = await POST();
+    const res = await POST(local());
     expect(res.status).toBe(503);
     const body = await res.text();
     expect(body).toContain("not available or not signed in");
@@ -47,7 +57,7 @@ describe("POST /api/token/cli", () => {
   it("returns 401 when viewer has no login", async () => {
     execFileMock.mockResolvedValue({ stdout: "ghp_fake\n" });
     queryMock.mockResolvedValue({ viewer: {} });
-    const res = await POST();
+    const res = await POST(local());
     expect(res.status).toBe(401);
     expect(setSessionMock).not.toHaveBeenCalled();
   });
@@ -55,7 +65,7 @@ describe("POST /api/token/cli", () => {
   it("returns 401 when the GitHub call throws", async () => {
     execFileMock.mockResolvedValue({ stdout: "ghp_fake\n" });
     queryMock.mockRejectedValue(new Error("bad credentials"));
-    const res = await POST();
+    const res = await POST(local());
     expect(res.status).toBe(401);
     const body = await res.text();
     expect(body).toContain("Invalid token");
@@ -66,7 +76,7 @@ describe("POST /api/token/cli", () => {
     execFileMock.mockResolvedValue({ stdout: "ghp_real\n" });
     queryMock.mockResolvedValue({ viewer: { login: "alice" } });
     setSessionMock.mockResolvedValue(undefined);
-    const res = await POST();
+    const res = await POST(local());
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ login: "alice" });
     expect(setSessionMock).toHaveBeenCalledOnce();

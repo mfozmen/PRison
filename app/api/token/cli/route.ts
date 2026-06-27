@@ -6,7 +6,18 @@ import { setSession } from "@/lib/session";
 
 const execFile = promisify(execFileCb);
 
-export async function POST() {
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+export async function POST(request: Request) {
+  // This mints a session from the host's `gh` credentials, so restrict it to a
+  // loopback origin — the intended local, single-user use. A networked instance
+  // (a different host) must use a pasted token instead.
+  if (!LOCAL_HOSTS.has(new URL(request.url).hostname)) {
+    return new Response("GitHub CLI sign-in is only available locally", {
+      status: 403,
+    });
+  }
+
   let token: string;
   try {
     const { stdout } = await execFile("gh", ["auth", "token"], {

@@ -1029,3 +1029,39 @@ git push -u origin task-8-ci-docs && gh pr create --fill
 **Placeholder scan:** Task 3 Step 1 (fixtures) and the repeated component cycle in Task 6 Step 6 reference structures shown in adjacent code blocks rather than re-printing them — acceptable since the exact shapes appear in the same task's tests. No `TODO`/`TBD` left in code steps.
 
 **Type consistency:** `StuckPr`/`ReviewRequest`/`Org` (Task 2) used identically in Tasks 3, 5, 6, 7. `ageBucket`/`sortByAgeAsc` signatures consistent across Tasks 2, 6, 7. `session.accessToken`/`session.login` defined in Task 4, consumed in Task 5. `searchQuery("author"|"review", org)` consistent in Tasks 3 and 5.
+
+---
+
+## Post-MVP follow-ups
+
+The MVP (Tasks 1–8) is complete and merged. These items were surfaced by
+per-task reviews, the AI code review, and the ui-ux-pro-max UI audit
+(`docs/UI-AUDIT.md`). None block the MVP; each can be its own PR.
+
+### Product / correctness
+- **`repo` OAuth scope is broad.** OAuth classic has no read-only scope for
+  private-repo PRs, so `repo` is required for private repos. Offer a
+  `public_repo`-only mode for users who only need public PRs.
+- **"Stuck" check states.** `classify()` counts FAILURE/ERROR/TIMED_OUT/CANCELLED
+  as failing. Consider treating `ACTION_REQUIRED` (and STARTUP_FAILURE/STALE) as
+  stuck too — `ACTION_REQUIRED` genuinely needs the author's attention.
+- **Pagination.** GraphQL queries cap at `first: 50` (search) / `first: 100`
+  (contexts) with no cursor — large orgs silently truncate. Add cursor paging or
+  surface a "showing first N" notice.
+- **`ageBucket` on malformed ISO** returns "urgent" (NaN falls through). Add a
+  guard if inputs ever come from outside the GitHub API.
+
+### Robustness / observability
+- **API route error logging.** The routes map GitHub errors to 502 but the catch
+  blocks log nothing server-side; add structured logging for diagnosis.
+- **Org-fetch failure** in `app/page.tsx` surfaces a banner but isn't logged.
+- **React `act()` warning** in `Dashboard.test.tsx` (async transition state
+  updates) — harmless but should be silenced for pristine test output.
+
+### UI / UX (from `docs/UI-AUDIT.md`)
+- **Light-mode variant** — design system supports light + dark; only dark ships.
+- **SVG icons** — replace the empty-state emoji and add icons (Lucide/Phosphor)
+  to "Open PR" / suggestion links.
+- **Skeleton loading** for fetches > ~1s (currently a pulse dot).
+- **OrgSwitcher visible label** when placed in a form context.
+- **Responsive pass** at 375 / 768 / 1024 / 1440.

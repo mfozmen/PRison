@@ -44,5 +44,13 @@ next-env.d.ts
 # superpowers scratch directory (not to be committed)
 .superpowers/
 
-# ui-ux-pro-max-cli bulk install (skill templates, not project code)
-.claude/
+# Local .claude state is ignored, except the ui-ux-pro-max design skill,
+# which is checked in so the design system is reproducible in the repo.
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/ui-ux-pro-max/
+
+# Python bytecode (vendored design skill)
+__pycache__/
+*.pyc

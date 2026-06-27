@@ -13,14 +13,24 @@ export interface HeaderProps {
 
 export function Header({ orgs, selectedOrg, onOrgChange, login }: HeaderProps) {
   return (
-    <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3 shadow-sm">
-      <span className="text-xl font-bold text-indigo-600">PRison</span>
+    <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-slate-900/80 px-6 py-3 backdrop-blur">
+      <div className="flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className="flex h-6 w-6 items-center justify-center rounded bg-green-500 font-mono text-sm font-bold text-slate-950"
+        >
+          P
+        </span>
+        <span className="text-lg font-bold tracking-tight text-slate-100">PRison</span>
+      </div>
       <div className="flex items-center gap-4">
         <OrgSwitcher orgs={orgs} value={selectedOrg} onChange={onOrgChange} />
-        <span className="text-sm text-slate-600">Welcome, {login || "there"}</span>
+        <span className="hidden text-sm text-slate-400 sm:inline">
+          {login || "there"}
+        </span>
         <button
           onClick={() => signOut()}
-          className="rounded bg-slate-100 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-200"
+          className="cursor-pointer rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-200 transition-colors hover:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
         >
           Sign Out
         </button>

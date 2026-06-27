@@ -9,7 +9,7 @@ vi.mock("@/lib/session", () => ({
   readToken: readTokenMock,
   readLogin: vi.fn(),
 }));
-vi.mock("@/lib/github/client", () => ({ ghClient: () => queryMock }));
+vi.mock("@/lib/github/client", () => ({ ghQuery: queryMock }));
 
 import { GET } from "./route";
 
@@ -69,7 +69,7 @@ describe("GET /api/stuck-prs", () => {
     const body = await res.json();
     expect(body).toHaveLength(1);
     expect(body[0].failingChecks).toBe(1);
-    expect(queryMock.mock.calls[0][1].q).toBe("is:open is:pr author:@me org:acme");
+    expect(queryMock.mock.calls[0][2].q).toBe("is:open is:pr author:@me org:acme");
   });
 
   it("spans everything (no org scope) when org is omitted", async () => {
@@ -77,7 +77,7 @@ describe("GET /api/stuck-prs", () => {
     queryMock.mockResolvedValue(STUCK_RAW);
     const res = await GET(req("http://x/api/stuck-prs"));
     expect(res.status).toBe(200);
-    expect(queryMock.mock.calls[0][1].q).toBe("is:open is:pr author:@me");
+    expect(queryMock.mock.calls[0][2].q).toBe("is:open is:pr author:@me");
   });
 
   it("returns 502 when GitHub API throws", async () => {

@@ -9,7 +9,7 @@ vi.mock("@/lib/session", () => ({
   readToken: readTokenMock,
   readLogin: vi.fn(),
 }));
-vi.mock("@/lib/github/client", () => ({ ghClient: () => queryMock }));
+vi.mock("@/lib/github/client", () => ({ ghQuery: queryMock }));
 
 import { GET } from "./route";
 

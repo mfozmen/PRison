@@ -203,3 +203,48 @@ describe("PrList groupBy", () => {
     expect(screen.queryAllByTestId("group-header")).toHaveLength(0);
   });
 });
+
+describe("PrList accentCount", () => {
+  it("count badge has amber style when accentCount is true and items are present", () => {
+    render(
+      <PrList
+        title="Blocking"
+        items={["a"]}
+        emptyMessage="None."
+        renderRow={(item) => <div>{item}</div>}
+        accentCount={true}
+      />,
+    );
+    const badge = screen.getByTestId("count-badge");
+    expect(badge).toHaveClass("bg-amber-500");
+  });
+
+  it("count badge has slate style when accentCount is false (default)", () => {
+    render(
+      <PrList
+        title="Blocking"
+        items={["a"]}
+        emptyMessage="None."
+        renderRow={(item) => <div>{item}</div>}
+      />,
+    );
+    const badge = screen.getByTestId("count-badge");
+    expect(badge).toHaveClass("bg-slate-800");
+    expect(badge).not.toHaveClass("bg-amber-500");
+  });
+
+  it("count badge has slate style when items is empty even with accentCount=true", () => {
+    render(
+      <PrList
+        title="Blocking"
+        items={[]}
+        emptyMessage="None."
+        renderRow={(item: string) => <div>{item}</div>}
+        accentCount={true}
+      />,
+    );
+    const badge = screen.getByTestId("count-badge");
+    expect(badge).toHaveClass("bg-slate-800");
+    expect(badge).not.toHaveClass("bg-amber-500");
+  });
+});

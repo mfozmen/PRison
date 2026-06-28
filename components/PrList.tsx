@@ -7,6 +7,7 @@ export interface PrListProps<T> {
   renderRow: (item: T) => React.ReactNode;
   keyExtractor?: (item: T, index: number) => string | number;
   groupBy?: (item: T) => string;
+  accentCount?: boolean;
 }
 
 export function PrList<T>({
@@ -16,6 +17,7 @@ export function PrList<T>({
   renderRow,
   keyExtractor = (_item, i) => i,
   groupBy,
+  accentCount = false,
 }: PrListProps<T>) {
   // Build ordered groups when groupBy is provided. Each entry retains the
   // item's original index so default keys stay unique across the full list.
@@ -41,7 +43,14 @@ export function PrList<T>({
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
           {title}
         </h2>
-        <span className="rounded-full bg-slate-800 px-2 py-0.5 font-mono text-xs tabular-nums text-slate-400 ring-1 ring-inset ring-slate-700">
+        <span
+          data-testid="count-badge"
+          className={
+            accentCount && items.length > 0
+              ? "rounded-full bg-amber-500 px-2 py-0.5 font-mono text-xs tabular-nums text-slate-950 ring-1 ring-inset ring-amber-600 font-semibold"
+              : "rounded-full bg-slate-800 px-2 py-0.5 font-mono text-xs tabular-nums text-slate-400 ring-1 ring-inset ring-slate-700"
+          }
+        >
           {items.length}
         </span>
       </div>

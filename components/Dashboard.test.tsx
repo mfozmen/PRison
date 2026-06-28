@@ -31,17 +31,33 @@ const REVIEW_PR = {
 
 const DRAFT_REVIEW_PR = { ...REVIEW_PR, id: "draft-review", title: "draft review pr", isDraft: true };
 
+const READY_PR = {
+  id: "r1",
+  title: "ready pr",
+  url: "u",
+  repo: "acme/d",
+  number: 5,
+  readySince: "2026-06-21T00:00:00Z",
+};
+
 const ORGS = [
   { login: "acme", avatarUrl: "a" },
   { login: "beta", avatarUrl: "b" },
 ];
 
 function okFetch() {
+  // THREE-WAY: ready → [READY_PR], stuck → [STUCK_PR], else (review) → [REVIEW_PR]
   return vi.fn((url: string) =>
     Promise.resolve({
       ok: true,
       json: () =>
-        Promise.resolve(url.includes("stuck") ? [STUCK_PR] : [REVIEW_PR]),
+        Promise.resolve(
+          url.includes("ready")
+            ? [READY_PR]
+            : url.includes("stuck")
+              ? [STUCK_PR]
+              : [REVIEW_PR],
+        ),
     }),
   ) as unknown as typeof fetch;
 }
@@ -91,7 +107,9 @@ describe("Dashboard", () => {
     global.fetch = vi.fn((url: string) =>
       url.includes("stuck")
         ? Promise.reject(new Error("network error"))
-        : Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) }),
+        : url.includes("ready")
+          ? Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+          : Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
     await waitFor(() =>
@@ -105,7 +123,9 @@ describe("Dashboard", () => {
     global.fetch = vi.fn((url: string) =>
       url.includes("stuck")
         ? Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve([]) })
-        : Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) }),
+        : url.includes("ready")
+          ? Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+          : Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
     await waitFor(() =>
@@ -115,9 +135,11 @@ describe("Dashboard", () => {
 
   it("shows an error banner when the review fetch fails", async () => {
     global.fetch = vi.fn((url: string) =>
-      url.includes("review")
-        ? Promise.reject(new Error("network error"))
-        : Promise.resolve({ ok: true, json: () => Promise.resolve([STUCK_PR]) }),
+      url.includes("ready")
+        ? Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+        : url.includes("review")
+          ? Promise.reject(new Error("network error"))
+          : Promise.resolve({ ok: true, json: () => Promise.resolve([STUCK_PR]) }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
     await waitFor(() =>
@@ -129,6 +151,9 @@ describe("Dashboard", () => {
   it("recovers when retry is clicked after an error", async () => {
     let fail = true;
     global.fetch = vi.fn((url: string) => {
+      if (url.includes("ready")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
       if (url.includes("stuck")) {
         return fail
           ? Promise.reject(new Error("network error"))
@@ -153,7 +178,9 @@ describe("Dashboard", () => {
         ? new Promise((res) => {
             resolveStuck = res;
           })
-        : Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) }),
+        : url.includes("ready")
+          ? Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+          : Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText(/loading/i)).toBeInTheDocument();
@@ -228,7 +255,9 @@ describe("Dashboard", () => {
       Promise.resolve({
         ok: true,
         json: () =>
-          Promise.resolve(url.includes("stuck") ? [PENDING_PR] : [REVIEW_PR]),
+          Promise.resolve(
+            url.includes("ready") ? [] : url.includes("stuck") ? [PENDING_PR] : [REVIEW_PR],
+          ),
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
@@ -248,7 +277,9 @@ describe("Dashboard", () => {
       Promise.resolve({
         ok: true,
         json: () =>
-          Promise.resolve(url.includes("stuck") ? [MANY_PR] : [REVIEW_PR]),
+          Promise.resolve(
+            url.includes("ready") ? [] : url.includes("stuck") ? [MANY_PR] : [REVIEW_PR],
+          ),
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
@@ -276,7 +307,9 @@ describe("Dashboard", () => {
       Promise.resolve({
         ok: true,
         json: () =>
-          Promise.resolve(url.includes("stuck") ? [FOUR_FAILING_PR] : [REVIEW_PR]),
+          Promise.resolve(
+            url.includes("ready") ? [] : url.includes("stuck") ? [FOUR_FAILING_PR] : [REVIEW_PR],
+          ),
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
@@ -301,7 +334,9 @@ describe("Dashboard", () => {
       Promise.resolve({
         ok: true,
         json: () =>
-          Promise.resolve(url.includes("stuck") ? [LOPSIDED_PR] : [REVIEW_PR]),
+          Promise.resolve(
+            url.includes("ready") ? [] : url.includes("stuck") ? [LOPSIDED_PR] : [REVIEW_PR],
+          ),
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
@@ -328,7 +363,9 @@ describe("Dashboard", () => {
       Promise.resolve({
         ok: true,
         json: () =>
-          Promise.resolve(url.includes("stuck") ? [NO_NAMES_PR] : [REVIEW_PR]),
+          Promise.resolve(
+            url.includes("ready") ? [] : url.includes("stuck") ? [NO_NAMES_PR] : [REVIEW_PR],
+          ),
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
@@ -343,9 +380,11 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("stuck")
-              ? [STUCK_PR, DRAFT_STUCK_PR]
-              : [REVIEW_PR, DRAFT_REVIEW_PR],
+            url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [STUCK_PR, DRAFT_STUCK_PR]
+                : [REVIEW_PR, DRAFT_REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
@@ -386,9 +425,11 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("stuck")
-              ? [STUCK_PR, DRAFT_STUCK_PR]
-              : [REVIEW_PR, DRAFT_REVIEW_PR],
+            url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [STUCK_PR, DRAFT_STUCK_PR]
+                : [REVIEW_PR, DRAFT_REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
@@ -476,7 +517,9 @@ describe("Dashboard", () => {
         Promise.resolve({
           ok: true,
           json: () =>
-            Promise.resolve(url.includes("stuck") ? [PR_X, PR_Y] : []),
+            Promise.resolve(
+              url.includes("ready") ? [] : url.includes("stuck") ? [PR_X, PR_Y] : [],
+            ),
         }),
       ) as unknown as typeof fetch;
       render(<Dashboard orgs={ORGS} login="testuser" />);
@@ -510,7 +553,9 @@ describe("Dashboard", () => {
         Promise.resolve({
           ok: true,
           json: () =>
-            Promise.resolve(url.includes("stuck") ? [NO_CHECKS_PR] : []),
+            Promise.resolve(
+              url.includes("ready") ? [] : url.includes("stuck") ? [NO_CHECKS_PR] : [],
+            ),
         }),
       ) as unknown as typeof fetch;
       render(<Dashboard orgs={ORGS} login="testuser" />);
@@ -529,6 +574,7 @@ describe("Dashboard", () => {
       fireEvent.click(screen.getByRole("button", { name: /^by check$/i }));
       // STUCK_PR has failing: ["build"] → "build" check → 1 group header
       // Review list is flat in check mode → 0 group headers from review
+      // Ready list is always flat → 0 group headers from ready
       await waitFor(() =>
         expect(screen.getAllByTestId("group-header")).toHaveLength(1),
       );
@@ -566,7 +612,9 @@ describe("Dashboard", () => {
         Promise.resolve({
           ok: true,
           json: () =>
-            Promise.resolve(url.includes("stuck") ? [STUCK_PR] : []),
+            Promise.resolve(
+              url.includes("ready") ? [] : url.includes("stuck") ? [STUCK_PR] : [],
+            ),
         }),
       ) as unknown as typeof fetch;
       render(<Dashboard orgs={ORGS} login="testuser" />);
@@ -593,7 +641,7 @@ describe("Dashboard", () => {
       ).toBeInTheDocument();
     });
 
-    it("re-fetches both lists when Refresh is clicked", async () => {
+    it("re-fetches all lists when Refresh is clicked", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       await waitFor(() =>
         expect(screen.getByText("stuck pr")).toBeInTheDocument(),
@@ -604,8 +652,8 @@ describe("Dashboard", () => {
       await waitFor(() => {
         const after = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
           .length;
-        // One refresh = one stuck-prs fetch + one review-requests fetch.
-        expect(after).toBe(before + 2);
+        // One refresh = one stuck-prs fetch + one review-requests fetch + one ready-to-merge fetch.
+        expect(after).toBe(before + 3);
       });
     });
 
@@ -616,6 +664,9 @@ describe("Dashboard", () => {
       let stuckPass = 0;
       let resolveStuck!: (v: unknown) => void;
       global.fetch = vi.fn((url: string) => {
+        if (url.includes("ready")) {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+        }
         if (!url.includes("stuck")) {
           return Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) });
         }
@@ -760,7 +811,11 @@ describe("Dashboard", () => {
           ok: true,
           json: () =>
             Promise.resolve(
-              url.includes("stuck") ? [STUCK_PR, STUCK_PR_B] : [REVIEW_PR],
+              url.includes("ready")
+                ? []
+                : url.includes("stuck")
+                  ? [STUCK_PR, STUCK_PR_B]
+                  : [REVIEW_PR],
             ),
         }),
       ) as unknown as typeof fetch;
@@ -777,9 +832,91 @@ describe("Dashboard", () => {
       fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
 
       // Now group headers appear: 2 distinct repos in stuck list + 1 in review list = 3 total
+      // Ready list is always flat → contributes 0 group headers
       await waitFor(() =>
         expect(screen.getAllByTestId("group-header")).toHaveLength(3),
       );
+    });
+  });
+
+  describe("ready-to-merge", () => {
+    it("renders the ready-to-merge list with its fetched items", async () => {
+      // beforeEach okFetch returns [READY_PR] for ready endpoints
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("ready pr")).toBeInTheDocument(),
+      );
+      expect(screen.getByText("Ready to merge")).toBeInTheDocument();
+    });
+
+    it("shows the empty message when nothing is ready", async () => {
+      global.fetch = vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve(
+              url.includes("ready")
+                ? []
+                : url.includes("stuck")
+                  ? [STUCK_PR]
+                  : [REVIEW_PR],
+            ),
+        }),
+      ) as unknown as typeof fetch;
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("Nothing ready to merge")).toBeInTheDocument(),
+      );
+    });
+
+    it("renders the ready list above the two columns", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("Ready to merge")).toBeInTheDocument(),
+      );
+      const html = document.body.innerHTML;
+      expect(html.indexOf("Ready to merge")).toBeLessThan(
+        html.indexOf("PRs waiting on your review"),
+      );
+    });
+
+    it("includes ready-to-merge in a Refresh", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("ready pr")).toBeInTheDocument(),
+      );
+      const before = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
+      fireEvent.click(screen.getByRole("button", { name: /^refresh$/i }));
+      await waitFor(() => {
+        const after = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
+        // One refresh = stuck + review + ready = 3 fetches.
+        expect(after).toBe(before + 3);
+      });
+    });
+
+    it("shows a 'Merge on GitHub' link on a ready row", async () => {
+      // okFetch returns [READY_PR]; suggestReady returns { text: "Merge on GitHub", href: pr.url }
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("Merge on GitHub")).toBeInTheDocument(),
+      );
+    });
+
+    it("shows an error banner and retry when the ready fetch fails", async () => {
+      global.fetch = vi.fn((url: string) =>
+        url.includes("ready")
+          ? Promise.reject(new Error("network error"))
+          : url.includes("stuck")
+            ? Promise.resolve({ ok: true, json: () => Promise.resolve([STUCK_PR]) })
+            : Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) }),
+      ) as unknown as typeof fetch;
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(
+          screen.getByText(/failed to load ready-to-merge/i),
+        ).toBeInTheDocument(),
+      );
+      expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
     });
   });
 });

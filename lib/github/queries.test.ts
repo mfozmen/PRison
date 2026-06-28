@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs } from "./queries";
+import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs, parseReadyPrs } from "./queries";
 
 describe("searchQuery", () => {
   it("scopes author search to the org", () => {
@@ -11,6 +11,12 @@ describe("searchQuery", () => {
   it("omits the org scope when no org is given (spans everything)", () => {
     expect(searchQuery("author")).toBe("is:open is:pr author:@me");
     expect(searchQuery("review", "")).toBe("is:open is:pr review-requested:@me");
+  });
+  it("ready kind emits author:@me review:approved", () => {
+    expect(searchQuery("ready")).toBe("is:open is:pr author:@me review:approved");
+  });
+  it("ready kind with org appends org scope", () => {
+    expect(searchQuery("ready", "acme")).toBe("is:open is:pr author:@me review:approved org:acme");
   });
 });
 
@@ -458,6 +464,114 @@ describe("parseReviewRequests", () => {
     expect(draft.isDraft).toBe(true);
     expect(nonDraft.isDraft).toBe(false);
     expect(absentDraft.isDraft).toBe(false);
+  });
+});
+
+describe("parseReadyPrs", () => {
+  function makePr(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "pr1",
+      title: "My PR",
+      url: "https://github.com/acme/repo/pull/1",
+      number: 1,
+      isDraft: false,
+      updatedAt: "2026-06-20T00:00:00Z",
+      reviewDecision: "APPROVED",
+      repository: { nameWithOwner: "acme/repo" },
+      commits: { nodes: [{ commit: {
+        statusCheckRollup: { state: "SUCCESS" },
+        pushedDate: "2026-06-25T00:00:00Z",
+        committedDate: "2026-06-24T00:00:00Z",
+      } }] },
+      ...overrides,
+    };
+  }
+
+  it("keeps APPROVED + SUCCESS", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr()] } });
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: "pr1", title: "My PR", number: 1, repo: "acme/repo",
+      readySince: "2026-06-25T00:00:00Z",
+    });
+  });
+
+  it("keeps APPROVED + no checks (null rollup)", () => {
+    const pr = makePr({ commits: { nodes: [{ commit: {
+      statusCheckRollup: null,
+      pushedDate: "2026-06-25T00:00:00Z",
+      committedDate: "2026-06-24T00:00:00Z",
+    } }] } });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result).toHaveLength(1);
+  });
+
+  it("drops not-approved", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr({ reviewDecision: "REVIEW_REQUIRED" })] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("drops CHANGES_REQUESTED", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr({ reviewDecision: "CHANGES_REQUESTED" })] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("drops failing checks", () => {
+    const pr = makePr({ commits: { nodes: [{ commit: {
+      statusCheckRollup: { state: "FAILURE" },
+      pushedDate: "2026-06-25T00:00:00Z",
+      committedDate: "2026-06-24T00:00:00Z",
+    } }] } });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("drops pending checks", () => {
+    const pr = makePr({ commits: { nodes: [{ commit: {
+      statusCheckRollup: { state: "PENDING" },
+      pushedDate: "2026-06-25T00:00:00Z",
+      committedDate: "2026-06-24T00:00:00Z",
+    } }] } });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("drops draft PRs", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr({ isDraft: true })] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("readySince falls back to committedDate when pushedDate absent", () => {
+    const pr = makePr({ commits: { nodes: [{ commit: {
+      statusCheckRollup: { state: "SUCCESS" },
+      pushedDate: null,
+      committedDate: "2026-06-24T00:00:00Z",
+    } }] } });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result[0].readySince).toBe("2026-06-24T00:00:00Z");
+  });
+
+  it("readySince falls back to updatedAt when both dates absent", () => {
+    const pr = makePr({ commits: { nodes: [{ commit: {
+      statusCheckRollup: { state: "SUCCESS" },
+      pushedDate: null,
+      committedDate: null,
+    } }] } });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result[0].readySince).toBe("2026-06-20T00:00:00Z");
+  });
+
+  it("drops nodes missing an id", () => {
+    const noId = { ...makePr(), id: undefined };
+    const withId = makePr({ id: "pr2" });
+    const result = parseReadyPrs({ search: { nodes: [noId, withId] } });
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("pr2");
+  });
+
+  it("returns [] on null/missing input", () => {
+    expect(parseReadyPrs(null)).toEqual([]);
+    expect(parseReadyPrs({})).toEqual([]);
   });
 });
 

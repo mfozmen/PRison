@@ -554,6 +554,64 @@ describe("Dashboard", () => {
     });
   });
 
+  describe("refresh button", () => {
+    it("renders a Refresh button", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      expect(
+        screen.getByRole("button", { name: /^refresh$/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("re-fetches both lists when Refresh is clicked", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      const before = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
+        .length;
+      fireEvent.click(screen.getByRole("button", { name: /^refresh$/i }));
+      await waitFor(() => {
+        const after = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
+          .length;
+        // One refresh = one stuck-prs fetch + one review-requests fetch.
+        expect(after).toBe(before + 2);
+      });
+    });
+
+    it("disables the Refresh button while a click-triggered fetch is in flight, then re-enables it", async () => {
+      // First stuck fetch (mount load) resolves immediately so the button
+      // settles to enabled; the second one (the Refresh click) hangs so we can
+      // observe the disabled state for the click path itself, not just mount.
+      let stuckPass = 0;
+      let resolveStuck!: (v: unknown) => void;
+      global.fetch = vi.fn((url: string) => {
+        if (!url.includes("stuck")) {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) });
+        }
+        stuckPass += 1;
+        if (stuckPass === 1) {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve([STUCK_PR]) });
+        }
+        return new Promise((res) => {
+          resolveStuck = res;
+        });
+      }) as unknown as typeof fetch;
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      // Mount load settles: button is enabled.
+      const refresh = await screen.findByRole("button", { name: /^refresh$/i });
+      await waitFor(() => expect(refresh).toBeEnabled());
+      // Clicking Refresh starts a fetch that stays in flight: button disables.
+      fireEvent.click(refresh);
+      await waitFor(() => expect(refresh).toBeDisabled());
+      // Resolving the click-triggered fetch re-enables the button.
+      resolveStuck({ ok: true, json: () => Promise.resolve([STUCK_PR]) });
+      await waitFor(() => expect(refresh).toBeEnabled());
+    });
+  });
+
   describe("groupBy toggle", () => {
     it("renders both Flat and By repo buttons", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);

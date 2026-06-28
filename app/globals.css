@@ -19,11 +19,11 @@
  * why the raw values live under distinct names. */
 :root {
   color-scheme: light;
-  --bg: #F8FAFC;
-  --surface: #FFFFFF;
+  --bg: #EEF2F7;
+  --surface: #FAFBFE;
   --fg: #0F172A;
   --muted: #475569;
-  --brd: #E2E8F0;
+  --brd: #DCE3EC;
   --accent: #16A34A;
   --danger: #DC2626;
   --warning: #B45309;

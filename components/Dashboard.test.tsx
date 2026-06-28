@@ -401,6 +401,159 @@ describe("Dashboard", () => {
     expect(screen.queryByText("draft review pr")).not.toBeInTheDocument();
   });
 
+  describe("prioritize-blocking", () => {
+    it("review list renders before the stuck list in the DOM", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      const html = document.body.innerHTML;
+      expect(html.indexOf("PRs waiting on your review")).toBeLessThan(
+        html.indexOf("PRs stuck on checks"),
+      );
+    });
+
+    it("review row shows 'Blocking @author' with amber styling", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("review pr")).toBeInTheDocument(),
+      );
+      expect(screen.getByText(/Blocking @alice/)).toBeInTheDocument();
+      expect(screen.queryByText(/Requested by/)).not.toBeInTheDocument();
+    });
+
+    it("By blocker button is present in the toggle", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      expect(
+        screen.getByRole("button", { name: /^by blocker$/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("By blocker button toggles groupBy to blocker", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByRole("button", { name: /^by blocker$/i }));
+      expect(
+        screen.getByRole("button", { name: /^by blocker$/i }),
+      ).toHaveAttribute("aria-pressed", "true");
+      await waitFor(() =>
+        expect(localStorage.getItem("prison.groupBy")).toBe("blocker"),
+      );
+    });
+
+    it("hydrates 'blocker' from localStorage", async () => {
+      localStorage.setItem("prison.groupBy", "blocker");
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      expect(
+        screen.getByRole("button", { name: /^by blocker$/i }),
+      ).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("By-blocker groups stuck PRs as Failing/Pending/No checks in that order", async () => {
+      const PENDING_PR = {
+        ...STUCK_PR,
+        id: "pending",
+        title: "pending pr",
+        failing: [],
+        pending: ["ci"],
+      };
+      const FAILING_PR = {
+        ...STUCK_PR,
+        id: "failing",
+        title: "failing pr",
+        failing: ["build"],
+        pending: [],
+      };
+      const NO_CHECKS_PR = {
+        ...STUCK_PR,
+        id: "nochecks",
+        title: "no checks pr",
+        failing: [],
+        pending: [],
+      };
+      global.fetch = vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve(
+              url.includes("stuck")
+                ? [PENDING_PR, FAILING_PR, NO_CHECKS_PR]
+                : [],
+            ),
+        }),
+      ) as unknown as typeof fetch;
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      fireEvent.click(screen.getByRole("button", { name: /^by blocker$/i }));
+      await waitFor(() =>
+        expect(screen.getAllByTestId("group-header")).toHaveLength(3),
+      );
+      const headers = screen.getAllByTestId("group-header");
+      const texts = headers.map((h) => h.textContent ?? "");
+      const failingIdx = texts.findIndex((t) => t.includes("Failing checks"));
+      const pendingIdx = texts.findIndex((t) => t.includes("Pending checks"));
+      expect(failingIdx).toBeLessThan(pendingIdx);
+      const html = document.body.innerHTML;
+      expect(html.indexOf("Failing checks")).toBeLessThan(
+        html.indexOf("Pending checks"),
+      );
+    });
+
+    it("review list stays flat in By-blocker mode (no group headers in review section)", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("review pr")).toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByRole("button", { name: /^by blocker$/i }));
+      // STUCK_PR has failing: ["build"] → "Failing checks" → 1 group header
+      // Review list is flat → 0 group headers from review
+      await waitFor(() =>
+        expect(screen.getAllByTestId("group-header")).toHaveLength(1),
+      );
+      expect(screen.getByText("review pr")).toBeInTheDocument();
+    });
+
+    it("By-repo subheaders are links to the repo on GitHub", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
+      await waitFor(() =>
+        expect(screen.getAllByTestId("group-header")).toHaveLength(2),
+      );
+      const link = screen.getByRole("link", { name: /open acme\/b on github/i });
+      expect(link).toHaveAttribute("href", "https://github.com/acme/b");
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    });
+
+    it("By-blocker subheaders are NOT links (stay plain text)", async () => {
+      global.fetch = vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve(url.includes("stuck") ? [STUCK_PR] : []),
+        }),
+      ) as unknown as typeof fetch;
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      fireEvent.click(screen.getByRole("button", { name: /^by blocker$/i }));
+      await waitFor(() =>
+        expect(screen.getByText(/Failing checks/i)).toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByRole("link", { name: /failing checks/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe("groupBy toggle", () => {
     it("renders both Flat and By repo buttons", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);

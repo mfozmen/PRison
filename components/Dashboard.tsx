@@ -18,11 +18,19 @@ export interface DashboardProps {
 // narrows the view.
 const ALL = "";
 
+const BLOCKER_ORDER = ["Failing checks", "Pending checks", "No checks"] as const;
+
+function blockerCategory(pr: StuckPr): string {
+  if (pr.failing.length > 0) return "Failing checks";
+  if (pr.pending.length > 0) return "Pending checks";
+  return "No checks";
+}
+
 export function Dashboard({ orgs, login }: DashboardProps) {
   const [selectedOrg, setSelectedOrg] = useState<string>(ALL);
   const [hydrated, setHydrated] = useState(false);
   const [hideDrafts, setHideDrafts] = useState(false);
-  const [groupBy, setGroupBy] = useState<"flat" | "repo">("flat");
+  const [groupBy, setGroupBy] = useState<"flat" | "repo" | "blocker">("flat");
 
   const [stuckPrs, setStuckPrs] = useState<StuckPr[]>([]);
   const [reviewReqs, setReviewReqs] = useState<ReviewRequest[]>([]);
@@ -84,8 +92,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       if (storedHideDrafts === "true") {
         setHideDrafts(true);
       }
-      if (storedGroupBy === "repo") {
-        setGroupBy("repo");
+      if (storedGroupBy === "repo" || storedGroupBy === "blocker") {
+        setGroupBy(storedGroupBy);
       }
       setHydrated(true);
     });
@@ -112,6 +120,19 @@ export function Dashboard({ orgs, login }: DashboardProps) {
 
   const visibleStuck = hideDrafts ? sortedStuck.filter((pr) => !pr.isDraft) : sortedStuck;
   const visibleReviews = hideDrafts ? sortedReviews.filter((req) => !req.isDraft) : sortedReviews;
+
+  const sortedForBlocker =
+    groupBy === "blocker"
+      ? [...visibleStuck].sort(
+          (a, b) =>
+            BLOCKER_ORDER.indexOf(
+              blockerCategory(a) as (typeof BLOCKER_ORDER)[number],
+            ) -
+            BLOCKER_ORDER.indexOf(
+              blockerCategory(b) as (typeof BLOCKER_ORDER)[number],
+            ),
+        )
+      : visibleStuck;
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-900">
@@ -155,7 +176,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               type="button"
               aria-pressed={groupBy === "repo"}
               onClick={() => setGroupBy("repo")}
-              className={`min-h-[44px] rounded-r-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:outline-none ${
+              className={`min-h-[44px] px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:outline-none ${
                 groupBy === "repo"
                   ? "bg-green-600 text-white"
                   : "bg-slate-700 text-slate-300"
@@ -163,9 +184,91 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             >
               By repo
             </button>
+            <button
+              type="button"
+              aria-pressed={groupBy === "blocker"}
+              onClick={() => setGroupBy("blocker")}
+              className={`min-h-[44px] rounded-r-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:outline-none ${
+                groupBy === "blocker"
+                  ? "bg-green-600 text-white"
+                  : "bg-slate-700 text-slate-300"
+              }`}
+            >
+              By blocker
+            </button>
           </div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Review list is LEFT/TOP column */}
+          <div className="flex flex-col gap-4">
+            {reviewError && (
+              <div className="flex items-center justify-between rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                <span>{reviewError}</span>
+                <button
+                  onClick={() => fetchData(selectedOrg)}
+                  className="ml-4 cursor-pointer rounded bg-red-500/20 px-3 py-1 text-xs font-medium text-red-200 transition-colors hover:bg-red-500/30"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            <PrList
+              title="PRs waiting on your review"
+              items={visibleReviews}
+              emptyMessage="No PRs waiting on your review 🎉"
+              keyExtractor={(req) => req.id}
+              groupBy={groupBy === "repo" ? (req) => req.repo : undefined}
+              groupHref={
+                groupBy === "repo"
+                  ? (repo) => `https://github.com/${repo}`
+                  : undefined
+              }
+              accentCount={visibleReviews.length > 0}
+              renderRow={(req) => (
+                <PrRow
+                  title={req.title}
+                  repo={req.repo}
+                  number={req.number}
+                  url={req.url}
+                  since={req.requestedAt}
+                  now={new Date()}
+                  draft={req.isDraft}
+                  accent="blocking"
+                  detail={
+                    <span className="flex items-center gap-1 text-amber-400">
+                      <svg
+                        aria-hidden="true"
+                        className="shrink-0"
+                        width="12"
+                        height="12"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle cx="5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.5" />
+                        <path
+                          d="M1 10c0-2.21 1.79-4 4-4s4 1.79 4 4"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                        />
+                        <path
+                          d="M9 6l2 2-2 2"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      <span>Blocking @{req.author}</span>
+                    </span>
+                  }
+                  suggestion={suggestReview(req)}
+                />
+              )}
+            />
+          </div>
+          {/* Stuck list is RIGHT/BOTTOM column */}
           <div className="flex flex-col gap-4">
             {stuckError && (
               <div className="flex items-center justify-between rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
@@ -180,10 +283,21 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             )}
             <PrList
               title="PRs stuck on checks"
-              items={visibleStuck}
+              items={sortedForBlocker}
               emptyMessage="No PRs stuck on checks 🎉"
               keyExtractor={(pr) => pr.id}
-              groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
+              groupBy={
+                groupBy === "blocker"
+                  ? blockerCategory
+                  : groupBy === "repo"
+                    ? (pr) => pr.repo
+                    : undefined
+              }
+              groupHref={
+                groupBy === "repo"
+                  ? (repo) => `https://github.com/${repo}`
+                  : undefined
+              }
               renderRow={(pr) => {
                 const hasNames = pr.failing.length > 0 || pr.pending.length > 0;
                 const totalNames = pr.failing.length + pr.pending.length;
@@ -234,39 +348,6 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   />
                 );
               }}
-            />
-          </div>
-          <div className="flex flex-col gap-4">
-            {reviewError && (
-              <div className="flex items-center justify-between rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                <span>{reviewError}</span>
-                <button
-                  onClick={() => fetchData(selectedOrg)}
-                  className="ml-4 cursor-pointer rounded bg-red-500/20 px-3 py-1 text-xs font-medium text-red-200 transition-colors hover:bg-red-500/30"
-                >
-                  Retry
-                </button>
-              </div>
-            )}
-            <PrList
-              title="PRs waiting on your review"
-              items={visibleReviews}
-              emptyMessage="No PRs waiting on your review 🎉"
-              keyExtractor={(req) => req.id}
-              groupBy={groupBy === "repo" ? (req) => req.repo : undefined}
-              renderRow={(req) => (
-                <PrRow
-                  title={req.title}
-                  repo={req.repo}
-                  number={req.number}
-                  url={req.url}
-                  since={req.requestedAt}
-                  now={new Date()}
-                  draft={req.isDraft}
-                  detail={`Requested by ${req.author}`}
-                  suggestion={suggestReview(req)}
-                />
-              )}
             />
           </div>
         </div>

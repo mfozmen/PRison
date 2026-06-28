@@ -30,10 +30,14 @@ cp .env.example .env.local        # set AUTH_SECRET: openssl rand -base64 32
 npm run dev                       # http://localhost:3000
 ```
 
+`AUTH_SECRET` is the secret key used to encrypt the session cookie that stores your GitHub token.
+
 Open the app and click **Sign in with GitHub CLI** (recommended if `gh` is installed and signed in). The server reads your CLI token — nothing is stored in the browser.
 
 > [!WARNING]
 > `POST /api/token/cli` runs `gh auth token` on the server and mints a session from the host machine's GitHub credentials. PRison is designed to run on **your own machine** — do NOT expose a `gh`-authenticated instance on a reachable network without adding your own access control.
+
+If the GitHub CLI is not installed or not signed in, the app will show a specific message and automatically fall back to the manual token paste form.
 
 If `gh` is not available (e.g. a Vercel deployment or a machine without the CLI), paste a Personal Access Token instead:
 

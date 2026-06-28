@@ -422,59 +422,86 @@ describe("Dashboard", () => {
       expect(screen.queryByText(/Requested by/)).not.toBeInTheDocument();
     });
 
-    it("By blocker button is present in the toggle", async () => {
+    it("By check button is present in the toggle", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       await waitFor(() =>
         expect(screen.getByText("stuck pr")).toBeInTheDocument(),
       );
       expect(
-        screen.getByRole("button", { name: /^by blocker$/i }),
+        screen.getByRole("button", { name: /^by check$/i }),
       ).toBeInTheDocument();
     });
 
-    it("By blocker button toggles groupBy to blocker", async () => {
+    it("By check button toggles groupBy to check and persists", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       await waitFor(() =>
         expect(screen.getByText("stuck pr")).toBeInTheDocument(),
       );
-      fireEvent.click(screen.getByRole("button", { name: /^by blocker$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^by check$/i }));
       expect(
-        screen.getByRole("button", { name: /^by blocker$/i }),
+        screen.getByRole("button", { name: /^by check$/i }),
       ).toHaveAttribute("aria-pressed", "true");
       await waitFor(() =>
-        expect(localStorage.getItem("prison.groupBy")).toBe("blocker"),
+        expect(localStorage.getItem("prison.groupBy")).toBe("check"),
       );
     });
 
-    it("hydrates 'blocker' from localStorage", async () => {
+    it("hydrates old 'blocker' value from localStorage as flat", async () => {
       localStorage.setItem("prison.groupBy", "blocker");
       render(<Dashboard orgs={ORGS} login="testuser" />);
       await waitFor(() =>
         expect(screen.getByText("stuck pr")).toBeInTheDocument(),
       );
       expect(
-        screen.getByRole("button", { name: /^by blocker$/i }),
-      ).toHaveAttribute("aria-pressed", "true");
+        screen.getByRole("button", { name: /^by check$/i }),
+      ).toHaveAttribute("aria-pressed", "false");
     });
 
-    it("By-blocker groups stuck PRs as Failing/Pending/No checks in that order", async () => {
-      const PENDING_PR = {
+    it("By check groups stuck PRs by check name — a PR appears under every blocking check", async () => {
+      const PR_X = {
         ...STUCK_PR,
-        id: "pending",
-        title: "pending pr",
-        failing: [],
-        pending: ["ci"],
+        id: "prx",
+        title: "PR-X",
+        failing: ["ci"],
+        pending: ["lint"],
       };
-      const FAILING_PR = {
+      const PR_Y = {
         ...STUCK_PR,
-        id: "failing",
-        title: "failing pr",
-        failing: ["build"],
+        id: "pry",
+        title: "PR-Y",
+        failing: ["ci"],
         pending: [],
       };
+      global.fetch = vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve(url.includes("stuck") ? [PR_X, PR_Y] : []),
+        }),
+      ) as unknown as typeof fetch;
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      fireEvent.click(screen.getByRole("button", { name: /^by check$/i }));
+      // ci has 2 PRs, lint has 1 → 2 group headers total
+      await waitFor(() =>
+        expect(screen.getAllByTestId("group-header")).toHaveLength(2),
+      );
+      const headers = screen.getAllByTestId("group-header");
+      // ci (2 PRs) comes first (count-desc ordering)
+      expect(headers[0].textContent).toContain("ci");
+      expect(headers[0].textContent).toContain("2");
+      // lint (1 PR) comes second
+      expect(headers[1].textContent).toContain("lint");
+      expect(headers[1].textContent).toContain("1");
+      // PR-X appears in both ci and lint groups → title in DOM twice
+      expect(screen.getAllByText("PR-X")).toHaveLength(2);
+      // PR-Y appears only in ci group → title in DOM once
+      expect(screen.getAllByText("PR-Y")).toHaveLength(1);
+    });
+
+    it("By check — PRs with no named checks go under Other", async () => {
       const NO_CHECKS_PR = {
         ...STUCK_PR,
-        id: "nochecks",
+        id: "nochex",
         title: "no checks pr",
         failing: [],
         pending: [],
@@ -483,41 +510,40 @@ describe("Dashboard", () => {
         Promise.resolve({
           ok: true,
           json: () =>
-            Promise.resolve(
-              url.includes("stuck")
-                ? [PENDING_PR, FAILING_PR, NO_CHECKS_PR]
-                : [],
-            ),
+            Promise.resolve(url.includes("stuck") ? [NO_CHECKS_PR] : []),
         }),
       ) as unknown as typeof fetch;
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      fireEvent.click(screen.getByRole("button", { name: /^by blocker$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^by check$/i }));
       await waitFor(() =>
-        expect(screen.getAllByTestId("group-header")).toHaveLength(3),
+        expect(screen.getByTestId("group-header")).toBeInTheDocument(),
       );
-      const headers = screen.getAllByTestId("group-header");
-      const texts = headers.map((h) => h.textContent ?? "");
-      const failingIdx = texts.findIndex((t) => t.includes("Failing checks"));
-      const pendingIdx = texts.findIndex((t) => t.includes("Pending checks"));
-      expect(failingIdx).toBeLessThan(pendingIdx);
-      const html = document.body.innerHTML;
-      expect(html.indexOf("Failing checks")).toBeLessThan(
-        html.indexOf("Pending checks"),
-      );
+      expect(screen.getByTestId("group-header").textContent).toContain("Other");
     });
 
-    it("review list stays flat in By-blocker mode (no group headers in review section)", async () => {
+    it("review list stays flat in By check mode (no group headers in review section)", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       await waitFor(() =>
         expect(screen.getByText("review pr")).toBeInTheDocument(),
       );
-      fireEvent.click(screen.getByRole("button", { name: /^by blocker$/i }));
-      // STUCK_PR has failing: ["build"] → "Failing checks" → 1 group header
-      // Review list is flat → 0 group headers from review
+      fireEvent.click(screen.getByRole("button", { name: /^by check$/i }));
+      // STUCK_PR has failing: ["build"] → "build" check → 1 group header
+      // Review list is flat in check mode → 0 group headers from review
       await waitFor(() =>
         expect(screen.getAllByTestId("group-header")).toHaveLength(1),
       );
       expect(screen.getByText("review pr")).toBeInTheDocument();
+    });
+
+    it("By check — persists 'check' to localStorage", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByRole("button", { name: /^by check$/i }));
+      await waitFor(() =>
+        expect(localStorage.getItem("prison.groupBy")).toBe("check"),
+      );
     });
 
     it("By-repo subheaders are links to the repo on GitHub", async () => {
@@ -535,7 +561,7 @@ describe("Dashboard", () => {
       expect(link).toHaveAttribute("rel", "noopener noreferrer");
     });
 
-    it("By-blocker subheaders are NOT links (stay plain text)", async () => {
+    it("By check subheaders are NOT links (stay plain text)", async () => {
       global.fetch = vi.fn((url: string) =>
         Promise.resolve({
           ok: true,
@@ -544,12 +570,14 @@ describe("Dashboard", () => {
         }),
       ) as unknown as typeof fetch;
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      fireEvent.click(screen.getByRole("button", { name: /^by blocker$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^by check$/i }));
+      // STUCK_PR has failing: ["build"] → a "build" group header appears
       await waitFor(() =>
-        expect(screen.getByText(/Failing checks/i)).toBeInTheDocument(),
+        expect(screen.getByTestId("group-header")).toBeInTheDocument(),
       );
+      // The group header for "build" should not be a link
       expect(
-        screen.queryByRole("link", { name: /failing checks/i }),
+        screen.queryByRole("link", { name: /build/i }),
       ).not.toBeInTheDocument();
     });
   });

@@ -646,9 +646,14 @@ describe("Dashboard", () => {
       await waitFor(() =>
         expect(screen.getByText("stuck pr")).toBeInTheDocument(),
       );
+      // Wait for the mount fetches to settle so the button is enabled —
+      // clicking while it is still disabled (mount load in flight) is a no-op
+      // and races under full-suite concurrency.
+      const refreshButton = screen.getByRole("button", { name: /^refresh$/i });
+      await waitFor(() => expect(refreshButton).toBeEnabled());
       const before = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
         .length;
-      fireEvent.click(screen.getByRole("button", { name: /^refresh$/i }));
+      fireEvent.click(refreshButton);
       await waitFor(() => {
         const after = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
           .length;

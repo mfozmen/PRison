@@ -26,7 +26,7 @@ describe("PrRow", () => {
     expect(screen.getByText("Fix the thing")).toBeInTheDocument();
   });
 
-  it("renders Open PR link with correct href", () => {
+  it("title is a link to the PR url with correct attributes", () => {
     render(
       <PrRow
         title="Fix the thing"
@@ -38,10 +38,56 @@ describe("PrRow", () => {
         suggestion={suggestion}
       />,
     );
-    const link = screen.getByRole("link", { name: /open pr/i });
+    const link = screen.getByRole("link", { name: /open fix the thing on github/i });
     expect(link).toHaveAttribute("href", "https://github.com/org/repo/pull/42");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("no standalone 'Open PR' button text in the rendered output", () => {
+    render(
+      <PrRow
+        title="Fix the thing"
+        repo="org/repo"
+        number={42}
+        url="https://github.com/org/repo/pull/42"
+        since="2026-06-25T00:00:00Z"
+        now={now}
+        suggestion={suggestion}
+      />,
+    );
+    expect(screen.queryByRole("link", { name: /^open pr$/i })).toBeNull();
+  });
+
+  it("renders amber left accent border when accent='blocking'", () => {
+    const { container } = render(
+      <PrRow
+        title="Fix the thing"
+        repo="org/repo"
+        number={42}
+        url="https://github.com/org/repo/pull/42"
+        since="2026-06-25T00:00:00Z"
+        now={now}
+        suggestion={suggestion}
+        accent="blocking"
+      />,
+    );
+    expect(container.firstChild).toHaveClass("border-l-amber-500");
+  });
+
+  it("no accent border class when accent is not provided", () => {
+    const { container } = render(
+      <PrRow
+        title="Fix the thing"
+        repo="org/repo"
+        number={42}
+        url="https://github.com/org/repo/pull/42"
+        since="2026-06-25T00:00:00Z"
+        now={now}
+        suggestion={suggestion}
+      />,
+    );
+    expect(container.firstChild).not.toHaveClass("border-l-amber-500");
   });
 
   it("renders suggestion text and href", () => {

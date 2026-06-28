@@ -34,41 +34,51 @@ describe("POST /api/token/cli", () => {
       new Request("http://prison.example.com/api/token/cli", { method: "POST" }),
     );
     expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ reason: "not-local" });
     expect(execFileMock).not.toHaveBeenCalled();
   });
 
-  it("returns 503 when gh CLI is not available", async () => {
-    execFileMock.mockRejectedValue(new Error("spawn gh ENOENT"));
+  it("returns 503 with not-installed when gh CLI is not available (ENOENT)", async () => {
+    execFileMock.mockRejectedValue(
+      Object.assign(new Error("spawn gh ENOENT"), { code: "ENOENT" }),
+    );
     const res = await POST(local());
     expect(res.status).toBe(503);
-    const body = await res.text();
-    expect(body).toContain("not available or not signed in");
+    expect(await res.json()).toEqual({ reason: "not-installed" });
   });
 
-  it("returns 503 when gh CLI exits cleanly but yields an empty token", async () => {
+  it("returns 503 with not-signed-in when gh exits with a non-ENOENT error", async () => {
+    execFileMock.mockRejectedValue(
+      Object.assign(new Error("exit 1"), { code: "1" }),
+    );
+    const res = await POST(local());
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ reason: "not-signed-in" });
+  });
+
+  it("returns 503 with not-signed-in when gh CLI exits cleanly but yields an empty token", async () => {
     execFileMock.mockResolvedValue({ stdout: "  \n" });
     const res = await POST(local());
     expect(res.status).toBe(503);
-    const body = await res.text();
-    expect(body).toContain("not available or not signed in");
+    expect(await res.json()).toEqual({ reason: "not-signed-in" });
     expect(queryMock).not.toHaveBeenCalled();
   });
 
-  it("returns 401 when viewer has no login", async () => {
+  it("returns 401 with token-rejected when viewer has no login", async () => {
     execFileMock.mockResolvedValue({ stdout: "ghp_fake\n" });
     queryMock.mockResolvedValue({ viewer: {} });
     const res = await POST(local());
     expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ reason: "token-rejected" });
     expect(setSessionMock).not.toHaveBeenCalled();
   });
 
-  it("returns 401 when the GitHub call throws", async () => {
+  it("returns 401 with token-rejected when the GitHub call throws", async () => {
     execFileMock.mockResolvedValue({ stdout: "ghp_fake\n" });
     queryMock.mockRejectedValue(new Error("bad credentials"));
     const res = await POST(local());
     expect(res.status).toBe(401);
-    const body = await res.text();
-    expect(body).toContain("Invalid token");
+    expect(await res.json()).toEqual({ reason: "token-rejected" });
     expect(setSessionMock).not.toHaveBeenCalled();
   });
 

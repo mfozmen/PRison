@@ -7,6 +7,7 @@ export interface PrListProps<T> {
   renderRow: (item: T) => React.ReactNode;
   keyExtractor?: (item: T, index: number) => string | number;
   groupBy?: (item: T) => string;
+  groupKeys?: (item: T) => string[];
   groupHref?: (key: string) => string | undefined;
   accentCount?: boolean;
 }
@@ -18,13 +19,35 @@ export function PrList<T>({
   renderRow,
   keyExtractor = (_item, i) => i,
   groupBy,
+  groupKeys,
   groupHref,
   accentCount = false,
 }: PrListProps<T>) {
-  // Build ordered groups when groupBy is provided. Each entry retains the
-  // item's original index so default keys stay unique across the full list.
+  // Build ordered groups when groupBy or groupKeys is provided. groupKeys takes
+  // precedence and supports one-to-many placement (an item may appear in
+  // multiple groups). Each entry retains the item's original index so default
+  // keys stay unique across the full list.
   const groups: Array<{ key: string; entries: Array<{ item: T; index: number }> }> =
     React.useMemo(() => {
+      if (groupKeys) {
+        const map = new Map<string, Array<{ item: T; index: number }>>();
+        items.forEach((item, index) => {
+          const keys = Array.from(new Set(groupKeys(item)));
+          keys.forEach((key) => {
+            if (!map.has(key)) {
+              map.set(key, []);
+            }
+            map.get(key)!.push({ item, index });
+          });
+        });
+        // Sort: count descending, then alphabetical (A-Z) as tie-break.
+        const sortedKeys = Array.from(map.keys()).sort((a, b) => {
+          const countDiff = map.get(b)!.length - map.get(a)!.length;
+          if (countDiff !== 0) return countDiff;
+          return a.localeCompare(b);
+        });
+        return sortedKeys.map((key) => ({ key, entries: map.get(key)! }));
+      }
       if (!groupBy) return [];
       const order: string[] = [];
       const map = new Map<string, Array<{ item: T; index: number }>>();
@@ -37,7 +60,7 @@ export function PrList<T>({
         map.get(key)!.push({ item, index });
       });
       return order.map((key) => ({ key, entries: map.get(key)! }));
-    }, [items, groupBy]);
+    }, [items, groupBy, groupKeys]);
 
   return (
     <section className="flex flex-col gap-3">
@@ -50,7 +73,7 @@ export function PrList<T>({
           className={
             accentCount && items.length > 0
               ? "rounded-full bg-warning px-2 py-0.5 font-mono text-xs tabular-nums text-background ring-1 ring-inset ring-warning font-semibold"
-              : "rounded-full bg-surface px-2 py-0.5 font-mono text-xs tabular-nums text-muted ring-1 ring-inset ring-border"
+              : "rounded-full bg-border px-2 py-0.5 font-mono text-xs tabular-nums text-foreground ring-1 ring-inset ring-border"
           }
         >
           {items.length}
@@ -60,7 +83,7 @@ export function PrList<T>({
         <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">
           {emptyMessage}
         </p>
-      ) : groupBy ? (
+      ) : (groupBy || groupKeys) ? (
         <div className="flex flex-col">
           {groups.map(({ key, entries }) => {
             const href = groupHref?.(key);

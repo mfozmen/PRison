@@ -18,19 +18,11 @@ export interface DashboardProps {
 // narrows the view.
 const ALL = "";
 
-const BLOCKER_ORDER = ["Failing checks", "Pending checks", "No checks"] as const;
-
-function blockerCategory(pr: StuckPr): string {
-  if (pr.failing.length > 0) return "Failing checks";
-  if (pr.pending.length > 0) return "Pending checks";
-  return "No checks";
-}
-
 export function Dashboard({ orgs, login }: DashboardProps) {
   const [selectedOrg, setSelectedOrg] = useState<string>(ALL);
   const [hydrated, setHydrated] = useState(false);
   const [hideDrafts, setHideDrafts] = useState(false);
-  const [groupBy, setGroupBy] = useState<"flat" | "repo" | "blocker">("flat");
+  const [groupBy, setGroupBy] = useState<"flat" | "repo" | "check">("flat");
 
   const [stuckPrs, setStuckPrs] = useState<StuckPr[]>([]);
   const [reviewReqs, setReviewReqs] = useState<ReviewRequest[]>([]);
@@ -92,9 +84,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       if (storedHideDrafts === "true") {
         setHideDrafts(true);
       }
-      if (storedGroupBy === "repo" || storedGroupBy === "blocker") {
+      if (storedGroupBy === "repo" || storedGroupBy === "check") {
         setGroupBy(storedGroupBy);
       }
+      // "blocker" (old value) falls through → stays "flat" (default)
       setHydrated(true);
     });
   }, [startTransition, orgs]);
@@ -120,19 +113,6 @@ export function Dashboard({ orgs, login }: DashboardProps) {
 
   const visibleStuck = hideDrafts ? sortedStuck.filter((pr) => !pr.isDraft) : sortedStuck;
   const visibleReviews = hideDrafts ? sortedReviews.filter((req) => !req.isDraft) : sortedReviews;
-
-  const sortedForBlocker =
-    groupBy === "blocker"
-      ? [...visibleStuck].sort(
-          (a, b) =>
-            BLOCKER_ORDER.indexOf(
-              blockerCategory(a) as (typeof BLOCKER_ORDER)[number],
-            ) -
-            BLOCKER_ORDER.indexOf(
-              blockerCategory(b) as (typeof BLOCKER_ORDER)[number],
-            ),
-        )
-      : visibleStuck;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -186,15 +166,15 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             </button>
             <button
               type="button"
-              aria-pressed={groupBy === "blocker"}
-              onClick={() => setGroupBy("blocker")}
+              aria-pressed={groupBy === "check"}
+              onClick={() => setGroupBy("check")}
               className={`min-h-[44px] rounded-r-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
-                groupBy === "blocker"
+                groupBy === "check"
                   ? "bg-accent text-background"
                   : "bg-surface text-foreground"
               }`}
             >
-              By blocker
+              By check
             </button>
           </div>
           <button
@@ -314,15 +294,19 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             )}
             <PrList
               title="PRs stuck on checks"
-              items={sortedForBlocker}
+              items={visibleStuck}
               emptyMessage="No PRs stuck on checks 🎉"
               keyExtractor={(pr) => pr.id}
-              groupBy={
-                groupBy === "blocker"
-                  ? blockerCategory
-                  : groupBy === "repo"
-                    ? (pr) => pr.repo
-                    : undefined
+              groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
+              groupKeys={
+                groupBy === "check"
+                  ? (pr) => {
+                      const keys = Array.from(
+                        new Set([...pr.failing, ...pr.pending]),
+                      );
+                      return keys.length > 0 ? keys : ["Other"];
+                    }
+                  : undefined
               }
               groupHref={
                 groupBy === "repo"

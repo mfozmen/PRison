@@ -1,9 +1,9 @@
 import { ageBucket } from "@/lib/prioritize";
 
 const COLORS = {
-  fresh: "bg-green-500/15 text-green-400 ring-green-500/30",
-  warning: "bg-amber-500/15 text-amber-400 ring-amber-500/30",
-  urgent: "bg-red-500/15 text-red-400 ring-red-500/30",
+  fresh: "bg-success/15 text-success ring-success/30",
+  warning: "bg-warning/15 text-warning ring-warning/30",
+  urgent: "bg-danger/15 text-danger ring-danger/30",
 } as const;
 
 function label(since: string, now: Date): string {

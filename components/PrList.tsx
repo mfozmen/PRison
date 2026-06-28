@@ -42,22 +42,22 @@ export function PrList<T>({
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
           {title}
         </h2>
         <span
           data-testid="count-badge"
           className={
             accentCount && items.length > 0
-              ? "rounded-full bg-amber-500 px-2 py-0.5 font-mono text-xs tabular-nums text-slate-950 ring-1 ring-inset ring-amber-600 font-semibold"
-              : "rounded-full bg-slate-800 px-2 py-0.5 font-mono text-xs tabular-nums text-slate-400 ring-1 ring-inset ring-slate-700"
+              ? "rounded-full bg-warning px-2 py-0.5 font-mono text-xs tabular-nums text-background ring-1 ring-inset ring-warning font-semibold"
+              : "rounded-full bg-surface px-2 py-0.5 font-mono text-xs tabular-nums text-muted ring-1 ring-inset ring-border"
           }
         >
           {items.length}
         </span>
       </div>
       {items.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-slate-800 bg-slate-900/40 px-4 py-6 text-center text-sm text-slate-400">
+        <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">
           {emptyMessage}
         </p>
       ) : groupBy ? (
@@ -76,7 +76,7 @@ export function PrList<T>({
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={`Open ${key} on GitHub`}
-                      className="text-slate-400 text-xs font-medium uppercase tracking-wide hover:text-green-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 rounded-sm"
+                      className="text-muted text-xs font-medium uppercase tracking-wide hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
                     >
                       {key}
                       <svg
@@ -98,11 +98,11 @@ export function PrList<T>({
                       </svg>
                     </a>
                   ) : (
-                    <span className="text-slate-400 text-xs font-medium uppercase tracking-wide">
+                    <span className="text-muted text-xs font-medium uppercase tracking-wide">
                       {key}
                     </span>
                   )}
-                  <span className="rounded-full bg-slate-800 px-2 py-0.5 font-mono text-xs tabular-nums text-slate-400 ring-1 ring-inset ring-slate-700">
+                  <span className="rounded-full bg-surface px-2 py-0.5 font-mono text-xs tabular-nums text-muted ring-1 ring-inset ring-border">
                     {entries.length}
                   </span>
                 </div>

@@ -11,7 +11,7 @@ export function OrgSwitcher({ orgs, value, onChange }: OrgSwitcherProps) {
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="cursor-pointer rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 shadow-sm transition-colors hover:border-slate-600 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+      className="cursor-pointer rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground shadow-sm transition-colors hover:border-border/70 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
       aria-label="Filter by organization"
     >
       <option value="">All organizations</option>

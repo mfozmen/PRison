@@ -433,3 +433,38 @@ describe("PrList groupKeys", () => {
     expect(rowTexts.filter((t) => t === "PR-B")).toHaveLength(1);
   });
 });
+
+describe("PrList group subheader count badge", () => {
+  it("group subheader count badge uses bg-border text-foreground (not bg-surface text-muted)", () => {
+    type Item = { repo: string; name: string };
+    const items: Item[] = [
+      { repo: "acme/alpha", name: "PR-1" },
+      { repo: "acme/alpha", name: "PR-2" },
+    ];
+    render(
+      <PrList
+        title="All PRs"
+        items={items}
+        emptyMessage="No PRs."
+        renderRow={(item) => <div data-testid="row">{item.name}</div>}
+        groupBy={(item) => item.repo}
+      />,
+    );
+    // The group subheader contains the group name AND the count badge.
+    // Find the badge span inside the group header.
+    const headers = screen.getAllByTestId("group-header");
+    expect(headers).toHaveLength(1);
+    // The count badge is the last span child of the group header div.
+    // It should have bg-border and text-foreground, not bg-surface or text-muted.
+    const header = headers[0];
+    // Find the span that contains the count number ("2")
+    const countSpan = Array.from(header.querySelectorAll("span")).find(
+      (s) => s.textContent?.trim() === "2",
+    );
+    expect(countSpan).toBeDefined();
+    expect(countSpan).toHaveClass("bg-border");
+    expect(countSpan).toHaveClass("text-foreground");
+    expect(countSpan).not.toHaveClass("bg-surface");
+    expect(countSpan).not.toHaveClass("text-muted");
+  });
+});

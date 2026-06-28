@@ -135,7 +135,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       : visibleStuck;
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-900">
+    <div className="flex min-h-screen flex-col bg-background">
       <Header
         orgs={orgs}
         selectedOrg={selectedOrg}
@@ -144,18 +144,18 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       />
       <main className="mx-auto w-full max-w-screen-2xl flex-1 space-y-8 px-4 sm:px-6 lg:px-8 py-8">
         {isPending && (
-          <p className="flex items-center gap-2 text-sm text-slate-400" aria-live="polite">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
+          <p className="flex items-center gap-2 text-sm text-muted" aria-live="polite">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
             Loading&hellip;
           </p>
         )}
         <div className="flex flex-wrap items-center gap-4">
-          <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer select-none">
+          <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none">
             <input
               type="checkbox"
               checked={hideDrafts}
               onChange={(e) => setHideDrafts(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-700 bg-slate-800 accent-green-500"
+              className="h-4 w-4 rounded border-border bg-surface accent-accent"
             />
             Hide drafts
           </label>
@@ -164,10 +164,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               type="button"
               aria-pressed={groupBy === "flat"}
               onClick={() => setGroupBy("flat")}
-              className={`min-h-[44px] rounded-l-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:outline-none ${
+              className={`min-h-[44px] rounded-l-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
                 groupBy === "flat"
-                  ? "bg-green-600 text-white"
-                  : "bg-slate-700 text-slate-300"
+                  ? "bg-accent text-background"
+                  : "bg-surface text-foreground"
               }`}
             >
               Flat
@@ -176,10 +176,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               type="button"
               aria-pressed={groupBy === "repo"}
               onClick={() => setGroupBy("repo")}
-              className={`min-h-[44px] px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:outline-none ${
+              className={`min-h-[44px] px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
                 groupBy === "repo"
-                  ? "bg-green-600 text-white"
-                  : "bg-slate-700 text-slate-300"
+                  ? "bg-accent text-background"
+                  : "bg-surface text-foreground"
               }`}
             >
               By repo
@@ -188,10 +188,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               type="button"
               aria-pressed={groupBy === "blocker"}
               onClick={() => setGroupBy("blocker")}
-              className={`min-h-[44px] rounded-r-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:outline-none ${
+              className={`min-h-[44px] rounded-r-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
                 groupBy === "blocker"
-                  ? "bg-green-600 text-white"
-                  : "bg-slate-700 text-slate-300"
+                  ? "bg-accent text-background"
+                  : "bg-surface text-foreground"
               }`}
             >
               By blocker
@@ -201,7 +201,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             type="button"
             onClick={() => fetchData(selectedOrg)}
             disabled={isPending}
-            className="ml-auto flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md bg-slate-700 px-4 text-sm font-medium text-slate-300 hover:bg-slate-600 focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            className="ml-auto flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-95 dark:hover:brightness-110 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
           >
             <svg
               aria-hidden="true"
@@ -233,11 +233,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           {/* Review list is LEFT/TOP column */}
           <div className="flex flex-col gap-4">
             {reviewError && (
-              <div className="flex items-center justify-between rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+              <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
                 <span>{reviewError}</span>
                 <button
                   onClick={() => fetchData(selectedOrg)}
-                  className="ml-4 cursor-pointer rounded bg-red-500/20 px-3 py-1 text-xs font-medium text-red-200 transition-colors hover:bg-red-500/30"
+                  className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
                 >
                   Retry
                 </button>
@@ -266,7 +266,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   draft={req.isDraft}
                   accent="blocking"
                   detail={
-                    <span className="flex items-center gap-1 text-amber-400">
+                    <span className="flex items-center gap-1 text-warning">
                       <svg
                         aria-hidden="true"
                         className="shrink-0"
@@ -302,11 +302,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           {/* Stuck list is RIGHT/BOTTOM column */}
           <div className="flex flex-col gap-4">
             {stuckError && (
-              <div className="flex items-center justify-between rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+              <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
                 <span>{stuckError}</span>
                 <button
                   onClick={() => fetchData(selectedOrg)}
-                  className="ml-4 cursor-pointer rounded bg-red-500/20 px-3 py-1 text-xs font-medium text-red-200 transition-colors hover:bg-red-500/30"
+                  className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
                 >
                   Retry
                 </button>
@@ -345,7 +345,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     {showFailingNames.map((name, i) => (
                       <span
                         key={`fail-${i}-${name}`}
-                        className="bg-red-500/10 text-red-300 ring-1 ring-inset ring-red-500/30 rounded px-1.5 py-0.5 text-xs font-medium"
+                        className="bg-danger/10 text-danger ring-1 ring-inset ring-danger/30 rounded px-1.5 py-0.5 text-xs font-medium"
                       >
                         {name}
                       </span>
@@ -353,13 +353,13 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     {showPendingNames.map((name, i) => (
                       <span
                         key={`pend-${i}-${name}`}
-                        className="bg-amber-500/10 text-amber-400 ring-1 ring-inset ring-amber-500/30 rounded px-1.5 py-0.5 text-xs font-medium"
+                        className="bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium"
                       >
                         {name}
                       </span>
                     ))}
                     {overflow > 0 && (
-                      <span className="text-xs text-slate-400">+{overflow} more</span>
+                      <span className="text-xs text-muted">+{overflow} more</span>
                     )}
                   </div>
                 ) : (

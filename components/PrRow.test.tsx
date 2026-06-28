@@ -72,7 +72,7 @@ describe("PrRow", () => {
         accent="blocking"
       />,
     );
-    expect(container.firstChild).toHaveClass("border-l-amber-500");
+    expect(container.firstChild).toHaveClass("border-l-warning");
   });
 
   it("no accent border class when accent is not provided", () => {
@@ -87,7 +87,7 @@ describe("PrRow", () => {
         suggestion={suggestion}
       />,
     );
-    expect(container.firstChild).not.toHaveClass("border-l-amber-500");
+    expect(container.firstChild).not.toHaveClass("border-l-warning");
   });
 
   it("renders suggestion text and href", () => {

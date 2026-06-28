@@ -1,38 +1,70 @@
 @import "tailwindcss";
 
 /*
- * PRison design system — "Data-Dense Dashboard" (dark) with a green "run"
- * accent. Generated via the ui-ux-pro-max skill; see design-system/prison/.
+ * PRison design system — "Data-Dense Dashboard" with light/dark theme support.
  * Fonts (Fira Sans / Fira Code) are loaded with next/font in app/layout.tsx
  * and exposed as --font-fira-sans / --font-fira-code.
  */
 
+/* Font tokens (build-time, not runtime-switchable) */
 @theme {
   --font-sans: var(--font-fira-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-fira-code), ui-monospace, monospace;
-
-  /* Surfaces */
-  --color-canvas: #0f172a;
-  --color-surface: #1e293b;
-  --color-surface-2: #243043;
-  --color-edge: #334155;
-
-  /* Text */
-  --color-ink: #f8fafc;
-  --color-ink-muted: #94a3b8;
-
-  /* Accent — "run green" */
-  --color-accent: #22c55e;
 }
 
-html {
-  background: #0f172a;
+/* Theme-switching raw values — light theme (default).
+ * These use a separate namespace (--bg, --danger, ...) from the Tailwind
+ * color utilities below. The @theme inline block maps --color-* to these, so
+ * referencing --color-danger: var(--color-danger) would be circular — that is
+ * why the raw values live under distinct names. */
+:root {
+  color-scheme: light;
+  --bg: #F8FAFC;
+  --surface: #FFFFFF;
+  --fg: #0F172A;
+  --muted: #475569;
+  --brd: #E2E8F0;
+  --accent: #16A34A;
+  --danger: #DC2626;
+  --warning: #B45309;
+  --success: #16A34A;
+}
+
+/* Theme-switching raw values — dark theme */
+html.dark {
   color-scheme: dark;
+  --bg: #0F172A;
+  --surface: #1E293B;
+  --fg: #F1F5F9;
+  --muted: #94A3B8;
+  --brd: #334155;
+  --accent: #22C55E;
+  --danger: #F87171;
+  --warning: #FBBF24;
+  --success: #4ADE80;
+}
+
+/* Map Tailwind color utilities (bg-background, text-danger, ...) to the
+ * theme-switching vars so utilities re-resolve when html.dark toggles. */
+@theme inline {
+  --color-background: var(--bg);
+  --color-surface: var(--surface);
+  --color-foreground: var(--fg);
+  --color-muted: var(--muted);
+  --color-border: var(--brd);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+}
+
+html,
+body {
+  background: var(--bg);
 }
 
 body {
-  background: #0f172a;
-  color: #f8fafc;
+  color: var(--fg);
   font-family: var(--font-sans);
 }
 

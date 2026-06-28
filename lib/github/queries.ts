@@ -93,8 +93,8 @@ export function parseStuckPrs(raw: any): StuckPr[] {
       // 2. pending — else any run is PENDING / QUEUED / IN_PROGRESS / EXPECTED
       // 3. ok — else (SUCCESS / NEUTRAL / SKIPPED / CANCELLED)
       for (const [name, runs] of namedMap) {
-        const hasFailing = runs.some(r => FAILING.has(r.conclusion ?? r.status ?? r.state ?? ""));
-        const hasPending = !hasFailing && runs.some(r => PENDING.has(r.conclusion ?? r.status ?? r.state ?? ""));
+        const hasFailing = runs.some((r: any) => classify(r) === "failing");
+        const hasPending = !hasFailing && runs.some((r: any) => classify(r) === "pending");
         if (hasFailing) {
           failingChecks++;
           failing.push(name);

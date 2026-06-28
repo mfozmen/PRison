@@ -1,38 +1,65 @@
 @import "tailwindcss";
 
 /*
- * PRison design system — "Data-Dense Dashboard" (dark) with a green "run"
- * accent. Generated via the ui-ux-pro-max skill; see design-system/prison/.
+ * PRison design system — "Data-Dense Dashboard" with light/dark theme support.
  * Fonts (Fira Sans / Fira Code) are loaded with next/font in app/layout.tsx
  * and exposed as --font-fira-sans / --font-fira-code.
  */
 
+/* Font tokens (build-time, not runtime-switchable) */
 @theme {
   --font-sans: var(--font-fira-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-fira-code), ui-monospace, monospace;
+}
 
-  /* Surfaces */
-  --color-canvas: #0f172a;
-  --color-surface: #1e293b;
-  --color-surface-2: #243043;
-  --color-edge: #334155;
+/* Semantic color tokens — light theme (default) */
+:root {
+  color-scheme: light;
+  --color-background: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-foreground: #0F172A;
+  --color-muted: #475569;
+  --color-border: #E2E8F0;
+  --color-accent: #16A34A;
+  --color-danger: #DC2626;
+  --color-warning: #B45309;
+  --color-success: #16A34A;
+}
 
-  /* Text */
-  --color-ink: #f8fafc;
-  --color-ink-muted: #94a3b8;
+/* Semantic color tokens — dark theme */
+html.dark {
+  color-scheme: dark;
+  --color-background: #0F172A;
+  --color-surface: #1E293B;
+  --color-foreground: #F1F5F9;
+  --color-muted: #94A3B8;
+  --color-border: #1E293B;
+  --color-accent: #22C55E;
+  --color-danger: #F87171;
+  --color-warning: #FBBF24;
+  --color-success: #4ADE80;
+}
 
-  /* Accent — "run green" */
-  --color-accent: #22c55e;
+/* Register color tokens with Tailwind inline so utilities reference CSS vars at runtime */
+@theme inline {
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-foreground: var(--color-foreground);
+  --color-muted: var(--color-muted);
+  --color-border: var(--color-border);
+  --color-accent: var(--color-accent);
+  --color-danger: var(--color-danger);
+  --color-warning: var(--color-warning);
+  --color-success: var(--color-success);
 }
 
 html {
-  background: #0f172a;
-  color-scheme: dark;
+  background: var(--color-background);
 }
 
 body {
-  background: #0f172a;
-  color: #f8fafc;
+  background: var(--color-background);
+  color: var(--color-foreground);
   font-family: var(--font-sans);
 }
 

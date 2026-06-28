@@ -35,6 +35,7 @@ describe("parseStuckPrs", () => {
     expect(prs[0]).toMatchObject({
       id: "2", title: "stuck", url: "u2", repo: "acme/b", number: 2,
       failingChecks: 2, pendingChecks: 1, stuckSince: "2026-06-20T00:00:00Z",
+      failing: [], pending: [], isDraft: false,
     });
   });
 
@@ -216,6 +217,110 @@ describe("parseStuckPrs", () => {
     expect(prs).toHaveLength(1);
     expect(prs[0].repo).toBe("");
   });
+
+  it("isDraft is true for a draft PR, false for a non-draft, and false when absent", () => {
+    const rawDraft = {
+      search: { nodes: [
+        { id: "20", title: "draft-pr", url: "u20", number: 20, isDraft: true,
+          repository: { nameWithOwner: "acme/z" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-10T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [{ name: "lint", status: "IN_PROGRESS", conclusion: null }] } },
+          } }] } },
+        { id: "21", title: "non-draft-pr", url: "u21", number: 21, isDraft: false,
+          repository: { nameWithOwner: "acme/z" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-10T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [{ name: "lint", conclusion: "FAILURE" }] } },
+          } }] } },
+        { id: "22", title: "absent-draft", url: "u22", number: 22,
+          // no isDraft field
+          repository: { nameWithOwner: "acme/z" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-10T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [{ name: "lint", conclusion: "FAILURE" }] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawDraft);
+    expect(prs).toHaveLength(3);
+    const draft = prs.find((p) => p.id === "20")!;
+    const nonDraft = prs.find((p) => p.id === "21")!;
+    const absentDraft = prs.find((p) => p.id === "22")!;
+    expect(draft.isDraft).toBe(true);
+    expect(nonDraft.isDraft).toBe(false);
+    expect(absentDraft.isDraft).toBe(false);
+  });
+
+  it("collects CheckRun names into failing/pending arrays, skips unnamed", () => {
+    const rawNames = {
+      search: { nodes: [
+        { id: "30", title: "named-checks", url: "u30", number: 30,
+          repository: { nameWithOwner: "acme/n" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-10T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { name: "build", conclusion: "FAILURE" },       // CheckRun: failing, named
+              { name: "lint", conclusion: "FAILURE" },        // CheckRun: failing, named
+              { name: "deploy", status: "IN_PROGRESS" },      // CheckRun: pending, named
+              { conclusion: "FAILURE" },                       // CheckRun: no name → counted but not named
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawNames);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].failing).toEqual(["build", "lint"]);
+    expect(prs[0].pending).toEqual(["deploy"]);
+    // failingChecks counts ALL failing (including unnamed), pending counts ALL pending
+    expect(prs[0].failingChecks).toBe(3); // build + lint + unnamed
+    expect(prs[0].pendingChecks).toBe(1); // deploy
+  });
+
+  it("all-named fixture: failing.length === failingChecks and pending.length === pendingChecks", () => {
+    const rawAllNamed = {
+      search: { nodes: [
+        { id: "32", title: "all-named", url: "u32", number: 32,
+          repository: { nameWithOwner: "acme/n" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-10T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { name: "build", conclusion: "FAILURE" },
+              { name: "ci/test", conclusion: "FAILURE" },
+              { name: "deploy", status: "QUEUED" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawAllNamed);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].failing.length).toBe(prs[0].failingChecks);
+    expect(prs[0].pending.length).toBe(prs[0].pendingChecks);
+  });
+
+  it("collects StatusContext names via context field into pending array", () => {
+    const rawStatus = {
+      search: { nodes: [
+        { id: "31", title: "status-ctx", url: "u31", number: 31,
+          repository: { nameWithOwner: "acme/s" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-10T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { context: "ci/checks", state: "PENDING" },       // StatusContext: pending, named
+              { context: "ci/lint", state: "FAILURE" },         // StatusContext: failing, named
+              { state: "PENDING" },                              // StatusContext: no context → counted but not named
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawStatus);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].pending).toContain("ci/checks");
+    expect(prs[0].failing).toContain("ci/lint");
+    // failingChecks and pendingChecks count ALL (including unnamed)
+    expect(prs[0].failingChecks).toBe(1); // ci/lint only
+    expect(prs[0].pendingChecks).toBe(2); // ci/checks + unnamed
+  });
 });
 
 describe("parseReviewRequests", () => {
@@ -322,6 +427,37 @@ describe("parseReviewRequests", () => {
     const reqs = parseReviewRequests(rawNullRepo, "me");
     expect(reqs).toHaveLength(1);
     expect(reqs[0].repo).toBe("");
+  });
+
+  it("isDraft is true for a draft PR, false for a non-draft, and false when absent", () => {
+    const rawDraft = {
+      search: { nodes: [
+        { id: "40", title: "draft-rr", url: "u40", number: 40, isDraft: true,
+          updatedAt: "2026-06-24T00:00:00Z",
+          repository: { nameWithOwner: "acme/r" },
+          author: { login: "alice" },
+          timelineItems: { nodes: [] } },
+        { id: "41", title: "non-draft-rr", url: "u41", number: 41, isDraft: false,
+          updatedAt: "2026-06-24T00:00:00Z",
+          repository: { nameWithOwner: "acme/r" },
+          author: { login: "alice" },
+          timelineItems: { nodes: [] } },
+        { id: "42", title: "absent-draft-rr", url: "u42", number: 42,
+          // no isDraft field
+          updatedAt: "2026-06-24T00:00:00Z",
+          repository: { nameWithOwner: "acme/r" },
+          author: { login: "alice" },
+          timelineItems: { nodes: [] } },
+      ] },
+    };
+    const reqs = parseReviewRequests(rawDraft, "me");
+    expect(reqs).toHaveLength(3);
+    const draft = reqs.find((r) => r.id === "40")!;
+    const nonDraft = reqs.find((r) => r.id === "41")!;
+    const absentDraft = reqs.find((r) => r.id === "42")!;
+    expect(draft.isDraft).toBe(true);
+    expect(nonDraft.isDraft).toBe(false);
+    expect(absentDraft.isDraft).toBe(false);
   });
 });
 

@@ -202,6 +202,62 @@ describe("PrList groupBy", () => {
     expect(screen.getByText("No PRs here.")).toBeInTheDocument();
     expect(screen.queryAllByTestId("group-header")).toHaveLength(0);
   });
+
+  it("renders subheader as a link to the group url when groupHref is provided", () => {
+    render(
+      <PrList
+        title="All PRs"
+        items={items}
+        emptyMessage="No PRs."
+        renderRow={(item) => <div data-testid="row">{item.name}</div>}
+        groupBy={(item) => item.repo}
+        groupHref={(key) => `https://github.com/${key}`}
+      />,
+    );
+    const link = screen.getByRole("link", {
+      name: /open acme\/alpha on github/i,
+    });
+    expect(link).toHaveAttribute("href", "https://github.com/acme/alpha");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("renders subheader as plain text (no link) when groupHref is omitted", () => {
+    render(
+      <PrList
+        title="All PRs"
+        items={items}
+        emptyMessage="No PRs."
+        renderRow={(item) => <div data-testid="row">{item.name}</div>}
+        groupBy={(item) => item.repo}
+      />,
+    );
+    expect(
+      screen.queryByRole("link", { name: /open acme\/alpha on github/i }),
+    ).toBeNull();
+    const headers = screen.getAllByTestId("group-header");
+    expect(headers.some((h) => h.textContent?.includes("acme/alpha"))).toBe(
+      true,
+    );
+  });
+
+  it("renders subheader as plain text when groupHref returns undefined for a key", () => {
+    render(
+      <PrList
+        title="All PRs"
+        items={items}
+        emptyMessage="No PRs."
+        renderRow={(item) => <div data-testid="row">{item.name}</div>}
+        groupBy={(item) => item.repo}
+        groupHref={() => undefined}
+      />,
+    );
+    expect(screen.queryByRole("link")).toBeNull();
+    const headers = screen.getAllByTestId("group-header");
+    expect(headers.some((h) => h.textContent?.includes("acme/alpha"))).toBe(
+      true,
+    );
+  });
 });
 
 describe("PrList accentCount", () => {

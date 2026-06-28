@@ -12,54 +12,59 @@
   --font-mono: var(--font-fira-code), ui-monospace, monospace;
 }
 
-/* Semantic color tokens — light theme (default) */
+/* Theme-switching raw values — light theme (default).
+ * These use a separate namespace (--bg, --danger, ...) from the Tailwind
+ * color utilities below. The @theme inline block maps --color-* to these, so
+ * referencing --color-danger: var(--color-danger) would be circular — that is
+ * why the raw values live under distinct names. */
 :root {
   color-scheme: light;
-  --color-background: #F8FAFC;
-  --color-surface: #FFFFFF;
-  --color-foreground: #0F172A;
-  --color-muted: #475569;
-  --color-border: #E2E8F0;
-  --color-accent: #16A34A;
-  --color-danger: #DC2626;
-  --color-warning: #B45309;
-  --color-success: #16A34A;
+  --bg: #F8FAFC;
+  --surface: #FFFFFF;
+  --fg: #0F172A;
+  --muted: #475569;
+  --brd: #E2E8F0;
+  --accent: #16A34A;
+  --danger: #DC2626;
+  --warning: #B45309;
+  --success: #16A34A;
 }
 
-/* Semantic color tokens — dark theme */
+/* Theme-switching raw values — dark theme */
 html.dark {
   color-scheme: dark;
-  --color-background: #0F172A;
-  --color-surface: #1E293B;
-  --color-foreground: #F1F5F9;
-  --color-muted: #94A3B8;
-  --color-border: #1E293B;
-  --color-accent: #22C55E;
-  --color-danger: #F87171;
-  --color-warning: #FBBF24;
-  --color-success: #4ADE80;
+  --bg: #0F172A;
+  --surface: #1E293B;
+  --fg: #F1F5F9;
+  --muted: #94A3B8;
+  --brd: #1E293B;
+  --accent: #22C55E;
+  --danger: #F87171;
+  --warning: #FBBF24;
+  --success: #4ADE80;
 }
 
-/* Register color tokens with Tailwind inline so utilities reference CSS vars at runtime */
+/* Map Tailwind color utilities (bg-background, text-danger, ...) to the
+ * theme-switching vars so utilities re-resolve when html.dark toggles. */
 @theme inline {
-  --color-background: var(--color-background);
-  --color-surface: var(--color-surface);
-  --color-foreground: var(--color-foreground);
-  --color-muted: var(--color-muted);
-  --color-border: var(--color-border);
-  --color-accent: var(--color-accent);
-  --color-danger: var(--color-danger);
-  --color-warning: var(--color-warning);
-  --color-success: var(--color-success);
+  --color-background: var(--bg);
+  --color-surface: var(--surface);
+  --color-foreground: var(--fg);
+  --color-muted: var(--muted);
+  --color-border: var(--brd);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
 }
 
-html {
-  background: var(--color-background);
+html,
+body {
+  background: var(--bg);
 }
 
 body {
-  background: var(--color-background);
-  color: var(--color-foreground);
+  color: var(--fg);
   font-family: var(--font-sans);
 }
 

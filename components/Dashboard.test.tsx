@@ -10,8 +10,13 @@ const STUCK_PR = {
   number: 2,
   failingChecks: 1,
   pendingChecks: 0,
+  failing: ["build"],
+  pending: [],
+  isDraft: false,
   stuckSince: "2026-06-20T00:00:00Z",
 };
+
+const DRAFT_STUCK_PR = { ...STUCK_PR, id: "draft-stuck", title: "draft stuck pr", isDraft: true };
 
 const REVIEW_PR = {
   id: "9",
@@ -20,8 +25,11 @@ const REVIEW_PR = {
   repo: "acme/c",
   number: 9,
   author: "alice",
+  isDraft: false,
   requestedAt: "2026-06-22T00:00:00Z",
 };
+
+const DRAFT_REVIEW_PR = { ...REVIEW_PR, id: "draft-review", title: "draft review pr", isDraft: true };
 
 const ORGS = [
   { login: "acme", avatarUrl: "a" },
@@ -200,5 +208,196 @@ describe("Dashboard", () => {
       const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
       expect(calls.some((c) => String(c[0]).includes("org=a%20b"))).toBe(true);
     });
+  });
+
+  it("shows a failing check name in the stuck detail", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("build")).toBeInTheDocument(),
+    );
+  });
+
+  it("shows a pending check name in the stuck detail", async () => {
+    const PENDING_PR = {
+      ...STUCK_PR,
+      id: "pending",
+      failing: [],
+      pending: ["lint"],
+    };
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(url.includes("stuck") ? [PENDING_PR] : [REVIEW_PR]),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("lint")).toBeInTheDocument(),
+    );
+  });
+
+  it("truncates to 4 named checks and shows a +N more overflow", async () => {
+    const MANY_PR = {
+      ...STUCK_PR,
+      id: "many",
+      failing: ["f1", "f2", "f3"],
+      pending: ["p1", "p2", "p3"],
+    };
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(url.includes("stuck") ? [MANY_PR] : [REVIEW_PR]),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("f1")).toBeInTheDocument(),
+    );
+    // First 2 failing + first 2 pending shown; the rest collapse into overflow.
+    expect(screen.getByText("f2")).toBeInTheDocument();
+    expect(screen.getByText("p1")).toBeInTheDocument();
+    expect(screen.getByText("p2")).toBeInTheDocument();
+    expect(screen.queryByText("f3")).not.toBeInTheDocument();
+    expect(screen.queryByText("p3")).not.toBeInTheDocument();
+    // 6 total names - 4 shown = +2 more
+    expect(screen.getByText("+2 more")).toBeInTheDocument();
+  });
+
+  it("shows all names without overflow when there are exactly 4", async () => {
+    const FOUR_FAILING_PR = {
+      ...STUCK_PR,
+      id: "four",
+      failing: ["f1", "f2", "f3", "f4"],
+      pending: [],
+    };
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(url.includes("stuck") ? [FOUR_FAILING_PR] : [REVIEW_PR]),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("f1")).toBeInTheDocument(),
+    );
+    // 4 total (not > 4): every name is shown, no truncation, no overflow chip.
+    expect(screen.getByText("f2")).toBeInTheDocument();
+    expect(screen.getByText("f3")).toBeInTheDocument();
+    expect(screen.getByText("f4")).toBeInTheDocument();
+    expect(screen.queryByText(/more/)).not.toBeInTheDocument();
+  });
+
+  it("derives the overflow count from rendered chips for a lopsided list", async () => {
+    const LOPSIDED_PR = {
+      ...STUCK_PR,
+      id: "lopsided",
+      failing: ["f1", "f2", "f3", "f4", "f5"],
+      pending: [],
+    };
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(url.includes("stuck") ? [LOPSIDED_PR] : [REVIEW_PR]),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("f1")).toBeInTheDocument(),
+    );
+    // 5 total (> 4): only 2 failing chips render (no pending to fill the other
+    // 2 slots), so 3 are hidden — the overflow must reflect that, not 5 - 4.
+    expect(screen.getByText("f2")).toBeInTheDocument();
+    expect(screen.queryByText("f3")).not.toBeInTheDocument();
+    expect(screen.getByText("+3 more")).toBeInTheDocument();
+  });
+
+  it("falls back to the count string when there are no named checks", async () => {
+    const NO_NAMES_PR = {
+      ...STUCK_PR,
+      id: "no-names",
+      failingChecks: 3,
+      pendingChecks: 2,
+      failing: [],
+      pending: [],
+    };
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(url.includes("stuck") ? [NO_NAMES_PR] : [REVIEW_PR]),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("3 failing · 2 pending")).toBeInTheDocument(),
+    );
+  });
+
+  it("hides draft items from both lists when hide-drafts is checked", async () => {
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            url.includes("stuck")
+              ? [STUCK_PR, DRAFT_STUCK_PR]
+              : [REVIEW_PR, DRAFT_REVIEW_PR],
+          ),
+      }),
+    ) as unknown as typeof fetch;
+
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    // Both drafts visible initially
+    await waitFor(() =>
+      expect(screen.getByText("draft stuck pr")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("draft review pr")).toBeInTheDocument();
+
+    // Check the hide-drafts checkbox
+    fireEvent.click(screen.getByRole("checkbox", { name: /hide drafts/i }));
+
+    await waitFor(() =>
+      expect(screen.queryByText("draft stuck pr")).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByText("draft review pr")).not.toBeInTheDocument();
+    expect(screen.getByText("stuck pr")).toBeInTheDocument();
+    expect(screen.getByText("review pr")).toBeInTheDocument();
+  });
+
+  it("persists hideDrafts toggle to localStorage", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: /hide drafts/i }));
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.hideDrafts")).toBe("true"),
+    );
+  });
+
+  it("hydrates hideDrafts from localStorage", async () => {
+    localStorage.setItem("prison.hideDrafts", "true");
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            url.includes("stuck")
+              ? [STUCK_PR, DRAFT_STUCK_PR]
+              : [REVIEW_PR, DRAFT_REVIEW_PR],
+          ),
+      }),
+    ) as unknown as typeof fetch;
+
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("draft stuck pr")).not.toBeInTheDocument();
+    expect(screen.queryByText("draft review pr")).not.toBeInTheDocument();
   });
 });

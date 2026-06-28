@@ -80,4 +80,35 @@ describe("PrRow", () => {
     );
     expect(screen.getByText("2 failing checks")).toBeInTheDocument();
   });
+
+  it("Draft badge is shown when draft={true}", () => {
+    render(
+      <PrRow
+        title="Fix the thing"
+        repo="org/repo"
+        number={42}
+        url="https://github.com/org/repo/pull/42"
+        since="2026-06-25T00:00:00Z"
+        now={now}
+        draft={true}
+        suggestion={suggestion}
+      />,
+    );
+    expect(screen.getByText("Draft")).toBeInTheDocument();
+  });
+
+  it("Draft badge is absent when draft is not passed", () => {
+    render(
+      <PrRow
+        title="Fix the thing"
+        repo="org/repo"
+        number={42}
+        url="https://github.com/org/repo/pull/42"
+        since="2026-06-25T00:00:00Z"
+        now={now}
+        suggestion={suggestion}
+      />,
+    );
+    expect(screen.queryByText("Draft")).toBeNull();
+  });
 });

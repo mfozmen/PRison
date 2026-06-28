@@ -11,13 +11,21 @@ export interface PrRowProps {
   now: Date;
   detail?: React.ReactNode;
   suggestion: Suggestion;
+  draft?: boolean;
 }
 
-export function PrRow({ title, repo, number, url, since, now, detail, suggestion }: PrRowProps) {
+export function PrRow({ title, repo, number, url, since, now, detail, suggestion, draft }: PrRowProps) {
   return (
     <div className="flex flex-col gap-1 rounded-lg border border-slate-800 bg-slate-800/50 p-4 transition-colors hover:border-slate-700 hover:bg-slate-800">
       <div className="flex items-start justify-between gap-3">
-        <span className="font-medium text-slate-100">{title}</span>
+        <div className="flex items-center gap-2">
+          {draft && (
+            <span className="bg-slate-700 text-slate-300 ring-1 ring-inset ring-slate-600 rounded px-1.5 py-0.5 text-xs font-medium">
+              Draft
+            </span>
+          )}
+          <span className="font-medium text-slate-100">{title}</span>
+        </div>
         <AgeBadge since={since} now={now} />
       </div>
       <span className="font-mono text-xs text-slate-400">

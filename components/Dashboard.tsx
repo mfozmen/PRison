@@ -197,6 +197,37 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               By blocker
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => fetchData(selectedOrg)}
+            disabled={isPending}
+            className="ml-auto flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md bg-slate-700 px-4 text-sm font-medium text-slate-300 hover:bg-slate-600 focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <svg
+              aria-hidden="true"
+              className={`shrink-0 ${isPending ? "animate-spin" : ""}`}
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M12 7a5 5 0 1 1-1.46-3.54"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+              <path
+                d="M12 1.5V4H9.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Refresh
+          </button>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Review list is LEFT/TOP column */}

@@ -7,7 +7,9 @@ const COLORS = {
 } as const;
 
 function label(since: string, now: Date): string {
-  const h = Math.floor((now.getTime() - new Date(since).getTime()) / 3_600_000);
+  const m = Math.floor((now.getTime() - new Date(since).getTime()) / 60_000);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
   return h < 24 ? `${h}h` : `${Math.floor(h / 24)}d`;
 }
 

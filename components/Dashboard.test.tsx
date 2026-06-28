@@ -885,13 +885,12 @@ describe("Dashboard", () => {
       await waitFor(() =>
         expect(screen.getByText("ready pr")).toBeInTheDocument(),
       );
-      const before = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
       fireEvent.click(screen.getByRole("button", { name: /^refresh$/i }));
-      await waitFor(() => {
-        const after = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
-        // One refresh = stuck + review + ready = 3 fetches.
-        expect(after).toBe(before + 3);
-      });
+      // 3 fetches on mount + 3 on refresh (stuck + review + ready) = 6 total.
+      // Use waitFor so the assertion retries until all async refresh fetches register.
+      await waitFor(() =>
+        expect(global.fetch as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(6),
+      );
     });
 
     it("shows a 'Merge on GitHub' link on a ready row", async () => {

@@ -25,4 +25,6 @@ export type ReviewRequest = {
   isDraft: boolean;
 };
 
+export type ReadyPr = { id: string; title: string; url: string; number: number; repo: string; readySince: string };
+
 export type AgeBucket = "fresh" | "warning" | "urgent";

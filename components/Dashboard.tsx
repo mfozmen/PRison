@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useTransition } from "react";
-import type { Org, StuckPr, ReviewRequest } from "@/lib/types";
+import type { Org, StuckPr, ReviewRequest, ReadyPr } from "@/lib/types";
 import { sortByAgeAsc } from "@/lib/prioritize";
-import { suggestStuck, suggestReview } from "@/lib/suggest";
+import { suggestStuck, suggestReview, suggestReady } from "@/lib/suggest";
 import { PrList } from "./PrList";
 import { PrRow } from "./PrRow";
 import { Header } from "./Header";
@@ -26,8 +26,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
 
   const [stuckPrs, setStuckPrs] = useState<StuckPr[]>([]);
   const [reviewReqs, setReviewReqs] = useState<ReviewRequest[]>([]);
+  const [readyPrs, setReadyPrs] = useState<ReadyPr[]>([]);
   const [stuckError, setStuckError] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
+  const [readyError, setReadyError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   // Tracks the most recently requested org so stale in-flight responses are
@@ -39,7 +41,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       latestOrgRef.current = org;
       const qs = org ? `?org=${encodeURIComponent(org)}` : "";
       startTransition(async () => {
-        const [stuckResult, reviewResult] = await Promise.allSettled([
+        const [stuckResult, reviewResult, readyResult] = await Promise.allSettled([
           fetch(`/api/stuck-prs${qs}`).then((r) => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             return r.json() as Promise<StuckPr[]>;
@@ -47,6 +49,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           fetch(`/api/review-requests${qs}`).then((r) => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             return r.json() as Promise<ReviewRequest[]>;
+          }),
+          fetch(`/api/ready-to-merge${qs}`).then((r) => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json() as Promise<ReadyPr[]>;
           }),
         ]);
 
@@ -66,6 +72,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         setReviewReqs(
           reviewResult.status === "fulfilled" ? reviewResult.value : [],
         );
+        setReadyError(
+          readyResult.status === "rejected"
+            ? "Failed to load ready-to-merge PRs. Please retry."
+            : null,
+        );
+        setReadyPrs(readyResult.status === "fulfilled" ? readyResult.value : []);
       });
     },
     [startTransition],
@@ -110,9 +122,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
 
   const sortedStuck = sortByAgeAsc(stuckPrs, (pr) => pr.stuckSince);
   const sortedReviews = sortByAgeAsc(reviewReqs, (req) => req.requestedAt);
+  const sortedReady = sortByAgeAsc(readyPrs, (pr) => pr.readySince);
 
   const visibleStuck = hideDrafts ? sortedStuck.filter((pr) => !pr.isDraft) : sortedStuck;
   const visibleReviews = hideDrafts ? sortedReviews.filter((req) => !req.isDraft) : sortedReviews;
+  // Drafts are already excluded server-side (parseReadyPrs drops drafts); hideDrafts is a no-op here.
+  const visibleReady = sortedReady;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -208,6 +223,43 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             </svg>
             Refresh
           </button>
+        </div>
+        {/* Ready-to-merge — full-width section above the two-column review/stuck grid */}
+        <div className="flex flex-col gap-4">
+          {readyError && (
+            <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+              <span>{readyError}</span>
+              <button
+                onClick={() => fetchData(selectedOrg)}
+                className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {/*
+            accentCount is intentionally omitted (neutral count badge). The ready
+            list is positive — green would be ideal — but accentCount renders amber
+            (bg-warning), which is wrong for this context. Neutral is readable and
+            on-theme; green would require a PrList shared-component change.
+          */}
+          <PrList
+            title="Ready to merge"
+            items={visibleReady}
+            emptyMessage="Nothing ready to merge"
+            keyExtractor={(pr) => pr.id}
+            renderRow={(pr) => (
+              <PrRow
+                title={pr.title}
+                repo={pr.repo}
+                number={pr.number}
+                url={pr.url}
+                since={pr.readySince}
+                now={new Date()}
+                suggestion={suggestReady(pr)}
+              />
+            )}
+          />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Review list is LEFT/TOP column */}

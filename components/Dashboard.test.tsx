@@ -225,6 +225,34 @@ describe("Dashboard", () => {
     expect(screen.queryByText("stuck-all")).not.toBeInTheDocument();
   });
 
+  it("selecting the personal option fetches with ?user= and persists", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+    );
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "testuser" } });
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.org")).toBe("testuser"),
+    );
+    const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
+    // Some call after the change must use user=testuser
+    expect(calls.some((c) => String(c[0]).includes("user=testuser"))).toBe(true);
+    // No call that includes "testuser" should use org= (must use user=)
+    expect(
+      calls.every((c) => !String(c[0]).includes("org=testuser")),
+    ).toBe(true);
+  });
+
+  it("hydrates the persisted personal selection", async () => {
+    localStorage.setItem("prison.org", "testuser");
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() => {
+      const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
+      expect(calls.some((c) => String(c[0]).includes("user=testuser"))).toBe(true);
+    });
+    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("testuser");
+  });
+
   it("encodes the org name in the request URLs", async () => {
     render(<Dashboard orgs={[{ login: "a b", avatarUrl: "x" }]} login="testuser" />);
     await waitFor(() =>

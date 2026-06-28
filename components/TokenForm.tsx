@@ -2,6 +2,23 @@
 
 import { useState } from "react";
 
+const GENERIC_CLI_MESSAGE =
+  "Couldn't sign in with the GitHub CLI — paste a token below.";
+
+const CLI_MESSAGES: Record<string, string> = {
+  "not-installed": "GitHub CLI not found — paste a token below instead.",
+  "not-signed-in":
+    "GitHub CLI isn't signed in. Run gh auth login, then retry — or paste a token below.",
+  "token-rejected":
+    "GitHub rejected the CLI token. Try gh auth refresh, or paste a token below.",
+};
+
+function cliMessageForReason(reason: unknown): string {
+  return typeof reason === "string" && Object.hasOwn(CLI_MESSAGES, reason)
+    ? CLI_MESSAGES[reason]
+    : GENERIC_CLI_MESSAGE;
+}
+
 export function TokenForm() {
   const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -18,13 +35,10 @@ export function TokenForm() {
         window.location.reload();
         return;
       }
-      if (res.status === 503) {
-        setCliError("GitHub CLI not found — paste a token below instead.");
-      } else {
-        setCliError("Something went wrong. Try again.");
-      }
+      const body = await res.json().catch(() => null);
+      setCliError(cliMessageForReason(body?.reason));
     } catch {
-      setCliError("Couldn't reach the server. Try again.");
+      setCliError(GENERIC_CLI_MESSAGE);
     }
     setCliBusy(false);
   }
@@ -77,7 +91,13 @@ export function TokenForm() {
         >
           {cliBusy ? "Checking…" : "Sign in with GitHub CLI"}
         </button>
-        {cliError && <p className="mt-2 text-xs text-red-400">{cliError}</p>}
+        <div aria-live="polite">
+          {cliError && (
+            <p className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+              {cliError}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="relative my-4">

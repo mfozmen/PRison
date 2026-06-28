@@ -400,4 +400,147 @@ describe("Dashboard", () => {
     expect(screen.queryByText("draft stuck pr")).not.toBeInTheDocument();
     expect(screen.queryByText("draft review pr")).not.toBeInTheDocument();
   });
+
+  describe("groupBy toggle", () => {
+    it("renders both Flat and By repo buttons", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      expect(screen.getByRole("button", { name: /^flat$/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^by repo$/i })).toBeInTheDocument();
+    });
+
+    it('defaults to Flat: "Flat" is pressed, "By repo" is not', async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      expect(screen.getByRole("button", { name: /^flat$/i })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(screen.getByRole("button", { name: /^by repo$/i })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+    });
+
+    it('clicking "By repo" sets its aria-pressed to true', async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
+      expect(screen.getByRole("button", { name: /^by repo$/i })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(screen.getByRole("button", { name: /^flat$/i })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+    });
+
+    it('clicking "Flat" after "By repo" switches back', async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^flat$/i }));
+      expect(screen.getByRole("button", { name: /^flat$/i })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(screen.getByRole("button", { name: /^by repo$/i })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+    });
+
+    it('persists "repo" to localStorage when "By repo" is clicked', async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
+      await waitFor(() =>
+        expect(localStorage.getItem("prison.groupBy")).toBe("repo"),
+      );
+    });
+
+    it('persists "flat" to localStorage when "Flat" is clicked after "By repo"', async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^flat$/i }));
+      await waitFor(() =>
+        expect(localStorage.getItem("prison.groupBy")).toBe("flat"),
+      );
+    });
+
+    it('hydrates "By repo" from localStorage', async () => {
+      localStorage.setItem("prison.groupBy", "repo");
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      expect(screen.getByRole("button", { name: /^by repo$/i })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(screen.getByRole("button", { name: /^flat$/i })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+    });
+
+    it('defaults to "Flat" when no localStorage key is present', async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      expect(screen.getByRole("button", { name: /^flat$/i })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    });
+
+    it("shows group headers in By repo mode and hides them in Flat mode", async () => {
+      const STUCK_PR_B = {
+        ...STUCK_PR,
+        id: "stuck-b",
+        title: "stuck pr b",
+        repo: "acme/x",
+      };
+      global.fetch = vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve(
+              url.includes("stuck") ? [STUCK_PR, STUCK_PR_B] : [REVIEW_PR],
+            ),
+        }),
+      ) as unknown as typeof fetch;
+
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+
+      // In Flat mode: no group headers visible
+      expect(screen.queryByTestId("group-header")).not.toBeInTheDocument();
+
+      // Switch to By repo
+      fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
+
+      // Now group headers appear (two distinct repos in stuck list)
+      await waitFor(() =>
+        expect(screen.getAllByTestId("group-header").length).toBeGreaterThan(0),
+      );
+    });
+  });
 });

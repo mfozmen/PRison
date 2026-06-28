@@ -13,9 +13,7 @@ export async function POST(request: Request) {
   // loopback origin — the intended local, single-user use. A networked instance
   // (a different host) must use a pasted token instead.
   if (!LOCAL_HOSTS.has(new URL(request.url).hostname)) {
-    return new Response("GitHub CLI sign-in is only available locally", {
-      status: 403,
-    });
+    return Response.json({ reason: "not-local" }, { status: 403 });
   }
 
   let token: string;
@@ -25,12 +23,16 @@ export async function POST(request: Request) {
       shell: false,
     });
     token = stdout.trim();
-  } catch {
-    return new Response("GitHub CLI is not available or not signed in", { status: 503 });
+  } catch (err) {
+    const reason =
+      (err as NodeJS.ErrnoException).code === "ENOENT"
+        ? "not-installed"
+        : "not-signed-in";
+    return Response.json({ reason }, { status: 503 });
   }
 
   if (!token) {
-    return new Response("GitHub CLI is not available or not signed in", { status: 503 });
+    return Response.json({ reason: "not-signed-in" }, { status: 503 });
   }
 
   let login: string;
@@ -39,11 +41,11 @@ export async function POST(request: Request) {
       viewer?: { login?: string };
     };
     if (!raw?.viewer?.login) {
-      return new Response("Token has no access", { status: 401 });
+      return Response.json({ reason: "token-rejected" }, { status: 401 });
     }
     login = raw.viewer.login;
   } catch {
-    return new Response("Invalid token", { status: 401 });
+    return Response.json({ reason: "token-rejected" }, { status: 401 });
   }
 
   await setSession(token, login);

@@ -76,24 +76,68 @@ describe("TokenForm", () => {
     await waitFor(() => expect(window.location.reload).toHaveBeenCalled());
   });
 
-  it("CLI button shows 503 fallback message", async () => {
+  it("shows the not-installed message when gh is missing (reason: not-installed)", async () => {
     global.fetch = vi.fn(() =>
-      Promise.resolve({ ok: false, status: 503 }),
+      Promise.resolve({
+        ok: false,
+        status: 503,
+        json: async () => ({ reason: "not-installed" }),
+      }),
     ) as unknown as typeof fetch;
     render(<TokenForm />);
     fireEvent.click(
       screen.getByRole("button", { name: /sign in with github cli/i }),
     );
     await waitFor(() =>
-      expect(
-        screen.getByText(/github cli not found/i),
-      ).toBeInTheDocument(),
+      expect(screen.getByText(/github cli not found/i)).toBeInTheDocument(),
     );
   });
 
-  it("paste form is still accessible after a 503", async () => {
+  it("shows the not-signed-in message with the gh auth login hint", async () => {
     global.fetch = vi.fn(() =>
-      Promise.resolve({ ok: false, status: 503 }),
+      Promise.resolve({
+        ok: false,
+        status: 503,
+        json: async () => ({ reason: "not-signed-in" }),
+      }),
+    ) as unknown as typeof fetch;
+    render(<TokenForm />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /sign in with github cli/i }),
+    );
+    await waitFor(() => {
+      const msg = screen.getByText(/isn't signed in/i);
+      expect(msg).toBeInTheDocument();
+      expect(msg).toHaveTextContent(/gh auth login/i);
+    });
+  });
+
+  it("shows the token-rejected message with the gh auth refresh hint", async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 401,
+        json: async () => ({ reason: "token-rejected" }),
+      }),
+    ) as unknown as typeof fetch;
+    render(<TokenForm />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /sign in with github cli/i }),
+    );
+    await waitFor(() => {
+      const msg = screen.getByText(/rejected the cli token/i);
+      expect(msg).toBeInTheDocument();
+      expect(msg).toHaveTextContent(/gh auth refresh/i);
+    });
+  });
+
+  it("paste form is still accessible after a CLI failure", async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 503,
+        json: async () => ({ reason: "not-installed" }),
+      }),
     ) as unknown as typeof fetch;
     render(<TokenForm />);
     fireEvent.click(
@@ -105,20 +149,66 @@ describe("TokenForm", () => {
     expect(screen.getByLabelText(/personal access token/i)).toBeInTheDocument();
   });
 
-  it("CLI button shows a generic error on a non-503 failure", async () => {
+  it("shows the generic message for an unknown reason", async () => {
     global.fetch = vi.fn(() =>
-      Promise.resolve({ ok: false, status: 500 }),
+      Promise.resolve({
+        ok: false,
+        status: 500,
+        json: async () => ({}),
+      }),
     ) as unknown as typeof fetch;
     render(<TokenForm />);
     fireEvent.click(
       screen.getByRole("button", { name: /sign in with github cli/i }),
     );
     await waitFor(() =>
-      expect(screen.getByText(/something went wrong/i)).toBeInTheDocument(),
+      expect(
+        screen.getByText(/couldn't sign in with the github cli/i),
+      ).toBeInTheDocument(),
     );
   });
 
-  it("CLI button shows a network error when the request rejects", async () => {
+  it("shows the generic message for a prototype-key reason (e.g. toString)", async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 503,
+        json: async () => ({ reason: "toString" }),
+      }),
+    ) as unknown as typeof fetch;
+    render(<TokenForm />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /sign in with github cli/i }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText(/couldn't sign in with the github cli/i),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("shows the generic message when the response body is not JSON", async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 503,
+        json: async () => {
+          throw new Error("not json");
+        },
+      }),
+    ) as unknown as typeof fetch;
+    render(<TokenForm />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /sign in with github cli/i }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByText(/couldn't sign in with the github cli/i),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("shows the generic message when the request rejects (network error)", async () => {
     global.fetch = vi.fn(() =>
       Promise.reject(new Error("network down")),
     ) as unknown as typeof fetch;
@@ -127,7 +217,9 @@ describe("TokenForm", () => {
       screen.getByRole("button", { name: /sign in with github cli/i }),
     );
     await waitFor(() =>
-      expect(screen.getByText(/couldn't reach the server/i)).toBeInTheDocument(),
+      expect(
+        screen.getByText(/couldn't sign in with the github cli/i),
+      ).toBeInTheDocument(),
     );
   });
 });

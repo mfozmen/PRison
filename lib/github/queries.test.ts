@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs } from "./queries";
+import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs, parseReadyPrs } from "./queries";
 
 describe("searchQuery", () => {
   it("scopes author search to the org", () => {
@@ -11,6 +11,12 @@ describe("searchQuery", () => {
   it("omits the org scope when no org is given (spans everything)", () => {
     expect(searchQuery("author")).toBe("is:open is:pr author:@me");
     expect(searchQuery("review", "")).toBe("is:open is:pr review-requested:@me");
+  });
+  it("ready kind emits author:@me review:approved", () => {
+    expect(searchQuery("ready")).toBe("is:open is:pr author:@me review:approved");
+  });
+  it("ready kind with org appends org scope", () => {
+    expect(searchQuery("ready", "acme")).toBe("is:open is:pr author:@me review:approved org:acme");
   });
 });
 
@@ -458,6 +464,110 @@ describe("parseReviewRequests", () => {
     expect(draft.isDraft).toBe(true);
     expect(nonDraft.isDraft).toBe(false);
     expect(absentDraft.isDraft).toBe(false);
+  });
+});
+
+describe("parseReadyPrs", () => {
+  function makePr(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "pr1",
+      title: "My PR",
+      url: "https://github.com/acme/repo/pull/1",
+      number: 1,
+      isDraft: false,
+      updatedAt: "2026-06-20T00:00:00Z",
+      reviewDecision: "APPROVED",
+      mergeStateStatus: "CLEAN",
+      repository: { nameWithOwner: "acme/repo" },
+      commits: { nodes: [{ commit: {
+        pushedDate: "2026-06-25T00:00:00Z",
+        committedDate: "2026-06-24T00:00:00Z",
+      } }] },
+      ...overrides,
+    };
+  }
+
+  it("keeps APPROVED + CLEAN + not-draft; readySince comes from pushedDate", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr()] } });
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: "pr1", title: "My PR", number: 1, repo: "acme/repo",
+      readySince: "2026-06-25T00:00:00Z",
+    });
+  });
+
+  it("APPROVED + BLOCKED mergeStateStatus → NOT ready even when commits look green (the bug)", () => {
+    // This is the key false-positive bug: APPROVED + green rollup but branch protection
+    // blocks the merge. mergeStateStatus=BLOCKED must exclude the PR.
+    const pr = makePr({ mergeStateStatus: "BLOCKED" });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("drops APPROVED + BEHIND mergeStateStatus", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr({ mergeStateStatus: "BEHIND" })] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("drops APPROVED + UNSTABLE mergeStateStatus", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr({ mergeStateStatus: "UNSTABLE" })] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("drops APPROVED + DIRTY mergeStateStatus", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr({ mergeStateStatus: "DIRTY" })] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("drops APPROVED + UNKNOWN mergeStateStatus", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr({ mergeStateStatus: "UNKNOWN" })] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("drops not-approved (REVIEW_REQUIRED) even when mergeStateStatus is CLEAN", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr({ reviewDecision: "REVIEW_REQUIRED" })] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("drops CHANGES_REQUESTED even when mergeStateStatus is CLEAN", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr({ reviewDecision: "CHANGES_REQUESTED" })] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("drops draft PRs even when APPROVED + CLEAN", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr({ isDraft: true })] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("readySince falls back to committedDate when pushedDate absent", () => {
+    const pr = makePr({ commits: { nodes: [{ commit: {
+      pushedDate: null,
+      committedDate: "2026-06-24T00:00:00Z",
+    } }] } });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result[0].readySince).toBe("2026-06-24T00:00:00Z");
+  });
+
+  it("readySince falls back to updatedAt when both dates absent", () => {
+    const pr = makePr({ commits: { nodes: [{ commit: {
+      pushedDate: null,
+      committedDate: null,
+    } }] } });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result[0].readySince).toBe("2026-06-20T00:00:00Z");
+  });
+
+  it("drops nodes missing an id", () => {
+    const noId = { ...makePr(), id: undefined };
+    const withId = makePr({ id: "pr2" });
+    const result = parseReadyPrs({ search: { nodes: [noId, withId] } });
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("pr2");
+  });
+
+  it("returns [] on null/missing input", () => {
+    expect(parseReadyPrs(null)).toEqual([]);
+    expect(parseReadyPrs({})).toEqual([]);
   });
 });
 

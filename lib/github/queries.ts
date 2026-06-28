@@ -1,13 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Raw GraphQL responses are intentionally untyped at the boundary; parsers
 // convert them to domain types as the first step.
-import type { Org, StuckPr, ReviewRequest } from "@/lib/types";
+import type { Org, StuckPr, ReviewRequest, ReadyPr } from "@/lib/types";
 
 // org is optional: when omitted, the search spans every repo the token can
 // see (the user's personal account plus all accessible organizations).
-export function searchQuery(kind: "author" | "review", org?: string): string {
-  const who = kind === "author" ? "author:@me" : "review-requested:@me";
+export function searchQuery(kind: "author" | "review" | "ready", org?: string): string {
   const scope = org ? ` org:${org}` : "";
+  if (kind === "ready") return `is:open is:pr author:@me review:approved${scope}`;
+  const who = kind === "author" ? "author:@me" : "review-requested:@me";
   return `is:open is:pr ${who}${scope}`;
 }
 
@@ -115,4 +116,37 @@ export function parseOrgs(raw: any): Org[] {
   return (raw?.viewer?.organizations?.nodes ?? []).map((o: any) => ({
     login: o.login, avatarUrl: o.avatarUrl,
   }));
+}
+
+export const READY_PRS_QUERY = `
+  query($q: String!) {
+    search(query: $q, type: ISSUE, first: 50) {
+      nodes { ... on PullRequest {
+        id title url number isDraft updatedAt
+        reviewDecision mergeStateStatus
+        repository { nameWithOwner }
+        commits(last: 1) { nodes { commit {
+          pushedDate committedDate
+        } } }
+      } }
+    }
+  }`;
+
+export function parseReadyPrs(raw: any): ReadyPr[] {
+  return (raw?.search?.nodes ?? [])
+    .filter((n: any) => n?.id)
+    .filter((n: any) => n.reviewDecision === "APPROVED")
+    .filter((n: any) => n.mergeStateStatus === "CLEAN")
+    .filter((n: any) => !n.isDraft)
+    .map((n: any) => {
+      const commit = n.commits?.nodes?.[0]?.commit ?? {};
+      return {
+        id: n.id,
+        title: n.title,
+        url: n.url,
+        number: n.number,
+        repo: n.repository?.nameWithOwner ?? "",
+        readySince: commit.pushedDate ?? commit.committedDate ?? n.updatedAt ?? "",
+      } as ReadyPr;
+    });
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { suggestStuck, suggestReview } from "./suggest";
-import type { StuckPr, ReviewRequest } from "./types";
+import { suggestStuck, suggestReview, suggestReady } from "./suggest";
+import type { StuckPr, ReviewRequest, ReadyPr } from "./types";
 
 const base = { id: "1", title: "t", url: "https://github.com/acme/b/pull/2", number: 2, repo: "acme/b" };
 
@@ -27,6 +27,16 @@ describe("suggestReview", () => {
     expect(suggestReview(req)).toEqual({
       text: "Review to unblock alice",
       href: "https://github.com/acme/b/pull/2/files",
+    });
+  });
+});
+
+describe("suggestReady", () => {
+  it("links to the PR on GitHub to merge manually", () => {
+    const pr: ReadyPr = { id: "1", title: "t", url: "https://github.com/acme/b/pull/2", number: 2, repo: "acme/b", readySince: "x" };
+    expect(suggestReady(pr)).toEqual({
+      text: "Merge on GitHub",
+      href: "https://github.com/acme/b/pull/2",
     });
   });
 });

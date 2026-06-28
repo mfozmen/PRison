@@ -537,9 +537,9 @@ describe("Dashboard", () => {
       // Switch to By repo
       fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
 
-      // Now group headers appear (two distinct repos in stuck list)
+      // Now group headers appear: 2 distinct repos in stuck list + 1 in review list = 3 total
       await waitFor(() =>
-        expect(screen.getAllByTestId("group-header").length).toBeGreaterThan(0),
+        expect(screen.getAllByTestId("group-header")).toHaveLength(3),
       );
     });
   });

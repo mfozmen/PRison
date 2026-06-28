@@ -138,11 +138,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             />
             Hide drafts
           </label>
-          <div role="group" aria-label="Group by" className="flex overflow-hidden rounded-md">
+          <div role="group" aria-label="Group by" className="flex rounded-md">
             <button
+              type="button"
               aria-pressed={groupBy === "flat"}
               onClick={() => setGroupBy("flat")}
-              className={`min-h-[44px] px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:outline-none ${
+              className={`min-h-[44px] rounded-l-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:outline-none ${
                 groupBy === "flat"
                   ? "bg-green-600 text-white"
                   : "bg-slate-700 text-slate-300"
@@ -151,9 +152,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               Flat
             </button>
             <button
+              type="button"
               aria-pressed={groupBy === "repo"}
               onClick={() => setGroupBy("repo")}
-              className={`min-h-[44px] px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:outline-none ${
+              className={`min-h-[44px] rounded-r-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:outline-none ${
                 groupBy === "repo"
                   ? "bg-green-600 text-white"
                   : "bg-slate-700 text-slate-300"

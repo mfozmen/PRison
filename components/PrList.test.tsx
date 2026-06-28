@@ -272,7 +272,7 @@ describe("PrList accentCount", () => {
       />,
     );
     const badge = screen.getByTestId("count-badge");
-    expect(badge).toHaveClass("bg-amber-500");
+    expect(badge).toHaveClass("bg-warning");
   });
 
   it("count badge has slate style when accentCount is false (default)", () => {
@@ -285,8 +285,8 @@ describe("PrList accentCount", () => {
       />,
     );
     const badge = screen.getByTestId("count-badge");
-    expect(badge).toHaveClass("bg-slate-800");
-    expect(badge).not.toHaveClass("bg-amber-500");
+    expect(badge).toHaveClass("bg-surface");
+    expect(badge).not.toHaveClass("bg-warning");
   });
 
   it("count badge has slate style when items is empty even with accentCount=true", () => {
@@ -300,7 +300,7 @@ describe("PrList accentCount", () => {
       />,
     );
     const badge = screen.getByTestId("count-badge");
-    expect(badge).toHaveClass("bg-slate-800");
-    expect(badge).not.toHaveClass("bg-amber-500");
+    expect(badge).toHaveClass("bg-surface");
+    expect(badge).not.toHaveClass("bg-warning");
   });
 });

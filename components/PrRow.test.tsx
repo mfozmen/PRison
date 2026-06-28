@@ -75,6 +75,22 @@ describe("PrRow", () => {
     expect(container.firstChild).toHaveClass("border-l-warning");
   });
 
+  it("amber left accent persists on hover: card has hover:border-l-warning when accent='blocking'", () => {
+    const { container } = render(
+      <PrRow
+        title="Fix the thing"
+        repo="org/repo"
+        number={42}
+        url="https://github.com/org/repo/pull/42"
+        since="2026-06-25T00:00:00Z"
+        now={now}
+        suggestion={suggestion}
+        accent="blocking"
+      />,
+    );
+    expect(container.firstChild).toHaveClass("hover:border-l-warning");
+  });
+
   it("no accent border class when accent is not provided", () => {
     const { container } = render(
       <PrRow

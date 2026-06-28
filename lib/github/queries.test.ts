@@ -123,7 +123,7 @@ describe("parseStuckPrs", () => {
     expect(prs).toHaveLength(0);
   });
 
-  it("counts ERROR and TIMED_OUT and CANCELLED as failing", () => {
+  it("counts ERROR and TIMED_OUT as failing; treats CANCELLED as ok", () => {
     const rawMultiFail = {
       search: { nodes: [
         { id: "7", title: "multi-fail", url: "u7", number: 7,
@@ -142,7 +142,7 @@ describe("parseStuckPrs", () => {
     };
     const prs = parseStuckPrs(rawMultiFail);
     expect(prs).toHaveLength(1);
-    expect(prs[0].failingChecks).toBe(3);
+    expect(prs[0].failingChecks).toBe(2);
     expect(prs[0].pendingChecks).toBe(2);
   });
 
@@ -326,6 +326,108 @@ describe("parseStuckPrs", () => {
     // failingChecks and pendingChecks count ALL (including unnamed)
     expect(prs[0].failingChecks).toBe(1); // ci/lint only
     expect(prs[0].pendingChecks).toBe(2); // ci/checks + unnamed
+  });
+
+  it("dedup: CANCELLED + SUCCESS on same name → not failing, not pending", () => {
+    const raw = {
+      search: { nodes: [
+        { id: "50", title: "relinted", url: "u50", number: 50,
+          repository: { nameWithOwner: "acme/x" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { name: "pr-linter", conclusion: "CANCELLED" },
+              { name: "pr-linter", conclusion: "SUCCESS" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(raw);
+    expect(prs).toHaveLength(0); // PR filtered out: 0 failing + 0 pending
+  });
+
+  it("dedup: single FAILURE run → failing", () => {
+    const raw = {
+      search: { nodes: [
+        { id: "51", title: "smoke-fail", url: "u51", number: 51,
+          repository: { nameWithOwner: "acme/x" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { name: "qa/smoke", conclusion: "FAILURE" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(raw);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].failing).toContain("qa/smoke");
+    expect(prs[0].failingChecks).toBe(1);
+  });
+
+  it("dedup: FAILURE + SUCCESS on same name → still failing (real failure wins)", () => {
+    const raw = {
+      search: { nodes: [
+        { id: "52", title: "flaky", url: "u52", number: 52,
+          repository: { nameWithOwner: "acme/x" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { name: "build", conclusion: "FAILURE" },
+              { name: "build", conclusion: "SUCCESS" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(raw);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].failing).toContain("build");
+    expect(prs[0].failingChecks).toBe(1);
+  });
+
+  it("dedup: PENDING + SUCCESS on same name → pending", () => {
+    const raw = {
+      search: { nodes: [
+        { id: "53", title: "running", url: "u53", number: 53,
+          repository: { nameWithOwner: "acme/x" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { name: "ci/test", status: "IN_PROGRESS" },
+              { name: "ci/test", conclusion: "SUCCESS" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(raw);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].pending).toContain("ci/test");
+    expect(prs[0].pendingChecks).toBe(1);
+    expect(prs[0].failingChecks).toBe(0);
+  });
+
+  it("dedup: counts match the deduped arrays for all-named fixture", () => {
+    const raw = {
+      search: { nodes: [
+        { id: "54", title: "mixed", url: "u54", number: 54,
+          repository: { nameWithOwner: "acme/x" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { name: "pr-linter", conclusion: "CANCELLED" },
+              { name: "pr-linter", conclusion: "SUCCESS" }, // deduped to ok
+              { name: "build", conclusion: "FAILURE" },     // failing
+              { name: "ci/test", status: "QUEUED" },       // pending
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(raw);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].failing).toEqual(["build"]);
+    expect(prs[0].pending).toEqual(["ci/test"]);
+    expect(prs[0].failingChecks).toBe(prs[0].failing.length); // 1
+    expect(prs[0].pendingChecks).toBe(prs[0].pending.length); // 1
   });
 });
 

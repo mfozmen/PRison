@@ -50,7 +50,7 @@ export const REVIEW_REQUESTS_QUERY = `
     }
   }`;
 
-const FAILING = new Set(["FAILURE", "ERROR", "TIMED_OUT", "CANCELLED"]);
+const FAILING = new Set(["FAILURE", "ERROR", "TIMED_OUT"]);
 const PENDING = new Set(["PENDING", "EXPECTED", "QUEUED", "IN_PROGRESS"]);
 
 function classify(ctx: { status?: string; conclusion?: string; state?: string }) {
@@ -70,19 +70,45 @@ export function parseStuckPrs(raw: any): StuckPr[] {
       let pendingChecks = 0;
       const failing: string[] = [];
       const pending: string[] = [];
+
+      // Phase 1 — split into named and unnamed contexts
+      const namedMap = new Map<string, typeof ctxs>();
+      const unnamedCtxs: typeof ctxs = [];
+
       for (const c of ctxs) {
-        const k = classify(c);
         // Detect CheckRun vs StatusContext: CheckRun has a `name` property (even if undefined);
         // use ctx.name !== undefined to distinguish. Otherwise treat as StatusContext (ctx.context).
         const checkName: string | undefined =
           c.name !== undefined ? (c.name || undefined) : (c.context || undefined);
-        if (k === "failing") {
-          failingChecks++;
-          if (checkName) failing.push(checkName);
-        } else if (k === "pending") {
-          pendingChecks++;
-          if (checkName) pending.push(checkName);
+        if (checkName) {
+          if (!namedMap.has(checkName)) namedMap.set(checkName, []);
+          namedMap.get(checkName)!.push(c);
+        } else {
+          unnamedCtxs.push(c);
         }
+      }
+
+      // Phase 2 — compute effective status per named group with precedence:
+      // 1. failing — any run is FAILURE / ERROR / TIMED_OUT
+      // 2. pending — else any run is PENDING / QUEUED / IN_PROGRESS / EXPECTED
+      // 3. ok — else (SUCCESS / NEUTRAL / SKIPPED / CANCELLED)
+      for (const [name, runs] of namedMap) {
+        const hasFailing = runs.some((r: any) => classify(r) === "failing");
+        const hasPending = !hasFailing && runs.some((r: any) => classify(r) === "pending");
+        if (hasFailing) {
+          failingChecks++;
+          failing.push(name);
+        } else if (hasPending) {
+          pendingChecks++;
+          pending.push(name);
+        }
+      }
+
+      // Unnamed checks: count individually (cannot group without a name)
+      for (const c of unnamedCtxs) {
+        const k = classify(c);
+        if (k === "failing") failingChecks++;
+        else if (k === "pending") pendingChecks++;
       }
       return {
         id: n.id, title: n.title, url: n.url, number: n.number,

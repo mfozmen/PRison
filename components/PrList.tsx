@@ -125,7 +125,7 @@ export function PrList<T>({
                       {key}
                     </span>
                   )}
-                  <span className="rounded-full bg-surface px-2 py-0.5 font-mono text-xs tabular-nums text-muted ring-1 ring-inset ring-border">
+                  <span className="rounded-full bg-border px-2 py-0.5 font-mono text-xs tabular-nums text-foreground ring-1 ring-inset ring-border">
                     {entries.length}
                   </span>
                 </div>

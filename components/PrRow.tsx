@@ -17,7 +17,7 @@ export interface PrRowProps {
 
 export function PrRow({ title, repo, number, url, since, now, detail, suggestion, draft, accent }: PrRowProps) {
   return (
-    <div className={`flex flex-col gap-1 rounded-lg border border-border bg-surface/50 p-4 transition-colors hover:border-border/70 hover:bg-surface${accent === "blocking" ? " border-l-2 border-l-warning" : ""}`}>
+    <div className={`flex flex-col gap-1 rounded-lg border border-border bg-surface/50 p-4 transition-colors hover:border-border/70 hover:bg-surface${accent === "blocking" ? " border-l-2 border-l-warning hover:border-l-warning" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2">
           {draft && (

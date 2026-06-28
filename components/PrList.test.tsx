@@ -285,7 +285,9 @@ describe("PrList accentCount", () => {
       />,
     );
     const badge = screen.getByTestId("count-badge");
-    expect(badge).toHaveClass("bg-surface");
+    expect(badge).toHaveClass("bg-border");
+    expect(badge).toHaveClass("text-foreground");
+    expect(badge).not.toHaveClass("text-muted");
     expect(badge).not.toHaveClass("bg-warning");
   });
 
@@ -300,7 +302,134 @@ describe("PrList accentCount", () => {
       />,
     );
     const badge = screen.getByTestId("count-badge");
-    expect(badge).toHaveClass("bg-surface");
+    expect(badge).toHaveClass("bg-border");
     expect(badge).not.toHaveClass("bg-warning");
+  });
+});
+
+describe("PrList groupKeys", () => {
+  type CheckItem = { name: string; checks: string[] };
+
+  it("groupKeys — one-to-many: item with two keys appears under both group headers", () => {
+    const items: CheckItem[] = [
+      { name: "PR-A", checks: ["ci", "lint"] },
+      { name: "PR-B", checks: ["ci"] },
+    ];
+    render(
+      <PrList
+        title="All PRs"
+        items={items}
+        emptyMessage="No PRs."
+        renderRow={(item) => <div data-testid="row">{item.name}</div>}
+        groupKeys={(item) => item.checks}
+      />,
+    );
+    const headers = screen.getAllByTestId("group-header");
+    const ciHeader = headers.find((h) => h.textContent?.includes("ci"));
+    const lintHeader = headers.find((h) => h.textContent?.includes("lint"));
+    expect(ciHeader).toBeDefined();
+    expect(lintHeader).toBeDefined();
+
+    // "ci" group should contain both PR-A and PR-B
+    const rows = screen.getAllByTestId("row");
+    const rowTexts = rows.map((r) => r.textContent);
+    // PR-A appears twice (once in ci, once in lint), PR-B once (in ci)
+    expect(rowTexts.filter((t) => t === "PR-A")).toHaveLength(2);
+    expect(rowTexts.filter((t) => t === "PR-B")).toHaveLength(1);
+  });
+
+  it("groupKeys — count-desc then alpha ordering", () => {
+    // 3 items with ci, 2 with build, 1 with deploy
+    const items: CheckItem[] = [
+      { name: "PR-1", checks: ["ci"] },
+      { name: "PR-2", checks: ["ci"] },
+      { name: "PR-3", checks: ["ci"] },
+      { name: "PR-4", checks: ["deploy"] },
+      { name: "PR-5", checks: ["build"] },
+      { name: "PR-6", checks: ["build"] },
+    ];
+    render(
+      <PrList
+        title="All PRs"
+        items={items}
+        emptyMessage="No PRs."
+        renderRow={(item) => <div data-testid="row">{item.name}</div>}
+        groupKeys={(item) => item.checks}
+      />,
+    );
+    const headers = screen.getAllByTestId("group-header");
+    const headerTexts = headers.map((h) => h.textContent ?? "");
+    const ciIdx = headerTexts.findIndex((t) => t.includes("ci"));
+    const buildIdx = headerTexts.findIndex((t) => t.includes("build"));
+    const deployIdx = headerTexts.findIndex((t) => t.includes("deploy"));
+    // Expected order: ci(3) → build(2) → deploy(1)
+    expect(ciIdx).toBeLessThan(buildIdx);
+    expect(buildIdx).toBeLessThan(deployIdx);
+  });
+
+  it("groupKeys — equal-count groups are ordered alphabetically", () => {
+    // All groups have count 1, so ordering falls back to alpha (A-Z),
+    // regardless of insertion order.
+    const items: CheckItem[] = [
+      { name: "PR-1", checks: ["gamma"] },
+      { name: "PR-2", checks: ["alpha"] },
+      { name: "PR-3", checks: ["beta"] },
+    ];
+    render(
+      <PrList
+        title="All PRs"
+        items={items}
+        emptyMessage="No PRs."
+        renderRow={(item) => <div data-testid="row">{item.name}</div>}
+        groupKeys={(item) => item.checks}
+      />,
+    );
+    const headers = screen.getAllByTestId("group-header");
+    const headerTexts = headers.map((h) => h.textContent ?? "");
+    const alphaIdx = headerTexts.findIndex((t) => t.includes("alpha"));
+    const betaIdx = headerTexts.findIndex((t) => t.includes("beta"));
+    const gammaIdx = headerTexts.findIndex((t) => t.includes("gamma"));
+    expect(alphaIdx).toBeLessThan(betaIdx);
+    expect(betaIdx).toBeLessThan(gammaIdx);
+  });
+
+  it("groupKeys — empty array items are skipped", () => {
+    const items: CheckItem[] = [
+      { name: "PR-A", checks: ["ci"] },
+      { name: "PR-B", checks: [] },
+    ];
+    render(
+      <PrList
+        title="All PRs"
+        items={items}
+        emptyMessage="No PRs."
+        renderRow={(item) => <div data-testid="row">{item.name}</div>}
+        groupKeys={(item) => item.checks}
+      />,
+    );
+    const rows = screen.getAllByTestId("row");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toBe("PR-A");
+  });
+
+  it("groupKeys — deduped keys per item: duplicate keys render item once per group", () => {
+    const items: CheckItem[] = [
+      { name: "PR-A", checks: ["ci", "ci"] },
+      { name: "PR-B", checks: ["ci"] },
+    ];
+    render(
+      <PrList
+        title="All PRs"
+        items={items}
+        emptyMessage="No PRs."
+        renderRow={(item) => <div data-testid="row">{item.name}</div>}
+        groupKeys={(item) => item.checks}
+      />,
+    );
+    const rows = screen.getAllByTestId("row");
+    const rowTexts = rows.map((r) => r.textContent);
+    // PR-A has ["ci","ci"] deduped to ["ci"], so it appears once in "ci" group
+    expect(rowTexts.filter((t) => t === "PR-A")).toHaveLength(1);
+    expect(rowTexts.filter((t) => t === "PR-B")).toHaveLength(1);
   });
 });

@@ -26,6 +26,7 @@ const READY_RAW = {
         url: "https://github.com/acme/b/pull/1",
         number: 1,
         reviewDecision: "APPROVED",
+        mergeStateStatus: "CLEAN",
         isDraft: false,
         repository: { nameWithOwner: "acme/b" },
         commits: {
@@ -33,7 +34,7 @@ const READY_RAW = {
             {
               commit: {
                 pushedDate: "2026-06-25T00:00:00Z",
-                statusCheckRollup: { state: "SUCCESS" },
+                committedDate: "2026-06-24T00:00:00Z",
               },
             },
           ],

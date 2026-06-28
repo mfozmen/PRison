@@ -123,10 +123,9 @@ export const READY_PRS_QUERY = `
     search(query: $q, type: ISSUE, first: 50) {
       nodes { ... on PullRequest {
         id title url number isDraft updatedAt
-        reviewDecision
+        reviewDecision mergeStateStatus
         repository { nameWithOwner }
         commits(last: 1) { nodes { commit {
-          statusCheckRollup { state }
           pushedDate committedDate
         } } }
       } }
@@ -137,11 +136,8 @@ export function parseReadyPrs(raw: any): ReadyPr[] {
   return (raw?.search?.nodes ?? [])
     .filter((n: any) => n?.id)
     .filter((n: any) => n.reviewDecision === "APPROVED")
+    .filter((n: any) => n.mergeStateStatus === "CLEAN")
     .filter((n: any) => !n.isDraft)
-    .filter((n: any) => {
-      const state = n.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state;
-      return state === "SUCCESS" || state == null;
-    })
     .map((n: any) => {
       const commit = n.commits?.nodes?.[0]?.commit ?? {};
       return {

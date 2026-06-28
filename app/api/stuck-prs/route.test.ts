@@ -87,4 +87,27 @@ describe("GET /api/stuck-prs", () => {
     expect(res.status).toBe(502);
     expect(await res.text()).toBe("Upstream GitHub error");
   });
+
+  it("returns parsed stuck PRs scoped to a personal account (?user=mfozmen)", async () => {
+    readTokenMock.mockResolvedValue("t");
+    queryMock.mockResolvedValue(STUCK_RAW);
+    const res = await GET(req("http://x/api/stuck-prs?user=mfozmen"));
+    expect(res.status).toBe(200);
+    expect(queryMock.mock.calls[0][2].q).toBe("is:open is:pr author:@me user:mfozmen");
+  });
+
+  it("returns 400 when user contains invalid characters", async () => {
+    readTokenMock.mockResolvedValue("t");
+    const res = await GET(req("http://x/api/stuck-prs?user=invalid+char"));
+    expect(res.status).toBe(400);
+  });
+
+  it("user wins over org when both are present", async () => {
+    readTokenMock.mockResolvedValue("t");
+    queryMock.mockResolvedValue(STUCK_RAW);
+    const res = await GET(req("http://x/api/stuck-prs?org=acme&user=mfozmen"));
+    expect(res.status).toBe(200);
+    expect(queryMock.mock.calls[0][2].q).toContain("user:mfozmen");
+    expect(queryMock.mock.calls[0][2].q).not.toContain("org:acme");
+  });
 });

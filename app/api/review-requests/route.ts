@@ -8,11 +8,16 @@ export async function GET(request: Request) {
   if (!token) return new Response("Unauthorized", { status: 401 });
   const login = await readLogin();
   if (!login) return new Response("Unauthorized", { status: 401 });
-  const org = new URL(request.url).searchParams.get("org") ?? "";
+  const params = new URL(request.url).searchParams;
+  const org = params.get("org") ?? "";
+  const user = params.get("user") ?? "";
   if (org && !isValidLogin(org)) return new Response("invalid org", { status: 400 });
+  if (user && !isValidLogin(user)) return new Response("invalid user", { status: 400 });
+  // If both org and user are somehow present, user wins.
+  const scope = user ? `user:${user}` : org ? `org:${org}` : undefined;
   try {
     const raw = await ghQuery(token, REVIEW_REQUESTS_QUERY, {
-      q: searchQuery("review", org || undefined),
+      q: searchQuery("review", scope),
     });
     return Response.json(parseReviewRequests(raw, login));
   } catch {

@@ -22,7 +22,7 @@ export const STUCK_PRS_QUERY = `
   query($q: String!) {
     search(query: $q, type: ISSUE, first: 50) {
       nodes { ... on PullRequest {
-        id title url number isDraft
+        id title url number isDraft mergeStateStatus
         repository { nameWithOwner }
         commits(last: 1) { nodes { commit {
           pushedDate committedDate
@@ -111,15 +111,17 @@ export function parseStuckPrs(raw: any): StuckPr[] {
         if (k === "failing") failingChecks++;
         else if (k === "pending") pendingChecks++;
       }
+      const blocked = n.mergeStateStatus === "BLOCKED" || n.mergeStateStatus === "BEHIND";
       return {
         id: n.id, title: n.title, url: n.url, number: n.number,
         repo: n.repository?.nameWithOwner ?? "",
         failingChecks, pendingChecks, failing, pending,
         isDraft: n.isDraft ?? false,
+        blocked,
         stuckSince: commit.pushedDate ?? commit.committedDate ?? "",
       } as StuckPr;
     })
-    .filter((p: StuckPr) => p.failingChecks > 0 || p.pendingChecks > 0);
+    .filter((p: StuckPr) => p.failingChecks > 0 || p.pendingChecks > 0 || p.blocked);
 }
 
 export function parseReviewRequests(raw: any, viewerLogin: string): ReviewRequest[] {

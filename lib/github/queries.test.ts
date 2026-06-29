@@ -435,6 +435,84 @@ describe("parseStuckPrs", () => {
     expect(prs[0].failingChecks).toBe(prs[0].failing.length); // 1
     expect(prs[0].pendingChecks).toBe(prs[0].pending.length); // 1
   });
+
+  it("BLOCKED mergeStateStatus with no failing/pending → included with blocked:true", () => {
+    const rawBlocked = {
+      search: { nodes: [
+        { id: "60", title: "blocked-pr", url: "u60", number: 60,
+          mergeStateStatus: "BLOCKED",
+          repository: { nameWithOwner: "acme/b" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { conclusion: "SUCCESS" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawBlocked);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].blocked).toBe(true);
+    expect(prs[0].failingChecks).toBe(0);
+    expect(prs[0].pendingChecks).toBe(0);
+  });
+
+  it("CLEAN mergeStateStatus with no failing/pending → excluded (not blocked)", () => {
+    const rawClean = {
+      search: { nodes: [
+        { id: "61", title: "clean-pr", url: "u61", number: 61,
+          mergeStateStatus: "CLEAN",
+          repository: { nameWithOwner: "acme/b" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { conclusion: "SUCCESS" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawClean);
+    expect(prs).toHaveLength(0);
+  });
+
+  it("BEHIND mergeStateStatus with no failing/pending → included with blocked:true", () => {
+    const rawBehind = {
+      search: { nodes: [
+        { id: "62", title: "behind-pr", url: "u62", number: 62,
+          mergeStateStatus: "BEHIND",
+          repository: { nameWithOwner: "acme/b" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { conclusion: "SUCCESS" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawBehind);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].blocked).toBe(true);
+  });
+
+  it("failing checks + BLOCKED mergeStateStatus → included with blocked:true", () => {
+    const rawFailingBlocked = {
+      search: { nodes: [
+        { id: "63", title: "failing-blocked", url: "u63", number: 63,
+          mergeStateStatus: "BLOCKED",
+          repository: { nameWithOwner: "acme/b" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { name: "ci/test", conclusion: "FAILURE" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawFailingBlocked);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].blocked).toBe(true);
+    expect(prs[0].failingChecks).toBe(1);
+  });
 });
 
 describe("parseReviewRequests", () => {

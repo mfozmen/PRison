@@ -407,6 +407,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                       <span className="text-xs text-muted">+{overflow} more</span>
                     )}
                   </div>
+                ) : pr.blocked ? (
+                  <span className="text-muted">Required checks pending on GitHub</span>
                 ) : (
                   `${pr.failingChecks} failing · ${pr.pendingChecks} pending`
                 );
@@ -419,6 +421,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     since={pr.stuckSince}
                     now={new Date()}
                     draft={pr.isDraft}
+                    blocked={pr.blocked}
                     detail={detail}
                     suggestion={suggestStuck(pr)}
                   />

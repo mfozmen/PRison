@@ -13,6 +13,7 @@ const STUCK_PR = {
   failing: ["build"],
   pending: [],
   isDraft: false,
+  blocked: false,
   stuckSince: "2026-06-20T00:00:00Z",
 };
 
@@ -399,6 +400,56 @@ describe("Dashboard", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     await waitFor(() =>
       expect(screen.getByText("3 failing · 2 pending")).toBeInTheDocument(),
+    );
+  });
+
+  it("blocked-no-checks PR shows 'Required checks pending on GitHub' detail", async () => {
+    const BLOCKED_NO_CHECKS_PR = {
+      ...STUCK_PR,
+      id: "blocked-no-checks",
+      failingChecks: 0,
+      pendingChecks: 0,
+      failing: [],
+      pending: [],
+      blocked: true,
+    };
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            url.includes("ready") ? [] : url.includes("stuck") ? [BLOCKED_NO_CHECKS_PR] : [REVIEW_PR],
+          ),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("Required checks pending on GitHub")).toBeInTheDocument(),
+    );
+  });
+
+  it("blocked-no-checks PR shows the Blocked badge", async () => {
+    const BLOCKED_NO_CHECKS_PR = {
+      ...STUCK_PR,
+      id: "blocked-no-checks",
+      failingChecks: 0,
+      pendingChecks: 0,
+      failing: [],
+      pending: [],
+      blocked: true,
+    };
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            url.includes("ready") ? [] : url.includes("stuck") ? [BLOCKED_NO_CHECKS_PR] : [REVIEW_PR],
+          ),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("Blocked")).toBeInTheDocument(),
     );
   });
 

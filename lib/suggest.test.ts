@@ -19,6 +19,13 @@ describe("suggestStuck", () => {
       href: "https://github.com/acme/b/pull/2/checks",
     });
   });
+  it("points to required checks when blocked with no visible failing/pending", () => {
+    const pr: StuckPr = { ...base, failingChecks: 0, pendingChecks: 0, failing: [], pending: [], isDraft: false, blocked: true, stuckSince: "x" };
+    expect(suggestStuck(pr)).toEqual({
+      text: "See required checks",
+      href: "https://github.com/acme/b/pull/2/checks",
+    });
+  });
 });
 
 describe("suggestReview", () => {

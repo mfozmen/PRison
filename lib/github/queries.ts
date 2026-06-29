@@ -3,13 +3,14 @@
 // convert them to domain types as the first step.
 import type { Org, StuckPr, ReviewRequest, ReadyPr } from "@/lib/types";
 
-// org is optional: when omitted, the search spans every repo the token can
+// scope is optional: when omitted, the search spans every repo the token can
 // see (the user's personal account plus all accessible organizations).
-export function searchQuery(kind: "author" | "review" | "ready", org?: string): string {
-  const scope = org ? ` org:${org}` : "";
-  if (kind === "ready") return `is:open is:pr author:@me review:approved${scope}`;
+// Callers pass a ready-made qualifier string such as "org:acme" or "user:mfozmen".
+export function searchQuery(kind: "author" | "review" | "ready", scope?: string): string {
+  const scopePart = scope ? ` ${scope}` : "";
+  if (kind === "ready") return `is:open is:pr author:@me review:approved${scopePart}`;
   const who = kind === "author" ? "author:@me" : "review-requested:@me";
-  return `is:open is:pr ${who}${scope}`;
+  return `is:open is:pr ${who}${scopePart}`;
 }
 
 export const VIEWER_QUERY = `query { viewer { login } }`;

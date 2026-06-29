@@ -62,7 +62,7 @@ export function Header({ orgs, selectedOrg, onOrgChange, login }: HeaderProps) {
         <span className="text-lg font-bold tracking-tight text-foreground">PRison</span>
       </div>
       <div className="flex items-center gap-4">
-        <OrgSwitcher orgs={orgs} value={selectedOrg} onChange={onOrgChange} />
+        <OrgSwitcher orgs={orgs} value={selectedOrg} onChange={onOrgChange} login={login} />
         <span className="hidden text-sm text-muted sm:inline">
           {login || "there"}
         </span>

@@ -39,7 +39,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const fetchData = useCallback(
     (org: string) => {
       latestOrgRef.current = org;
-      const qs = org ? `?org=${encodeURIComponent(org)}` : "";
+      const qs =
+        org === login
+          ? `?user=${encodeURIComponent(login)}`
+          : org
+            ? `?org=${encodeURIComponent(org)}`
+            : "";
       startTransition(async () => {
         const [stuckResult, reviewResult, readyResult] = await Promise.allSettled([
           fetch(`/api/stuck-prs${qs}`).then((r) => {
@@ -80,7 +85,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         setReadyPrs(readyResult.status === "fulfilled" ? readyResult.value : []);
       });
     },
-    [startTransition],
+    [startTransition, login],
   );
 
   // Apply the persisted selection after mount (client-only) to avoid a
@@ -90,7 +95,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     const storedHideDrafts = localStorage.getItem("prison.hideDrafts");
     const storedGroupBy = localStorage.getItem("prison.groupBy");
     startTransition(() => {
-      if (stored === ALL || (stored && orgs.some((o) => o.login === stored))) {
+      if (
+        stored === ALL ||
+        stored === login ||
+        (stored && orgs.some((o) => o.login === stored))
+      ) {
         setSelectedOrg(stored);
       }
       if (storedHideDrafts === "true") {
@@ -102,7 +111,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       // "blocker" (old value) falls through → stays "flat" (default)
       setHydrated(true);
     });
-  }, [startTransition, orgs]);
+  }, [startTransition, orgs, login]);
 
   useEffect(() => {
     if (!hydrated) return;

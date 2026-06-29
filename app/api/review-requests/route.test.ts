@@ -99,4 +99,32 @@ describe("GET /api/review-requests", () => {
     expect(res.status).toBe(502);
     expect(await res.text()).toBe("Upstream GitHub error");
   });
+
+  it("returns parsed review requests scoped to a personal account (?user=mfozmen)", async () => {
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("me");
+    queryMock.mockResolvedValue(REVIEW_RAW);
+    const res = await GET(req("http://x/api/review-requests?user=mfozmen"));
+    expect(res.status).toBe(200);
+    expect(queryMock.mock.calls[0][2].q).toBe(
+      "is:open is:pr review-requested:@me user:mfozmen",
+    );
+  });
+
+  it("returns 400 when user contains invalid characters", async () => {
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("me");
+    const res = await GET(req("http://x/api/review-requests?user=invalid+char"));
+    expect(res.status).toBe(400);
+  });
+
+  it("user wins over org when both are present", async () => {
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("me");
+    queryMock.mockResolvedValue(REVIEW_RAW);
+    const res = await GET(req("http://x/api/review-requests?org=acme&user=mfozmen"));
+    expect(res.status).toBe(200);
+    expect(queryMock.mock.calls[0][2].q).toContain("user:mfozmen");
+    expect(queryMock.mock.calls[0][2].q).not.toContain("org:acme");
+  });
 });

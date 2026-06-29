@@ -24,7 +24,7 @@ describe("Header", () => {
   it("renders app name and user login", () => {
     render(<Header orgs={orgs} selectedOrg="acme" onOrgChange={() => {}} login="mehmet" />);
     expect(screen.getByText("PRison")).toBeInTheDocument();
-    expect(screen.getByText(/mehmet/)).toBeInTheDocument();
+    expect(screen.getByText("mehmet", { selector: "span" })).toBeInTheDocument();
   });
 
   it("clears the token via the API on sign out", async () => {
@@ -41,6 +41,13 @@ describe("Header", () => {
     expect(screen.getByText("All organizations")).toBeInTheDocument();
     expect(screen.getByText("acme")).toBeInTheDocument();
     expect(screen.getByText("beta")).toBeInTheDocument();
+  });
+
+  it("forwards login into the OrgSwitcher personal account option", () => {
+    render(<Header orgs={orgs} selectedOrg="acme" onOrgChange={() => {}} login="mehmet" />);
+    const personalOption = screen.getByText("mehmet (you)");
+    expect(personalOption).toBeInTheDocument();
+    expect((personalOption as HTMLOptionElement).value).toBe("mehmet");
   });
 
   it("renders 'there' as fallback when login is empty", () => {

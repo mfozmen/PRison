@@ -2,11 +2,12 @@ import type { Org } from "@/lib/types";
 
 export interface OrgSwitcherProps {
   orgs: Org[];
+  login: string;
   value: string;
   onChange: (login: string) => void;
 }
 
-export function OrgSwitcher({ orgs, value, onChange }: OrgSwitcherProps) {
+export function OrgSwitcher({ orgs, login, value, onChange }: OrgSwitcherProps) {
   return (
     <select
       value={value}
@@ -15,6 +16,7 @@ export function OrgSwitcher({ orgs, value, onChange }: OrgSwitcherProps) {
       aria-label="Filter by organization"
     >
       <option value="">All organizations</option>
+      <option value={login}>{login} (you)</option>
       {orgs.map((org) => (
         <option key={org.login} value={org.login}>
           {org.login}

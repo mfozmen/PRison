@@ -3,10 +3,10 @@ import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs, parseReadyP
 
 describe("searchQuery", () => {
   it("scopes author search to the org", () => {
-    expect(searchQuery("author", "acme")).toBe("is:open is:pr author:@me org:acme");
+    expect(searchQuery("author", "org:acme")).toBe("is:open is:pr author:@me org:acme");
   });
   it("scopes review search to the org", () => {
-    expect(searchQuery("review", "acme")).toBe("is:open is:pr review-requested:@me org:acme");
+    expect(searchQuery("review", "org:acme")).toBe("is:open is:pr review-requested:@me org:acme");
   });
   it("omits the org scope when no org is given (spans everything)", () => {
     expect(searchQuery("author")).toBe("is:open is:pr author:@me");
@@ -16,7 +16,13 @@ describe("searchQuery", () => {
     expect(searchQuery("ready")).toBe("is:open is:pr author:@me review:approved");
   });
   it("ready kind with org appends org scope", () => {
-    expect(searchQuery("ready", "acme")).toBe("is:open is:pr author:@me review:approved org:acme");
+    expect(searchQuery("ready", "org:acme")).toBe("is:open is:pr author:@me review:approved org:acme");
+  });
+  it("scopes author search to a personal user account", () => {
+    expect(searchQuery("author", "user:mfozmen")).toBe("is:open is:pr author:@me user:mfozmen");
+  });
+  it("ready kind with user scope appends user qualifier", () => {
+    expect(searchQuery("ready", "user:mfozmen")).toBe("is:open is:pr author:@me review:approved user:mfozmen");
   });
 });
 

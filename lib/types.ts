@@ -11,6 +11,7 @@ export type StuckPr = {
   failing: string[];
   pending: string[];
   isDraft: boolean;
+  blocked: boolean;
   stuckSince: string; // ISO
 };
 

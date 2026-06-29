@@ -12,10 +12,11 @@ export interface PrRowProps {
   detail?: React.ReactNode;
   suggestion: Suggestion;
   draft?: boolean;
+  blocked?: boolean;
   accent?: "blocking";
 }
 
-export function PrRow({ title, repo, number, url, since, now, detail, suggestion, draft, accent }: PrRowProps) {
+export function PrRow({ title, repo, number, url, since, now, detail, suggestion, draft, blocked, accent }: PrRowProps) {
   return (
     <div className={`flex flex-col gap-1 rounded-lg border border-border bg-surface/50 p-4 transition-colors hover:border-border/70 hover:bg-surface${accent === "blocking" ? " border-l-2 border-l-warning hover:border-l-warning" : ""}`}>
       <div className="flex items-start justify-between gap-3">
@@ -23,6 +24,18 @@ export function PrRow({ title, repo, number, url, since, now, detail, suggestion
           {draft && (
             <span className="shrink-0 mt-0.5 bg-surface text-foreground ring-1 ring-inset ring-border rounded px-1.5 py-0.5 text-xs font-medium">
               Draft
+            </span>
+          )}
+          {blocked && (
+            <span
+              className="shrink-0 mt-0.5 inline-flex items-center gap-1 bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium"
+              title="GitHub is blocking this merge. Some required checks aren't visible via the API — open the PR on GitHub for the full list."
+            >
+              <svg aria-hidden="true" className="shrink-0" width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2" y="4" width="6" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+                <path d="M3.5 4V3a1.5 1.5 0 0 1 3 0v1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+              Blocked
             </span>
           )}
           <a

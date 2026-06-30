@@ -75,6 +75,28 @@ describe("GET /api/repos", () => {
     expect(vars).toEqual({ q: "acme in:name fork:true" });
   });
 
+  it("scopes the search to the given owners with user: qualifiers", async () => {
+    readTokenMock.mockResolvedValue("token");
+    queryMock.mockResolvedValue({ search: { nodes: [] } });
+    const req = new Request(
+      "http://localhost/api/repos?q=web&owners=acme,bob",
+    );
+    await GET(req);
+    const vars = queryMock.mock.calls[0][2] as { q: string };
+    expect(vars.q).toBe("web in:name fork:true user:acme user:bob");
+  });
+
+  it("ignores invalid owner logins", async () => {
+    readTokenMock.mockResolvedValue("token");
+    queryMock.mockResolvedValue({ search: { nodes: [] } });
+    const req = new Request(
+      "http://localhost/api/repos?q=web&owners=acme,bad%20name,",
+    );
+    await GET(req);
+    const vars = queryMock.mock.calls[0][2] as { q: string };
+    expect(vars.q).toBe("web in:name fork:true user:acme");
+  });
+
   it("strips control characters and caps q at 100 chars before searching", async () => {
     readTokenMock.mockResolvedValue("token");
     queryMock.mockResolvedValue({ search: { nodes: [] } });

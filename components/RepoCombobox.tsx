@@ -6,6 +6,8 @@ export interface RepoComboboxProps {
   value: string;
   onChange: (repo: string) => void;
   suggestions?: string[];
+  /** Owner logins (your orgs + personal account) to scope the search to. */
+  owners?: string[];
   id?: string;
 }
 
@@ -13,6 +15,7 @@ export function RepoCombobox({
   value,
   onChange,
   suggestions = [],
+  owners = [],
   id,
 }: RepoComboboxProps) {
   const [inputText, setInputText] = useState(value);
@@ -69,8 +72,10 @@ export function RepoCombobox({
     setIsSearching(true);
     const thisRequest = ++fetchCounterRef.current;
 
+    const ownersParam =
+      owners.length > 0 ? `&owners=${encodeURIComponent(owners.join(","))}` : "";
     debounceRef.current = setTimeout(() => {
-      fetch(`/api/repos?q=${encodeURIComponent(trimmed)}`)
+      fetch(`/api/repos?q=${encodeURIComponent(trimmed)}${ownersParam}`)
         .then((res) => res.json())
         .then((data: string[]) => {
           if (thisRequest !== fetchCounterRef.current) return;

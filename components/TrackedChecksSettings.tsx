@@ -8,6 +8,8 @@ import { RepoCombobox } from "./RepoCombobox";
 export interface TrackedChecksSettingsProps {
   orgs: Org[];
   availableRepos: string[];
+  /** Owner logins (orgs + personal) used to scope the repo search. */
+  owners?: string[];
   value: TrackedChecks;
   onChange: (next: TrackedChecks) => void;
   open: boolean;
@@ -44,6 +46,7 @@ function seedRows(repos: Record<string, string[]>): RepoRow[] {
 export function TrackedChecksSettings({
   orgs,
   availableRepos,
+  owners = [],
   value,
   onChange,
   open,
@@ -232,6 +235,7 @@ export function TrackedChecksSettings({
                   value={row.repo}
                   onChange={(repo) => handleRowChange(index, "repo", repo)}
                   suggestions={availableRepos}
+                  owners={owners}
                 />
                 <input
                   type="text"

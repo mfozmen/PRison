@@ -37,6 +37,24 @@ describe("RepoCombobox", () => {
     expect(screen.getByRole("option", { name: "acme/web" })).toBeInTheDocument();
   });
 
+  it("includes the owners in the fetch URL to scope the search", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      json: () => Promise.resolve([]),
+    });
+
+    render(
+      <RepoCombobox value="" onChange={vi.fn()} owners={["useinsider", "mfozmen"]} />,
+    );
+    const input = screen.getByRole("combobox", { name: "Repository" });
+    fireEvent.change(input, { target: { value: "email" } });
+
+    await drainDebounce();
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "/api/repos?q=email&owners=useinsider%2Cmfozmen",
+    );
+  });
+
   it("selecting a result calls onChange", async () => {
     const onChange = vi.fn();
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({

@@ -403,7 +403,7 @@ describe("Dashboard", () => {
     );
   });
 
-  it("blocked-no-checks PR shows 'Required checks pending on GitHub' detail", async () => {
+  it("blocked-no-checks PR shows the inline note detail", async () => {
     const BLOCKED_NO_CHECKS_PR = {
       ...STUCK_PR,
       id: "blocked-no-checks",
@@ -424,17 +424,20 @@ describe("Dashboard", () => {
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
     await waitFor(() =>
-      expect(screen.getByText("Required checks pending on GitHub")).toBeInTheDocument(),
+      expect(screen.getByText("Some required checks run on GitHub and aren't shown here.")).toBeInTheDocument(),
     );
+    // The blocked PR still appears in the list (its title row is rendered)
+    expect(screen.getByText("stuck pr")).toBeInTheDocument();
   });
 
-  it("blocked-no-checks PR shows the Blocked badge", async () => {
-    const BLOCKED_NO_CHECKS_PR = {
+  it("blocked PR with visible check names shows chips and not the note", async () => {
+    const BLOCKED_WITH_CHECKS_PR = {
       ...STUCK_PR,
-      id: "blocked-no-checks",
-      failingChecks: 0,
+      id: "blocked-with-checks",
+      title: "blocked with checks pr",
+      failingChecks: 1,
       pendingChecks: 0,
-      failing: [],
+      failing: ["ci"],
       pending: [],
       blocked: true,
     };
@@ -443,14 +446,17 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("ready") ? [] : url.includes("stuck") ? [BLOCKED_NO_CHECKS_PR] : [REVIEW_PR],
+            url.includes("ready") ? [] : url.includes("stuck") ? [BLOCKED_WITH_CHECKS_PR] : [REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
     await waitFor(() =>
-      expect(screen.getByText("Blocked")).toBeInTheDocument(),
+      expect(screen.getByText("ci")).toBeInTheDocument(),
     );
+    expect(
+      screen.queryByText("Some required checks run on GitHub and aren't shown here."),
+    ).not.toBeInTheDocument();
   });
 
   it("hides draft items from both lists when hide-drafts is checked", async () => {

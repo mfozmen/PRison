@@ -513,6 +513,33 @@ describe("parseStuckPrs", () => {
     expect(prs[0].blocked).toBe(true);
     expect(prs[0].failingChecks).toBe(1);
   });
+
+  it("checkNames includes all named checks regardless of state; excludes unnamed", () => {
+    const rawCheckNames = {
+      search: { nodes: [
+        { id: "70", title: "check-names", url: "u70", number: 70,
+          repository: { nameWithOwner: "acme/cn" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { name: "build", conclusion: "SUCCESS" },    // passing
+              { name: "qa/smoke", conclusion: "FAILURE" }, // failing
+              { name: "deploy", status: "IN_PROGRESS" },   // pending
+              { conclusion: "FAILURE" },                   // unnamed → NOT in checkNames
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawCheckNames);
+    expect(prs).toHaveLength(1);
+    const { checkNames } = prs[0];
+    expect(checkNames).toContain("build");
+    expect(checkNames).toContain("qa/smoke");
+    expect(checkNames).toContain("deploy");
+    // unnamed checks (no name/context field) must not appear
+    expect(checkNames.every((n) => n !== undefined && n !== null && n !== "")).toBe(true);
+    expect(checkNames).toHaveLength(3);
+  });
 });
 
 describe("parseReviewRequests", () => {

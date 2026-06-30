@@ -116,6 +116,7 @@ export function parseStuckPrs(raw: any): StuckPr[] {
         id: n.id, title: n.title, url: n.url, number: n.number,
         repo: n.repository?.nameWithOwner ?? "",
         failingChecks, pendingChecks, failing, pending,
+        checkNames: Array.from(namedMap.keys()),
         isDraft: n.isDraft ?? false,
         blocked,
         stuckSince: commit.pushedDate ?? commit.committedDate ?? "",

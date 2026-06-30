@@ -423,6 +423,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     <path d="M7 6v4M7 4.5v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
                   </svg>
                 );
+                const noteSpan = (text: string) => (
+                  <span className="flex items-center gap-1.5 text-muted text-sm">
+                    {noteIcon}
+                    {text}
+                  </span>
+                );
                 const chipsBlock = hasNames ? (
                   <div className="flex flex-wrap gap-1 items-center">
                     {showFailingNames.map((name, i) => (
@@ -446,20 +452,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     )}
                   </div>
                 ) : pr.mergeState === "BEHIND" ? (
-                  <span className="flex items-center gap-1.5 text-muted text-sm">
-                    {noteIcon}
-                    Out of date with the base branch — update it to merge.
-                  </span>
+                  noteSpan("Out of date with the base branch — update it to merge.")
                 ) : pr.mergeState === "DIRTY" ? (
-                  <span className="flex items-center gap-1.5 text-muted text-sm">
-                    {noteIcon}
-                    Has merge conflicts — resolve them on GitHub.
-                  </span>
+                  noteSpan("Has merge conflicts — resolve them on GitHub.")
                 ) : pr.blocked ? (
-                  <span className="flex items-center gap-1.5 text-muted text-sm">
-                    {noteIcon}
-                    Some required checks run on GitHub and aren&apos;t shown here.
-                  </span>
+                  noteSpan("Some required checks run on GitHub and aren't shown here.")
                 ) : (
                   `${pr.failingChecks} failing · ${pr.pendingChecks} pending`
                 );

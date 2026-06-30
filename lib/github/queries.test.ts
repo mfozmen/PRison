@@ -496,6 +496,26 @@ describe("parseStuckPrs", () => {
     expect(prs[0].mergeState).toBe("BEHIND");
   });
 
+  it("DIRTY mergeStateStatus with no failing/pending → included with blocked:true, mergeState DIRTY", () => {
+    const rawDirty = {
+      search: { nodes: [
+        { id: "64", title: "dirty-pr", url: "u64", number: 64,
+          mergeStateStatus: "DIRTY",
+          repository: { nameWithOwner: "acme/b" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { conclusion: "SUCCESS" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawDirty);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].blocked).toBe(true);
+    expect(prs[0].mergeState).toBe("DIRTY");
+  });
+
   it("BEHIND PR with all-green checks is included with mergeState:'BEHIND' and blocked:true (live bug scenario)", () => {
     const rawBehindGreen = {
       search: { nodes: [

@@ -515,6 +515,12 @@ describe("Dashboard", () => {
     await waitFor(() =>
       expect(screen.getByText("Has merge conflicts — resolve them on GitHub.")).toBeInTheDocument(),
     );
+    expect(
+      screen.queryByText("Out of date with the base branch — update it to merge."),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Some required checks run on GitHub and aren't shown here."),
+    ).not.toBeInTheDocument();
   });
 
   it("BLOCKED PR still shows the required-checks note", async () => {

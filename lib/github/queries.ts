@@ -111,7 +111,11 @@ export function parseStuckPrs(raw: any): StuckPr[] {
         if (k === "failing") failingChecks++;
         else if (k === "pending") pendingChecks++;
       }
-      const blocked = n.mergeStateStatus === "BLOCKED" || n.mergeStateStatus === "BEHIND";
+      // A PR is "blocked" (shown in the stuck list even with green checks) when
+      // branch protection blocks it (BLOCKED), it is out of date (BEHIND), or it
+      // has merge conflicts (DIRTY). All three states prevent merging regardless
+      // of check results.
+      const blocked = n.mergeStateStatus === "BLOCKED" || n.mergeStateStatus === "BEHIND" || n.mergeStateStatus === "DIRTY";
       const mergeState: string = n.mergeStateStatus ?? "";
       return {
         id: n.id, title: n.title, url: n.url, number: n.number,

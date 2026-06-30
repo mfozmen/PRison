@@ -149,6 +149,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     ])
   ).sort();
 
+  // Owner logins (personal + orgs) used to scope the repo search to repos the
+  // user can access.
+  const repoOwners = [login, ...orgs.map((o) => o.login)];
+
   const sortedStuck = sortByAgeAsc(stuckPrs, (pr) => pr.stuckSince);
   const sortedReviews = sortByAgeAsc(reviewReqs, (req) => req.requestedAt);
   const sortedReady = sortByAgeAsc(readyPrs, (pr) => pr.readySince);
@@ -170,6 +174,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       <TrackedChecksSettings
         orgs={orgs}
         availableRepos={availableRepos}
+        owners={repoOwners}
         value={tracked}
         onChange={setTracked}
         open={settingsOpen}

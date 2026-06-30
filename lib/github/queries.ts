@@ -64,6 +64,31 @@ function classify(ctx: { status?: string; conclusion?: string; state?: string })
   return "ok";
 }
 
+// CheckRun has a `name` property (even if undefined); a StatusContext uses
+// `context`. So `name === undefined` identifies a StatusContext.
+function checkName(c: any): string | undefined {
+  return c.name === undefined ? c.context || undefined : c.name || undefined;
+}
+
+// Effective status of a named group, by precedence:
+// failing (any FAILURE/ERROR/TIMED_OUT) > pending (any PENDING/…) > ok.
+function groupStatus(runs: any[]): "failing" | "pending" | "ok" {
+  if (runs.some((r: any) => classify(r) === "failing")) return "failing";
+  if (runs.some((r: any) => classify(r) === "pending")) return "pending";
+  return "ok";
+}
+
+function groupByName(ctxs: any[]): { named: Map<string, any[]>; unnamed: any[] } {
+  const named = new Map<string, any[]>();
+  const unnamed: any[] = [];
+  for (const c of ctxs) {
+    const name = checkName(c);
+    if (name) named.set(name, [...(named.get(name) ?? []), c]);
+    else unnamed.push(c);
+  }
+  return { named, unnamed };
+}
+
 function computeCheckRollup(ctxs: any[]): {
   failing: string[];
   pending: string[];
@@ -71,52 +96,30 @@ function computeCheckRollup(ctxs: any[]): {
   pendingChecks: number;
   checkNames: string[];
 } {
-  let failingChecks = 0;
-  let pendingChecks = 0;
+  const { named, unnamed } = groupByName(ctxs);
+
   const failing: string[] = [];
   const pending: string[] = [];
-
-  // Phase 1 — split into named and unnamed contexts
-  const namedMap = new Map<string, any[]>();
-  const unnamedCtxs: any[] = [];
-
-  for (const c of ctxs) {
-    // Detect CheckRun vs StatusContext: CheckRun has a `name` property (even if undefined);
-    // use ctx.name === undefined to identify StatusContext (ctx.context). Otherwise CheckRun (ctx.name).
-    const checkName: string | undefined =
-      c.name === undefined ? (c.context || undefined) : (c.name || undefined);
-    if (checkName) {
-      if (!namedMap.has(checkName)) namedMap.set(checkName, []);
-      namedMap.get(checkName)!.push(c);
-    } else {
-      unnamedCtxs.push(c);
-    }
+  for (const [name, runs] of named) {
+    const status = groupStatus(runs);
+    if (status === "failing") failing.push(name);
+    else if (status === "pending") pending.push(name);
   }
 
-  // Phase 2 — compute effective status per named group with precedence:
-  // 1. failing — any run is FAILURE / ERROR / TIMED_OUT
-  // 2. pending — else any run is PENDING / QUEUED / IN_PROGRESS / EXPECTED
-  // 3. ok — else (SUCCESS / NEUTRAL / SKIPPED / CANCELLED)
-  for (const [name, runs] of namedMap) {
-    const hasFailing = runs.some((r: any) => classify(r) === "failing");
-    const hasPending = !hasFailing && runs.some((r: any) => classify(r) === "pending");
-    if (hasFailing) {
-      failingChecks++;
-      failing.push(name);
-    } else if (hasPending) {
-      pendingChecks++;
-      pending.push(name);
-    }
-  }
+  // Unnamed checks can't be grouped; count each individually.
+  const unnamedStatuses = unnamed.map(classify);
+  const failingChecks =
+    failing.length + unnamedStatuses.filter((k) => k === "failing").length;
+  const pendingChecks =
+    pending.length + unnamedStatuses.filter((k) => k === "pending").length;
 
-  // Unnamed checks: count individually (cannot group without a name)
-  for (const c of unnamedCtxs) {
-    const k = classify(c);
-    if (k === "failing") failingChecks++;
-    else if (k === "pending") pendingChecks++;
-  }
-
-  return { failing, pending, failingChecks, pendingChecks, checkNames: Array.from(namedMap.keys()) };
+  return {
+    failing,
+    pending,
+    failingChecks,
+    pendingChecks,
+    checkNames: Array.from(named.keys()),
+  };
 }
 
 export function parseStuckPrs(raw: any): StuckPr[] {

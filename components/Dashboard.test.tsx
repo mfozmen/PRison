@@ -540,6 +540,16 @@ describe("Dashboard", () => {
       );
     });
 
+    it("review list count badge uses warning style when items are present", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("review pr")).toBeInTheDocument(),
+      );
+      const heading = screen.getByRole("heading", { name: /prs waiting on your review/i });
+      const badge = heading.closest("section")?.querySelector('[data-testid="count-badge"]');
+      expect(badge).toHaveClass("bg-warning");
+    });
+
     it("review row shows 'Blocking @author' with amber styling", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       await waitFor(() =>
@@ -714,6 +724,16 @@ describe("Dashboard", () => {
         screen.queryByRole("link", { name: /build/i }),
       ).not.toBeInTheDocument();
     });
+  });
+
+  it("stuck list count badge uses danger style when items are present", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+    );
+    const heading = screen.getByRole("heading", { name: /prs stuck on checks/i });
+    const badge = heading.closest("section")?.querySelector('[data-testid="count-badge"]');
+    expect(badge).toHaveClass("bg-danger");
   });
 
   describe("refresh button", () => {
@@ -1040,6 +1060,16 @@ describe("Dashboard", () => {
       await waitFor(() =>
         expect(screen.getByText("Merge on GitHub")).toBeInTheDocument(),
       );
+    });
+
+    it("ready list count badge uses success style when items are present", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("ready pr")).toBeInTheDocument(),
+      );
+      const heading = screen.getByRole("heading", { name: /ready to merge/i });
+      const badge = heading.closest("section")?.querySelector('[data-testid="count-badge"]');
+      expect(badge).toHaveClass("bg-success");
     });
 
     it("shows an error banner and retry when the ready fetch fails", async () => {

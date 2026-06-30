@@ -9,8 +9,15 @@ export interface PrListProps<T> {
   groupBy?: (item: T) => string;
   groupKeys?: (item: T) => string[];
   groupHref?: (key: string) => string | undefined;
-  accentCount?: boolean;
+  countAccent?: "success" | "warning" | "danger";
 }
+
+const countAccentClasses: Record<"success" | "warning" | "danger", string> = {
+  success: "rounded-full bg-success px-2 py-0.5 font-mono text-xs tabular-nums text-background ring-1 ring-inset ring-success font-semibold",
+  warning: "rounded-full bg-warning px-2 py-0.5 font-mono text-xs tabular-nums text-background ring-1 ring-inset ring-warning font-semibold",
+  danger:  "rounded-full bg-danger  px-2 py-0.5 font-mono text-xs tabular-nums text-background ring-1 ring-inset ring-danger  font-semibold",
+};
+const neutralBadge = "rounded-full bg-border px-2 py-0.5 font-mono text-xs tabular-nums text-foreground ring-1 ring-inset ring-border";
 
 export function PrList<T>({
   title,
@@ -21,7 +28,7 @@ export function PrList<T>({
   groupBy,
   groupKeys,
   groupHref,
-  accentCount = false,
+  countAccent,
 }: PrListProps<T>) {
   // Build ordered groups when groupBy or groupKeys is provided. groupKeys takes
   // precedence and supports one-to-many placement (an item may appear in
@@ -71,9 +78,7 @@ export function PrList<T>({
         <span
           data-testid="count-badge"
           className={
-            accentCount && items.length > 0
-              ? "rounded-full bg-warning px-2 py-0.5 font-mono text-xs tabular-nums text-background ring-1 ring-inset ring-warning font-semibold"
-              : "rounded-full bg-border px-2 py-0.5 font-mono text-xs tabular-nums text-foreground ring-1 ring-inset ring-border"
+            countAccent && items.length > 0 ? countAccentClasses[countAccent] : neutralBadge
           }
         >
           {items.length}

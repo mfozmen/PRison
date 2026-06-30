@@ -265,7 +265,7 @@ export function TrackedChecksSettings({
           <button
             type="button"
             onClick={addRow}
-            className="cursor-pointer rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:hover:brightness-110"
+            className="min-h-[44px] cursor-pointer rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:hover:brightness-110"
           >
             Add override
           </button>

@@ -138,12 +138,15 @@ export function TrackedChecksSettings({
 
       {/* Panel */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tracked-checks-title"
         className="relative z-10 w-full max-w-lg rounded-xl border border-border bg-background p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header row */}
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-semibold text-foreground">Tracked checks</h2>
+          <h2 id="tracked-checks-title" className="font-semibold text-foreground">Tracked checks</h2>
           <button
             ref={closeButtonRef}
             type="button"

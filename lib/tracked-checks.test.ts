@@ -49,6 +49,33 @@ describe("awaitingChecks", () => {
   });
 });
 
+describe("resolveTracked — malformed config guard", () => {
+  it("returns [] when repos[repo] is a non-array (e.g. a number from hand-edited localStorage)", () => {
+    const malformed = {
+      orgs: {},
+      repos: { "acme/app": 5 },
+    } as unknown as import("./tracked-checks").TrackedChecks;
+    expect(resolveTracked("acme/app", malformed)).toEqual([]);
+  });
+
+  it("falls through to org-level array when repos value is a non-array", () => {
+    const malformed = {
+      orgs: { acme: ["build"] },
+      repos: { "acme/app": 5 },
+    } as unknown as import("./tracked-checks").TrackedChecks;
+    expect(resolveTracked("acme/app", malformed)).toEqual(["build"]);
+  });
+
+  it("awaitingChecks does not throw on malformed config (returns [])", () => {
+    const malformed = {
+      orgs: { acme: 5 },
+      repos: { "acme/app": 5 },
+    } as unknown as import("./tracked-checks").TrackedChecks;
+    expect(() => awaitingChecks("acme/app", ["build"], malformed)).not.toThrow();
+    expect(awaitingChecks("acme/app", ["build"], malformed)).toEqual([]);
+  });
+});
+
 describe("parseTracked", () => {
   it("null input returns EMPTY_TRACKED", () => {
     expect(parseTracked(null)).toEqual(EMPTY_TRACKED);

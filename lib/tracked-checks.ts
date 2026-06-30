@@ -8,9 +8,11 @@ export const EMPTY_TRACKED: TrackedChecks = { orgs: {}, repos: {} };
  * 3. else → []
  */
 export function resolveTracked(repo: string, cfg: TrackedChecks): string[] {
-  if (cfg.repos[repo] !== undefined) return cfg.repos[repo];
+  const repoVal = cfg.repos[repo];
+  if (Array.isArray(repoVal)) return repoVal;
   const org = repo.split("/")[0];
-  if (cfg.orgs[org] !== undefined) return cfg.orgs[org];
+  const orgVal = cfg.orgs[org];
+  if (Array.isArray(orgVal)) return orgVal;
   return [];
 }
 

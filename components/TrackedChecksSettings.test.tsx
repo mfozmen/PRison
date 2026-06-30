@@ -241,4 +241,17 @@ describe("TrackedChecksSettings", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("panel has dialog role when open", () => {
+    render(
+      <TrackedChecksSettings
+        orgs={[]}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
 });

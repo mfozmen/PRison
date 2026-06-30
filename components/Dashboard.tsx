@@ -7,6 +7,8 @@ import { suggestStuck, suggestReview, suggestReady } from "@/lib/suggest";
 import { PrList } from "./PrList";
 import { PrRow } from "./PrRow";
 import { Header } from "./Header";
+import { TrackedChecksSettings } from "./TrackedChecksSettings";
+import { type TrackedChecks, EMPTY_TRACKED, parseTracked, awaitingChecks } from "@/lib/tracked-checks";
 
 export interface DashboardProps {
   orgs: Org[];
@@ -23,6 +25,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [hydrated, setHydrated] = useState(false);
   const [hideDrafts, setHideDrafts] = useState(false);
   const [groupBy, setGroupBy] = useState<"flat" | "repo" | "check">("flat");
+
+  const [tracked, setTracked] = useState<TrackedChecks>(EMPTY_TRACKED);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [stuckPrs, setStuckPrs] = useState<StuckPr[]>([]);
   const [reviewReqs, setReviewReqs] = useState<ReviewRequest[]>([]);
@@ -94,6 +99,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     const stored = localStorage.getItem("prison.org");
     const storedHideDrafts = localStorage.getItem("prison.hideDrafts");
     const storedGroupBy = localStorage.getItem("prison.groupBy");
+    const storedTracked = localStorage.getItem("prison.trackedChecks");
     startTransition(() => {
       if (
         stored === ALL ||
@@ -109,6 +115,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         setGroupBy(storedGroupBy);
       }
       // "blocker" (old value) falls through → stays "flat" (default)
+      setTracked(parseTracked(storedTracked));
       setHydrated(true);
     });
   }, [startTransition, orgs, login]);
@@ -129,6 +136,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     localStorage.setItem("prison.groupBy", groupBy);
   }, [groupBy, hydrated]);
 
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.trackedChecks", JSON.stringify(tracked));
+  }, [tracked, hydrated]);
+
   const sortedStuck = sortByAgeAsc(stuckPrs, (pr) => pr.stuckSince);
   const sortedReviews = sortByAgeAsc(reviewReqs, (req) => req.requestedAt);
   const sortedReady = sortByAgeAsc(readyPrs, (pr) => pr.readySince);
@@ -145,6 +157,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         selectedOrg={selectedOrg}
         onOrgChange={setSelectedOrg}
         login={login}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+      <TrackedChecksSettings
+        orgs={orgs}
+        value={tracked}
+        onChange={setTracked}
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
       />
       <main className="mx-auto w-full max-w-screen-2xl flex-1 space-y-8 px-4 sm:px-6 lg:px-8 py-8">
         {isPending && (
@@ -385,7 +405,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 const showFailingNames = truncate ? pr.failing.slice(0, 2) : pr.failing;
                 const showPendingNames = truncate ? pr.pending.slice(0, 2) : pr.pending;
                 const overflow = totalNames - (showFailingNames.length + showPendingNames.length);
-                const detail = hasNames ? (
+                const awaiting = awaitingChecks(pr.repo, pr.checkNames, tracked);
+                const chipsBlock = hasNames ? (
                   <div className="flex flex-wrap gap-1 items-center">
                     {showFailingNames.map((name, i) => (
                       <span
@@ -418,6 +439,29 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 ) : (
                   `${pr.failingChecks} failing · ${pr.pendingChecks} pending`
                 );
+                const awaitingBlock = awaiting.length > 0 ? (
+                  <div className="flex flex-wrap gap-1 items-center mt-1">
+                    <svg aria-hidden="true" className="shrink-0 text-warning" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3"/>
+                      <path d="M6 3.5v2.75l1.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <span className="text-xs text-muted">Awaiting:</span>
+                    {awaiting.map((name) => (
+                      <span
+                        key={name}
+                        className="bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium"
+                      >
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                ) : null;
+                const detail = awaiting.length > 0 ? (
+                  <div className="flex flex-col gap-0.5">
+                    {chipsBlock}
+                    {awaitingBlock}
+                  </div>
+                ) : chipsBlock;
                 return (
                   <PrRow
                     title={pr.title}

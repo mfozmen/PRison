@@ -289,7 +289,7 @@ describe("parseStuckPrs", () => {
     expect(prs[0].pendingChecks).toBe(1); // deploy
   });
 
-  it("all-named fixture: failing.length === failingChecks and pending.length === pendingChecks", () => {
+  it("all-named fixture: correct failing and pending arrays", () => {
     const rawAllNamed = {
       search: { nodes: [
         { id: "32", title: "all-named", url: "u32", number: 32,
@@ -306,8 +306,8 @@ describe("parseStuckPrs", () => {
     };
     const prs = parseStuckPrs(rawAllNamed);
     expect(prs).toHaveLength(1);
-    expect(prs[0].failing.length).toBe(prs[0].failingChecks);
-    expect(prs[0].pending.length).toBe(prs[0].pendingChecks);
+    expect(prs[0].failing).toEqual(["build", "ci/test"]);
+    expect(prs[0].pending).toEqual(["deploy"]);
   });
 
   it("collects StatusContext names via context field into pending array", () => {

@@ -12,5 +12,11 @@ export function resolveScope(
   const user = params.get("user") ?? "";
   if (org && !isValidLogin(org)) return { error: "invalid org" };
   if (user && !isValidLogin(user)) return { error: "invalid user" };
-  return { scope: user ? `user:${user}` : org ? `org:${org}` : undefined };
+  let scope: string | undefined;
+  if (user) {
+    scope = `user:${user}`;
+  } else if (org) {
+    scope = `org:${org}`;
+  }
+  return { scope };
 }

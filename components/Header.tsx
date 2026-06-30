@@ -31,9 +31,10 @@ export interface HeaderProps {
   selectedOrg: string;
   onOrgChange: (login: string) => void;
   login: string;
+  onOpenSettings: () => void;
 }
 
-export function Header({ orgs, selectedOrg, onOrgChange, login }: HeaderProps) {
+export function Header({ orgs, selectedOrg, onOrgChange, login, onOpenSettings }: HeaderProps) {
   const isDark = useSyncExternalStore(
     subscribeToTheme,
     getThemeSnapshot,
@@ -66,6 +67,17 @@ export function Header({ orgs, selectedOrg, onOrgChange, login }: HeaderProps) {
         <span className="hidden text-sm text-muted sm:inline">
           {login || "there"}
         </span>
+        <button
+          type="button"
+          aria-label="Tracked checks settings"
+          onClick={onOpenSettings}
+          className="cursor-pointer rounded-md border border-border bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors hover:brightness-95 dark:hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3.05 3.05l1.06 1.06M11.88 11.88l1.06 1.06M3.05 12.95l1.06-1.06M11.88 4.12l1.06-1.06" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        </button>
         <button
           type="button"
           aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}

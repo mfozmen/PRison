@@ -12,6 +12,7 @@ const STUCK_PR = {
   pendingChecks: 0,
   failing: ["build"],
   pending: [],
+  checkNames: ["build"],
   isDraft: false,
   blocked: false,
   stuckSince: "2026-06-20T00:00:00Z",
@@ -926,6 +927,56 @@ describe("Dashboard", () => {
       await waitFor(() =>
         expect(screen.getAllByTestId("group-header")).toHaveLength(3),
       );
+    });
+  });
+
+  describe("tracked checks", () => {
+    it("shows an awaiting chip for a tracked check absent from checkNames", async () => {
+      localStorage.setItem(
+        "prison.trackedChecks",
+        JSON.stringify({ orgs: { acme: ["qa/smoke"] }, repos: {} }),
+      );
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      expect(screen.getByText("qa/smoke")).toBeInTheDocument();
+    });
+
+    it("does NOT show an awaiting chip when the tracked check is present in checkNames", async () => {
+      localStorage.setItem(
+        "prison.trackedChecks",
+        JSON.stringify({ orgs: { acme: ["build"] }, repos: {} }),
+      );
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      expect(screen.queryByText("Awaiting:")).not.toBeInTheDocument();
+    });
+
+    it("opening settings via gear button renders the tracked checks panel", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Tracked checks settings" }));
+      expect(screen.getByText("Tracked checks")).toBeInTheDocument();
+    });
+
+    it("hydrates tracked config from localStorage and persists it back", async () => {
+      localStorage.setItem(
+        "prison.trackedChecks",
+        JSON.stringify({ orgs: { acme: ["qa/smoke"] }, repos: {} }),
+      );
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      const stored = localStorage.getItem("prison.trackedChecks");
+      expect(stored).not.toBeNull();
+      const parsed = JSON.parse(stored!);
+      expect(parsed.orgs.acme).toContain("qa/smoke");
     });
   });
 

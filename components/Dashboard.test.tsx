@@ -998,6 +998,24 @@ describe("Dashboard", () => {
       const parsed = JSON.parse(stored!);
       expect(parsed.orgs.acme).toContain("qa/smoke");
     });
+
+    it("passes distinct repos from loaded PR lists as dropdown options to the settings modal", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      // STUCK_PR.repo = "acme/b", REVIEW_PR.repo = "acme/c", READY_PR.repo = "acme/d"
+      fireEvent.click(screen.getByRole("button", { name: "Tracked checks settings" }));
+      // The settings modal is open; since there are loaded repos, Add override button is rendered.
+      const addButton = screen.getByRole("button", { name: /add override/i });
+      expect(addButton).toBeInTheDocument();
+      fireEvent.click(addButton);
+      const select = screen.getByRole("combobox", { name: "Repository" }) as HTMLSelectElement;
+      const optionValues = Array.from(select.options).map((o) => o.value);
+      expect(optionValues).toContain("acme/b");
+      expect(optionValues).toContain("acme/c");
+      expect(optionValues).toContain("acme/d");
+    });
   });
 
   describe("ready-to-merge", () => {

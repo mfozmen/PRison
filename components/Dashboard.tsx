@@ -141,6 +141,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     localStorage.setItem("prison.trackedChecks", JSON.stringify(tracked));
   }, [tracked, hydrated]);
 
+  const availableRepos = Array.from(
+    new Set([
+      ...stuckPrs.map((p) => p.repo),
+      ...reviewReqs.map((r) => r.repo),
+      ...readyPrs.map((p) => p.repo),
+    ])
+  ).sort();
+
   const sortedStuck = sortByAgeAsc(stuckPrs, (pr) => pr.stuckSince);
   const sortedReviews = sortByAgeAsc(reviewReqs, (req) => req.requestedAt);
   const sortedReady = sortByAgeAsc(readyPrs, (pr) => pr.readySince);
@@ -161,6 +169,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       />
       <TrackedChecksSettings
         orgs={orgs}
+        availableRepos={availableRepos}
         value={tracked}
         onChange={setTracked}
         open={settingsOpen}

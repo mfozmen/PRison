@@ -12,17 +12,17 @@ describe("searchQuery", () => {
     expect(searchQuery("author")).toBe("is:open is:pr author:@me");
     expect(searchQuery("review", "")).toBe("is:open is:pr review-requested:@me");
   });
-  it("ready kind emits author:@me review:approved", () => {
-    expect(searchQuery("ready")).toBe("is:open is:pr author:@me review:approved");
+  it("ready kind emits author:@me (parseReadyPrs filters to CLEAN)", () => {
+    expect(searchQuery("ready")).toBe("is:open is:pr author:@me");
   });
   it("ready kind with org appends org scope", () => {
-    expect(searchQuery("ready", "org:acme")).toBe("is:open is:pr author:@me review:approved org:acme");
+    expect(searchQuery("ready", "org:acme")).toBe("is:open is:pr author:@me org:acme");
   });
   it("scopes author search to a personal user account", () => {
     expect(searchQuery("author", "user:mfozmen")).toBe("is:open is:pr author:@me user:mfozmen");
   });
   it("ready kind with user scope appends user qualifier", () => {
-    expect(searchQuery("ready", "user:mfozmen")).toBe("is:open is:pr author:@me review:approved user:mfozmen");
+    expect(searchQuery("ready", "user:mfozmen")).toBe("is:open is:pr author:@me user:mfozmen");
   });
 });
 

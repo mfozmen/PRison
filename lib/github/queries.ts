@@ -8,8 +8,11 @@ import type { Org, StuckPr, ReviewRequest, ReadyPr } from "@/lib/types";
 // Callers pass a ready-made qualifier string such as "org:acme" or "user:mfozmen".
 export function searchQuery(kind: "author" | "review" | "ready", scope?: string): string {
   const scopePart = scope ? ` ${scope}` : "";
-  if (kind === "ready") return `is:open is:pr author:@me review:approved${scopePart}`;
-  const who = kind === "author" ? "author:@me" : "review-requested:@me";
+  // "ready" fetches all of the user's open PRs; parseReadyPrs then keeps the
+  // ones GitHub reports as mergeable now (mergeStateStatus CLEAN, not draft).
+  // We do NOT filter on review:approved here — a CLEAN PR is already mergeable
+  // (including any required review), and some repos don't require review.
+  const who = kind === "review" ? "review-requested:@me" : "author:@me";
   return `is:open is:pr ${who}${scopePart}`;
 }
 

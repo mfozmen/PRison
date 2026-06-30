@@ -999,22 +999,22 @@ describe("Dashboard", () => {
       expect(parsed.orgs.acme).toContain("qa/smoke");
     });
 
-    it("passes distinct repos from loaded PR lists as dropdown options to the settings modal", async () => {
+    it("passes distinct repos from loaded PR lists as suggestions to the settings modal", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       await waitFor(() =>
         expect(screen.getByText("stuck pr")).toBeInTheDocument(),
       );
       // STUCK_PR.repo = "acme/b", REVIEW_PR.repo = "acme/c", READY_PR.repo = "acme/d"
       fireEvent.click(screen.getByRole("button", { name: "Tracked checks settings" }));
-      // The settings modal is open; since there are loaded repos, Add override button is rendered.
       const addButton = screen.getByRole("button", { name: /add override/i });
       expect(addButton).toBeInTheDocument();
       fireEvent.click(addButton);
-      const select = screen.getByRole("combobox", { name: "Repository" }) as HTMLSelectElement;
-      const optionValues = Array.from(select.options).map((o) => o.value);
-      expect(optionValues).toContain("acme/b");
-      expect(optionValues).toContain("acme/c");
-      expect(optionValues).toContain("acme/d");
+      // Focus the combobox; empty input shows availableRepos as suggestions
+      const combobox = screen.getByRole("combobox", { name: "Repository" });
+      fireEvent.focus(combobox);
+      expect(screen.getByRole("option", { name: "acme/b" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "acme/c" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "acme/d" })).toBeInTheDocument();
     });
   });
 
@@ -1064,7 +1064,12 @@ describe("Dashboard", () => {
       await waitFor(() =>
         expect(screen.getByText("ready pr")).toBeInTheDocument(),
       );
-      fireEvent.click(screen.getByRole("button", { name: /^refresh$/i }));
+      // Wait for the mount fetches to settle so the button is enabled — clicking
+      // while it is still disabled (mount load in flight) is a no-op and races
+      // under full-suite concurrency.
+      const refreshButton = screen.getByRole("button", { name: /^refresh$/i });
+      await waitFor(() => expect(refreshButton).toBeEnabled());
+      fireEvent.click(refreshButton);
       // 3 fetches on mount + 3 on refresh (stuck + review + ready) = 6 total.
       // Use waitFor so the assertion retries until all async refresh fetches register.
       await waitFor(() =>

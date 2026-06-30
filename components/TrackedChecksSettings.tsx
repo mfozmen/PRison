@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { Org } from "@/lib/types";
 import type { TrackedChecks } from "@/lib/tracked-checks";
+import { RepoCombobox } from "./RepoCombobox";
 
 export interface TrackedChecksSettingsProps {
   orgs: Org[];
@@ -91,10 +92,6 @@ export function TrackedChecksSettings({
   }, [open]);
 
   if (!open) return null;
-
-  const repoOptions = Array.from(
-    new Set([...availableRepos, ...Object.keys(value.repos)])
-  ).sort();
 
   function handleOrgChange(orgLogin: string, inputValue: string) {
     setOrgDrafts((prev) => ({ ...prev, [orgLogin]: inputValue }));
@@ -223,72 +220,61 @@ export function TrackedChecksSettings({
           <p className="mb-3 text-xs text-muted">
             A repo override replaces the org default for that repo.
           </p>
-          {repoOptions.length === 0 ? (
-            <p className="text-xs text-muted">
-              No repositories loaded yet &mdash; they&apos;ll appear here once your PRs load.
+          {availableRepos.length === 0 && rows.length === 0 && (
+            <p className="mb-3 text-xs text-muted">
+              No repositories loaded yet &mdash; you can search any repo by name below.
             </p>
-          ) : (
-            <>
-              <div className="mb-3 space-y-2">
-                {rows.map((row, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <select
-                      aria-label="Repository"
-                      value={row.repo}
-                      onChange={(e) =>
-                        handleRowChange(index, "repo", e.target.value)
-                      }
-                      className="flex-1 cursor-pointer rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground shadow-sm transition-colors hover:border-border/70 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                    >
-                      <option value="" disabled>Select a repository&hellip;</option>
-                      {repoOptions.map((repo) => (
-                        <option key={repo} value={repo}>{repo}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="text"
-                      aria-label="Check names for this repo override"
-                      placeholder="e.g. qa/smoke"
-                      value={row.checks}
-                      onChange={(e) =>
-                        handleRowChange(index, "checks", e.target.value)
-                      }
-                      className="flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                    />
-                    <button
-                      type="button"
-                      aria-label="Remove repo override"
-                      onClick={() => removeRow(index)}
-                      className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                    >
-                      <svg
-                        aria-hidden="true"
-                        width="14"
-                        height="14"
-                        viewBox="0 0 14 14"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M11 3L3 11M3 3l8 8"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={addRow}
-                className="min-h-[44px] cursor-pointer rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:hover:brightness-110"
-              >
-                Add override
-              </button>
-            </>
           )}
+          <div className="mb-3 space-y-2">
+            {rows.map((row, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <RepoCombobox
+                  value={row.repo}
+                  onChange={(repo) => handleRowChange(index, "repo", repo)}
+                  suggestions={availableRepos}
+                />
+                <input
+                  type="text"
+                  aria-label="Check names for this repo override"
+                  placeholder="e.g. qa/smoke"
+                  value={row.checks}
+                  onChange={(e) =>
+                    handleRowChange(index, "checks", e.target.value)
+                  }
+                  className="flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+                <button
+                  type="button"
+                  aria-label="Remove repo override"
+                  onClick={() => removeRow(index)}
+                  className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                >
+                  <svg
+                    aria-hidden="true"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M11 3L3 11M3 3l8 8"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={addRow}
+            className="min-h-[44px] cursor-pointer rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:hover:brightness-110"
+          >
+            Add override
+          </button>
         </section>
       </div>
     </div>

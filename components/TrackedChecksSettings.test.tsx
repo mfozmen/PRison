@@ -158,9 +158,11 @@ describe("TrackedChecksSettings", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /add override/i }));
-    const repoSelect = screen.getByRole("combobox", { name: "Repository" });
+    const repoInput = screen.getByRole("combobox", { name: "Repository" });
     const checksInput = screen.getByPlaceholderText("e.g. qa/smoke");
-    fireEvent.change(repoSelect, { target: { value: "acme/web" } });
+    // Focus the combobox to reveal availableRepos as suggestions, then pick one
+    fireEvent.focus(repoInput);
+    fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
     fireEvent.change(checksInput, { target: { value: "Automation Result" } });
     expect(onChange).toHaveBeenLastCalledWith({
       orgs: {},
@@ -271,7 +273,7 @@ describe("TrackedChecksSettings", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
-  it("repo override field is a select with options from availableRepos", () => {
+  it("repo override field shows availableRepos as suggestions on focus", () => {
     render(
       <TrackedChecksSettings
         orgs={[]}
@@ -283,13 +285,14 @@ describe("TrackedChecksSettings", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /add override/i }));
-    const select = screen.getByRole("combobox", { name: "Repository" }) as HTMLSelectElement;
-    const optionValues = Array.from(select.options).map((o) => o.value);
-    expect(optionValues).toContain("acme/web");
-    expect(optionValues).toContain("beta/api");
+    const combobox = screen.getByRole("combobox", { name: "Repository" });
+    // Focus opens the suggestion dropdown; empty input shows availableRepos
+    fireEvent.focus(combobox);
+    expect(screen.getByRole("option", { name: "acme/web" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "beta/api" })).toBeInTheDocument();
   });
 
-  it("already-configured repo not in availableRepos still appears as an option", () => {
+  it("already-configured repo not in availableRepos is shown as the input value", () => {
     const value: TrackedChecks = {
       orgs: {},
       repos: { "legacy/repo": ["ci"] },
@@ -304,9 +307,9 @@ describe("TrackedChecksSettings", () => {
         onClose={vi.fn()}
       />,
     );
-    const select = screen.getByRole("combobox", { name: "Repository" }) as HTMLSelectElement;
-    const optionValues = Array.from(select.options).map((o) => o.value);
-    expect(optionValues).toContain("legacy/repo");
+    // The row is seeded from value.repos; the combobox input displays the repo name
+    const combobox = screen.getByRole("combobox", { name: "Repository" });
+    expect(combobox).toHaveValue("legacy/repo");
   });
 
   it("selecting a repo and entering checks calls onChange with the right repos shape", () => {
@@ -322,8 +325,10 @@ describe("TrackedChecksSettings", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /add override/i }));
-    const select = screen.getByRole("combobox", { name: "Repository" });
-    fireEvent.change(select, { target: { value: "acme/web" } });
+    const repoInput = screen.getByRole("combobox", { name: "Repository" });
+    // Focus to show suggestions, then pick one
+    fireEvent.focus(repoInput);
+    fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
     const checksInput = screen.getByPlaceholderText("e.g. qa/smoke");
     fireEvent.change(checksInput, { target: { value: "Automation Result" } });
     expect(onChange).toHaveBeenLastCalledWith({
@@ -332,7 +337,7 @@ describe("TrackedChecksSettings", () => {
     });
   });
 
-  it("shows empty-state hint when availableRepos and configured repos are both empty", () => {
+  it("shows empty-state hint and Add override button when availableRepos and configured repos are both empty", () => {
     render(
       <TrackedChecksSettings
         orgs={[]}
@@ -346,6 +351,7 @@ describe("TrackedChecksSettings", () => {
     expect(
       screen.getByText(/no repositories loaded yet/i),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /add override/i })).not.toBeInTheDocument();
+    // Add override is always available so the user can search server-side
+    expect(screen.getByRole("button", { name: /add override/i })).toBeInTheDocument();
   });
 });

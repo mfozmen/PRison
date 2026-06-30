@@ -763,14 +763,25 @@ describe("parseReadyPrs", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("drops not-approved (REVIEW_REQUIRED) even when mergeStateStatus is CLEAN", () => {
-    const result = parseReadyPrs({ search: { nodes: [makePr({ reviewDecision: "REVIEW_REQUIRED" })] } });
+  // When review is required but not yet given, GitHub reports BLOCKED (not CLEAN).
+  // REVIEW_REQUIRED + CLEAN is an impossible combo in practice, so we test the
+  // realistic scenario: REVIEW_REQUIRED + BLOCKED → excluded because it's BLOCKED.
+  it("drops REVIEW_REQUIRED + BLOCKED mergeStateStatus (realistic: GitHub reports BLOCKED when review is missing)", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr({ reviewDecision: "REVIEW_REQUIRED", mergeStateStatus: "BLOCKED" })] } });
     expect(result).toHaveLength(0);
   });
 
-  it("drops CHANGES_REQUESTED even when mergeStateStatus is CLEAN", () => {
-    const result = parseReadyPrs({ search: { nodes: [makePr({ reviewDecision: "CHANGES_REQUESTED" })] } });
+  // Same reasoning: CHANGES_REQUESTED causes BLOCKED in GitHub's API, not CLEAN.
+  it("drops CHANGES_REQUESTED + BLOCKED mergeStateStatus (realistic: GitHub reports BLOCKED when changes are requested)", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr({ reviewDecision: "CHANGES_REQUESTED", mergeStateStatus: "BLOCKED" })] } });
     expect(result).toHaveLength(0);
+  });
+
+  it("keeps CLEAN + not-draft when reviewDecision is null (review not required) — the personal-PR case", () => {
+    // Personal-account repos often have no required reviewers; reviewDecision is null
+    // and mergeStateStatus is CLEAN, meaning GitHub has already confirmed it's mergeable.
+    const result = parseReadyPrs({ search: { nodes: [makePr({ reviewDecision: null })] } });
+    expect(result).toHaveLength(1);
   });
 
   it("drops draft PRs even when APPROVED + CLEAN", () => {

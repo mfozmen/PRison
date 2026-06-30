@@ -155,7 +155,7 @@ export const READY_PRS_QUERY = `
     search(query: $q, type: ISSUE, first: 50) {
       nodes { ... on PullRequest {
         id title url number isDraft updatedAt
-        reviewDecision mergeStateStatus
+        mergeStateStatus
         repository { nameWithOwner }
         commits(last: 1) { nodes { commit {
           pushedDate committedDate
@@ -190,9 +190,13 @@ export function parseRepoSearch(raw: any): string[] {
 }
 
 export function parseReadyPrs(raw: any): ReadyPr[] {
+  // mergeStateStatus === "CLEAN" is GitHub's own "mergeable now" signal.
+  // If branch protection requires a review, a not-yet-approved PR reports BLOCKED
+  // (not CLEAN), so CLEAN already implies the review gate is satisfied (or not
+  // required, as is common for personal-account repos). No separate reviewDecision
+  // check is needed.
   return (raw?.search?.nodes ?? [])
     .filter((n: any) => n?.id)
-    .filter((n: any) => n.reviewDecision === "APPROVED")
     .filter((n: any) => n.mergeStateStatus === "CLEAN")
     .filter((n: any) => !n.isDraft)
     .map((n: any) => {

@@ -453,6 +453,7 @@ describe("parseStuckPrs", () => {
     const prs = parseStuckPrs(rawBlocked);
     expect(prs).toHaveLength(1);
     expect(prs[0].blocked).toBe(true);
+    expect(prs[0].mergeState).toBe("BLOCKED");
     expect(prs[0].failingChecks).toBe(0);
     expect(prs[0].pendingChecks).toBe(0);
   });
@@ -492,6 +493,31 @@ describe("parseStuckPrs", () => {
     const prs = parseStuckPrs(rawBehind);
     expect(prs).toHaveLength(1);
     expect(prs[0].blocked).toBe(true);
+    expect(prs[0].mergeState).toBe("BEHIND");
+  });
+
+  it("BEHIND PR with all-green checks is included with mergeState:'BEHIND' and blocked:true (live bug scenario)", () => {
+    const rawBehindGreen = {
+      search: { nodes: [
+        { id: "65", title: "behind-all-green", url: "u65", number: 65,
+          mergeStateStatus: "BEHIND",
+          repository: { nameWithOwner: "acme/b" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { name: "build", conclusion: "SUCCESS" },
+              { name: "ci/test", conclusion: "SUCCESS" },
+              { name: "lint", conclusion: "SUCCESS" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawBehindGreen);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].blocked).toBe(true);
+    expect(prs[0].mergeState).toBe("BEHIND");
+    expect(prs[0].failingChecks).toBe(0);
+    expect(prs[0].pendingChecks).toBe(0);
   });
 
   it("failing checks + BLOCKED mergeStateStatus → included with blocked:true", () => {

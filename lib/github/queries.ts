@@ -112,6 +112,7 @@ export function parseStuckPrs(raw: any): StuckPr[] {
         else if (k === "pending") pendingChecks++;
       }
       const blocked = n.mergeStateStatus === "BLOCKED" || n.mergeStateStatus === "BEHIND";
+      const mergeState: string = n.mergeStateStatus ?? "";
       return {
         id: n.id, title: n.title, url: n.url, number: n.number,
         repo: n.repository?.nameWithOwner ?? "",
@@ -119,6 +120,7 @@ export function parseStuckPrs(raw: any): StuckPr[] {
         checkNames: Array.from(namedMap.keys()),
         isDraft: n.isDraft ?? false,
         blocked,
+        mergeState,
         stuckSince: commit.pushedDate ?? commit.committedDate ?? "",
       } as StuckPr;
     })

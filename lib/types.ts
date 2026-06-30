@@ -13,6 +13,7 @@ export type StuckPr = {
   checkNames: string[];   // all DISTINCT context display names present in the rollup (any state)
   isDraft: boolean;
   blocked: boolean;
+  mergeState: string;   // raw mergeStateStatus from GitHub API, e.g. "BEHIND", "DIRTY", "BLOCKED", ""
   stuckSince: string; // ISO
 };
 

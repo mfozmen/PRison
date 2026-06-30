@@ -6,8 +6,9 @@ export function suggestStuck(pr: StuckPr): Suggestion {
   const href = `${pr.url}/checks`;
   if (pr.failingChecks > 0) return { text: "Re-run failed checks", href };
   if (pr.pendingChecks > 0) return { text: "Investigate pending CI", href };
-  // Blocked with no visible failing/pending checks — required checks haven't
-  // reported yet (e.g. a manual stage); the Checks tab lists them on GitHub.
+  // No visible checks — branch by mergeState
+  if (pr.mergeState === "BEHIND") return { text: "Update branch", href: pr.url };
+  if (pr.mergeState === "DIRTY") return { text: "Resolve conflicts", href: pr.url };
   return { text: "See required checks", href };
 }
 

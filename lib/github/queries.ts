@@ -8,8 +8,11 @@ import type { Org, StuckPr, ReviewRequest, ReadyPr } from "@/lib/types";
 // Callers pass a ready-made qualifier string such as "org:acme" or "user:mfozmen".
 export function searchQuery(kind: "author" | "review" | "ready", scope?: string): string {
   const scopePart = scope ? ` ${scope}` : "";
-  if (kind === "ready") return `is:open is:pr author:@me review:approved${scopePart}`;
-  const who = kind === "author" ? "author:@me" : "review-requested:@me";
+  // "ready" fetches all of the user's open PRs; parseReadyPrs then keeps the
+  // ones GitHub reports as mergeable now (mergeStateStatus CLEAN, not draft).
+  // We do NOT filter on review:approved here — a CLEAN PR is already mergeable
+  // (including any required review), and some repos don't require review.
+  const who = kind === "review" ? "review-requested:@me" : "author:@me";
   return `is:open is:pr ${who}${scopePart}`;
 }
 
@@ -111,7 +114,12 @@ export function parseStuckPrs(raw: any): StuckPr[] {
         if (k === "failing") failingChecks++;
         else if (k === "pending") pendingChecks++;
       }
-      const blocked = n.mergeStateStatus === "BLOCKED" || n.mergeStateStatus === "BEHIND";
+      // A PR is "blocked" (shown in the stuck list even with green checks) when
+      // branch protection blocks it (BLOCKED), it is out of date (BEHIND), or it
+      // has merge conflicts (DIRTY). All three states prevent merging regardless
+      // of check results.
+      const blocked = n.mergeStateStatus === "BLOCKED" || n.mergeStateStatus === "BEHIND" || n.mergeStateStatus === "DIRTY";
+      const mergeState: string = n.mergeStateStatus ?? "";
       return {
         id: n.id, title: n.title, url: n.url, number: n.number,
         repo: n.repository?.nameWithOwner ?? "",
@@ -119,6 +127,7 @@ export function parseStuckPrs(raw: any): StuckPr[] {
         checkNames: Array.from(namedMap.keys()),
         isDraft: n.isDraft ?? false,
         blocked,
+        mergeState,
         stuckSince: commit.pushedDate ?? commit.committedDate ?? "",
       } as StuckPr;
     })
@@ -153,7 +162,7 @@ export const READY_PRS_QUERY = `
     search(query: $q, type: ISSUE, first: 50) {
       nodes { ... on PullRequest {
         id title url number isDraft updatedAt
-        reviewDecision mergeStateStatus
+        mergeStateStatus
         repository { nameWithOwner }
         commits(last: 1) { nodes { commit {
           pushedDate committedDate
@@ -188,9 +197,13 @@ export function parseRepoSearch(raw: any): string[] {
 }
 
 export function parseReadyPrs(raw: any): ReadyPr[] {
+  // mergeStateStatus === "CLEAN" is GitHub's own "mergeable now" signal.
+  // If branch protection requires a review, a not-yet-approved PR reports BLOCKED
+  // (not CLEAN), so CLEAN already implies the review gate is satisfied (or not
+  // required, as is common for personal-account repos). No separate reviewDecision
+  // check is needed.
   return (raw?.search?.nodes ?? [])
     .filter((n: any) => n?.id)
-    .filter((n: any) => n.reviewDecision === "APPROVED")
     .filter((n: any) => n.mergeStateStatus === "CLEAN")
     .filter((n: any) => !n.isDraft)
     .map((n: any) => {

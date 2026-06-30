@@ -71,7 +71,7 @@ describe("GET /api/ready-to-merge", () => {
     expect(body).toHaveLength(1);
     expect(body[0].readySince).toBe("2026-06-25T00:00:00Z");
     expect(queryMock.mock.calls[0][2].q).toBe(
-      "is:open is:pr author:@me review:approved org:acme",
+      "is:open is:pr author:@me org:acme",
     );
   });
 
@@ -81,7 +81,7 @@ describe("GET /api/ready-to-merge", () => {
     const res = await GET(req("http://x/api/ready-to-merge"));
     expect(res.status).toBe(200);
     expect(queryMock.mock.calls[0][2].q).toBe(
-      "is:open is:pr author:@me review:approved",
+      "is:open is:pr author:@me",
     );
   });
 
@@ -99,7 +99,7 @@ describe("GET /api/ready-to-merge", () => {
     const res = await GET(req("http://x/api/ready-to-merge?user=mfozmen"));
     expect(res.status).toBe(200);
     expect(queryMock.mock.calls[0][2].q).toBe(
-      "is:open is:pr author:@me review:approved user:mfozmen",
+      "is:open is:pr author:@me user:mfozmen",
     );
   });
 

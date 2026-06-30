@@ -12,12 +12,18 @@ export interface PrRowProps {
   detail?: React.ReactNode;
   suggestion: Suggestion;
   draft?: boolean;
-  accent?: "blocking";
+  accent?: "success" | "warning" | "danger";
 }
+
+const accentClasses: Record<"success" | "warning" | "danger", string> = {
+  success: "border-l-2 border-l-success hover:border-l-success",
+  warning: "border-l-2 border-l-warning hover:border-l-warning",
+  danger:  "border-l-2 border-l-danger  hover:border-l-danger",
+};
 
 export function PrRow({ title, repo, number, url, since, now, detail, suggestion, draft, accent }: PrRowProps) {
   return (
-    <div className={`flex flex-col gap-1 rounded-lg border border-border bg-surface/50 p-4 transition-colors hover:border-border/70 hover:bg-surface${accent === "blocking" ? " border-l-2 border-l-warning hover:border-l-warning" : ""}`}>
+    <div className={`flex flex-col gap-1 rounded-lg border border-border bg-surface/50 p-4 transition-colors hover:border-border/70 hover:bg-surface${accent ? ` ${accentClasses[accent]}` : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2">
           {draft && (

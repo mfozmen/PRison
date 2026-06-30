@@ -10,6 +10,7 @@ export type StuckPr = {
   pendingChecks: number;
   failing: string[];
   pending: string[];
+  checkNames: string[];   // all DISTINCT context display names present in the rollup (any state)
   isDraft: boolean;
   blocked: boolean;
   stuckSince: string; // ISO

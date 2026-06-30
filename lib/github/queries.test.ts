@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs, parseReadyPrs } from "./queries";
+import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs, parseReadyPrs, parseRepoSearch } from "./queries";
 
 describe("searchQuery", () => {
   it("scopes author search to the org", () => {
@@ -800,5 +800,50 @@ describe("parseOrgs", () => {
   it("returns [] for empty organizations list", () => {
     const raw = { viewer: { organizations: { nodes: [] } } };
     expect(parseOrgs(raw)).toEqual([]);
+  });
+});
+
+describe("parseRepoSearch", () => {
+  it("maps nameWithOwner to a string array in order", () => {
+    const raw = { search: { nodes: [{ nameWithOwner: "acme/web" }, { nameWithOwner: "beta/api" }] } };
+    expect(parseRepoSearch(raw)).toEqual(["acme/web", "beta/api"]);
+  });
+
+  it("de-duplicates repeated names, keeping first occurrence", () => {
+    const raw = {
+      search: {
+        nodes: [
+          { nameWithOwner: "acme/web" },
+          { nameWithOwner: "acme/web" },
+          { nameWithOwner: "beta/api" },
+        ],
+      },
+    };
+    expect(parseRepoSearch(raw)).toEqual(["acme/web", "beta/api"]);
+  });
+
+  it("skips nodes with missing or empty nameWithOwner", () => {
+    const raw = {
+      search: {
+        nodes: [
+          { nameWithOwner: "acme/web" },
+          {},
+          null,
+          { nameWithOwner: "" },
+          { nameWithOwner: "beta/api" },
+        ],
+      },
+    };
+    expect(parseRepoSearch(raw)).toEqual(["acme/web", "beta/api"]);
+  });
+
+  it("returns [] when search nodes are absent", () => {
+    expect(parseRepoSearch({})).toEqual([]);
+    expect(parseRepoSearch({ search: {} })).toEqual([]);
+    expect(parseRepoSearch(null)).toEqual([]);
+  });
+
+  it("returns [] for empty nodes list", () => {
+    expect(parseRepoSearch({ search: { nodes: [] } })).toEqual([]);
   });
 });

@@ -162,6 +162,31 @@ export const READY_PRS_QUERY = `
     }
   }`;
 
+export const REPO_SEARCH_QUERY = `
+  query($q: String!) {
+    search(query: $q, type: REPOSITORY, first: 20) {
+      nodes {
+        ... on Repository {
+          nameWithOwner
+        }
+      }
+    }
+  }`;
+
+export function parseRepoSearch(raw: any): string[] {
+  const nodes: any[] = raw?.search?.nodes ?? [];
+  const seen = new Set<string>();
+  const results: string[] = [];
+  for (const node of nodes) {
+    const name: string | undefined = node?.nameWithOwner;
+    if (name && !seen.has(name)) {
+      seen.add(name);
+      results.push(name);
+    }
+  }
+  return results;
+}
+
 export function parseReadyPrs(raw: any): ReadyPr[] {
   return (raw?.search?.nodes ?? [])
     .filter((n: any) => n?.id)

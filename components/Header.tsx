@@ -73,9 +73,13 @@ export function Header({ orgs, selectedOrg, onOrgChange, login, onOpenSettings }
           onClick={onOpenSettings}
           className="cursor-pointer rounded-md border border-border bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors hover:brightness-95 dark:hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
-            <path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3.05 3.05l1.06 1.06M11.88 11.88l1.06 1.06M3.05 12.95l1.06-1.06M11.88 4.12l1.06-1.06" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 6h10M18 6h2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="16" cy="6" r="2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M4 12h2M10 12h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="8" cy="12" r="2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M4 18h10M18 18h2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="16" cy="18" r="2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
         <button

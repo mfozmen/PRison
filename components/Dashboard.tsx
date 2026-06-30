@@ -417,6 +417,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 const showPendingNames = truncate ? pr.pending.slice(0, 2) : pr.pending;
                 const overflow = totalNames - (showFailingNames.length + showPendingNames.length);
                 const awaiting = awaitingChecks(pr.repo, pr.checkNames, tracked);
+                const noteIcon = (
+                  <svg aria-hidden="true" className="shrink-0" width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3"/>
+                    <path d="M7 6v4M7 4.5v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                  </svg>
+                );
                 const chipsBlock = hasNames ? (
                   <div className="flex flex-wrap gap-1 items-center">
                     {showFailingNames.map((name, i) => (
@@ -439,12 +445,19 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                       <span className="text-xs text-muted">+{overflow} more</span>
                     )}
                   </div>
+                ) : pr.mergeState === "BEHIND" ? (
+                  <span className="flex items-center gap-1.5 text-muted text-sm">
+                    {noteIcon}
+                    Out of date with the base branch — update it to merge.
+                  </span>
+                ) : pr.mergeState === "DIRTY" ? (
+                  <span className="flex items-center gap-1.5 text-muted text-sm">
+                    {noteIcon}
+                    Has merge conflicts — resolve them on GitHub.
+                  </span>
                 ) : pr.blocked ? (
                   <span className="flex items-center gap-1.5 text-muted text-sm">
-                    <svg aria-hidden="true" className="shrink-0" width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3"/>
-                      <path d="M7 6v4M7 4.5v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                    </svg>
+                    {noteIcon}
                     Some required checks run on GitHub and aren&apos;t shown here.
                   </span>
                 ) : (

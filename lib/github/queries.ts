@@ -64,56 +64,68 @@ function classify(ctx: { status?: string; conclusion?: string; state?: string })
   return "ok";
 }
 
+function computeCheckRollup(ctxs: any[]): {
+  failing: string[];
+  pending: string[];
+  failingChecks: number;
+  pendingChecks: number;
+  checkNames: string[];
+} {
+  let failingChecks = 0;
+  let pendingChecks = 0;
+  const failing: string[] = [];
+  const pending: string[] = [];
+
+  // Phase 1 — split into named and unnamed contexts
+  const namedMap = new Map<string, any[]>();
+  const unnamedCtxs: any[] = [];
+
+  for (const c of ctxs) {
+    // Detect CheckRun vs StatusContext: CheckRun has a `name` property (even if undefined);
+    // use ctx.name === undefined to identify StatusContext (ctx.context). Otherwise CheckRun (ctx.name).
+    const checkName: string | undefined =
+      c.name === undefined ? (c.context || undefined) : (c.name || undefined);
+    if (checkName) {
+      if (!namedMap.has(checkName)) namedMap.set(checkName, []);
+      namedMap.get(checkName)!.push(c);
+    } else {
+      unnamedCtxs.push(c);
+    }
+  }
+
+  // Phase 2 — compute effective status per named group with precedence:
+  // 1. failing — any run is FAILURE / ERROR / TIMED_OUT
+  // 2. pending — else any run is PENDING / QUEUED / IN_PROGRESS / EXPECTED
+  // 3. ok — else (SUCCESS / NEUTRAL / SKIPPED / CANCELLED)
+  for (const [name, runs] of namedMap) {
+    const hasFailing = runs.some((r: any) => classify(r) === "failing");
+    const hasPending = !hasFailing && runs.some((r: any) => classify(r) === "pending");
+    if (hasFailing) {
+      failingChecks++;
+      failing.push(name);
+    } else if (hasPending) {
+      pendingChecks++;
+      pending.push(name);
+    }
+  }
+
+  // Unnamed checks: count individually (cannot group without a name)
+  for (const c of unnamedCtxs) {
+    const k = classify(c);
+    if (k === "failing") failingChecks++;
+    else if (k === "pending") pendingChecks++;
+  }
+
+  return { failing, pending, failingChecks, pendingChecks, checkNames: Array.from(namedMap.keys()) };
+}
+
 export function parseStuckPrs(raw: any): StuckPr[] {
   return (raw?.search?.nodes ?? [])
     .filter((n: any) => n?.id)
     .map((n: any) => {
       const commit = n.commits?.nodes?.[0]?.commit ?? {};
       const ctxs = commit.statusCheckRollup?.contexts?.nodes ?? [];
-      let failingChecks = 0;
-      let pendingChecks = 0;
-      const failing: string[] = [];
-      const pending: string[] = [];
-
-      // Phase 1 — split into named and unnamed contexts
-      const namedMap = new Map<string, typeof ctxs>();
-      const unnamedCtxs: typeof ctxs = [];
-
-      for (const c of ctxs) {
-        // Detect CheckRun vs StatusContext: CheckRun has a `name` property (even if undefined);
-        // use ctx.name !== undefined to distinguish. Otherwise treat as StatusContext (ctx.context).
-        const checkName: string | undefined =
-          c.name !== undefined ? (c.name || undefined) : (c.context || undefined);
-        if (checkName) {
-          if (!namedMap.has(checkName)) namedMap.set(checkName, []);
-          namedMap.get(checkName)!.push(c);
-        } else {
-          unnamedCtxs.push(c);
-        }
-      }
-
-      // Phase 2 — compute effective status per named group with precedence:
-      // 1. failing — any run is FAILURE / ERROR / TIMED_OUT
-      // 2. pending — else any run is PENDING / QUEUED / IN_PROGRESS / EXPECTED
-      // 3. ok — else (SUCCESS / NEUTRAL / SKIPPED / CANCELLED)
-      for (const [name, runs] of namedMap) {
-        const hasFailing = runs.some((r: any) => classify(r) === "failing");
-        const hasPending = !hasFailing && runs.some((r: any) => classify(r) === "pending");
-        if (hasFailing) {
-          failingChecks++;
-          failing.push(name);
-        } else if (hasPending) {
-          pendingChecks++;
-          pending.push(name);
-        }
-      }
-
-      // Unnamed checks: count individually (cannot group without a name)
-      for (const c of unnamedCtxs) {
-        const k = classify(c);
-        if (k === "failing") failingChecks++;
-        else if (k === "pending") pendingChecks++;
-      }
+      const { failing, pending, failingChecks, pendingChecks, checkNames } = computeCheckRollup(ctxs);
       // A PR is "blocked" (shown in the stuck list even with green checks) when
       // branch protection blocks it (BLOCKED), it is out of date (BEHIND), or it
       // has merge conflicts (DIRTY). All three states prevent merging regardless
@@ -124,7 +136,7 @@ export function parseStuckPrs(raw: any): StuckPr[] {
         id: n.id, title: n.title, url: n.url, number: n.number,
         repo: n.repository?.nameWithOwner ?? "",
         failingChecks, pendingChecks, failing, pending,
-        checkNames: Array.from(namedMap.keys()),
+        checkNames,
         isDraft: n.isDraft ?? false,
         blocked,
         mergeState,

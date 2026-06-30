@@ -15,6 +15,7 @@ const STUCK_PR = {
   checkNames: ["build"],
   isDraft: false,
   blocked: false,
+  mergeState: "",
   stuckSince: "2026-06-20T00:00:00Z",
 };
 
@@ -413,6 +414,7 @@ describe("Dashboard", () => {
       failing: [],
       pending: [],
       blocked: true,
+      mergeState: "BLOCKED",
     };
     global.fetch = vi.fn((url: string) =>
       Promise.resolve({
@@ -457,6 +459,96 @@ describe("Dashboard", () => {
     );
     expect(
       screen.queryByText("Some required checks run on GitHub and aren't shown here."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("BEHIND PR with no visible/awaiting checks shows the out-of-date note, not the required-checks note", async () => {
+    const BEHIND_PR = {
+      ...STUCK_PR,
+      id: "behind",
+      failingChecks: 0,
+      pendingChecks: 0,
+      failing: [],
+      pending: [],
+      blocked: true,
+      mergeState: "BEHIND",
+    };
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            url.includes("ready") ? [] : url.includes("stuck") ? [BEHIND_PR] : [REVIEW_PR],
+          ),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("Out of date with the base branch — update it to merge.")).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByText("Some required checks run on GitHub and aren't shown here."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("DIRTY PR shows the merge-conflicts note", async () => {
+    const DIRTY_PR = {
+      ...STUCK_PR,
+      id: "dirty",
+      failingChecks: 0,
+      pendingChecks: 0,
+      failing: [],
+      pending: [],
+      blocked: true,
+      mergeState: "DIRTY",
+    };
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            url.includes("ready") ? [] : url.includes("stuck") ? [DIRTY_PR] : [REVIEW_PR],
+          ),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("Has merge conflicts — resolve them on GitHub.")).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByText("Out of date with the base branch — update it to merge."),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Some required checks run on GitHub and aren't shown here."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("BLOCKED PR still shows the required-checks note", async () => {
+    const BLOCKED_PR = {
+      ...STUCK_PR,
+      id: "blocked-explicit",
+      failingChecks: 0,
+      pendingChecks: 0,
+      failing: [],
+      pending: [],
+      blocked: true,
+      mergeState: "BLOCKED",
+    };
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            url.includes("ready") ? [] : url.includes("stuck") ? [BLOCKED_PR] : [REVIEW_PR],
+          ),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("Some required checks run on GitHub and aren't shown here.")).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByText("Out of date with the base branch — update it to merge."),
     ).not.toBeInTheDocument();
   });
 

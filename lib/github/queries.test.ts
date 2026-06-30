@@ -12,17 +12,17 @@ describe("searchQuery", () => {
     expect(searchQuery("author")).toBe("is:open is:pr author:@me");
     expect(searchQuery("review", "")).toBe("is:open is:pr review-requested:@me");
   });
-  it("ready kind emits author:@me review:approved", () => {
-    expect(searchQuery("ready")).toBe("is:open is:pr author:@me review:approved");
+  it("ready kind emits author:@me (parseReadyPrs filters to CLEAN)", () => {
+    expect(searchQuery("ready")).toBe("is:open is:pr author:@me");
   });
   it("ready kind with org appends org scope", () => {
-    expect(searchQuery("ready", "org:acme")).toBe("is:open is:pr author:@me review:approved org:acme");
+    expect(searchQuery("ready", "org:acme")).toBe("is:open is:pr author:@me org:acme");
   });
   it("scopes author search to a personal user account", () => {
     expect(searchQuery("author", "user:mfozmen")).toBe("is:open is:pr author:@me user:mfozmen");
   });
   it("ready kind with user scope appends user qualifier", () => {
-    expect(searchQuery("ready", "user:mfozmen")).toBe("is:open is:pr author:@me review:approved user:mfozmen");
+    expect(searchQuery("ready", "user:mfozmen")).toBe("is:open is:pr author:@me user:mfozmen");
   });
 });
 
@@ -453,6 +453,7 @@ describe("parseStuckPrs", () => {
     const prs = parseStuckPrs(rawBlocked);
     expect(prs).toHaveLength(1);
     expect(prs[0].blocked).toBe(true);
+    expect(prs[0].mergeState).toBe("BLOCKED");
     expect(prs[0].failingChecks).toBe(0);
     expect(prs[0].pendingChecks).toBe(0);
   });
@@ -492,6 +493,51 @@ describe("parseStuckPrs", () => {
     const prs = parseStuckPrs(rawBehind);
     expect(prs).toHaveLength(1);
     expect(prs[0].blocked).toBe(true);
+    expect(prs[0].mergeState).toBe("BEHIND");
+  });
+
+  it("DIRTY mergeStateStatus with no failing/pending → included with blocked:true, mergeState DIRTY", () => {
+    const rawDirty = {
+      search: { nodes: [
+        { id: "64", title: "dirty-pr", url: "u64", number: 64,
+          mergeStateStatus: "DIRTY",
+          repository: { nameWithOwner: "acme/b" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { conclusion: "SUCCESS" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawDirty);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].blocked).toBe(true);
+    expect(prs[0].mergeState).toBe("DIRTY");
+  });
+
+  it("BEHIND PR with all-green checks is included with mergeState:'BEHIND' and blocked:true (live bug scenario)", () => {
+    const rawBehindGreen = {
+      search: { nodes: [
+        { id: "65", title: "behind-all-green", url: "u65", number: 65,
+          mergeStateStatus: "BEHIND",
+          repository: { nameWithOwner: "acme/b" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { name: "build", conclusion: "SUCCESS" },
+              { name: "ci/test", conclusion: "SUCCESS" },
+              { name: "lint", conclusion: "SUCCESS" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawBehindGreen);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].blocked).toBe(true);
+    expect(prs[0].mergeState).toBe("BEHIND");
+    expect(prs[0].failingChecks).toBe(0);
+    expect(prs[0].pendingChecks).toBe(0);
   });
 
   it("failing checks + BLOCKED mergeStateStatus → included with blocked:true", () => {
@@ -737,14 +783,25 @@ describe("parseReadyPrs", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("drops not-approved (REVIEW_REQUIRED) even when mergeStateStatus is CLEAN", () => {
-    const result = parseReadyPrs({ search: { nodes: [makePr({ reviewDecision: "REVIEW_REQUIRED" })] } });
+  // When review is required but not yet given, GitHub reports BLOCKED (not CLEAN).
+  // REVIEW_REQUIRED + CLEAN is an impossible combo in practice, so we test the
+  // realistic scenario: REVIEW_REQUIRED + BLOCKED → excluded because it's BLOCKED.
+  it("drops REVIEW_REQUIRED + BLOCKED mergeStateStatus (realistic: GitHub reports BLOCKED when review is missing)", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr({ reviewDecision: "REVIEW_REQUIRED", mergeStateStatus: "BLOCKED" })] } });
     expect(result).toHaveLength(0);
   });
 
-  it("drops CHANGES_REQUESTED even when mergeStateStatus is CLEAN", () => {
-    const result = parseReadyPrs({ search: { nodes: [makePr({ reviewDecision: "CHANGES_REQUESTED" })] } });
+  // Same reasoning: CHANGES_REQUESTED causes BLOCKED in GitHub's API, not CLEAN.
+  it("drops CHANGES_REQUESTED + BLOCKED mergeStateStatus (realistic: GitHub reports BLOCKED when changes are requested)", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr({ reviewDecision: "CHANGES_REQUESTED", mergeStateStatus: "BLOCKED" })] } });
     expect(result).toHaveLength(0);
+  });
+
+  it("keeps CLEAN + not-draft when reviewDecision is null (review not required) — the personal-PR case", () => {
+    // Personal-account repos often have no required reviewers; reviewDecision is null
+    // and mergeStateStatus is CLEAN, meaning GitHub has already confirmed it's mergeable.
+    const result = parseReadyPrs({ search: { nodes: [makePr({ reviewDecision: null })] } });
+    expect(result).toHaveLength(1);
   });
 
   it("drops draft PRs even when APPROVED + CLEAN", () => {

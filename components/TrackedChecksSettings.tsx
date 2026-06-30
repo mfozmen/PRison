@@ -137,7 +137,6 @@ export function TrackedChecksSettings({
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-16"
-      onClick={onClose}
     >
       {/* Scrim */}
       <div className="absolute inset-0 bg-black/50" aria-hidden="true" />
@@ -148,7 +147,6 @@ export function TrackedChecksSettings({
         aria-modal="true"
         aria-labelledby="tracked-checks-title"
         className="relative z-10 w-full max-w-lg rounded-xl border border-border bg-background p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Header row */}
         <div className="mb-4 flex items-center justify-between">

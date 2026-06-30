@@ -226,7 +226,7 @@ describe("TrackedChecksSettings", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("clicking the backdrop calls onClose", () => {
+  it("clicking the backdrop does NOT call onClose", () => {
     const onClose = vi.fn();
     const { container } = render(
       <TrackedChecksSettings
@@ -240,7 +240,7 @@ describe("TrackedChecksSettings", () => {
     );
     // Click the outermost backdrop div (not the panel)
     fireEvent.click(container.firstChild as HTMLElement);
-    expect(onClose).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it("pressing Escape calls onClose", () => {

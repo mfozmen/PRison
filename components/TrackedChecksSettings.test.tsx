@@ -10,12 +10,14 @@ const orgs: Org[] = [
 ];
 
 const emptyValue: TrackedChecks = { orgs: {}, repos: {} };
+const someRepos = ["acme/web", "beta/api"];
 
 describe("TrackedChecksSettings", () => {
   it("renders nothing when closed", () => {
     const { container } = render(
       <TrackedChecksSettings
         orgs={orgs}
+        availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
         open={false}
@@ -33,6 +35,7 @@ describe("TrackedChecksSettings", () => {
     render(
       <TrackedChecksSettings
         orgs={orgs}
+        availableRepos={[]}
         value={value}
         onChange={vi.fn()}
         open={true}
@@ -50,6 +53,7 @@ describe("TrackedChecksSettings", () => {
     render(
       <TrackedChecksSettings
         orgs={[{ login: "acme", avatarUrl: "" }]}
+        availableRepos={[]}
         value={emptyValue}
         onChange={onChange}
         open={true}
@@ -69,6 +73,7 @@ describe("TrackedChecksSettings", () => {
     render(
       <TrackedChecksSettings
         orgs={[{ login: "acme", avatarUrl: "" }]}
+        availableRepos={[]}
         value={emptyValue}
         onChange={onChange}
         open={true}
@@ -96,6 +101,7 @@ describe("TrackedChecksSettings", () => {
     const { rerender } = render(
       <TrackedChecksSettings
         orgs={[{ login: "acme", avatarUrl: "" }]}
+        availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
         open={false}
@@ -103,9 +109,11 @@ describe("TrackedChecksSettings", () => {
       />,
     );
     // Open with a populated value (e.g. parent hydrated from localStorage).
+    // "acme/web" is in value.repos so it appears in repoOptions even with availableRepos=[].
     rerender(
       <TrackedChecksSettings
         orgs={[{ login: "acme", avatarUrl: "" }]}
+        availableRepos={[]}
         value={value}
         onChange={vi.fn()}
         open={true}
@@ -115,7 +123,7 @@ describe("TrackedChecksSettings", () => {
     expect(
       screen.getByRole("textbox", { name: "acme check names" }),
     ).toHaveValue("qa/smoke");
-    expect(screen.getByPlaceholderText("owner/repo")).toHaveValue("acme/web");
+    expect(screen.getByRole("combobox", { name: "Repository" })).toHaveValue("acme/web");
     expect(screen.getByPlaceholderText("e.g. qa/smoke")).toHaveValue(
       "Automation Result",
     );
@@ -125,15 +133,16 @@ describe("TrackedChecksSettings", () => {
     render(
       <TrackedChecksSettings
         orgs={[]}
+        availableRepos={someRepos}
         value={emptyValue}
         onChange={vi.fn()}
         open={true}
         onClose={vi.fn()}
       />,
     );
-    expect(screen.queryByPlaceholderText("owner/repo")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Repository" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /add override/i }));
-    expect(screen.getByPlaceholderText("owner/repo")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Repository" })).toBeInTheDocument();
   });
 
   it("editing a repo override calls onChange with correct shape", () => {
@@ -141,6 +150,7 @@ describe("TrackedChecksSettings", () => {
     render(
       <TrackedChecksSettings
         orgs={[]}
+        availableRepos={["acme/web"]}
         value={emptyValue}
         onChange={onChange}
         open={true}
@@ -148,9 +158,9 @@ describe("TrackedChecksSettings", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /add override/i }));
-    const repoInput = screen.getByPlaceholderText("owner/repo");
+    const repoSelect = screen.getByRole("combobox", { name: "Repository" });
     const checksInput = screen.getByPlaceholderText("e.g. qa/smoke");
-    fireEvent.change(repoInput, { target: { value: "acme/web" } });
+    fireEvent.change(repoSelect, { target: { value: "acme/web" } });
     fireEvent.change(checksInput, { target: { value: "Automation Result" } });
     expect(onChange).toHaveBeenLastCalledWith({
       orgs: {},
@@ -163,6 +173,7 @@ describe("TrackedChecksSettings", () => {
     render(
       <TrackedChecksSettings
         orgs={[]}
+        availableRepos={someRepos}
         value={emptyValue}
         onChange={onChange}
         open={true}
@@ -170,8 +181,8 @@ describe("TrackedChecksSettings", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /add override/i }));
-    // Fill only the checks field, leaving the repo blank: the row must not
-    // emit an empty-string repo key.
+    // Fill only the checks field, leaving the repo select on the blank placeholder:
+    // the row must not emit an empty-string repo key.
     fireEvent.change(screen.getByPlaceholderText("e.g. qa/smoke"), {
       target: { value: "Automation Result" },
     });
@@ -182,6 +193,7 @@ describe("TrackedChecksSettings", () => {
     render(
       <TrackedChecksSettings
         orgs={[]}
+        availableRepos={someRepos}
         value={emptyValue}
         onChange={vi.fn()}
         open={true}
@@ -189,9 +201,9 @@ describe("TrackedChecksSettings", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /add override/i }));
-    expect(screen.getByPlaceholderText("owner/repo")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Repository" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /remove repo override/i }));
-    expect(screen.queryByPlaceholderText("owner/repo")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Repository" })).not.toBeInTheDocument();
   });
 
   it("clicking the close button calls onClose", () => {
@@ -199,6 +211,7 @@ describe("TrackedChecksSettings", () => {
     render(
       <TrackedChecksSettings
         orgs={[]}
+        availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
         open={true}
@@ -216,6 +229,7 @@ describe("TrackedChecksSettings", () => {
     const { container } = render(
       <TrackedChecksSettings
         orgs={[]}
+        availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
         open={true}
@@ -232,6 +246,7 @@ describe("TrackedChecksSettings", () => {
     render(
       <TrackedChecksSettings
         orgs={[]}
+        availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
         open={true}
@@ -246,6 +261,7 @@ describe("TrackedChecksSettings", () => {
     render(
       <TrackedChecksSettings
         orgs={[]}
+        availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
         open={true}
@@ -253,5 +269,83 @@ describe("TrackedChecksSettings", () => {
       />,
     );
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("repo override field is a select with options from availableRepos", () => {
+    render(
+      <TrackedChecksSettings
+        orgs={[]}
+        availableRepos={["acme/web", "beta/api"]}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /add override/i }));
+    const select = screen.getByRole("combobox", { name: "Repository" }) as HTMLSelectElement;
+    const optionValues = Array.from(select.options).map((o) => o.value);
+    expect(optionValues).toContain("acme/web");
+    expect(optionValues).toContain("beta/api");
+  });
+
+  it("already-configured repo not in availableRepos still appears as an option", () => {
+    const value: TrackedChecks = {
+      orgs: {},
+      repos: { "legacy/repo": ["ci"] },
+    };
+    render(
+      <TrackedChecksSettings
+        orgs={[]}
+        availableRepos={[]}
+        value={value}
+        onChange={vi.fn()}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    const select = screen.getByRole("combobox", { name: "Repository" }) as HTMLSelectElement;
+    const optionValues = Array.from(select.options).map((o) => o.value);
+    expect(optionValues).toContain("legacy/repo");
+  });
+
+  it("selecting a repo and entering checks calls onChange with the right repos shape", () => {
+    const onChange = vi.fn();
+    render(
+      <TrackedChecksSettings
+        orgs={[]}
+        availableRepos={["acme/web"]}
+        value={emptyValue}
+        onChange={onChange}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /add override/i }));
+    const select = screen.getByRole("combobox", { name: "Repository" });
+    fireEvent.change(select, { target: { value: "acme/web" } });
+    const checksInput = screen.getByPlaceholderText("e.g. qa/smoke");
+    fireEvent.change(checksInput, { target: { value: "Automation Result" } });
+    expect(onChange).toHaveBeenLastCalledWith({
+      orgs: {},
+      repos: { "acme/web": ["Automation Result"] },
+    });
+  });
+
+  it("shows empty-state hint when availableRepos and configured repos are both empty", () => {
+    render(
+      <TrackedChecksSettings
+        orgs={[]}
+        availableRepos={[]}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText(/no repositories loaded yet/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /add override/i })).not.toBeInTheDocument();
   });
 });

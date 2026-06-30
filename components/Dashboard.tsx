@@ -266,17 +266,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               </button>
             </div>
           )}
-          {/*
-            accentCount is intentionally omitted (neutral count badge). The ready
-            list is positive — green would be ideal — but accentCount renders amber
-            (bg-warning), which is wrong for this context. Neutral is readable and
-            on-theme; green would require a PrList shared-component change.
-          */}
           <PrList
             title="Ready to merge"
             items={visibleReady}
             emptyMessage="Nothing ready to merge"
             keyExtractor={(pr) => pr.id}
+            countAccent="success"
             renderRow={(pr) => (
               <PrRow
                 title={pr.title}
@@ -286,6 +281,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 since={pr.readySince}
                 now={new Date()}
                 suggestion={suggestReady(pr)}
+                accent="success"
               />
             )}
           />
@@ -315,7 +311,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   ? (repo) => `https://github.com/${repo}`
                   : undefined
               }
-              accentCount={visibleReviews.length > 0}
+              countAccent="warning"
               renderRow={(req) => (
                 <PrRow
                   title={req.title}
@@ -325,7 +321,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   since={req.requestedAt}
                   now={new Date()}
                   draft={req.isDraft}
-                  accent="blocking"
+                  accent="warning"
                   detail={
                     <span className="flex items-center gap-1 text-warning">
                       <svg
@@ -378,6 +374,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               items={visibleStuck}
               emptyMessage="No PRs stuck on checks 🎉"
               keyExtractor={(pr) => pr.id}
+              countAccent="danger"
               groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
               groupKeys={
                 groupBy === "check"
@@ -471,6 +468,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     since={pr.stuckSince}
                     now={new Date()}
                     draft={pr.isDraft}
+                    accent="danger"
                     detail={detail}
                     suggestion={suggestStuck(pr)}
                   />

@@ -260,22 +260,22 @@ describe("PrList groupBy", () => {
   });
 });
 
-describe("PrList accentCount", () => {
-  it("count badge has amber style when accentCount is true and items are present", () => {
+describe("PrList countAccent", () => {
+  it("count badge has warning style when countAccent='warning' and items are present", () => {
     render(
       <PrList
         title="Blocking"
         items={["a"]}
         emptyMessage="None."
         renderRow={(item) => <div>{item}</div>}
-        accentCount={true}
+        countAccent="warning"
       />,
     );
     const badge = screen.getByTestId("count-badge");
     expect(badge).toHaveClass("bg-warning");
   });
 
-  it("count badge has slate style when accentCount is false (default)", () => {
+  it("count badge has neutral style when countAccent is not provided (default)", () => {
     render(
       <PrList
         title="Blocking"
@@ -291,19 +291,47 @@ describe("PrList accentCount", () => {
     expect(badge).not.toHaveClass("bg-warning");
   });
 
-  it("count badge has slate style when items is empty even with accentCount=true", () => {
+  it("count badge has neutral style when items is empty even with countAccent='warning'", () => {
     render(
       <PrList
         title="Blocking"
         items={[]}
         emptyMessage="None."
         renderRow={(item: string) => <div>{item}</div>}
-        accentCount={true}
+        countAccent="warning"
       />,
     );
     const badge = screen.getByTestId("count-badge");
     expect(badge).toHaveClass("bg-border");
     expect(badge).not.toHaveClass("bg-warning");
+  });
+
+  it("count badge has success style when countAccent='success' and items are present", () => {
+    render(
+      <PrList
+        title="Ready"
+        items={["a"]}
+        emptyMessage="None."
+        renderRow={(item) => <div>{item}</div>}
+        countAccent="success"
+      />,
+    );
+    const badge = screen.getByTestId("count-badge");
+    expect(badge).toHaveClass("bg-success");
+  });
+
+  it("count badge has danger style when countAccent='danger' and items are present", () => {
+    render(
+      <PrList
+        title="Stuck"
+        items={["a"]}
+        emptyMessage="None."
+        renderRow={(item) => <div>{item}</div>}
+        countAccent="danger"
+      />,
+    );
+    const badge = screen.getByTestId("count-badge");
+    expect(badge).toHaveClass("bg-danger");
   });
 });
 

@@ -59,7 +59,7 @@ describe("PrRow", () => {
     expect(screen.queryByRole("link", { name: /^open pr$/i })).toBeNull();
   });
 
-  it("renders amber left accent border when accent='blocking'", () => {
+  it("renders success left accent border when accent='success'", () => {
     const { container } = render(
       <PrRow
         title="Fix the thing"
@@ -69,13 +69,31 @@ describe("PrRow", () => {
         since="2026-06-25T00:00:00Z"
         now={now}
         suggestion={suggestion}
-        accent="blocking"
+        accent="success"
+      />,
+    );
+    expect(container.firstChild).toHaveClass("border-l-success");
+    expect(container.firstChild).toHaveClass("hover:border-l-success");
+  });
+
+  it("renders warning left accent border when accent='warning'", () => {
+    const { container } = render(
+      <PrRow
+        title="Fix the thing"
+        repo="org/repo"
+        number={42}
+        url="https://github.com/org/repo/pull/42"
+        since="2026-06-25T00:00:00Z"
+        now={now}
+        suggestion={suggestion}
+        accent="warning"
       />,
     );
     expect(container.firstChild).toHaveClass("border-l-warning");
+    expect(container.firstChild).toHaveClass("hover:border-l-warning");
   });
 
-  it("amber left accent persists on hover: card has hover:border-l-warning when accent='blocking'", () => {
+  it("renders danger left accent border when accent='danger'", () => {
     const { container } = render(
       <PrRow
         title="Fix the thing"
@@ -85,10 +103,11 @@ describe("PrRow", () => {
         since="2026-06-25T00:00:00Z"
         now={now}
         suggestion={suggestion}
-        accent="blocking"
+        accent="danger"
       />,
     );
-    expect(container.firstChild).toHaveClass("hover:border-l-warning");
+    expect(container.firstChild).toHaveClass("border-l-danger");
+    expect(container.firstChild).toHaveClass("hover:border-l-danger");
   });
 
   it("no accent border class when accent is not provided", () => {
@@ -103,7 +122,9 @@ describe("PrRow", () => {
         suggestion={suggestion}
       />,
     );
+    expect(container.firstChild).not.toHaveClass("border-l-success");
     expect(container.firstChild).not.toHaveClass("border-l-warning");
+    expect(container.firstChild).not.toHaveClass("border-l-danger");
   });
 
   it("renders suggestion text and href", () => {

@@ -408,7 +408,13 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     )}
                   </div>
                 ) : pr.blocked ? (
-                  <span className="text-muted">Required checks pending on GitHub</span>
+                  <span className="flex items-center gap-1.5 text-muted text-sm">
+                    <svg aria-hidden="true" className="shrink-0" width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3"/>
+                      <path d="M7 6v4M7 4.5v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                    </svg>
+                    Some required checks run on GitHub and aren&apos;t shown here.
+                  </span>
                 ) : (
                   `${pr.failingChecks} failing · ${pr.pendingChecks} pending`
                 );
@@ -421,7 +427,6 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     since={pr.stuckSince}
                     now={new Date()}
                     draft={pr.isDraft}
-                    blocked={pr.blocked}
                     detail={detail}
                     suggestion={suggestStuck(pr)}
                   />

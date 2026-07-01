@@ -15,6 +15,7 @@ const hasSecret = /^AUTH_SECRET=.+/m.test(existing);
 if (!hasSecret) {
   const secret = randomBytes(32).toString("base64");
   const line = `AUTH_SECRET=${secret}\n`;
-  writeFileSync(envFile, existing ? existing + line : line, "utf8");
+  const prefix = existing && !existing.endsWith("\n") ? existing + "\n" : existing;
+  writeFileSync(envFile, prefix + line, "utf8");
   console.log(`[PRison] Generated AUTH_SECRET in .env.local`);
 }

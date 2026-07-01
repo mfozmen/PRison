@@ -16,8 +16,6 @@ access. Three lists, oldest first:
 
 ![The PRison dashboard showing the three PR lists in dark mode](docs/screenshot.png)
 
-<sub>Screenshot uses synthetic sample data.</sub>
-
 ### Features
 
 - **Tracked checks → Awaiting.** GitHub's API hides "expected" required checks

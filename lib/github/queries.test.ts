@@ -769,14 +769,6 @@ describe("parseReadyPrs", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("BEHIND is no longer excluded — parseStuckPrs no longer claims it (covered by 'BEHIND PR is included as ready' test)", () => {
-    // BEHIND PRs now move to ready-to-merge. The old "drops BEHIND" assertion
-    // is replaced by "BEHIND PR is included as ready with needsUpdate: true".
-    const result = parseReadyPrs({ search: { nodes: [makePr({ mergeStateStatus: "BEHIND" })] } });
-    expect(result).toHaveLength(1);
-    expect(result[0].needsUpdate).toBe(true);
-  });
-
   it("drops APPROVED + UNSTABLE mergeStateStatus", () => {
     const result = parseReadyPrs({ search: { nodes: [makePr({ mergeStateStatus: "UNSTABLE" })] } });
     expect(result).toHaveLength(0);

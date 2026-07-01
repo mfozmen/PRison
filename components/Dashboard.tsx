@@ -503,23 +503,21 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                       {overflow > 0 && (
                         <span className="text-xs text-muted">+{overflow} more</span>
                       )}
-                      {hasAwaiting && (
-                        <>
-                          <svg aria-hidden="true" className="shrink-0 text-warning" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3"/>
-                            <path d="M6 3.5v2.75l1.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                          <span className="text-xs text-muted">Awaiting:</span>
-                          {awaiting.map((name) => (
-                            <span
-                              key={name}
-                              className="bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium"
-                            >
-                              {name}
-                            </span>
-                          ))}
-                        </>
-                      )}
+                      {hasAwaiting &&
+                        awaiting.map((name) => (
+                          <span
+                            key={`await-${name}`}
+                            aria-label={`Awaiting: ${name}`}
+                            title={`Awaiting: ${name}`}
+                            className="inline-flex items-center gap-1 rounded border border-dashed border-muted/60 px-1.5 py-0.5 text-xs font-medium text-muted"
+                          >
+                            <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3" />
+                              <path d="M6 3.5v2.75l1.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            {name}
+                          </span>
+                        ))}
                     </div>
                   );
                 } else if (pr.blocked) {

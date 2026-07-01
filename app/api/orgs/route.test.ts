@@ -28,11 +28,14 @@ describe("GET /api/orgs", () => {
   it("returns parsed orgs", async () => {
     readTokenMock.mockResolvedValue("t");
     queryMock.mockResolvedValue({
-      viewer: {
-        organizations: {
-          nodes: [{ login: "acme", avatarUrl: "https://example.com/a.png" }],
+      data: {
+        viewer: {
+          organizations: {
+            nodes: [{ login: "acme", avatarUrl: "https://example.com/a.png" }],
+          },
         },
       },
+      partial: false,
     });
     const res = await GET();
     expect(res.status).toBe(200);

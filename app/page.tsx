@@ -22,7 +22,8 @@ export default async function Home() {
   // repo the token can see, so a failed org fetch is not fatal.
   let orgs: Org[] = [];
   try {
-    orgs = parseOrgs(await ghQuery(token, ORGS_QUERY));
+    const { data } = await ghQuery(token, ORGS_QUERY);
+    orgs = parseOrgs(data);
   } catch {
     orgs = [];
   }

@@ -35,6 +35,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [stuckError, setStuckError] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [readyError, setReadyError] = useState<string | null>(null);
+  const [partial, setPartial] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   // Tracks the most recently requested org so stale in-flight responses are
@@ -52,17 +53,23 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             : "";
       startTransition(async () => {
         const [stuckResult, reviewResult, readyResult] = await Promise.allSettled([
-          fetch(`/api/stuck-prs${qs}`).then((r) => {
+          fetch(`/api/stuck-prs${qs}`).then(async (r) => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            return r.json() as Promise<StuckPr[]>;
+            const partial = r.headers?.get?.("X-Partial") === "1";
+            const items = (await r.json()) as StuckPr[];
+            return { items, partial };
           }),
-          fetch(`/api/review-requests${qs}`).then((r) => {
+          fetch(`/api/review-requests${qs}`).then(async (r) => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            return r.json() as Promise<ReviewRequest[]>;
+            const partial = r.headers?.get?.("X-Partial") === "1";
+            const items = (await r.json()) as ReviewRequest[];
+            return { items, partial };
           }),
-          fetch(`/api/ready-to-merge${qs}`).then((r) => {
+          fetch(`/api/ready-to-merge${qs}`).then(async (r) => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            return r.json() as Promise<ReadyPr[]>;
+            const partial = r.headers?.get?.("X-Partial") === "1";
+            const items = (await r.json()) as ReadyPr[];
+            return { items, partial };
           }),
         ]);
 
@@ -73,21 +80,26 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             ? "Failed to load stuck PRs. Please retry."
             : null,
         );
-        setStuckPrs(stuckResult.status === "fulfilled" ? stuckResult.value : []);
+        setStuckPrs(stuckResult.status === "fulfilled" ? stuckResult.value.items : []);
         setReviewError(
           reviewResult.status === "rejected"
             ? "Failed to load review requests. Please retry."
             : null,
         );
         setReviewReqs(
-          reviewResult.status === "fulfilled" ? reviewResult.value : [],
+          reviewResult.status === "fulfilled" ? reviewResult.value.items : [],
         );
         setReadyError(
           readyResult.status === "rejected"
             ? "Failed to load ready-to-merge PRs. Please retry."
             : null,
         );
-        setReadyPrs(readyResult.status === "fulfilled" ? readyResult.value : []);
+        setReadyPrs(readyResult.status === "fulfilled" ? readyResult.value.items : []);
+        const anyPartial =
+          (stuckResult.status === "fulfilled" && stuckResult.value.partial) ||
+          (reviewResult.status === "fulfilled" && reviewResult.value.partial) ||
+          (readyResult.status === "fulfilled" && readyResult.value.partial);
+        setPartial(anyPartial);
       });
     },
     [startTransition, login],
@@ -171,6 +183,23 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         login={login}
         onOpenSettings={() => setSettingsOpen(true)}
       />
+      {partial && (
+        <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 pt-4">
+          <div
+            role="status"
+            className="flex items-center justify-between rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning"
+          >
+            <span>⚠ Some data couldn&apos;t be loaded — Retry</span>
+            <button
+              type="button"
+              onClick={() => fetchData(selectedOrg)}
+              className="ml-4 cursor-pointer rounded bg-warning/20 px-3 py-1 text-xs font-medium text-warning transition-colors hover:bg-warning/30"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
       <TrackedChecksSettings
         orgs={orgs}
         availableRepos={availableRepos}

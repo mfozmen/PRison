@@ -69,7 +69,7 @@ describe("GET /api/review-requests", () => {
   it("returns parsed review requests scoped to an org", async () => {
     readTokenMock.mockResolvedValue("t");
     readLoginMock.mockResolvedValue("me");
-    queryMock.mockResolvedValue(REVIEW_RAW);
+    queryMock.mockResolvedValue({ data: REVIEW_RAW, partial: false });
     const res = await GET(req("http://x/api/review-requests?org=acme"));
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -83,7 +83,7 @@ describe("GET /api/review-requests", () => {
   it("spans everything (no org scope) when org is omitted", async () => {
     readTokenMock.mockResolvedValue("t");
     readLoginMock.mockResolvedValue("me");
-    queryMock.mockResolvedValue(REVIEW_RAW);
+    queryMock.mockResolvedValue({ data: REVIEW_RAW, partial: false });
     const res = await GET(req("http://x/api/review-requests"));
     expect(res.status).toBe(200);
     expect(queryMock.mock.calls[0][2].q).toBe(
@@ -103,7 +103,7 @@ describe("GET /api/review-requests", () => {
   it("returns parsed review requests scoped to a personal account (?user=mfozmen)", async () => {
     readTokenMock.mockResolvedValue("t");
     readLoginMock.mockResolvedValue("me");
-    queryMock.mockResolvedValue(REVIEW_RAW);
+    queryMock.mockResolvedValue({ data: REVIEW_RAW, partial: false });
     const res = await GET(req("http://x/api/review-requests?user=mfozmen"));
     expect(res.status).toBe(200);
     expect(queryMock.mock.calls[0][2].q).toBe(
@@ -118,10 +118,28 @@ describe("GET /api/review-requests", () => {
     expect(res.status).toBe(400);
   });
 
+  it("sets X-Partial header when ghQuery reports partial data", async () => {
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("me");
+    queryMock.mockResolvedValue({ data: REVIEW_RAW, partial: true });
+    const res = await GET(req("http://x/api/review-requests?org=acme"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("X-Partial")).toBe("1");
+  });
+
+  it("omits X-Partial header when data is complete", async () => {
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("me");
+    queryMock.mockResolvedValue({ data: REVIEW_RAW, partial: false });
+    const res = await GET(req("http://x/api/review-requests?org=acme"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("X-Partial")).toBeNull();
+  });
+
   it("user wins over org when both are present", async () => {
     readTokenMock.mockResolvedValue("t");
     readLoginMock.mockResolvedValue("me");
-    queryMock.mockResolvedValue(REVIEW_RAW);
+    queryMock.mockResolvedValue({ data: REVIEW_RAW, partial: false });
     const res = await GET(req("http://x/api/review-requests?org=acme&user=mfozmen"));
     expect(res.status).toBe(200);
     expect(queryMock.mock.calls[0][2].q).toContain("user:mfozmen");

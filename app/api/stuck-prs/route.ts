@@ -9,10 +9,10 @@ export async function GET(request: Request) {
   const scoped = resolveScope(request);
   if ("error" in scoped) return new Response(scoped.error, { status: 400 });
   try {
-    const raw = await ghQuery(token, STUCK_PRS_QUERY, {
+    const { data, partial } = await ghQuery(token, STUCK_PRS_QUERY, {
       q: searchQuery("author", scoped.scope),
     });
-    return Response.json(parseStuckPrs(raw));
+    return Response.json(parseStuckPrs(data), partial ? { headers: { "X-Partial": "1" } } : undefined);
   } catch {
     return new Response("Upstream GitHub error", { status: 502 });
   }

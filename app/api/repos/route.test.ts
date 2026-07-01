@@ -58,12 +58,15 @@ describe("GET /api/repos", () => {
   it("returns parsed repo names for valid q", async () => {
     readTokenMock.mockResolvedValue("token");
     queryMock.mockResolvedValue({
-      search: {
-        nodes: [
-          { nameWithOwner: "acme/web" },
-          { nameWithOwner: "beta/api" },
-        ],
+      data: {
+        search: {
+          nodes: [
+            { nameWithOwner: "acme/web" },
+            { nameWithOwner: "beta/api" },
+          ],
+        },
       },
+      partial: false,
     });
     const req = new Request("http://localhost/api/repos?q=acme");
     const res = await GET(req);
@@ -77,7 +80,7 @@ describe("GET /api/repos", () => {
 
   it("scopes the search to the given owners with user: qualifiers", async () => {
     readTokenMock.mockResolvedValue("token");
-    queryMock.mockResolvedValue({ search: { nodes: [] } });
+    queryMock.mockResolvedValue({ data: { search: { nodes: [] } }, partial: false });
     const req = new Request(
       "http://localhost/api/repos?q=web&owners=acme,bob",
     );
@@ -88,7 +91,7 @@ describe("GET /api/repos", () => {
 
   it("ignores invalid owner logins", async () => {
     readTokenMock.mockResolvedValue("token");
-    queryMock.mockResolvedValue({ search: { nodes: [] } });
+    queryMock.mockResolvedValue({ data: { search: { nodes: [] } }, partial: false });
     const req = new Request(
       "http://localhost/api/repos?q=web&owners=acme,bad%20name,",
     );
@@ -99,7 +102,7 @@ describe("GET /api/repos", () => {
 
   it("strips control characters and caps q at 100 chars before searching", async () => {
     readTokenMock.mockResolvedValue("token");
-    queryMock.mockResolvedValue({ search: { nodes: [] } });
+    queryMock.mockResolvedValue({ data: { search: { nodes: [] } }, partial: false });
     const dirty = "ac\x00me\x1Frepo\x7F" + "x".repeat(200);
     const req = new Request(
       `http://localhost/api/repos?q=${encodeURIComponent(dirty)}`,

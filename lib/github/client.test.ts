@@ -14,7 +14,7 @@ import { ghQuery } from "./client";
 describe("ghQuery", () => {
   it("returns the data on success", async () => {
     graphqlMock.mockResolvedValue({ viewer: { login: "me" } });
-    expect(await ghQuery("t", "query")).toEqual({ viewer: { login: "me" } });
+    expect(await ghQuery("t", "query")).toEqual({ data: { viewer: { login: "me" } }, partial: false });
   });
 
   it("keeps partial data when GitHub reports per-org errors", async () => {
@@ -23,9 +23,7 @@ describe("ghQuery", () => {
       errors: [{ message: "`acme` forbids access" }],
     } as any);
     graphqlMock.mockRejectedValue(err);
-    expect(await ghQuery("t", "query")).toEqual({
-      search: { nodes: [{ id: "1" }] },
-    });
+    expect(await ghQuery("t", "query")).toEqual({ data: { search: { nodes: [{ id: "1" }] } }, partial: true });
   });
 
   it("rethrows non-GraphQL errors (network, auth)", async () => {

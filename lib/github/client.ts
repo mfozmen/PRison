@@ -10,15 +10,18 @@ export function ghClient(token: string) {
 // any errors and discards the partial data, which would lose every other org's
 // results too — so on a GraphqlResponseError we keep whatever data did come
 // back and drop the failed parts. Other errors (network, auth) still throw.
+// Returns `{ data, partial }` where `partial: true` means the response was
+// incomplete due to per-org errors.
 export async function ghQuery<T>(
   token: string,
   query: string,
   vars?: Record<string, unknown>,
-): Promise<T> {
+): Promise<{ data: T; partial: boolean }> {
   try {
-    return (await ghClient(token)(query, vars)) as T;
+    const data = (await ghClient(token)(query, vars)) as T;
+    return { data, partial: false };
   } catch (e) {
-    if (e instanceof GraphqlResponseError && e.data) return e.data as T;
+    if (e instanceof GraphqlResponseError && e.data) return { data: e.data as T, partial: true };
     throw e;
   }
 }

@@ -29,8 +29,8 @@ export async function GET(request: Request) {
   const searchString = `${sanitized} in:name fork:true${scope}`;
 
   try {
-    const raw = await ghQuery(token, REPO_SEARCH_QUERY, { q: searchString });
-    return Response.json(parseRepoSearch(raw));
+    const { data } = await ghQuery(token, REPO_SEARCH_QUERY, { q: searchString });
+    return Response.json(parseRepoSearch(data));
   } catch {
     return new Response("Upstream GitHub error", { status: 502 });
   }

@@ -6,8 +6,8 @@ export async function GET() {
   const token = await readToken();
   if (!token) return new Response("Unauthorized", { status: 401 });
   try {
-    const raw = await ghQuery(token, ORGS_QUERY);
-    return Response.json(parseOrgs(raw));
+    const { data } = await ghQuery(token, ORGS_QUERY);
+    return Response.json(parseOrgs(data));
   } catch {
     return new Response("Upstream GitHub error", { status: 502 });
   }

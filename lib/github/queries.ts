@@ -149,7 +149,10 @@ export function parseStuckPrs(raw: any): StuckPr[] {
       // Both states prevent merging regardless of check results. BEHIND is NOT
       // blocked — a merely out-of-date PR is otherwise mergeable and is surfaced
       // in the ready-to-merge list with a "Needs update" badge instead.
-      const blocked = (n.mergeStateStatus === "BLOCKED" && !isReadyViaBlocked(n)) || n.mergeStateStatus === "DIRTY";
+      // NOTE: BLOCKED+SUCCESS+APPROVED PRs are kept here too (readyViaBlocked:true);
+      // the Dashboard decides which list they land in based on awaitingChecks.
+      const blocked = n.mergeStateStatus === "BLOCKED" || n.mergeStateStatus === "DIRTY";
+      const readyViaBlocked = isReadyViaBlocked(n);
       const mergeState: string = n.mergeStateStatus ?? "";
       return {
         id: n.id, title: n.title, url: n.url, number: n.number,
@@ -158,6 +161,7 @@ export function parseStuckPrs(raw: any): StuckPr[] {
         checkNames,
         isDraft: n.isDraft ?? false,
         blocked,
+        readyViaBlocked,
         mergeState,
         stuckSince: commit.pushedDate ?? commit.committedDate ?? "",
       } as StuckPr;
@@ -197,7 +201,10 @@ export const READY_PRS_QUERY = `
         repository { nameWithOwner }
         commits(last: 1) { nodes { commit {
           pushedDate committedDate
-          statusCheckRollup { state }
+          statusCheckRollup { state contexts(first: 100) { nodes {
+            ... on CheckRun { name status conclusion }
+            ... on StatusContext { context state }
+          } } }
         } } }
       } }
     }
@@ -243,6 +250,8 @@ export function parseReadyPrs(raw: any): ReadyPr[] {
     .filter((n: any) => !n.isDraft)
     .map((n: any) => {
       const commit = n.commits?.nodes?.[0]?.commit ?? {};
+      const ctxs = commit.statusCheckRollup?.contexts?.nodes ?? [];
+      const { checkNames } = computeCheckRollup(ctxs);
       return {
         id: n.id,
         title: n.title,
@@ -251,6 +260,8 @@ export function parseReadyPrs(raw: any): ReadyPr[] {
         repo: n.repository?.nameWithOwner ?? "",
         readySince: commit.pushedDate ?? commit.committedDate ?? n.updatedAt ?? "",
         needsUpdate: n.mergeStateStatus !== "CLEAN",
+        checkNames,
+        viaBlocked: isReadyViaBlocked(n),
       } as ReadyPr;
     });
 }

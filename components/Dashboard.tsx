@@ -169,10 +169,24 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const sortedReviews = sortByAgeAsc(reviewReqs, (req) => req.requestedAt);
   const sortedReady = sortByAgeAsc(readyPrs, (pr) => pr.readySince);
 
-  const visibleStuck = hideDrafts ? sortedStuck.filter((pr) => !pr.isDraft) : sortedStuck;
+  // Client-side arbitration for BLOCKED+SUCCESS+APPROVED PRs: each such PR lands
+  // in exactly one list based on whether its tracked checks are present in the rollup.
+  // If awaiting checks are absent → stuck (with awaiting chips); if all present → ready.
+  const isAwaiting = (repo: string, checkNames: string[]) =>
+    awaitingChecks(repo, checkNames, tracked).length > 0;
+
+  const sortedStuckAll = hideDrafts ? sortedStuck.filter((pr) => !pr.isDraft) : sortedStuck;
+  // A BLOCKED+approved+green PR with no awaiting tracked checks is already in the ready
+  // list; exclude it from stuck so it doesn't appear in both lists.
+  const visibleStuck = sortedStuckAll.filter(
+    (pr) => !(pr.readyViaBlocked && !isAwaiting(pr.repo, pr.checkNames)),
+  );
   const visibleReviews = hideDrafts ? sortedReviews.filter((req) => !req.isDraft) : sortedReviews;
   // Drafts are already excluded server-side (parseReadyPrs drops drafts); hideDrafts is a no-op here.
-  const visibleReady = sortedReady;
+  // A BLOCKED+approved+green PR with awaiting tracked checks belongs in stuck, not here.
+  const visibleReady = sortedReady.filter(
+    (pr) => !(pr.viaBlocked && isAwaiting(pr.repo, pr.checkNames)),
+  );
 
   return (
     <div className="flex min-h-screen flex-col bg-background">

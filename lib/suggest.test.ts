@@ -26,13 +26,9 @@ describe("suggestStuck", () => {
       href: "https://github.com/acme/b/pull/2/checks",
     });
   });
-  it("BEHIND-only (no failing/pending) → 'Update branch' linking to pr.url", () => {
-    const pr: StuckPr = { ...base, failingChecks: 0, pendingChecks: 0, failing: [], pending: [], checkNames: [], isDraft: false, blocked: true, mergeState: "BEHIND", stuckSince: "x" };
-    expect(suggestStuck(pr)).toEqual({
-      text: "Update branch",
-      href: "https://github.com/acme/b/pull/2",
-    });
-  });
+  // BEHIND PRs are no longer in stuck — they move to the ready-to-merge list
+  // with needsUpdate: true. The "Update branch" suggestion is therefore dead;
+  // its test has been removed.
   it("DIRTY-only (no failing/pending) → 'Resolve conflicts' linking to pr.url", () => {
     const pr: StuckPr = { ...base, failingChecks: 0, pendingChecks: 0, failing: [], pending: [], checkNames: [], isDraft: false, blocked: true, mergeState: "DIRTY", stuckSince: "x" };
     expect(suggestStuck(pr)).toEqual({
@@ -40,8 +36,9 @@ describe("suggestStuck", () => {
       href: "https://github.com/acme/b/pull/2",
     });
   });
-  it("failing checks take priority even when BEHIND → 'Re-run failed checks'", () => {
-    const pr: StuckPr = { ...base, failingChecks: 1, pendingChecks: 0, failing: ["build"], pending: [], checkNames: ["build"], isDraft: false, blocked: true, mergeState: "BEHIND", stuckSince: "x" };
+  it("failing checks take priority even when BLOCKED → 'Re-run failed checks'", () => {
+    // BEHIND is no longer in stuck; use BLOCKED to exercise the same code path.
+    const pr: StuckPr = { ...base, failingChecks: 1, pendingChecks: 0, failing: ["build"], pending: [], checkNames: ["build"], isDraft: false, blocked: true, mergeState: "BLOCKED", stuckSince: "x" };
     expect(suggestStuck(pr)).toEqual({
       text: "Re-run failed checks",
       href: "https://github.com/acme/b/pull/2/checks",
@@ -61,7 +58,7 @@ describe("suggestReview", () => {
 
 describe("suggestReady", () => {
   it("links to the PR on GitHub to merge manually", () => {
-    const pr: ReadyPr = { id: "1", title: "t", url: "https://github.com/acme/b/pull/2", number: 2, repo: "acme/b", readySince: "x" };
+    const pr: ReadyPr = { id: "1", title: "t", url: "https://github.com/acme/b/pull/2", number: 2, repo: "acme/b", readySince: "x", needsUpdate: false };
     expect(suggestReady(pr)).toEqual({
       text: "Merge on GitHub",
       href: "https://github.com/acme/b/pull/2",

@@ -1181,6 +1181,99 @@ describe("Dashboard", () => {
         ).not.toBeInTheDocument();
       });
     });
+
+    describe("blocked-awaiting bucketing (regression guard)", () => {
+      // PR-A: tracked checks ARE present → ready list; PR-B: checks ABSENT → stuck list.
+      // Before the fix, PR-B appeared in ready (wrongly). This test fails on old code
+      // and passes after the symmetric client-side arbitration is in place.
+      it("PR-A (tracked checks present) → ready only; PR-B (checks absent) → stuck only with awaiting chip", async () => {
+        localStorage.setItem(
+          "prison.trackedChecks",
+          JSON.stringify({ orgs: { acme: ["qa/smoke", "Automation Result"] }, repos: {} }),
+        );
+
+        // PR-A: BLOCKED+approved+green, rollup includes both tracked names → ready
+        const PR_A_READY = {
+          id: "a1",
+          title: "PR A ready-via-blocked",
+          url: "https://github.com/acme/repo/pull/101",
+          repo: "acme/repo",
+          number: 101,
+          readySince: "2026-06-25T00:00:00Z",
+          needsUpdate: true,
+          checkNames: ["qa/smoke", "Automation Result"],
+          viaBlocked: true,
+        };
+
+        // PR-B: BLOCKED+approved+green, rollup does NOT include tracked names → stuck
+        const PR_B_READY = {
+          id: "b1",
+          title: "PR B awaiting-via-blocked",
+          url: "https://github.com/acme/repo/pull/102",
+          repo: "acme/repo",
+          number: 102,
+          readySince: "2026-06-25T00:00:00Z",
+          needsUpdate: true,
+          checkNames: [],  // tracked checks not reported yet
+          viaBlocked: true,
+        };
+        const PR_B_STUCK = {
+          id: "b1",
+          title: "PR B awaiting-via-blocked",
+          url: "https://github.com/acme/repo/pull/102",
+          repo: "acme/repo",
+          number: 102,
+          failingChecks: 0,
+          pendingChecks: 0,
+          failing: [],
+          pending: [],
+          checkNames: [],
+          isDraft: false,
+          blocked: true,
+          readyViaBlocked: true,
+          mergeState: "BLOCKED",
+          stuckSince: "2026-06-25T00:00:00Z",
+        };
+
+        global.fetch = vi.fn((url: string) =>
+          Promise.resolve({
+            ok: true,
+            headers: { get: () => null },
+            json: () =>
+              Promise.resolve(
+                url.includes("ready")
+                  ? [PR_A_READY, PR_B_READY]
+                  : url.includes("stuck")
+                    ? [PR_B_STUCK]
+                    : [],
+              ),
+          }),
+        ) as unknown as typeof fetch;
+
+        render(<Dashboard orgs={ORGS} login="testuser" />);
+
+        // Wait for PR-A to appear in the ready section
+        await waitFor(() =>
+          expect(screen.getByText("PR A ready-via-blocked")).toBeInTheDocument(),
+        );
+
+        // PR-B should be in the stuck section (awaiting chips visible)
+        expect(screen.getByText("PR B awaiting-via-blocked")).toBeInTheDocument();
+        expect(screen.getByText("qa/smoke")).toBeInTheDocument();
+
+        // Verify sections: use section elements wrapping each PrList
+        const readySection = screen.getByRole("heading", { name: /ready to merge/i }).closest("section")!;
+        const stuckSection = screen.getByRole("heading", { name: /PRs stuck on checks/i }).closest("section")!;
+
+        // PR-A in ready, NOT in stuck
+        expect(within(readySection).getByText("PR A ready-via-blocked")).toBeInTheDocument();
+        expect(within(stuckSection).queryByText("PR A ready-via-blocked")).not.toBeInTheDocument();
+
+        // PR-B in stuck, NOT in ready
+        expect(within(stuckSection).getByText("PR B awaiting-via-blocked")).toBeInTheDocument();
+        expect(within(readySection).queryByText("PR B awaiting-via-blocked")).not.toBeInTheDocument();
+      });
+    });
   });
 
   describe("partial-data notice", () => {

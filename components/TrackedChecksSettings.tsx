@@ -105,9 +105,14 @@ export function TrackedChecksSettings({
   function rebuildAndNotify(newRows: RepoRow[]) {
     const newRepos: Record<string, string[]> = {};
     for (const row of newRows) {
-      if (row.repo.trim()) {
-        newRepos[row.repo.trim()] = parseChecks(row.checks);
+      const repo = row.repo.trim();
+      if (!repo) continue;
+      const existing = newRepos[repo] ?? [];
+      const merged = [...existing];
+      for (const c of parseChecks(row.checks)) {
+        if (!merged.includes(c)) merged.push(c);
       }
+      newRepos[repo] = merged;
     }
     onChange({ ...value, repos: newRepos });
   }

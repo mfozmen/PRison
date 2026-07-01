@@ -1,4 +1,5 @@
 import { TokenForm } from "@/components/TokenForm";
+import { EnvSignIn } from "@/components/EnvSignIn";
 import { Dashboard } from "@/components/Dashboard";
 import { ghQuery } from "@/lib/github/client";
 import { ORGS_QUERY, parseOrgs } from "@/lib/github/queries";
@@ -7,11 +8,12 @@ import type { Org } from "@/lib/types";
 
 export default async function Home() {
   const token = await readToken();
+  const hasEnvToken = !!(process.env.GITHUB_TOKEN || process.env.GH_TOKEN);
 
   if (!token) {
     return (
       <main className="flex min-h-screen items-center justify-center px-6">
-        <TokenForm />
+        {hasEnvToken ? <EnvSignIn /> : <TokenForm />}
       </main>
     );
   }

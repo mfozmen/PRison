@@ -5,15 +5,28 @@
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=mfozmen_PRison&metric=coverage)](https://sonarcloud.io/summary/new_code?id=mfozmen_PRison)
 
 A read-only GitHub dashboard that shows which pull requests need your attention,
-and for how long they've been waiting:
+and for how long — across your personal account and every organization you can
+access. Three lists, oldest first:
 
-- **Stuck on checks** — your open PRs whose checks are failing or pending, oldest first.
-- **Waiting on your review** — PRs you're blocking, oldest first.
+- **Ready to merge** — PRs GitHub reports as mergeable now. Out-of-date branches
+  still count and get a **"Needs update"** hint (a bot/manual update handles them).
+- **Waiting on your review** — PRs you're blocking others on.
+- **Stuck on checks** — your open PRs with failing/pending checks, or otherwise
+  blocked from merging (required checks, review, or conflicts).
 
-It spans every repo you can access — your personal account and all your
-organizations — with an optional per-org filter. PRison uses **your own access
-token**, so there's no third-party app to get approved, and every row deep-links
-you to GitHub to act.
+### Features
+
+- **Tracked checks → Awaiting.** GitHub's API hides "expected" required checks
+  (e.g. a manually-triggered `qa/smoke` or automation) from non-admins. Name the
+  checks you care about — org defaults plus per-repo overrides, with a
+  type-to-search repo picker — and PRison shows them as **"⏳ Awaiting: &lt;name&gt;"**
+  on a blocked PR until they report.
+- **Grouping** — flat, by repository, or by check.
+- **Light / dark theme**, responsive two-column layout, minute-level ages,
+  color-coded lists, and a Refresh button.
+- **Personal account + per-org filter** in the top-right switcher.
+- **Your own access** — sign in with the GitHub CLI or a token; no third-party
+  app to approve. Every row deep-links to GitHub; PRison never writes anything.
 
 ## Getting started
 
@@ -71,10 +84,12 @@ or callback URLs needed.
 
 ## Usage
 
-Sign in with the GitHub CLI or paste a token, then use the filter in the
-top-right to narrow to one organization (defaults to **All**). Click **Open PR**
-or a suggested-action link to jump to GitHub. **Sign Out** clears the stored
-token.
+Sign in with the GitHub CLI or paste a token. In the top-right: the **switcher**
+scopes to All / your personal account / a single org; the **sliders icon** opens
+**Tracked checks** (name the required checks to see as "Awaiting"); the **sun/moon**
+toggles the theme; **Sign Out** clears the stored token. Click a **PR title** (or a
+suggested-action link) to jump to GitHub. Use **Flat / By repo / By check** to
+group, **Hide drafts** to filter, and **Refresh** to re-fetch without reloading.
 
 ## Documentation
 

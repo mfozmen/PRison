@@ -130,10 +130,11 @@ export function parseStuckPrs(raw: any): StuckPr[] {
       const ctxs = commit.statusCheckRollup?.contexts?.nodes ?? [];
       const { failing, pending, failingChecks, pendingChecks, checkNames } = computeCheckRollup(ctxs);
       // A PR is "blocked" (shown in the stuck list even with green checks) when
-      // branch protection blocks it (BLOCKED), it is out of date (BEHIND), or it
-      // has merge conflicts (DIRTY). All three states prevent merging regardless
-      // of check results.
-      const blocked = n.mergeStateStatus === "BLOCKED" || n.mergeStateStatus === "BEHIND" || n.mergeStateStatus === "DIRTY";
+      // branch protection blocks it (BLOCKED) or it has merge conflicts (DIRTY).
+      // Both states prevent merging regardless of check results. BEHIND is NOT
+      // blocked — a merely out-of-date PR is otherwise mergeable and is surfaced
+      // in the ready-to-merge list with a "Needs update" badge instead.
+      const blocked = n.mergeStateStatus === "BLOCKED" || n.mergeStateStatus === "DIRTY";
       const mergeState: string = n.mergeStateStatus ?? "";
       return {
         id: n.id, title: n.title, url: n.url, number: n.number,
@@ -219,7 +220,7 @@ export function parseReadyPrs(raw: any): ReadyPr[] {
   // check is needed.
   return (raw?.search?.nodes ?? [])
     .filter((n: any) => n?.id)
-    .filter((n: any) => n.mergeStateStatus === "CLEAN")
+    .filter((n: any) => n.mergeStateStatus === "CLEAN" || n.mergeStateStatus === "BEHIND")
     .filter((n: any) => !n.isDraft)
     .map((n: any) => {
       const commit = n.commits?.nodes?.[0]?.commit ?? {};
@@ -230,6 +231,7 @@ export function parseReadyPrs(raw: any): ReadyPr[] {
         number: n.number,
         repo: n.repository?.nameWithOwner ?? "",
         readySince: commit.pushedDate ?? commit.committedDate ?? n.updatedAt ?? "",
+        needsUpdate: n.mergeStateStatus === "BEHIND",
       } as ReadyPr;
     });
 }

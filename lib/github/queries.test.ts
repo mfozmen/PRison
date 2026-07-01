@@ -476,7 +476,7 @@ describe("parseStuckPrs", () => {
     expect(prs).toHaveLength(0);
   });
 
-  it("BEHIND mergeStateStatus with no failing/pending → included with blocked:true", () => {
+  it("BEHIND mergeStateStatus with no failing/pending → NOT in stuck (BEHIND moved to ready)", () => {
     const rawBehind = {
       search: { nodes: [
         { id: "62", title: "behind-pr", url: "u62", number: 62,
@@ -491,9 +491,7 @@ describe("parseStuckPrs", () => {
       ] },
     };
     const prs = parseStuckPrs(rawBehind);
-    expect(prs).toHaveLength(1);
-    expect(prs[0].blocked).toBe(true);
-    expect(prs[0].mergeState).toBe("BEHIND");
+    expect(prs).toHaveLength(0);
   });
 
   it("DIRTY mergeStateStatus with no failing/pending → included with blocked:true, mergeState DIRTY", () => {
@@ -516,7 +514,7 @@ describe("parseStuckPrs", () => {
     expect(prs[0].mergeState).toBe("DIRTY");
   });
 
-  it("BEHIND PR with all-green checks is included with mergeState:'BEHIND' and blocked:true (live bug scenario)", () => {
+  it("BEHIND PR with all-green checks is NOT in stuck (BEHIND moved to ready)", () => {
     const rawBehindGreen = {
       search: { nodes: [
         { id: "65", title: "behind-all-green", url: "u65", number: 65,
@@ -533,11 +531,7 @@ describe("parseStuckPrs", () => {
       ] },
     };
     const prs = parseStuckPrs(rawBehindGreen);
-    expect(prs).toHaveLength(1);
-    expect(prs[0].blocked).toBe(true);
-    expect(prs[0].mergeState).toBe("BEHIND");
-    expect(prs[0].failingChecks).toBe(0);
-    expect(prs[0].pendingChecks).toBe(0);
+    expect(prs).toHaveLength(0);
   });
 
   it("failing checks + BLOCKED mergeStateStatus → included with blocked:true", () => {
@@ -755,6 +749,18 @@ describe("parseReadyPrs", () => {
     });
   });
 
+  it("CLEAN PR has needsUpdate: false", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr()] } });
+    expect(result).toHaveLength(1);
+    expect(result[0].needsUpdate).toBe(false);
+  });
+
+  it("BEHIND PR is included as ready with needsUpdate: true", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr({ mergeStateStatus: "BEHIND" })] } });
+    expect(result).toHaveLength(1);
+    expect(result[0].needsUpdate).toBe(true);
+  });
+
   it("APPROVED + BLOCKED mergeStateStatus → NOT ready even when commits look green (the bug)", () => {
     // This is the key false-positive bug: APPROVED + green rollup but branch protection
     // blocks the merge. mergeStateStatus=BLOCKED must exclude the PR.
@@ -763,9 +769,12 @@ describe("parseReadyPrs", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("drops APPROVED + BEHIND mergeStateStatus", () => {
+  it("BEHIND is no longer excluded — parseStuckPrs no longer claims it (covered by 'BEHIND PR is included as ready' test)", () => {
+    // BEHIND PRs now move to ready-to-merge. The old "drops BEHIND" assertion
+    // is replaced by "BEHIND PR is included as ready with needsUpdate: true".
     const result = parseReadyPrs({ search: { nodes: [makePr({ mergeStateStatus: "BEHIND" })] } });
-    expect(result).toHaveLength(0);
+    expect(result).toHaveLength(1);
+    expect(result[0].needsUpdate).toBe(true);
   });
 
   it("drops APPROVED + UNSTABLE mergeStateStatus", () => {

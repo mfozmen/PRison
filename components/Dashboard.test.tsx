@@ -41,6 +41,7 @@ const READY_PR = {
   repo: "acme/d",
   number: 5,
   readySince: "2026-06-21T00:00:00Z",
+  needsUpdate: false,
 };
 
 const ORGS = [
@@ -462,8 +463,11 @@ describe("Dashboard", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("BEHIND PR with no visible/awaiting checks shows the out-of-date note, not the required-checks note", async () => {
-    const BEHIND_PR = {
+  it("BEHIND PR in stuck list no longer shows the out-of-date note (BEHIND arm removed)", async () => {
+    // BEHIND PRs are no longer returned by parseStuckPrs and the BEHIND arm has
+    // been removed from the stuck renderRow ternary. If a BEHIND PR somehow
+    // reached the stuck list it would fall through to the blocked note.
+    const BEHIND_STUCK_PR = {
       ...STUCK_PR,
       id: "behind",
       failingChecks: 0,
@@ -478,17 +482,22 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("ready") ? [] : url.includes("stuck") ? [BEHIND_PR] : [REVIEW_PR],
+            url.includes("ready") ? [] : url.includes("stuck") ? [BEHIND_STUCK_PR] : [REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
     await waitFor(() =>
-      expect(screen.getByText("Out of date with the base branch — update it to merge.")).toBeInTheDocument(),
+      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
     );
+    // Out-of-date note is gone — BEHIND arm was removed
     expect(
-      screen.queryByText("Some required checks run on GitHub and aren't shown here."),
+      screen.queryByText("Out of date with the base branch — update it to merge."),
     ).not.toBeInTheDocument();
+    // Falls through to the blocked note
+    expect(
+      screen.getByText("Some required checks run on GitHub and aren't shown here."),
+    ).toBeInTheDocument();
   });
 
   it("DIRTY PR shows the merge-conflicts note", async () => {
@@ -1185,6 +1194,27 @@ describe("Dashboard", () => {
       const heading = screen.getByRole("heading", { name: /ready to merge/i });
       const badge = heading.closest("section")?.querySelector('[data-testid="count-badge"]');
       expect(badge).toHaveClass("bg-success");
+    });
+
+    it("ready PR with needsUpdate shows the 'Needs update' badge", async () => {
+      const BEHIND_READY_PR = { ...READY_PR, id: "r-behind", needsUpdate: true };
+      global.fetch = vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve(
+              url.includes("ready")
+                ? [BEHIND_READY_PR]
+                : url.includes("stuck")
+                  ? [STUCK_PR]
+                  : [REVIEW_PR],
+            ),
+        }),
+      ) as unknown as typeof fetch;
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("Needs update")).toBeInTheDocument(),
+      );
     });
 
     it("shows an error banner and retry when the ready fetch fails", async () => {

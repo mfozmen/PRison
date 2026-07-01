@@ -296,6 +296,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 now={new Date()}
                 suggestion={suggestReady(pr)}
                 accent="success"
+                detail={pr.needsUpdate ? (
+                  <span className="bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium">
+                    Needs update
+                  </span>
+                ) : undefined}
               />
             )}
           />
@@ -451,8 +456,6 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                       <span className="text-xs text-muted">+{overflow} more</span>
                     )}
                   </div>
-                ) : pr.mergeState === "BEHIND" ? (
-                  noteSpan("Out of date with the base branch — update it to merge.")
                 ) : pr.mergeState === "DIRTY" ? (
                   noteSpan("Has merge conflicts — resolve them on GitHub.")
                 ) : pr.blocked ? (

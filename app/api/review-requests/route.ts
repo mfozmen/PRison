@@ -11,10 +11,10 @@ export async function GET(request: Request) {
   const scoped = resolveScope(request);
   if ("error" in scoped) return new Response(scoped.error, { status: 400 });
   try {
-    const raw = await ghQuery(token, REVIEW_REQUESTS_QUERY, {
+    const { data, partial } = await ghQuery(token, REVIEW_REQUESTS_QUERY, {
       q: searchQuery("review", scoped.scope),
     });
-    return Response.json(parseReviewRequests(raw, login));
+    return Response.json(parseReviewRequests(data, login), partial ? { headers: { "X-Partial": "1" } } : undefined);
   } catch {
     return new Response("Upstream GitHub error", { status: 502 });
   }

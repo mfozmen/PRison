@@ -422,6 +422,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 const showPendingNames = truncate ? pr.pending.slice(0, 2) : pr.pending;
                 const overflow = totalNames - (showFailingNames.length + showPendingNames.length);
                 const awaiting = awaitingChecks(pr.repo, pr.checkNames, tracked);
+                const hasAwaiting = awaiting.length > 0;
                 const noteIcon = (
                   <svg aria-hidden="true" className="shrink-0" width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3"/>
@@ -434,58 +435,55 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     {text}
                   </span>
                 );
-                const chipsBlock = hasNames ? (
-                  <div className="flex flex-wrap gap-1 items-center">
-                    {showFailingNames.map((name, i) => (
-                      <span
-                        key={`fail-${i}-${name}`}
-                        className="bg-danger/10 text-danger ring-1 ring-inset ring-danger/30 rounded px-1.5 py-0.5 text-xs font-medium"
-                      >
-                        {name}
-                      </span>
-                    ))}
-                    {showPendingNames.map((name, i) => (
-                      <span
-                        key={`pend-${i}-${name}`}
-                        className="bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium"
-                      >
-                        {name}
-                      </span>
-                    ))}
-                    {overflow > 0 && (
-                      <span className="text-xs text-muted">+{overflow} more</span>
-                    )}
-                  </div>
-                ) : pr.mergeState === "DIRTY" ? (
-                  noteSpan("Has merge conflicts — resolve them on GitHub.")
-                ) : pr.blocked ? (
-                  noteSpan("Some required checks run on GitHub and aren't shown here.")
-                ) : (
-                  `${pr.failingChecks} failing · ${pr.pendingChecks} pending`
-                );
-                const awaitingBlock = awaiting.length > 0 ? (
-                  <div className="flex flex-wrap gap-1 items-center mt-1">
-                    <svg aria-hidden="true" className="shrink-0 text-warning" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3"/>
-                      <path d="M6 3.5v2.75l1.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    <span className="text-xs text-muted">Awaiting:</span>
-                    {awaiting.map((name) => (
-                      <span
-                        key={name}
-                        className="bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium"
-                      >
-                        {name}
-                      </span>
-                    ))}
-                  </div>
-                ) : null;
-                const detail = awaiting.length > 0 ? (
-                  <div className="flex flex-col gap-0.5">
-                    {chipsBlock}
-                    {awaitingBlock}
-                  </div>
-                ) : chipsBlock;
+                let detail: React.ReactNode;
+                if (!hasNames && pr.mergeState === "DIRTY") {
+                  detail = noteSpan("Has merge conflicts — resolve them on GitHub.");
+                } else if (hasNames || hasAwaiting) {
+                  detail = (
+                    <div className="flex flex-wrap gap-1 items-center">
+                      {showFailingNames.map((name, i) => (
+                        <span
+                          key={`fail-${i}-${name}`}
+                          className="bg-danger/10 text-danger ring-1 ring-inset ring-danger/30 rounded px-1.5 py-0.5 text-xs font-medium"
+                        >
+                          {name}
+                        </span>
+                      ))}
+                      {showPendingNames.map((name, i) => (
+                        <span
+                          key={`pend-${i}-${name}`}
+                          className="bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium"
+                        >
+                          {name}
+                        </span>
+                      ))}
+                      {overflow > 0 && (
+                        <span className="text-xs text-muted">+{overflow} more</span>
+                      )}
+                      {hasAwaiting && (
+                        <>
+                          <svg aria-hidden="true" className="shrink-0 text-warning" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3"/>
+                            <path d="M6 3.5v2.75l1.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                          <span className="text-xs text-muted">Awaiting:</span>
+                          {awaiting.map((name) => (
+                            <span
+                              key={name}
+                              className="bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium"
+                            >
+                              {name}
+                            </span>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  );
+                } else if (pr.blocked) {
+                  detail = noteSpan("Some required checks run on GitHub and aren't shown here.");
+                } else {
+                  detail = `${pr.failingChecks} failing · ${pr.pendingChecks} pending`;
+                }
                 return (
                   <PrRow
                     title={pr.title}

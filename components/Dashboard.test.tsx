@@ -1117,6 +1117,56 @@ describe("Dashboard", () => {
       expect(screen.getByRole("option", { name: "acme/c" })).toBeInTheDocument();
       expect(screen.getByRole("option", { name: "acme/d" })).toBeInTheDocument();
     });
+
+    describe("inline awaiting chips", () => {
+      it("stuck PR with a failing check and a tracked awaiting check shows both chips inline and no generic note", async () => {
+        localStorage.setItem(
+          "prison.trackedChecks",
+          JSON.stringify({ orgs: { acme: ["Automation Result"] }, repos: {} }),
+        );
+        // STUCK_PR has repo "acme/b", failing: ["build"], checkNames: ["build"]
+        // awaitingChecks("acme/b", ["build"], ...) = ["Automation Result"]
+        render(<Dashboard orgs={ORGS} login="testuser" />);
+        await waitFor(() => expect(screen.getByText("build")).toBeInTheDocument());
+        expect(screen.getByText("Automation Result")).toBeInTheDocument();
+        expect(
+          screen.queryByText("Some required checks run on GitHub and aren't shown here."),
+        ).not.toBeInTheDocument();
+      });
+
+      it("blocked PR with no failing/pending but an awaiting check shows the awaiting chip and no generic note", async () => {
+        const BLOCKED_AWAITING_PR = {
+          ...STUCK_PR,
+          id: "blocked-awaiting",
+          title: "blocked awaiting pr",
+          failingChecks: 0,
+          pendingChecks: 0,
+          failing: [],
+          pending: [],
+          checkNames: [],
+          blocked: true,
+          mergeState: "BLOCKED",
+        };
+        localStorage.setItem(
+          "prison.trackedChecks",
+          JSON.stringify({ orgs: { acme: ["ci/required"] }, repos: {} }),
+        );
+        global.fetch = vi.fn((url: string) =>
+          Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve(
+                url.includes("ready") ? [] : url.includes("stuck") ? [BLOCKED_AWAITING_PR] : [REVIEW_PR],
+              ),
+          }),
+        ) as unknown as typeof fetch;
+        render(<Dashboard orgs={ORGS} login="testuser" />);
+        await waitFor(() => expect(screen.getByText("ci/required")).toBeInTheDocument());
+        expect(
+          screen.queryByText("Some required checks run on GitHub and aren't shown here."),
+        ).not.toBeInTheDocument();
+      });
+    });
   });
 
   describe("ready-to-merge", () => {

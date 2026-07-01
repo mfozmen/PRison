@@ -1075,7 +1075,9 @@ describe("Dashboard", () => {
       await waitFor(() =>
         expect(screen.getByText("stuck pr")).toBeInTheDocument(),
       );
+      // Chip renders the name as text content and carries an accessible label
       expect(screen.getByText("qa/smoke")).toBeInTheDocument();
+      expect(screen.getByLabelText("Awaiting: qa/smoke")).toBeInTheDocument();
     });
 
     it("does NOT show an awaiting chip when the tracked check is present in checkNames", async () => {
@@ -1087,7 +1089,9 @@ describe("Dashboard", () => {
       await waitFor(() =>
         expect(screen.getByText("stuck pr")).toBeInTheDocument(),
       );
+      // No visible "Awaiting:" label and no accessible awaiting chip
       expect(screen.queryByText("Awaiting:")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/^Awaiting:/)).not.toBeInTheDocument();
     });
 
     it("opening settings via gear button renders the tracked checks panel", async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { Dashboard } from "./Dashboard";
 
 const STUCK_PR = {
@@ -54,6 +54,7 @@ function okFetch() {
   return vi.fn((url: string) =>
     Promise.resolve({
       ok: true,
+      headers: { get: () => null },
       json: () =>
         Promise.resolve(
           url.includes("ready")
@@ -61,6 +62,19 @@ function okFetch() {
             : url.includes("stuck")
               ? [STUCK_PR]
               : [REVIEW_PR],
+        ),
+    }),
+  ) as unknown as typeof fetch;
+}
+
+function partialFetch() {
+  return vi.fn((url: string) =>
+    Promise.resolve({
+      ok: true,
+      headers: { get: (h: string) => (url.includes("stuck") && h === "X-Partial" ? "1" : null) },
+      json: () =>
+        Promise.resolve(
+          url.includes("ready") ? [READY_PR] : url.includes("stuck") ? [STUCK_PR] : [REVIEW_PR],
         ),
     }),
   ) as unknown as typeof fetch;
@@ -1166,6 +1180,28 @@ describe("Dashboard", () => {
           screen.queryByText("Some required checks run on GitHub and aren't shown here."),
         ).not.toBeInTheDocument();
       });
+    });
+  });
+
+  describe("partial-data notice", () => {
+    it("shows the partial-data notice when a list responds with X-Partial", async () => {
+      global.fetch = partialFetch();
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText(/Some data couldn't be loaded/i)).toBeInTheDocument(),
+      );
+      // Retry button present and clickable
+      const notice = screen.getByRole("status");
+      expect(within(notice).getByRole("button", { name: /retry/i })).toBeInTheDocument();
+    });
+
+    it("shows no partial-data notice when no list is partial", async () => {
+      // okFetch (default from beforeEach) returns X-Partial: null everywhere
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      await waitFor(() =>
+        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+      );
+      expect(screen.queryByText(/Some data couldn't be loaded/i)).not.toBeInTheDocument();
     });
   });
 

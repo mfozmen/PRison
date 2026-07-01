@@ -3,16 +3,15 @@ import { execFile as execFileCb } from "node:child_process";
 import { ghClient } from "@/lib/github/client";
 import { VIEWER_QUERY } from "@/lib/github/queries";
 import { setSession } from "@/lib/session";
+import { isLoopback } from "@/lib/loopback";
 
 const execFile = promisify(execFileCb);
-
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
 export async function POST(request: Request) {
   // This mints a session from the host's `gh` credentials, so restrict it to a
   // loopback origin — the intended local, single-user use. A networked instance
   // (a different host) must use a pasted token instead.
-  if (!LOCAL_HOSTS.has(new URL(request.url).hostname)) {
+  if (!isLoopback(request)) {
     return Response.json({ reason: "not-local" }, { status: 403 });
   }
 

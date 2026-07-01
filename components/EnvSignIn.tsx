@@ -7,7 +7,9 @@ export function EnvSignIn() {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    fetch("/api/token/env", { method: "POST" })
+    const controller = new AbortController();
+
+    fetch("/api/token/env", { method: "POST", signal: controller.signal })
       .then((res) => {
         if (res.ok) {
           window.location.reload();
@@ -15,9 +17,13 @@ export function EnvSignIn() {
           setFailed(true);
         }
       })
-      .catch(() => {
-        setFailed(true);
+      .catch((err: unknown) => {
+        if ((err as { name?: string })?.name !== "AbortError") {
+          setFailed(true);
+        }
       });
+
+    return () => controller.abort();
   }, []);
 
   if (failed) {

@@ -13,6 +13,7 @@ export type StuckPr = {
   checkNames: string[];   // all DISTINCT context display names present in the rollup (any state)
   isDraft: boolean;
   blocked: boolean;
+  readyViaBlocked: boolean;  // true when BLOCKED+SUCCESS+APPROVED; client-side arbitration decides which list it lands in
   mergeState: string;   // raw mergeStateStatus from GitHub API, e.g. "BEHIND", "DIRTY", "BLOCKED", ""
   stuckSince: string; // ISO
 };
@@ -36,6 +37,8 @@ export type ReadyPr = {
   repo: string;
   readySince: string;
   needsUpdate: boolean;
+  checkNames: string[];   // all DISTINCT context display names present in the rollup (any state)
+  viaBlocked: boolean;    // true when qualified via isReadyViaBlocked (BLOCKED+SUCCESS+APPROVED)
 };
 
 export type AgeBucket = "fresh" | "warning" | "urgent";

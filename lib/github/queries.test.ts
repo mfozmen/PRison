@@ -581,7 +581,8 @@ describe("parseStuckPrs", () => {
     expect(checkNames).toHaveLength(3);
   });
 
-  it("BLOCKED + SUCCESS rollupState + APPROVED → NOT in stuck (moved to ready)", () => {
+  it("BLOCKED + SUCCESS rollupState + APPROVED → in stuck with readyViaBlocked:true (client-side arbitration)", () => {
+    // parseStuckPrs keeps ALL BLOCKED PRs; the Dashboard filters by awaitingChecks.
     const rawBlockedReady = {
       search: { nodes: [
         { id: "80", title: "blocked-ready", url: "u80", number: 80,
@@ -595,7 +596,11 @@ describe("parseStuckPrs", () => {
       ] },
     };
     const prs = parseStuckPrs(rawBlockedReady);
-    expect(prs).toHaveLength(0);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].readyViaBlocked).toBe(true);
+    expect(prs[0].blocked).toBe(true);
+    expect(prs[0].failingChecks).toBe(0);
+    expect(prs[0].pendingChecks).toBe(0);
   });
 
   it("BLOCKED + FAILURE rollupState + APPROVED → in stuck (failing check)", () => {
@@ -658,6 +663,35 @@ describe("parseStuckPrs", () => {
     const prs = parseStuckPrs(rawBlockedUnapproved);
     expect(prs).toHaveLength(1);
     expect(prs[0].blocked).toBe(true);
+  });
+
+  it("BLOCKED+APPROVED+SUCCESS with rollup contexts → readyViaBlocked:true, blocked:true, checkNames populated", () => {
+    // This is the "genuinely awaiting" case: tracked checks qa/smoke and Automation Result
+    // are present in the rollup, so awaitingChecks returns [] → Dashboard routes to ready.
+    // parseStuckPrs keeps it regardless; the Dashboard performs client-side arbitration.
+    const rawBlockedWithContexts = {
+      search: { nodes: [
+        { id: "90", title: "blocked-with-contexts", url: "u90", number: 90,
+          mergeStateStatus: "BLOCKED",
+          reviewDecision: "APPROVED",
+          repository: { nameWithOwner: "acme/b" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { state: "SUCCESS", contexts: { nodes: [
+              { name: "qa/smoke", conclusion: "SUCCESS" },
+              { context: "Automation Result", state: "SUCCESS" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawBlockedWithContexts);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].readyViaBlocked).toBe(true);
+    expect(prs[0].blocked).toBe(true);
+    expect(prs[0].failingChecks).toBe(0);
+    expect(prs[0].pendingChecks).toBe(0);
+    expect(prs[0].checkNames).toContain("qa/smoke");
+    expect(prs[0].checkNames).toContain("Automation Result");
   });
 });
 
@@ -989,6 +1023,48 @@ describe("parseReadyPrs", () => {
   it("returns [] on null/missing input", () => {
     expect(parseReadyPrs(null)).toEqual([]);
     expect(parseReadyPrs({})).toEqual([]);
+  });
+
+  it("BLOCKED+APPROVED+SUCCESS with rollup contexts → viaBlocked:true, checkNames populated", () => {
+    const pr = makePr({
+      mergeStateStatus: "BLOCKED",
+      commits: { nodes: [{ commit: {
+        pushedDate: "2026-06-25T00:00:00Z",
+        committedDate: "2026-06-24T00:00:00Z",
+        statusCheckRollup: { state: "SUCCESS", contexts: { nodes: [
+          { name: "qa/smoke", conclusion: "SUCCESS" },
+          { context: "Automation Result", state: "SUCCESS" },
+        ] } },
+      } }] },
+    });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result).toHaveLength(1);
+    expect(result[0].viaBlocked).toBe(true);
+    expect(result[0].checkNames).toContain("qa/smoke");
+    expect(result[0].checkNames).toContain("Automation Result");
+  });
+
+  it("CLEAN PR has viaBlocked:false and checkNames derived from rollup", () => {
+    const pr = makePr({
+      commits: { nodes: [{ commit: {
+        pushedDate: "2026-06-25T00:00:00Z",
+        committedDate: "2026-06-24T00:00:00Z",
+        statusCheckRollup: { state: "SUCCESS", contexts: { nodes: [
+          { name: "build", conclusion: "SUCCESS" },
+        ] } },
+      } }] },
+    });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result).toHaveLength(1);
+    expect(result[0].viaBlocked).toBe(false);
+    expect(result[0].checkNames).toContain("build");
+  });
+
+  it("CLEAN PR with no rollup contexts has viaBlocked:false and checkNames:[]", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr()] } });
+    expect(result).toHaveLength(1);
+    expect(result[0].viaBlocked).toBe(false);
+    expect(result[0].checkNames).toEqual([]);
   });
 });
 

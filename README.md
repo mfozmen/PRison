@@ -14,6 +14,8 @@ access. Three lists, oldest first:
 - **Stuck on checks** — your open PRs with failing/pending checks, or otherwise
   blocked from merging (required checks, review, or conflicts).
 
+![The PRison dashboard showing the three PR lists in dark mode](docs/screenshot.png)
+
 ### Features
 
 - **Tracked checks → Awaiting.** GitHub's API hides "expected" required checks

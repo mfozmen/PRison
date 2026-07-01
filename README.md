@@ -30,11 +30,28 @@ access. Three lists, oldest first:
 
 ## Getting started
 
-PRison runs on **your own machine**. Sign in with the **GitHub CLI** (one click,
-uses your CLI token — the way into SSO-restricted orgs like useinsider) or a
-**Personal Access Token**. Two ways to run:
+PRison runs on **your own machine** — no third-party app to approve. The easiest
+way is Docker (one command); or run it locally with Node.
 
-### Run it locally
+> [!WARNING]
+> Sign-in mints a session from the host's GitHub credentials (your `gh` CLI token
+> or a `GITHUB_TOKEN`). PRison is designed to run on your own machine — do NOT
+> expose a `gh`-authenticated or `GITHUB_TOKEN`-configured instance on a reachable
+> network without adding your own access control.
+
+### Run with Docker (recommended)
+
+Zero-config — `AUTH_SECRET` is auto-generated and persisted in a volume (nothing to set):
+
+```sh
+GITHUB_TOKEN="$(gh auth token)" docker compose up --build   # http://localhost:3000
+```
+
+Passing your `gh` token signs you in automatically — needed for SSO-restricted orgs
+(e.g. useinsider) where classic PATs are blocked. The token rotates, so re-run when
+it expires. Without `GITHUB_TOKEN`, just open the app and paste a token.
+
+### Run locally (development)
 
 ```sh
 npm install
@@ -46,11 +63,7 @@ the session cookie) — nothing to configure. Open the app and click **Sign in w
 GitHub CLI**; the server reads your CLI token and stores it only in an encrypted,
 httpOnly cookie — never in the browser.
 
-> [!WARNING]
-> The CLI / env-token sign-in mints a session from the host's GitHub credentials.
-> PRison is designed to run on your own machine — do NOT expose a `gh`-authenticated
-> or `GITHUB_TOKEN`-configured instance on a reachable network without adding your
-> own access control.
+### No GitHub CLI? Paste a token
 
 If `gh` isn't installed or signed in, the app falls back to a paste-a-token form:
 
@@ -61,18 +74,6 @@ If `gh` isn't installed or signed in, the app falls back to a paste-a-token form
 > For SAML SSO orgs, click **Configure SSO** on the token and **Authorize** it —
 > self-service, no org owner approval. Some orgs forbid classic PATs entirely;
 > there the GitHub CLI token is the only way in.
-
-### Run with Docker
-
-Zero-config — `AUTH_SECRET` is auto-generated and persisted in a volume (nothing to set):
-
-```sh
-GITHUB_TOKEN="$(gh auth token)" docker compose up --build   # http://localhost:3000
-```
-
-Passing your `gh` token signs you in automatically — needed for SSO-restricted orgs
-(e.g. useinsider) where classic PATs are blocked. The token rotates, so re-run when
-it expires. Without `GITHUB_TOKEN`, just open the app and paste a token.
 
 ## Usage
 

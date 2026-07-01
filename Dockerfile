@@ -29,9 +29,13 @@ COPY --from=build /app/public ./public
 COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Create persistent data directory for auto-generated AUTH_SECRET
+RUN mkdir -p /data && chown nextjs:nodejs /data
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 USER nextjs
 EXPOSE 3000
 
-# AUTH_SECRET must be provided at runtime, e.g.:
-#   docker run -e AUTH_SECRET=... -p 3000:3000 prison
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "server.js"]

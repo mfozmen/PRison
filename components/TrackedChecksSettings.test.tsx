@@ -337,6 +337,85 @@ describe("TrackedChecksSettings", () => {
     });
   });
 
+  it("merges checks from two rows targeting the same repo (union, de-duplicated)", () => {
+    const onChange = vi.fn();
+    render(
+      <TrackedChecksSettings
+        orgs={[]}
+        availableRepos={["acme/web"]}
+        value={emptyValue}
+        onChange={onChange}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+
+    // Add first row: acme/web → qa/smoke
+    fireEvent.click(screen.getByRole("button", { name: /add override/i }));
+    const [repoInput1] = screen.getAllByRole("combobox", { name: "Repository" });
+    fireEvent.focus(repoInput1);
+    fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
+    const [checksInput1] = screen.getAllByPlaceholderText("e.g. qa/smoke");
+    fireEvent.change(checksInput1, { target: { value: "qa/smoke" } });
+
+    // Add second row: acme/web → Automation Result
+    fireEvent.click(screen.getByRole("button", { name: /add override/i }));
+    const allRepoInputs = screen.getAllByRole("combobox", { name: "Repository" });
+    const repoInput2 = allRepoInputs[allRepoInputs.length - 1];
+    fireEvent.focus(repoInput2);
+    fireEvent.mouseDown(screen.getAllByRole("option", { name: "acme/web" })[0]);
+    const allChecksInputs = screen.getAllByPlaceholderText("e.g. qa/smoke");
+    const checksInput2 = allChecksInputs[allChecksInputs.length - 1];
+    fireEvent.change(checksInput2, { target: { value: "Automation Result" } });
+
+    const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1][0] as {
+      repos: Record<string, string[]>;
+    };
+    // Both checks must appear for acme/web — union, de-duplicated
+    expect(lastCall.repos["acme/web"]).toEqual(
+      expect.arrayContaining(["qa/smoke", "Automation Result"]),
+    );
+    expect(lastCall.repos["acme/web"]).toHaveLength(2);
+  });
+
+  it("distinct repos still map independently with no cross-contamination", () => {
+    const onChange = vi.fn();
+    render(
+      <TrackedChecksSettings
+        orgs={[]}
+        availableRepos={["acme/web", "beta/api"]}
+        value={emptyValue}
+        onChange={onChange}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+
+    // Row 1: acme/web → qa/smoke
+    fireEvent.click(screen.getByRole("button", { name: /add override/i }));
+    const [repoInput1] = screen.getAllByRole("combobox", { name: "Repository" });
+    fireEvent.focus(repoInput1);
+    fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
+    const [checksInput1] = screen.getAllByPlaceholderText("e.g. qa/smoke");
+    fireEvent.change(checksInput1, { target: { value: "qa/smoke" } });
+
+    // Row 2: beta/api → lint
+    fireEvent.click(screen.getByRole("button", { name: /add override/i }));
+    const allRepoInputs = screen.getAllByRole("combobox", { name: "Repository" });
+    const repoInput2 = allRepoInputs[allRepoInputs.length - 1];
+    fireEvent.focus(repoInput2);
+    fireEvent.mouseDown(screen.getByRole("option", { name: "beta/api" }));
+    const allChecksInputs = screen.getAllByPlaceholderText("e.g. qa/smoke");
+    const checksInput2 = allChecksInputs[allChecksInputs.length - 1];
+    fireEvent.change(checksInput2, { target: { value: "lint" } });
+
+    const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1][0] as {
+      repos: Record<string, string[]>;
+    };
+    expect(lastCall.repos["acme/web"]).toEqual(["qa/smoke"]);
+    expect(lastCall.repos["beta/api"]).toEqual(["lint"]);
+  });
+
   it("shows empty-state hint and Add override button when availableRepos and configured repos are both empty", () => {
     render(
       <TrackedChecksSettings

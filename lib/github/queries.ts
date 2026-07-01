@@ -25,11 +25,11 @@ export const STUCK_PRS_QUERY = `
   query($q: String!) {
     search(query: $q, type: ISSUE, first: 50) {
       nodes { ... on PullRequest {
-        id title url number isDraft mergeStateStatus
+        id title url number isDraft mergeStateStatus reviewDecision
         repository { nameWithOwner }
         commits(last: 1) { nodes { commit {
           pushedDate committedDate
-          statusCheckRollup { contexts(first: 100) { nodes {
+          statusCheckRollup { state contexts(first: 100) { nodes {
             ... on CheckRun { name status conclusion }
             ... on StatusContext { context state }
           } } }
@@ -122,6 +122,21 @@ function computeCheckRollup(ctxs: any[]): {
   };
 }
 
+/**
+ * Returns true when a BLOCKED PR is blocked only by out-of-date/push-auth
+ * (bot-handled merge), not by a missing check or review.
+ * Heuristic: rollupState SUCCESS (an outstanding required check makes it non-SUCCESS)
+ * AND reviewDecision APPROVED.
+ */
+function isReadyViaBlocked(node: any): boolean {
+  const rollupState = node.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state;
+  return (
+    node.mergeStateStatus === "BLOCKED" &&
+    rollupState === "SUCCESS" &&
+    node.reviewDecision === "APPROVED"
+  );
+}
+
 export function parseStuckPrs(raw: any): StuckPr[] {
   return (raw?.search?.nodes ?? [])
     .filter((n: any) => n?.id)
@@ -134,7 +149,7 @@ export function parseStuckPrs(raw: any): StuckPr[] {
       // Both states prevent merging regardless of check results. BEHIND is NOT
       // blocked — a merely out-of-date PR is otherwise mergeable and is surfaced
       // in the ready-to-merge list with a "Needs update" badge instead.
-      const blocked = n.mergeStateStatus === "BLOCKED" || n.mergeStateStatus === "DIRTY";
+      const blocked = (n.mergeStateStatus === "BLOCKED" && !isReadyViaBlocked(n)) || n.mergeStateStatus === "DIRTY";
       const mergeState: string = n.mergeStateStatus ?? "";
       return {
         id: n.id, title: n.title, url: n.url, number: n.number,
@@ -178,10 +193,11 @@ export const READY_PRS_QUERY = `
     search(query: $q, type: ISSUE, first: 50) {
       nodes { ... on PullRequest {
         id title url number isDraft updatedAt
-        mergeStateStatus
+        mergeStateStatus reviewDecision
         repository { nameWithOwner }
         commits(last: 1) { nodes { commit {
           pushedDate committedDate
+          statusCheckRollup { state }
         } } }
       } }
     }
@@ -218,9 +234,12 @@ export function parseReadyPrs(raw: any): ReadyPr[] {
   // (not CLEAN), so CLEAN already implies the review gate is satisfied (or not
   // required, as is common for personal-account repos). No separate reviewDecision
   // check is needed.
+  // Additionally, a BLOCKED PR with rollupState SUCCESS and reviewDecision APPROVED
+  // is blocked only by out-of-date/push-auth (bot-handled merge), not by a missing
+  // check or review, and is routed to the ready bucket with needsUpdate:true.
   return (raw?.search?.nodes ?? [])
     .filter((n: any) => n?.id)
-    .filter((n: any) => n.mergeStateStatus === "CLEAN" || n.mergeStateStatus === "BEHIND")
+    .filter((n: any) => n.mergeStateStatus === "CLEAN" || n.mergeStateStatus === "BEHIND" || isReadyViaBlocked(n))
     .filter((n: any) => !n.isDraft)
     .map((n: any) => {
       const commit = n.commits?.nodes?.[0]?.commit ?? {};
@@ -231,7 +250,7 @@ export function parseReadyPrs(raw: any): ReadyPr[] {
         number: n.number,
         repo: n.repository?.nameWithOwner ?? "",
         readySince: commit.pushedDate ?? commit.committedDate ?? n.updatedAt ?? "",
-        needsUpdate: n.mergeStateStatus === "BEHIND",
+        needsUpdate: n.mergeStateStatus !== "CLEAN",
       } as ReadyPr;
     });
 }

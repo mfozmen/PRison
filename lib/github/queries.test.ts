@@ -580,6 +580,85 @@ describe("parseStuckPrs", () => {
     expect(checkNames.every((n) => n !== undefined && n !== null && n !== "")).toBe(true);
     expect(checkNames).toHaveLength(3);
   });
+
+  it("BLOCKED + SUCCESS rollupState + APPROVED → NOT in stuck (moved to ready)", () => {
+    const rawBlockedReady = {
+      search: { nodes: [
+        { id: "80", title: "blocked-ready", url: "u80", number: 80,
+          mergeStateStatus: "BLOCKED",
+          reviewDecision: "APPROVED",
+          repository: { nameWithOwner: "acme/b" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { state: "SUCCESS", contexts: { nodes: [] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawBlockedReady);
+    expect(prs).toHaveLength(0);
+  });
+
+  it("BLOCKED + FAILURE rollupState + APPROVED → in stuck (failing check)", () => {
+    const rawBlockedFail = {
+      search: { nodes: [
+        { id: "81", title: "blocked-fail", url: "u81", number: 81,
+          mergeStateStatus: "BLOCKED",
+          reviewDecision: "APPROVED",
+          repository: { nameWithOwner: "acme/b" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { state: "FAILURE", contexts: { nodes: [
+              { name: "ci/test", conclusion: "FAILURE" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawBlockedFail);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].blocked).toBe(true);
+    expect(prs[0].failingChecks).toBe(1);
+  });
+
+  it("BLOCKED + PENDING rollupState + CHANGES_REQUESTED → in stuck (pending check)", () => {
+    const rawBlockedPending = {
+      search: { nodes: [
+        { id: "82", title: "blocked-pending", url: "u82", number: 82,
+          mergeStateStatus: "BLOCKED",
+          reviewDecision: "CHANGES_REQUESTED",
+          repository: { nameWithOwner: "acme/b" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { state: "PENDING", contexts: { nodes: [
+              { name: "ci/build", status: "IN_PROGRESS" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawBlockedPending);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].blocked).toBe(true);
+    expect(prs[0].pendingChecks).toBe(1);
+  });
+
+  it("BLOCKED + SUCCESS rollupState + CHANGES_REQUESTED → in stuck (review gate: not approved)", () => {
+    // Isolates the reviewDecision half of isReadyViaBlocked: SUCCESS rollup with
+    // no failing/pending checks, but review is NOT approved → stays blocked/stuck.
+    const rawBlockedUnapproved = {
+      search: { nodes: [
+        { id: "83", title: "blocked-unapproved", url: "u83", number: 83,
+          mergeStateStatus: "BLOCKED",
+          reviewDecision: "CHANGES_REQUESTED",
+          repository: { nameWithOwner: "acme/b" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { state: "SUCCESS", contexts: { nodes: [] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawBlockedUnapproved);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].blocked).toBe(true);
+  });
 });
 
 describe("parseReviewRequests", () => {
@@ -761,10 +840,81 @@ describe("parseReadyPrs", () => {
     expect(result[0].needsUpdate).toBe(true);
   });
 
-  it("APPROVED + BLOCKED mergeStateStatus → NOT ready even when commits look green (the bug)", () => {
-    // This is the key false-positive bug: APPROVED + green rollup but branch protection
-    // blocks the merge. mergeStateStatus=BLOCKED must exclude the PR.
+  it("BLOCKED + no rollupState + APPROVED → excluded from ready (rollupState must be SUCCESS)", () => {
+    // Without statusCheckRollup.state === "SUCCESS", a BLOCKED PR does not qualify
+    // as ready-via-blocked even when approved. This covers the absent-rollup case.
     const pr = makePr({ mergeStateStatus: "BLOCKED" });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("BLOCKED + SUCCESS rollupState + APPROVED → included as ready with needsUpdate:true", () => {
+    const pr = makePr({
+      mergeStateStatus: "BLOCKED",
+      commits: { nodes: [{ commit: {
+        pushedDate: "2026-06-25T00:00:00Z",
+        committedDate: "2026-06-24T00:00:00Z",
+        statusCheckRollup: { state: "SUCCESS" },
+      } }] },
+    });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result).toHaveLength(1);
+    expect(result[0].needsUpdate).toBe(true);
+  });
+
+  it("BLOCKED + FAILURE rollupState + APPROVED → excluded from ready", () => {
+    const pr = makePr({
+      mergeStateStatus: "BLOCKED",
+      commits: { nodes: [{ commit: {
+        pushedDate: "2026-06-25T00:00:00Z",
+        committedDate: "2026-06-24T00:00:00Z",
+        statusCheckRollup: { state: "FAILURE" },
+      } }] },
+    });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("BLOCKED + PENDING rollupState + CHANGES_REQUESTED → excluded from ready", () => {
+    const pr = makePr({
+      mergeStateStatus: "BLOCKED",
+      reviewDecision: "CHANGES_REQUESTED",
+      commits: { nodes: [{ commit: {
+        pushedDate: "2026-06-25T00:00:00Z",
+        committedDate: "2026-06-24T00:00:00Z",
+        statusCheckRollup: { state: "PENDING" },
+      } }] },
+    });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("BLOCKED + SUCCESS rollupState + CHANGES_REQUESTED → excluded from ready (review gate: not approved)", () => {
+    // Isolates the reviewDecision half of isReadyViaBlocked: green rollup but the
+    // review is NOT approved → must not slip into ready via the BLOCKED path.
+    const pr = makePr({
+      mergeStateStatus: "BLOCKED",
+      reviewDecision: "CHANGES_REQUESTED",
+      commits: { nodes: [{ commit: {
+        pushedDate: "2026-06-25T00:00:00Z",
+        committedDate: "2026-06-24T00:00:00Z",
+        statusCheckRollup: { state: "SUCCESS" },
+      } }] },
+    });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("BLOCKED + SUCCESS rollupState + APPROVED + draft → excluded (drafts always excluded)", () => {
+    const pr = makePr({
+      mergeStateStatus: "BLOCKED",
+      isDraft: true,
+      commits: { nodes: [{ commit: {
+        pushedDate: "2026-06-25T00:00:00Z",
+        committedDate: "2026-06-24T00:00:00Z",
+        statusCheckRollup: { state: "SUCCESS" },
+      } }] },
+    });
     const result = parseReadyPrs({ search: { nodes: [pr] } });
     expect(result).toHaveLength(0);
   });

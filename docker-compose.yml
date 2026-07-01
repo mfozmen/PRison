@@ -4,7 +4,14 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # Provide AUTH_SECRET via your shell or a .env file next to this compose
-      # file: AUTH_SECRET=$(openssl rand -base64 32)
-      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET (openssl rand -base64 32)}
+      # AUTH_SECRET is auto-generated on first start and persisted to the
+      # prison-data volume. Optionally override by setting AUTH_SECRET in your
+      # shell or a .env file next to this compose file.
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    volumes:
+      - prison-data:/data
     restart: unless-stopped
+
+volumes:
+  prison-data:

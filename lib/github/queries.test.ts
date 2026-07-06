@@ -715,6 +715,22 @@ describe("parseReviewRequests", () => {
     });
   });
 
+  it("uses the LATEST review request when I was re-requested", () => {
+    const reRequested = {
+      search: { nodes: [
+        { id: "11", title: "re-requested", url: "u11", number: 11,
+          updatedAt: "2026-07-06T00:00:00Z",
+          repository: { nameWithOwner: "acme/e" },
+          author: { login: "bob" },
+          timelineItems: { nodes: [
+            { requestedReviewer: { login: "me" }, createdAt: "2026-06-30T00:00:00Z" },
+            { requestedReviewer: { login: "me" }, createdAt: "2026-07-06T13:04:00Z" },
+          ] } },
+      ] },
+    };
+    expect(parseReviewRequests(reRequested, "me")[0].requestedAt).toBe("2026-07-06T13:04:00Z");
+  });
+
   it("falls back to updatedAt when viewerLogin has no matching timeline event", () => {
     const rawNoMatch = {
       search: { nodes: [

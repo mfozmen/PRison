@@ -173,7 +173,11 @@ export function parseReviewRequests(raw: any, viewerLogin: string): ReviewReques
   return (raw?.search?.nodes ?? [])
     .filter((n: any) => n?.id)
     .map((n: any) => {
-      const mine = (n.timelineItems?.nodes ?? []).find(
+      // Use the LATEST review request for the viewer, not the first — a
+      // re-request adds another REVIEW_REQUESTED_EVENT, and the age should
+      // count from that, not the original request days earlier. timelineItems
+      // are chronological, so the last match is the most recent.
+      const mine = (n.timelineItems?.nodes ?? []).findLast(
         (e: any) => e?.requestedReviewer?.login === viewerLogin,
       );
       return {

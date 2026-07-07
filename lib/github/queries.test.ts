@@ -693,6 +693,37 @@ describe("parseStuckPrs", () => {
     expect(prs[0].checkNames).toContain("qa/smoke");
     expect(prs[0].checkNames).toContain("Automation Result");
   });
+
+  it("BLOCKED + APPROVED + FAILURE rollupState from a stale superseded run → readyViaBlocked:true (regression: api#90212)", () => {
+    // Real-world case: pr-linter ran, was CANCELLED (superseded), then re-ran twice
+    // to SUCCESS under the same name. GitHub's UI groups by name and shows "all
+    // checks passed", but statusCheckRollup.state is FAILURE because it counts the
+    // stale CANCELLED run. Our per-name grouping ignores the superseded run, so the
+    // PR is genuinely ready-via-blocked, not stuck.
+    const rawStaleRun = {
+      search: { nodes: [
+        { id: "91", title: "blocked-stale-run", url: "u91", number: 90212,
+          mergeStateStatus: "BLOCKED",
+          reviewDecision: "APPROVED",
+          repository: { nameWithOwner: "acme/api" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { state: "FAILURE", contexts: { nodes: [
+              { name: "pr-linter", conclusion: "CANCELLED" },
+              { name: "pr-linter", conclusion: "SUCCESS" },
+              { name: "pr-linter", conclusion: "SUCCESS" },
+              { name: "build", conclusion: "SUCCESS" },
+              { context: "qa/smoke", state: "SUCCESS" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawStaleRun);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].readyViaBlocked).toBe(true);
+    expect(prs[0].failingChecks).toBe(0);
+    expect(prs[0].pendingChecks).toBe(0);
+  });
 });
 
 describe("parseReviewRequests", () => {
@@ -923,6 +954,29 @@ describe("parseReadyPrs", () => {
     });
     const result = parseReadyPrs({ search: { nodes: [pr] } });
     expect(result).toHaveLength(0);
+  });
+
+  it("BLOCKED + APPROVED + FAILURE rollupState from a stale superseded run → included as ready (regression: api#90212)", () => {
+    // FAILURE rollup state, but the only non-success run (pr-linter CANCELLED) is
+    // superseded by later SUCCESS runs under the same name. Per-name grouping is
+    // all-clear, so the PR is ready-via-blocked (needsUpdate) — not stuck.
+    const pr = makePr({
+      mergeStateStatus: "BLOCKED",
+      commits: { nodes: [{ commit: {
+        pushedDate: "2026-06-25T00:00:00Z",
+        committedDate: "2026-06-24T00:00:00Z",
+        statusCheckRollup: { state: "FAILURE", contexts: { nodes: [
+          { name: "pr-linter", conclusion: "CANCELLED" },
+          { name: "pr-linter", conclusion: "SUCCESS" },
+          { name: "pr-linter", conclusion: "SUCCESS" },
+          { name: "build", conclusion: "SUCCESS" },
+        ] } },
+      } }] },
+    });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result).toHaveLength(1);
+    expect(result[0].needsUpdate).toBe(true);
+    expect(result[0].viaBlocked).toBe(true);
   });
 
   it("BLOCKED + PENDING rollupState + CHANGES_REQUESTED → excluded from ready", () => {

@@ -124,17 +124,28 @@ function computeCheckRollup(ctxs: any[]): {
 
 /**
  * Returns true when a BLOCKED PR is blocked only by out-of-date/push-auth
- * (bot-handled merge), not by a missing check or review.
- * Heuristic: rollupState SUCCESS (an outstanding required check makes it non-SUCCESS)
- * AND reviewDecision APPROVED.
+ * (bot-handled merge), not by a missing check or review: BLOCKED, APPROVED, and
+ * no failing/pending check.
+ *
+ * We can't simply trust statusCheckRollup.state === "SUCCESS": GitHub reports the
+ * rollup as FAILURE when a check NAME has a stale/superseded run (e.g. a CANCELLED
+ * run later re-run to SUCCESS under the same name) even though the UI, which groups
+ * by name and shows the latest, says every check passed. So: trust an explicit
+ * SUCCESS rollup (even with no visible contexts), otherwise fall back to our own
+ * per-name grouping (computeCheckRollup) — but only when contexts are actually
+ * present. A non-SUCCESS rollup with NO contexts is an unexplained failure with no
+ * positive evidence, so it stays blocked.
  */
 function isReadyViaBlocked(node: any): boolean {
-  const rollupState = node.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state;
-  return (
-    node.mergeStateStatus === "BLOCKED" &&
-    rollupState === "SUCCESS" &&
-    node.reviewDecision === "APPROVED"
-  );
+  if (node.mergeStateStatus !== "BLOCKED" || node.reviewDecision !== "APPROVED") {
+    return false;
+  }
+  const rollup = node.commits?.nodes?.[0]?.commit?.statusCheckRollup;
+  if (rollup?.state === "SUCCESS") return true;
+  const ctxs = rollup?.contexts?.nodes ?? [];
+  if (ctxs.length === 0) return false;
+  const { failingChecks, pendingChecks } = computeCheckRollup(ctxs);
+  return failingChecks === 0 && pendingChecks === 0;
 }
 
 export function parseStuckPrs(raw: any): StuckPr[] {

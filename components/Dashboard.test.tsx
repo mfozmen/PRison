@@ -15,6 +15,8 @@ const STUCK_PR = {
   checkNames: ["build"],
   isDraft: false,
   blocked: false,
+  readyViaBlocked: false,
+  reviewDecision: "",
   mergeState: "",
   stuckSince: "2026-06-20T00:00:00Z",
 };
@@ -446,6 +448,99 @@ describe("Dashboard", () => {
     );
     // The blocked PR still appears in the list (its title row is rendered)
     expect(screen.getByText("stuck pr")).toBeInTheDocument();
+  });
+
+  it("review-required PR shows a 'Review required' chip instead of the generic note", async () => {
+    const REVIEW_REQUIRED_PR = {
+      ...STUCK_PR,
+      id: "review-required",
+      title: "review required pr",
+      failingChecks: 0,
+      pendingChecks: 0,
+      failing: [],
+      pending: [],
+      checkNames: [],
+      blocked: true,
+      mergeState: "BLOCKED",
+      reviewDecision: "REVIEW_REQUIRED",
+    };
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            url.includes("ready") ? [] : url.includes("stuck") ? [REVIEW_REQUIRED_PR] : [REVIEW_PR],
+          ),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("Review required")).toBeInTheDocument(),
+    );
+    // The misleading "required checks" note must NOT be shown — the blocker is review, not CI.
+    expect(
+      screen.queryByText("Some required checks run on GitHub and aren't shown here."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("changes-requested PR shows a 'Changes requested' chip", async () => {
+    const CHANGES_REQUESTED_PR = {
+      ...STUCK_PR,
+      id: "changes-requested",
+      title: "changes requested pr",
+      failingChecks: 0,
+      pendingChecks: 0,
+      failing: [],
+      pending: [],
+      checkNames: [],
+      blocked: true,
+      mergeState: "BLOCKED",
+      reviewDecision: "CHANGES_REQUESTED",
+    };
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            url.includes("ready") ? [] : url.includes("stuck") ? [CHANGES_REQUESTED_PR] : [REVIEW_PR],
+          ),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("Changes requested")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Review required")).not.toBeInTheDocument();
+  });
+
+  it("DIRTY + review-required PR shows the conflicts note, not a review chip (conflicts win)", async () => {
+    const DIRTY_REVIEW_PR = {
+      ...STUCK_PR,
+      id: "dirty-review",
+      title: "dirty review pr",
+      failingChecks: 0,
+      pendingChecks: 0,
+      failing: [],
+      pending: [],
+      checkNames: [],
+      blocked: true,
+      mergeState: "DIRTY",
+      reviewDecision: "REVIEW_REQUIRED",
+    };
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            url.includes("ready") ? [] : url.includes("stuck") ? [DIRTY_REVIEW_PR] : [REVIEW_PR],
+          ),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("Has merge conflicts — resolve them on GitHub.")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Review required")).not.toBeInTheDocument();
   });
 
   it("blocked PR with visible check names shows chips and not the note", async () => {

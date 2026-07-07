@@ -14,6 +14,7 @@ export type StuckPr = {
   isDraft: boolean;
   blocked: boolean;
   readyViaBlocked: boolean;  // true when BLOCKED+APPROVED with no failing/pending check (see isReadyViaBlocked); client-side arbitration decides which list it lands in
+  reviewDecision: string;  // raw reviewDecision from GitHub, e.g. "REVIEW_REQUIRED", "CHANGES_REQUESTED", "APPROVED", ""; surfaces "waiting on review" vs "pending CI" in the card
   mergeState: string;   // raw mergeStateStatus from GitHub API, e.g. "BEHIND", "DIRTY", "BLOCKED", ""
   stuckSince: string; // ISO
 };

@@ -724,6 +724,36 @@ describe("parseStuckPrs", () => {
     expect(prs[0].failingChecks).toBe(0);
     expect(prs[0].pendingChecks).toBe(0);
   });
+
+  it("BLOCKED + REVIEW_REQUIRED + all-green rollup → carries reviewDecision (regression: api#90210)", () => {
+    // Real-world case: every check is SUCCESS/SKIPPED and the rollup state is
+    // SUCCESS, but the PR is BLOCKED waiting on a code-owner review. Without
+    // reviewDecision the card mislabels this as "pending CI"; parse must keep it
+    // so the UI can say "Review required".
+    const rawReviewRequired = {
+      search: { nodes: [
+        { id: "92", title: "blocked-review-required", url: "u92", number: 90210,
+          mergeStateStatus: "BLOCKED",
+          reviewDecision: "REVIEW_REQUIRED",
+          repository: { nameWithOwner: "acme/api" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { state: "SUCCESS", contexts: { nodes: [
+              { name: "build", conclusion: "SUCCESS" },
+              { name: "pr-linter", conclusion: "SUCCESS" },
+              { name: "call-security-review / security-review", conclusion: "SKIPPED" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawReviewRequired);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].reviewDecision).toBe("REVIEW_REQUIRED");
+    expect(prs[0].blocked).toBe(true);
+    expect(prs[0].readyViaBlocked).toBe(false);
+    expect(prs[0].failingChecks).toBe(0);
+    expect(prs[0].pendingChecks).toBe(0);
+  });
 });
 
 describe("parseReviewRequests", () => {

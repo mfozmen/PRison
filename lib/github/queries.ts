@@ -173,6 +173,7 @@ export function parseStuckPrs(raw: any): StuckPr[] {
         isDraft: n.isDraft ?? false,
         blocked,
         readyViaBlocked,
+        reviewDecision: n.reviewDecision ?? "",
         mergeState,
         stuckSince: commit.pushedDate ?? commit.committedDate ?? "",
       } as StuckPr;

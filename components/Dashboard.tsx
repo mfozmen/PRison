@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useTransition } from "react";
 import type { Org, StuckPr, ReviewRequest, ReadyPr } from "@/lib/types";
 import { sortByAgeAsc } from "@/lib/prioritize";
-import { suggestStuck, suggestReview, suggestReady } from "@/lib/suggest";
+import { suggestStuck, suggestReview, suggestReady, needsReview } from "@/lib/suggest";
 import { PrList } from "./PrList";
 import { PrRow } from "./PrRow";
 import { Header } from "./Header";
@@ -466,6 +466,28 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 const overflow = totalNames - (showFailingNames.length + showPendingNames.length);
                 const awaiting = awaitingChecks(pr.repo, pr.checkNames, tracked);
                 const hasAwaiting = awaiting.length > 0;
+                // A green PR can still be BLOCKED waiting on a code-owner review;
+                // surface that instead of mislabeling it as pending CI. Colour it
+                // with the repo's status vocabulary: CHANGES_REQUESTED is a negative
+                // signal (danger/red), REVIEW_REQUIRED is merely waiting (warning/amber).
+                const reviewNeeded = needsReview(pr.reviewDecision);
+                const changesRequested = pr.reviewDecision === "CHANGES_REQUESTED";
+                const reviewChip = reviewNeeded ? (
+                  <span
+                    key="review"
+                    className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
+                      changesRequested
+                        ? "bg-danger/10 text-danger ring-danger/30"
+                        : "bg-warning/10 text-warning ring-warning/30"
+                    }`}
+                  >
+                    <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.3" />
+                      <path d="M1 10c0-2.21 1.79-4 4-4s4 1.79 4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                    </svg>
+                    {changesRequested ? "Changes requested" : "Review required"}
+                  </span>
+                ) : null;
                 const noteIcon = (
                   <svg aria-hidden="true" className="shrink-0" width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3"/>
@@ -481,7 +503,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 let detail: React.ReactNode;
                 if (!hasNames && pr.mergeState === "DIRTY") {
                   detail = noteSpan("Has merge conflicts — resolve them on GitHub.");
-                } else if (hasNames || hasAwaiting) {
+                } else if (hasNames || hasAwaiting || reviewNeeded) {
                   detail = (
                     <div className="flex flex-wrap gap-1 items-center">
                       {showFailingNames.map((name, i) => (
@@ -518,6 +540,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                             {name}
                           </span>
                         ))}
+                      {reviewChip}
                     </div>
                   );
                 } else if (pr.blocked) {

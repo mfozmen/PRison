@@ -872,6 +872,36 @@ describe("Dashboard", () => {
       expect(screen.getByTestId("group-header").textContent).toContain("Other");
     });
 
+    it("By check — a review-required PR with no failing/pending checks groups under 'Review required', not Other", async () => {
+      const REVIEW_PR_X = {
+        ...STUCK_PR,
+        id: "revx",
+        title: "review pr x",
+        failing: [],
+        pending: [],
+        checkNames: [],
+        blocked: true,
+        mergeState: "BLOCKED",
+        reviewDecision: "REVIEW_REQUIRED",
+      };
+      global.fetch = vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve(
+              url.includes("ready") ? [] : url.includes("stuck") ? [REVIEW_PR_X] : [],
+            ),
+        }),
+      ) as unknown as typeof fetch;
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      fireEvent.click(screen.getByRole("button", { name: /^by check$/i }));
+      await waitFor(() =>
+        expect(screen.getByTestId("group-header")).toBeInTheDocument(),
+      );
+      expect(screen.getByTestId("group-header").textContent).toContain("Review required");
+      expect(screen.getByTestId("group-header").textContent).not.toContain("Other");
+    });
+
     it("review list stays flat in By check mode (no group headers in review section)", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       await waitFor(() =>

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { suggestStuck, suggestReview, suggestReady } from "./suggest";
+import { suggestStuck, suggestReview, suggestReady, stuckGroupKeys, reviewDecisionLabel } from "./suggest";
+import { EMPTY_TRACKED } from "./tracked-checks";
 import type { StuckPr, ReviewRequest, ReadyPr } from "./types";
 
 const base = { id: "1", title: "t", url: "https://github.com/acme/b/pull/2", number: 2, repo: "acme/b" };
@@ -77,6 +78,44 @@ describe("suggestReview", () => {
       text: "Review to unblock alice",
       href: "https://github.com/acme/b/pull/2/files",
     });
+  });
+});
+
+describe("reviewDecisionLabel", () => {
+  it("maps CHANGES_REQUESTED to 'Changes requested', everything else to 'Review required'", () => {
+    expect(reviewDecisionLabel("CHANGES_REQUESTED")).toBe("Changes requested");
+    expect(reviewDecisionLabel("REVIEW_REQUIRED")).toBe("Review required");
+  });
+});
+
+describe("stuckGroupKeys", () => {
+  const s = (over: Partial<StuckPr>): StuckPr => ({
+    id: "1", title: "t", url: "u", number: 2, repo: "acme/b",
+    failingChecks: 0, pendingChecks: 0, failing: [], pending: [], checkNames: [],
+    isDraft: false, blocked: true, readyViaBlocked: false, reviewDecision: "",
+    mergeState: "BLOCKED", stuckSince: "x",
+    ...over,
+  });
+
+  it("groups by failing and pending check names", () => {
+    expect(stuckGroupKeys(s({ failing: ["build"], pending: ["ci"] }), EMPTY_TRACKED)).toEqual(["build", "ci"]);
+  });
+  it("REVIEW_REQUIRED with no checks → 'Review required' (not Other)", () => {
+    expect(stuckGroupKeys(s({ reviewDecision: "REVIEW_REQUIRED" }), EMPTY_TRACKED)).toEqual(["Review required"]);
+  });
+  it("CHANGES_REQUESTED → 'Changes requested'", () => {
+    expect(stuckGroupKeys(s({ reviewDecision: "CHANGES_REQUESTED" }), EMPTY_TRACKED)).toEqual(["Changes requested"]);
+  });
+  it("includes awaiting tracked checks alongside the review bucket", () => {
+    const tracked = { orgs: {}, repos: { "acme/b": ["qa/smoke", "Automation Result"] } };
+    expect(stuckGroupKeys(s({ reviewDecision: "REVIEW_REQUIRED", checkNames: [] }), tracked)).toEqual([
+      "qa/smoke",
+      "Automation Result",
+      "Review required",
+    ]);
+  });
+  it("falls back to 'Other' when nothing is groupable", () => {
+    expect(stuckGroupKeys(s({}), EMPTY_TRACKED)).toEqual(["Other"]);
   });
 });
 

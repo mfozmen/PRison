@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useTransition } from "react";
 import type { Org, StuckPr, ReviewRequest, ReadyPr } from "@/lib/types";
 import { sortByAgeAsc } from "@/lib/prioritize";
-import { suggestStuck, suggestReview, suggestReady, needsReview } from "@/lib/suggest";
+import { suggestStuck, suggestReview, suggestReady, needsReview, stuckGroupKeys, reviewDecisionLabel } from "@/lib/suggest";
 import { PrList } from "./PrList";
 import { PrRow } from "./PrRow";
 import { Header } from "./Header";
@@ -440,12 +440,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
               groupKeys={
                 groupBy === "check"
-                  ? (pr) => {
-                      const keys = Array.from(
-                        new Set([...pr.failing, ...pr.pending]),
-                      );
-                      return keys.length > 0 ? keys : ["Other"];
-                    }
+                  ? (pr) => stuckGroupKeys(pr, tracked)
                   : undefined
               }
               groupHref={
@@ -485,7 +480,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                       <circle cx="5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.3" />
                       <path d="M1 10c0-2.21 1.79-4 4-4s4 1.79 4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
                     </svg>
-                    {changesRequested ? "Changes requested" : "Review required"}
+                    {reviewDecisionLabel(pr.reviewDecision)}
                   </span>
                 ) : null;
                 const noteIcon = (

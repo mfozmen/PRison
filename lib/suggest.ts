@@ -1,4 +1,5 @@
 import type { StuckPr, ReviewRequest, ReadyPr } from "./types";
+import { awaitingChecks, type TrackedChecks } from "./tracked-checks";
 
 export type Suggestion = { text: string; href: string };
 
@@ -7,6 +8,12 @@ export type Suggestion = { text: string; href: string };
 // which PRs "need review" (mirrors how awaitingChecks is shared).
 export function needsReview(reviewDecision: string): boolean {
   return reviewDecision === "REVIEW_REQUIRED" || reviewDecision === "CHANGES_REQUESTED";
+}
+
+// The card chip AND the By-check group header must read the same for a given
+// review state — centralize the label so they never drift (same reason as needsReview).
+export function reviewDecisionLabel(reviewDecision: string): string {
+  return reviewDecision === "CHANGES_REQUESTED" ? "Changes requested" : "Review required";
 }
 
 export function suggestStuck(pr: StuckPr): Suggestion {
@@ -20,6 +27,24 @@ export function suggestStuck(pr: StuckPr): Suggestion {
   if (pr.reviewDecision === "REVIEW_REQUIRED") return { text: "Request code owner review", href: pr.url };
   if (pr.reviewDecision === "CHANGES_REQUESTED") return { text: "Address review feedback", href: `${pr.url}/files` };
   return { text: "See required checks", href };
+}
+
+// "By check" group keys for a stuck PR: the things actually blocking it, so the
+// grouping mirrors the card. Beyond failing/pending CI names this includes the
+// awaiting tracked checks and the review gate — otherwise a review-blocked PR
+// (no failing/pending check) would fall to "Other". Only truly unattributable
+// PRs get "Other".
+export function stuckGroupKeys(pr: StuckPr, tracked: TrackedChecks): string[] {
+  const keys = [
+    ...pr.failing,
+    ...pr.pending,
+    ...awaitingChecks(pr.repo, pr.checkNames, tracked),
+  ];
+  if (needsReview(pr.reviewDecision)) {
+    keys.push(reviewDecisionLabel(pr.reviewDecision));
+  }
+  const unique = Array.from(new Set(keys));
+  return unique.length > 0 ? unique : ["Other"];
 }
 
 export function suggestReview(req: ReviewRequest): Suggestion {

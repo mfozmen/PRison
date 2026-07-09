@@ -75,11 +75,11 @@ describe("scanSource", () => {
   });
 
   it("catches GitHub-minted anchor ids pasted without their URL", () => {
-    expect(scanSource("resolved via issuecomment-4924692540")).toEqual([
-      "ticket:issuecomment-4924692540",
+    expect(scanSource("resolved via issuecomment-9998887776")).toEqual([
+      "ticket:issuecomment-9998887776",
     ]);
-    expect(scanSource("see pullrequestreview-4662665918")).toEqual([
-      "ticket:pullrequestreview-4662665918",
+    expect(scanSource("see pullrequestreview-9998887776")).toEqual([
+      "ticket:pullrequestreview-9998887776",
     ]);
   });
 
@@ -127,11 +127,28 @@ describe("scanRepo", () => {
     expect(scanRepo(root)).toEqual(["nested/leaky.ts: owner:jdoe"]);
   });
 
-  it("skips the self-referential files that necessarily hold real-looking names", () => {
+  // Exemptions are granted per-check, not per-file. REVIEW.md and the guard must
+  // hold ticket-shaped examples to document the patterns, but their *names* are
+  // still checked. Exempting all three files wholesale is how a real PR number
+  // once landed in two of them, as a documentation example.
+  it("exempts ticket shapes in the docs and the guard, but still checks their names", () => {
     const root = mkdtempSync(join(tmpdir(), "prison-guard-"));
     mkdirSync(join(root, "lib"));
-    writeFileSync(join(root, "REVIEW.md"), 'login: "jdoe"');
-    writeFileSync(join(root, "lib", "generic-fixtures.ts"), 'login: "jdoe"');
+    writeFileSync(join(root, "REVIEW.md"), 'e.g. #90210 — but login: "jdoe" is not ok');
+    writeFileSync(join(root, "lib", "generic-fixtures.ts"), 'e.g. #90210 and login: "jdoe"');
+    expect(scanRepo(root).sort()).toEqual([
+      "REVIEW.md: owner:jdoe",
+      "lib/generic-fixtures.ts: owner:jdoe",
+    ]);
+  });
+
+  it("exempts the guard's own test entirely — it is adversarial by design", () => {
+    const root = mkdtempSync(join(tmpdir(), "prison-guard-"));
+    mkdirSync(join(root, "lib"));
+    writeFileSync(
+      join(root, "lib", "generic-fixtures.test.ts"),
+      'expect(scanSource(\'login: "jdoe"\')).toEqual(["owner:jdoe"]); // #90210',
+    );
     expect(scanRepo(root)).toEqual([]);
   });
 });

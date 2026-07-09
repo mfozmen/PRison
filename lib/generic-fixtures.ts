@@ -10,7 +10,7 @@ import { join, relative } from "node:path";
  *
  * SCOPE — read this before trusting a green run. The guard reads *structured*
  * fixture fields: the owner AND repository halves of `nameWithOwner:` / `repo:` /
- * `github.com/<owner>/<repo>`, plus `login:` / `author:` / `owners={[…]}`.
+ * `github.com/<owner>/<repo>`, plus `login:`, `author:`, and the `owners` prop.
  * It cannot see a *name* sitting in free-form prose — a code comment, an `it(...)`
  * description, or a string like `` message: "`someone` forbids access" ``.
  * Nothing short of a denylist could, and a denylist is what we are avoiding.
@@ -111,11 +111,22 @@ const SCAN_EXT = /\.(ts|tsx|md|mjs|json|yml|yaml)$/;
 export const ROOT = join(__dirname, "..");
 
 /**
- * Scanning these would be circular: this module holds the allowlist, its test
- * holds deliberately real-looking names to prove the guard fires, and REVIEW.md
- * quotes the patterns to document what is and is not covered.
+ * Exemptions are the guard's blind spot, so they are granted per-check rather
+ * than per-file — an early version exempted these three files wholesale, and a
+ * real PR number promptly landed in two of them, as a documentation example.
+ *
+ * Only the test may contain real-looking NAMES: it exists to prove the guard
+ * fires, so a real-looking owner in one of its fixture fields is the assertion,
+ * not a leak.
  */
-export const SELF_REFERENTIAL = new Set([
+export const NAME_SCAN_EXEMPT = new Set(["lib/generic-fixtures.test.ts"]);
+
+/**
+ * These three necessarily carry ticket-SHAPED text — they document and exercise
+ * the ticket patterns. Nothing checks them, so their examples must be invented.
+ * If you add one, invent the number. Do not paste a real one.
+ */
+export const TICKET_SCAN_EXEMPT = new Set([
   "lib/generic-fixtures.ts",
   "lib/generic-fixtures.test.ts",
   "REVIEW.md",
@@ -199,7 +210,7 @@ export function scanSource(source: string): string[] {
     for (const m of source.matchAll(re)) checkOwner(m[1]);
   }
 
-  // owners={["a", "b"]}
+  // The owners prop: a bracketed list of logins.
   for (const m of source.matchAll(/owners=\{\[([^\]]+)\]\}/g)) {
     for (const raw of m[1].split(",")) {
       const name = raw.trim().replace(/^["']|["']$/g, "");
@@ -233,8 +244,10 @@ export function scanRepo(root: string = ROOT): string[] {
   const offenders: string[] = [];
   for (const file of walk(root)) {
     const rel = relative(root, file);
-    if (SELF_REFERENTIAL.has(rel)) continue;
     for (const bad of scanSource(readFileSync(file, "utf8"))) {
+      const isTicket = bad.startsWith("ticket:");
+      if (isTicket && TICKET_SCAN_EXEMPT.has(rel)) continue;
+      if (!isTicket && NAME_SCAN_EXEMPT.has(rel)) continue;
       offenders.push(`${rel}: ${bad}`);
     }
   }

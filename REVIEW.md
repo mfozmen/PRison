@@ -28,7 +28,7 @@ the fixture.
 
 **What the guard covers.** *Names* only in structured fields — the owner and
 repository halves of `nameWithOwner:` / `repo:` / `github.com/<owner>/<repo>`,
-plus `login:` / `author:` / `owners={[…]}`. *Ticket references* anywhere, because
+plus `login:`, `author:`, and the `owners` prop. *Ticket references* anywhere, because
 those have a shape rather than a name: `service#90210`, `Fixes #90210`,
 `/pull/90211`, `number: 90210`, `"number": 90210`, and GitHub-minted anchor ids
 (`discussion_r…`, `issuecomment-…`, `pullrequestreview-…`).

@@ -20,6 +20,24 @@ npm run typecheck  # tsc --noEmit
 npm run lint       # ESLint
 ```
 
+## Installing
+
+The repo pins the public npm registry in `.npmrc`, but npm's precedence is
+`cli flag > environment > project .npmrc` — so an `npm_config_registry` exported
+by a corporate shell profile silently wins and rewrites every `resolved` URL in
+`package-lock.json` to that private mirror. That breaks `npm ci` on the public CI
+runner and leaks an internal hostname from this public repository.
+
+A `preinstall` hook (`scripts/check-registry.mjs`) refuses the install rather than
+let that happen. If it fires, a CLI flag beats the environment:
+
+```sh
+npm install --registry=https://registry.npmjs.org/
+```
+
+`lib/public-registry.test.ts` is the backstop: it fails if any `resolved` host in
+the lockfile is not the public registry.
+
 ## Conventions
 
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/) — `feat:`, `fix:`, `docs:`, `test:`, `chore:`, `ci:`.

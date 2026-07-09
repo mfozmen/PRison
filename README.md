@@ -103,6 +103,7 @@ comments** to filter, and **Refresh** to re-fetch without reloading.
 ## Documentation
 
 - [CONTRIBUTING.md](CONTRIBUTING.md) — conventions, tests, and CI setup
+- [RELEASING.md](RELEASING.md) — how to cut a release, and how to roll one back
 - [docs/DESIGN.md](docs/DESIGN.md) — design system
 - [docs/UI-AUDIT.md](docs/UI-AUDIT.md) — UI/UX audit notes
 

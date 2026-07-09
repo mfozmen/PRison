@@ -4,6 +4,8 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
+# package.json's `preinstall` runs during `npm ci`, so its script must exist here.
+COPY scripts/check-registry.mjs ./scripts/
 RUN npm ci
 
 # --- build: compile the Next.js standalone server ---

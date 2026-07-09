@@ -67,6 +67,8 @@ export const ALLOWED_OWNERS = new Set([
   "community",
   // Public GitHub App slug (github.com/apps/claude), linked from CONTRIBUTING.md.
   "claude",
+  // The release tool, linked from RELEASING.md. A public project, not an identity.
+  "release-it",
 ]);
 
 // The repository half of "owner/repo". Real private repo names are exactly what
@@ -81,6 +83,8 @@ export const ALLOWED_REPOS = new Set([
   "repo",
   "cn",
   "PRison",
+  // github.com/release-it/release-it — the tool's own repo, linked from RELEASING.md.
+  "release-it",
 ]);
 
 // Single-letter throwaway repos: acme/a, acme/b, …

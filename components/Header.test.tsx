@@ -115,3 +115,26 @@ describe("Header theme toggle", () => {
     expect(svg?.querySelector("circle")).not.toBeNull();
   });
 });
+
+describe("Header — app version", () => {
+  // next.config.ts inlines this from package.json at build time. It is the only
+  // source of truth for the version; nothing hard-codes it.
+  it("shows the version and links to its GitHub release", () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_VERSION", "1.0.0");
+    render(<Header orgs={orgs} selectedOrg="" onOrgChange={vi.fn()} login="octocat" onOpenSettings={vi.fn()} />);
+
+    const link = screen.getByRole("link", { name: /v1\.0\.0/ });
+    expect(link).toHaveAttribute("href", "https://github.com/mfozmen/PRison/releases/tag/v1.0.0");
+    vi.unstubAllEnvs();
+  });
+
+  // Never "vundefined": a dev build without the env var must render nothing.
+  it("renders no version when the env var is absent", () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_VERSION", "");
+    render(<Header orgs={orgs} selectedOrg="" onOrgChange={vi.fn()} login="octocat" onOpenSettings={vi.fn()} />);
+
+    expect(screen.queryByText(/^v/)).toBeNull();
+    expect(screen.queryByText(/undefined/i)).toBeNull();
+    vi.unstubAllEnvs();
+  });
+});

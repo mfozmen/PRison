@@ -35,6 +35,10 @@ export interface HeaderProps {
 }
 
 export function Header({ orgs, selectedOrg, onOrgChange, login, onOpenSettings }: HeaderProps) {
+  // Read inside the component, not at module scope, so tests can stub it.
+  // next.config.ts inlines it from package.json; absent in a bare `next dev`.
+  const version = process.env.NEXT_PUBLIC_APP_VERSION;
+
   const isDark = useSyncExternalStore(
     subscribeToTheme,
     getThemeSnapshot,
@@ -94,6 +98,16 @@ export function Header({ orgs, selectedOrg, onOrgChange, login, onOpenSettings }
             <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 10A6 6 0 0 1 6 2a6 6 0 1 0 8 8z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           )}
         </button>
+        {version && (
+          <a
+            href={`https://github.com/mfozmen/PRison/releases/tag/v${version}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden text-xs text-muted transition-colors hover:text-accent sm:inline"
+          >
+            v{version}
+          </a>
+        )}
         <button
           onClick={() => signOut()}
           className="cursor-pointer rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:brightness-95 dark:hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"

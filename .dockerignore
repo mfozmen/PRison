@@ -13,3 +13,6 @@ docs
 Dockerfile
 .dockerignore
 README.md
+RELEASING.md
+CHANGELOG.md
+.release-it.json

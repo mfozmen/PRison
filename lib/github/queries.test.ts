@@ -694,7 +694,7 @@ describe("parseStuckPrs", () => {
     expect(prs[0].checkNames).toContain("Automation Result");
   });
 
-  it("BLOCKED + APPROVED + FAILURE rollupState from a stale superseded run → readyViaBlocked:true (regression: api#90212)", () => {
+  it("BLOCKED + APPROVED + FAILURE rollupState from a stale superseded run → readyViaBlocked:true", () => {
     // Real-world case: pr-linter ran, was CANCELLED (superseded), then re-ran twice
     // to SUCCESS under the same name. GitHub's UI groups by name and shows "all
     // checks passed", but statusCheckRollup.state is FAILURE because it counts the
@@ -702,7 +702,7 @@ describe("parseStuckPrs", () => {
     // PR is genuinely ready-via-blocked, not stuck.
     const rawStaleRun = {
       search: { nodes: [
-        { id: "91", title: "blocked-stale-run", url: "u91", number: 90212,
+        { id: "91", title: "blocked-stale-run", url: "u91", number: 91,
           mergeStateStatus: "BLOCKED",
           reviewDecision: "APPROVED",
           repository: { nameWithOwner: "acme/api" },
@@ -725,14 +725,14 @@ describe("parseStuckPrs", () => {
     expect(prs[0].pendingChecks).toBe(0);
   });
 
-  it("BLOCKED + REVIEW_REQUIRED + all-green rollup → carries reviewDecision (regression: api#90210)", () => {
+  it("BLOCKED + REVIEW_REQUIRED + all-green rollup → carries reviewDecision", () => {
     // Real-world case: every check is SUCCESS/SKIPPED and the rollup state is
     // SUCCESS, but the PR is BLOCKED waiting on a code-owner review. Without
     // reviewDecision the card mislabels this as "pending CI"; parse must keep it
     // so the UI can say "Review required".
     const rawReviewRequired = {
       search: { nodes: [
-        { id: "92", title: "blocked-review-required", url: "u92", number: 90210,
+        { id: "92", title: "blocked-review-required", url: "u92", number: 92,
           mergeStateStatus: "BLOCKED",
           reviewDecision: "REVIEW_REQUIRED",
           repository: { nameWithOwner: "acme/api" },
@@ -986,7 +986,7 @@ describe("parseReadyPrs", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("BLOCKED + APPROVED + FAILURE rollupState from a stale superseded run → included as ready (regression: api#90212)", () => {
+  it("BLOCKED + APPROVED + FAILURE rollupState from a stale superseded run → included as ready", () => {
     // FAILURE rollup state, but the only non-success run (pr-linter CANCELLED) is
     // superseded by later SUCCESS runs under the same name. Per-name grouping is
     // all-clear, so the PR is ready-via-blocked (needsUpdate) — not stuck.

@@ -43,7 +43,7 @@ describe("RepoCombobox", () => {
     });
 
     render(
-      <RepoCombobox value="" onChange={vi.fn()} owners={["acme", "mfozmen"]} />,
+      <RepoCombobox value="" onChange={vi.fn()} owners={["acme", "octocat"]} />,
     );
     const input = screen.getByRole("combobox", { name: "Repository" });
     fireEvent.change(input, { target: { value: "email" } });
@@ -51,7 +51,7 @@ describe("RepoCombobox", () => {
     await drainDebounce();
 
     expect(global.fetch).toHaveBeenCalledWith(
-      "/api/repos?q=email&owners=acme%2Cmfozmen",
+      "/api/repos?q=email&owners=acme%2Coctocat",
     );
   });
 

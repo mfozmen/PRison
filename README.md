@@ -50,7 +50,7 @@ GITHUB_TOKEN="$(gh auth token)" docker compose up --build   # http://localhost:3
 ```
 
 Passing your `gh` token signs you in automatically — needed for SSO-restricted orgs
-(e.g. acme) where classic PATs are blocked. The token rotates, so re-run when
+(where SSO/SAML enforcement blocks classic PATs). The token rotates, so re-run when
 it expires. Without `GITHUB_TOKEN`, just open the app and paste a token.
 
 ### Run locally (development)

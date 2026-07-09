@@ -48,7 +48,7 @@ export type ReadyPr = {
 export type PrComment = {
   id: string;          // review-thread id
   prId: string;        // PR node id — the Dashboard shows only comments on PRs visible in the stuck/ready lists
-  url: string;         // direct anchor to the comment, e.g. .../pull/90211#discussion_r9998887776
+  url: string;         // direct anchor to the comment, e.g. .../pull/42#discussion_r1
   repo: string;
   number: number;
   author: string;

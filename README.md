@@ -6,18 +6,26 @@
 
 A read-only GitHub dashboard that shows which pull requests need your attention,
 and for how long — across your personal account and every organization you can
-access. Three lists, oldest first:
+access. Four lists, oldest first:
 
 - **Ready to merge** — PRs GitHub reports as mergeable now. Out-of-date branches
   still count and get a **"Needs update"** hint (a bot/manual update handles them).
+- **Comments awaiting your reply** — review threads on your own PRs where the last
+  word isn't yours. Each row opens the comment itself, not the top of the PR.
 - **Waiting on your review** — PRs you're blocking others on.
 - **Stuck on checks** — your open PRs with failing/pending checks, or otherwise
   blocked from merging (required checks, review, or conflicts).
 
-![The PRison dashboard showing the three PR lists in dark mode](docs/screenshot.png)
+![The PRison dashboard showing the four PR lists in dark mode](docs/screenshot.png)
 
 ### Features
 
+- **Unanswered review comments.** A thread is waiting on you when it is unresolved
+  *and* its most recent comment isn't yours — replying adds a comment, so your own
+  last word means the ball is back in the reviewer's court. The age counts from
+  that comment, so you can see what you've been sitting on for four days. Bots
+  write most review threads, so they're hidden behind a **Show bot comments**
+  toggle.
 - **Tracked checks → Awaiting.** GitHub's API hides "expected" required checks
   (e.g. a manually-triggered `qa/smoke` or automation) from non-admins. Name the
   checks you care about — org defaults plus per-repo overrides, with a
@@ -83,8 +91,9 @@ Sign in with the GitHub CLI or paste a token. In the top-right: the **switcher**
 scopes to All / your personal account / a single org; the **sliders icon** opens
 **Tracked checks** (name the required checks to see as "Awaiting"); the **sun/moon**
 toggles the theme; **Sign Out** clears the stored token. Click a **PR title** (or a
-suggested-action link) to jump to GitHub. Use **Flat / By repo / By check** to
-group, **Hide drafts** to filter, and **Refresh** to re-fetch without reloading.
+suggested-action link) to jump to GitHub — a comment row lands on that exact
+thread. Use **Flat / By repo / By check** to group, **Hide drafts** and **Show bot
+comments** to filter, and **Refresh** to re-fetch without reloading.
 
 ## Documentation
 

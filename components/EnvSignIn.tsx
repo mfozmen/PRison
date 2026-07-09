@@ -27,6 +27,10 @@ export function EnvSignIn() {
   }, []);
 
   if (failed) {
+    // Deliberately WITHOUT hasEnvToken. The env token just failed, so offering it
+    // again is a retry of the thing that broke. The CLI button is the useful
+    // alternative where `gh` exists (npm run dev), and where it doesn't (Docker)
+    // it answers 503 and says "GitHub CLI not found — paste a token below".
     return <TokenForm />;
   }
 

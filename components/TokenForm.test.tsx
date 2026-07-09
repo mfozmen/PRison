@@ -223,3 +223,62 @@ describe("TokenForm", () => {
     );
   });
 });
+
+describe("TokenForm — host token (Docker, no gh in the container)", () => {
+  it("offers the host token as the primary button instead of the CLI", () => {
+    render(<TokenForm hasEnvToken />);
+    expect(screen.getByRole("button", { name: /sign in with the host token/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /sign in with github cli/i })).toBeNull();
+  });
+
+  it("posts to /api/token/env and reloads on success", async () => {
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, status: 200 })) as unknown as typeof fetch;
+    render(<TokenForm hasEnvToken />);
+    fireEvent.click(screen.getByRole("button", { name: /sign in with the host token/i }));
+    await waitFor(() =>
+      expect(global.fetch).toHaveBeenCalledWith("/api/token/env", expect.objectContaining({ method: "POST" })),
+    );
+    await waitFor(() => expect(window.location.reload).toHaveBeenCalled());
+  });
+
+  it("surfaces a failure without hiding the paste-a-token fallback", async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({ reason: "token-rejected" }) }),
+    ) as unknown as typeof fetch;
+    render(<TokenForm hasEnvToken />);
+    fireEvent.click(screen.getByRole("button", { name: /sign in with the host token/i }));
+    await waitFor(() =>
+      expect(screen.getByText(/github rejected the host token/i)).toBeInTheDocument(),
+    );
+    expect(screen.getByLabelText(/personal access token/i)).toBeInTheDocument();
+  });
+
+  // The two failures a Docker user actually hits: the host token expired (server
+  // sends an unmapped reason) and the server is gone. Both must say something.
+  it("falls back to a generic message on an unknown reason", async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({ reason: "kaboom" }) }),
+    ) as unknown as typeof fetch;
+    render(<TokenForm hasEnvToken />);
+    fireEvent.click(screen.getByRole("button", { name: /sign in with the host token/i }));
+    await waitFor(() =>
+      expect(screen.getByText(/couldn't sign in with the host token/i)).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("button", { name: /sign in with the host token/i })).toBeEnabled();
+  });
+
+  it("falls back to a generic message when the request throws", async () => {
+    global.fetch = vi.fn(() => Promise.reject(new Error("offline"))) as unknown as typeof fetch;
+    render(<TokenForm hasEnvToken />);
+    fireEvent.click(screen.getByRole("button", { name: /sign in with the host token/i }));
+    await waitFor(() =>
+      expect(screen.getByText(/couldn't sign in with the host token/i)).toBeInTheDocument(),
+    );
+  });
+
+  it("keeps the CLI button when there is no env token", () => {
+    render(<TokenForm />);
+    expect(screen.getByRole("button", { name: /sign in with github cli/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /host token/i })).toBeNull();
+  });
+});

@@ -43,6 +43,11 @@ access. Four lists, oldest first:
 PRison runs on **your own machine** — no third-party app to approve. The easiest
 way is Docker (one command); or run it locally with Node.
 
+**Sign Out** ends *your session* — it clears the encrypted cookie. It cannot revoke
+the host's credentials: on a `GITHUB_TOKEN`-configured instance, one click signs you
+back in, and anyone who can reach the instance can do the same. That is what the
+warning below is about.
+
 > [!WARNING]
 > Sign-in mints a session from the host's GitHub credentials (your `gh` CLI token
 > or a `GITHUB_TOKEN`). PRison is designed to run on your own machine — do NOT

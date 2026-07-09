@@ -46,6 +46,26 @@ describe("EnvSignIn", () => {
     expect(window.location.reload).not.toHaveBeenCalled();
   });
 
+  // The env token is what just failed, so the fallback must not offer it again.
+  // The CLI button is the useful alternative wherever `gh` exists — and where it
+  // doesn't, its 503 tells the user to paste a token.
+  it("offers the GitHub CLI, not a retry of the env token, in its fallback", async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({ ok: false, status: 500 }),
+    ) as unknown as typeof fetch;
+
+    render(<EnvSignIn />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /sign in with github cli/i }),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("button", { name: /sign in with the host token/i }),
+    ).toBeNull();
+  });
+
   it("renders TokenForm fallback when the request rejects (network error)", async () => {
     global.fetch = vi.fn(() =>
       Promise.reject(new Error("network down")),

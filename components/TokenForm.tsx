@@ -13,35 +13,68 @@ const CLI_MESSAGES: Record<string, string> = {
     "GitHub rejected the CLI token. Try gh auth refresh, or paste a token below.",
 };
 
-function cliMessageForReason(reason: unknown): string {
-  return typeof reason === "string" && Object.hasOwn(CLI_MESSAGES, reason)
-    ? CLI_MESSAGES[reason]
-    : GENERIC_CLI_MESSAGE;
+const GENERIC_ENV_MESSAGE = "Couldn't sign in with the host token — paste a token below.";
+
+const ENV_MESSAGES: Record<string, string> = {
+  "no-env-token": "The server has no GITHUB_TOKEN — paste a token below instead.",
+  "not-local": "The host token is only offered to a local browser.",
+  "token-rejected": "GitHub rejected the host token. It may have expired — paste a token below.",
+};
+
+function messageForReason(
+  reason: unknown,
+  messages: Record<string, string>,
+  fallback: string,
+): string {
+  return typeof reason === "string" && Object.hasOwn(messages, reason)
+    ? messages[reason]
+    : fallback;
 }
 
-export function TokenForm() {
+export interface TokenFormProps {
+  /**
+   * The server has a GITHUB_TOKEN. Offer to sign in with it rather than the
+   * GitHub CLI, which does not exist inside the Docker image — /api/token/cli
+   * answers `503 not-installed` there, so that button would be dead.
+   */
+  hasEnvToken?: boolean;
+}
+
+export function TokenForm({ hasEnvToken = false }: TokenFormProps) {
   const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [cliBusy, setCliBusy] = useState(false);
-  const [cliError, setCliError] = useState<string | null>(null);
+  const [shortcutBusy, setShortcutBusy] = useState(false);
+  const [shortcutError, setShortcutError] = useState<string | null>(null);
 
-  async function signInWithCli() {
-    setCliBusy(true);
-    setCliError(null);
+  // Both sign-in shortcuts are the same shape: POST, reload on ok, otherwise map
+  // the server's `reason` to a sentence and keep the paste-a-token form below.
+  async function signInVia(path: string, messages: Record<string, string>, fallback: string) {
+    setShortcutBusy(true);
+    setShortcutError(null);
     try {
-      const res = await fetch("/api/token/cli", { method: "POST" });
+      const res = await fetch(path, { method: "POST" });
       if (res.ok) {
         window.location.reload();
         return;
       }
       const body = await res.json().catch(() => null);
-      setCliError(cliMessageForReason(body?.reason));
+      setShortcutError(messageForReason(body?.reason, messages, fallback));
     } catch {
-      setCliError(GENERIC_CLI_MESSAGE);
+      setShortcutError(fallback);
     }
-    setCliBusy(false);
+    setShortcutBusy(false);
   }
+
+  const shortcut = hasEnvToken
+    ? {
+        label: "Sign in with the host token",
+        run: () => signInVia("/api/token/env", ENV_MESSAGES, GENERIC_ENV_MESSAGE),
+      }
+    : {
+        label: "Sign in with GitHub CLI",
+        run: () => signInVia("/api/token/cli", CLI_MESSAGES, GENERIC_CLI_MESSAGE),
+      };
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -77,24 +110,26 @@ export function TokenForm() {
         </div>
         <h1 className="text-xl font-bold text-foreground">PRison</h1>
         <p className="mt-2 text-sm text-muted">
-          Sign in with the GitHub CLI (one click) or paste a Personal Access
-          Token. PRison uses your own access — read-only, nothing is written.
+          {hasEnvToken
+            ? "Sign in with the token this server was started with (one click), or paste a Personal Access Token."
+            : "Sign in with the GitHub CLI (one click) or paste a Personal Access Token."}{" "}
+          PRison uses your own access — read-only, nothing is written.
         </p>
       </div>
 
       <div className="mt-6">
         <button
           type="button"
-          disabled={cliBusy}
-          onClick={signInWithCli}
+          disabled={shortcutBusy}
+          onClick={shortcut.run}
           className="w-full rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-background transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {cliBusy ? "Checking…" : "Sign in with GitHub CLI"}
+          {shortcutBusy ? "Checking…" : shortcut.label}
         </button>
         <div aria-live="polite">
-          {cliError && (
+          {shortcutError && (
             <p className="mt-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-              {cliError}
+              {shortcutError}
             </p>
           )}
         </div>

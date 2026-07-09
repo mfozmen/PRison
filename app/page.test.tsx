@@ -1,18 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { readTokenMock, readLoginMock, queryMock } = vi.hoisted(() => ({
+const { readTokenMock, readLoginMock, readSignedOutMock, queryMock } = vi.hoisted(() => ({
   readTokenMock: vi.fn(),
   readLoginMock: vi.fn(),
+  readSignedOutMock: vi.fn(),
   queryMock: vi.fn(),
 }));
 
 vi.mock("@/lib/session", () => ({
   readToken: readTokenMock,
   readLogin: readLoginMock,
+  readSignedOut: readSignedOutMock,
 }));
 vi.mock("@/lib/github/client", () => ({ ghQuery: queryMock }));
 
 import Home from "./page";
+import { EnvSignIn } from "@/components/EnvSignIn";
+import { TokenForm } from "@/components/TokenForm";
+
+// The signed-out screen is a <main> wrapping exactly one of these two.
+function signInComponent(el: { props: { children: { type: unknown } } }) {
+  return el.props.children.type;
+}
 
 const ORGS_RAW = {
   viewer: {
@@ -29,7 +38,11 @@ const ORGS_RAW = {
 beforeEach(() => {
   readTokenMock.mockReset();
   readLoginMock.mockReset();
+  readSignedOutMock.mockReset();
+  readSignedOutMock.mockResolvedValue(false);
   queryMock.mockReset();
+  delete process.env.GITHUB_TOKEN;
+  delete process.env.GH_TOKEN;
 });
 
 describe("Home page", () => {
@@ -60,5 +73,50 @@ describe("Home page", () => {
     const el = await Home();
 
     expect(el.props.orgs).toEqual([]);
+  });
+});
+
+describe("Home page — signed out", () => {
+  it("auto-signs-in from the env token on a fresh visit", async () => {
+    readTokenMock.mockResolvedValue(null);
+    process.env.GITHUB_TOKEN = "t";
+
+    expect(signInComponent(await Home())).toBe(EnvSignIn);
+  });
+
+  // The bug: sign-out cleared the cookie, page.tsx rendered EnvSignIn, EnvSignIn
+  // POSTed /api/token/env on mount, and the user was signed straight back in.
+  it("does NOT auto-sign-in after an explicit sign-out, even with an env token", async () => {
+    readTokenMock.mockResolvedValue(null);
+    readSignedOutMock.mockResolvedValue(true);
+    process.env.GITHUB_TOKEN = "t";
+
+    const type = signInComponent(await Home());
+    expect(type).toBe(TokenForm);
+    expect(type).not.toBe(EnvSignIn);
+  });
+
+  it("offers the host-token button when an env token exists", async () => {
+    readTokenMock.mockResolvedValue(null);
+    readSignedOutMock.mockResolvedValue(true);
+    process.env.GITHUB_TOKEN = "t";
+
+    const el = await Home();
+    expect(el.props.children.props.hasEnvToken).toBe(true);
+  });
+
+  it("shows the plain token form when there is no env token", async () => {
+    readTokenMock.mockResolvedValue(null);
+
+    const el = await Home();
+    expect(signInComponent(el)).toBe(TokenForm);
+    expect(el.props.children.props.hasEnvToken).toBe(false);
+  });
+
+  it("honours GH_TOKEN as well as GITHUB_TOKEN", async () => {
+    readTokenMock.mockResolvedValue(null);
+    process.env.GH_TOKEN = "t";
+
+    expect(signInComponent(await Home())).toBe(EnvSignIn);
   });
 });

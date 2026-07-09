@@ -3,7 +3,7 @@ import { EnvSignIn } from "@/components/EnvSignIn";
 import { Dashboard } from "@/components/Dashboard";
 import { ghQuery } from "@/lib/github/client";
 import { ORGS_QUERY, parseOrgs } from "@/lib/github/queries";
-import { readToken, readLogin } from "@/lib/session";
+import { readToken, readLogin, readSignedOut } from "@/lib/session";
 import type { Org } from "@/lib/types";
 
 export default async function Home() {
@@ -11,9 +11,13 @@ export default async function Home() {
   const hasEnvToken = !!(process.env.GITHUB_TOKEN || process.env.GH_TOKEN);
 
   if (!token) {
+    // EnvSignIn signs in from the host token the moment it mounts. That is the
+    // zero-config Docker path — but after an explicit sign-out it would make
+    // signing out and signing back in the same page load. Offer the button instead.
+    const signedOut = await readSignedOut();
     return (
       <main className="flex min-h-screen items-center justify-center px-6">
-        {hasEnvToken ? <EnvSignIn /> : <TokenForm />}
+        {hasEnvToken && !signedOut ? <EnvSignIn /> : <TokenForm hasEnvToken={hasEnvToken} />}
       </main>
     );
   }

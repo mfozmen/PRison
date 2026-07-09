@@ -8,6 +8,9 @@ const ALG = "aes-256-gcm";
 
 export const TOKEN_COOKIE = "prison_token";
 export const LOGIN_COOKIE = "prison_login";
+// Set by an explicit sign-out, cleared by any sign-in. Suppresses the zero-config
+// auto sign-in that would otherwise re-authenticate on the very next page load.
+export const SIGNED_OUT_COOKIE = "prison_signed_out";
 
 function keyFrom(secret: string): Buffer {
   return crypto.createHash("sha256").update(secret).digest();

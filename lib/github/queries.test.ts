@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs, parseReadyPrs, parseRepoSearch } from "./queries";
+import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs, parseReadyPrs, parseRepoSearch, parsePrComments } from "./queries";
 
 describe("searchQuery", () => {
   it("scopes author search to the org", () => {
@@ -1229,5 +1229,88 @@ describe("parseRepoSearch", () => {
 
   it("returns [] for empty nodes list", () => {
     expect(parseRepoSearch({ search: { nodes: [] } })).toEqual([]);
+  });
+});
+
+describe("parsePrComments", () => {
+  const thread = (over: Record<string, unknown> = {}, comment: Record<string, unknown> | null = {}) => ({
+    id: "t1",
+    isResolved: false,
+    path: "src/app.ts",
+    comments: { nodes: comment ? [{ author: { login: "alice", __typename: "User" }, bodyText: "please fix", createdAt: "2026-07-01T00:00:00Z", url: "https://gh/acme/b/pull/2#discussion_r1", ...comment }] : [] },
+    ...over,
+  });
+
+  const raw = (threads: unknown[]) => ({
+    search: {
+      nodes: [
+        {
+          id: "PR_1",
+          number: 2,
+          url: "https://gh/acme/b/pull/2",
+          repository: { nameWithOwner: "acme/b" },
+          reviewThreads: { nodes: threads },
+        },
+      ],
+    },
+  });
+
+  it("keeps an unresolved thread whose last comment is not the viewer's, anchored to the comment URL", () => {
+    const [c] = parsePrComments(raw([thread()]), "mfozmen");
+    expect(c).toEqual({
+      id: "t1",
+      prId: "PR_1",
+      url: "https://gh/acme/b/pull/2#discussion_r1",
+      repo: "acme/b",
+      number: 2,
+      author: "alice",
+      isBot: false,
+      path: "src/app.ts",
+      preview: "please fix",
+      commentedAt: "2026-07-01T00:00:00Z",
+    });
+  });
+
+  it("drops a resolved thread", () => {
+    expect(parsePrComments(raw([thread({ isResolved: true })]), "mfozmen")).toEqual([]);
+  });
+
+  it("drops an unresolved thread whose last comment is the viewer's (already replied)", () => {
+    expect(parsePrComments(raw([thread({}, { author: { login: "mfozmen", __typename: "User" } })]), "mfozmen")).toEqual([]);
+  });
+
+  it("keeps bot comments but marks them isBot so the client can filter them", () => {
+    const [c] = parsePrComments(raw([thread({}, { author: { login: "github-actions", __typename: "Bot" } })]), "mfozmen");
+    expect(c.isBot).toBe(true);
+    expect(c.author).toBe("github-actions");
+  });
+
+  it("drops a thread with no comments without crashing", () => {
+    expect(parsePrComments(raw([thread({}, null)]), "mfozmen")).toEqual([]);
+  });
+
+  it("drops a thread whose last comment has no author (ghost user)", () => {
+    expect(parsePrComments(raw([thread({}, { author: null })]), "mfozmen")).toEqual([]);
+  });
+
+  it("collapses newlines and runs of whitespace in the preview", () => {
+    const [c] = parsePrComments(raw([thread({}, { bodyText: "  line one\n\n  line   two\t\n" })]), "mfozmen");
+    expect(c.preview).toBe("line one line two");
+  });
+
+  it("leaves a body of exactly 140 characters untouched", () => {
+    const body = "a".repeat(140);
+    const [c] = parsePrComments(raw([thread({}, { bodyText: body })]), "mfozmen");
+    expect(c.preview).toBe(body);
+  });
+
+  it("truncates a longer body to 140 characters plus an ellipsis", () => {
+    const [c] = parsePrComments(raw([thread({}, { bodyText: "b".repeat(200) })]), "mfozmen");
+    expect(c.preview).toBe("b".repeat(140) + "…");
+  });
+
+  it("returns [] when search nodes are absent", () => {
+    expect(parsePrComments({}, "mfozmen")).toEqual([]);
+    expect(parsePrComments(null, "mfozmen")).toEqual([]);
   });
 });

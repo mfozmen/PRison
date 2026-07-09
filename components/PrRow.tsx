@@ -13,6 +13,10 @@ export interface PrRowProps {
   suggestion: Suggestion;
   draft?: boolean;
   accent?: "success" | "warning" | "danger";
+  // Clamp the title to two lines. Off by default: PR titles are short and must
+  // stay fully readable. On for comment previews, which are prose and would
+  // otherwise stretch the row to an unbounded height.
+  clampTitle?: boolean;
 }
 
 const accentClasses: Record<"success" | "warning" | "danger", string> = {
@@ -21,7 +25,7 @@ const accentClasses: Record<"success" | "warning" | "danger", string> = {
   danger:  "border-l-2 border-l-danger  hover:border-l-danger",
 };
 
-export function PrRow({ title, repo, number, url, since, now, detail, suggestion, draft, accent }: PrRowProps) {
+export function PrRow({ title, repo, number, url, since, now, detail, suggestion, draft, accent, clampTitle }: PrRowProps) {
   return (
     <div className={`flex flex-col gap-1 rounded-lg border border-border bg-surface/50 p-4 transition-colors hover:border-border/70 hover:bg-surface${accent ? ` ${accentClasses[accent]}` : ""}`}>
       <div className="flex items-start justify-between gap-3">
@@ -36,7 +40,7 @@ export function PrRow({ title, repo, number, url, since, now, detail, suggestion
             target="_blank"
             rel="noopener noreferrer"
             aria-label={`Open ${title} on GitHub`}
-            className="font-medium text-foreground hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
+            className={`${clampTitle ? "line-clamp-2 " : ""}font-medium text-foreground hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm`}
           >
             {title}
             <svg aria-hidden="true" className="inline-block ml-1 -mt-0.5 shrink-0" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">

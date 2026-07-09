@@ -1,0 +1,23 @@
+import { ghQuery } from "@/lib/github/client";
+import { PR_COMMENTS_QUERY, searchQuery, parsePrComments } from "@/lib/github/queries";
+import { resolveScope } from "@/lib/github/scope";
+import { readToken, readLogin } from "@/lib/session";
+
+export async function GET(request: Request) {
+  const token = await readToken();
+  if (!token) return new Response("Unauthorized", { status: 401 });
+  // parsePrComments needs the viewer's login to tell "someone is waiting on me"
+  // from "I already replied".
+  const login = await readLogin();
+  if (!login) return new Response("Unauthorized", { status: 401 });
+  const scoped = resolveScope(request);
+  if ("error" in scoped) return new Response(scoped.error, { status: 400 });
+  try {
+    const { data, partial } = await ghQuery(token, PR_COMMENTS_QUERY, {
+      q: searchQuery("author", scoped.scope),
+    });
+    return Response.json(parsePrComments(data, login), partial ? { headers: { "X-Partial": "1" } } : undefined);
+  } catch {
+    return new Response("Upstream GitHub error", { status: 502 });
+  }
+}

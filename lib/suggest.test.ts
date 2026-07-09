@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { suggestStuck, suggestReview, suggestReady, stuckGroupKeys, reviewDecisionLabel } from "./suggest";
+import { suggestStuck, suggestReview, suggestReady, suggestComment, stuckGroupKeys, reviewDecisionLabel } from "./suggest";
 import { EMPTY_TRACKED } from "./tracked-checks";
-import type { StuckPr, ReviewRequest, ReadyPr } from "./types";
+import type { StuckPr, ReviewRequest, ReadyPr, PrComment } from "./types";
 
 const base = { id: "1", title: "t", url: "https://github.com/acme/b/pull/2", number: 2, repo: "acme/b" };
 
@@ -116,6 +116,20 @@ describe("stuckGroupKeys", () => {
   });
   it("falls back to 'Other' when nothing is groupable", () => {
     expect(stuckGroupKeys(s({}), EMPTY_TRACKED)).toEqual(["Other"]);
+  });
+});
+
+describe("suggestComment", () => {
+  it("links straight to the comment anchor, not the PR", () => {
+    const c: PrComment = {
+      id: "t1", prId: "PR_1", url: "https://github.com/acme/b/pull/2#discussion_r1",
+      repo: "acme/b", number: 2, author: "alice", isBot: false,
+      path: "src/app.ts", preview: "please fix", commentedAt: "x",
+    };
+    expect(suggestComment(c)).toEqual({
+      text: "Reply to alice",
+      href: "https://github.com/acme/b/pull/2#discussion_r1",
+    });
   });
 });
 

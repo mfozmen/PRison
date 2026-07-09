@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useTransition } from "react";
-import type { Org, StuckPr, ReviewRequest, ReadyPr } from "@/lib/types";
+import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment } from "@/lib/types";
 import { sortByAgeAsc } from "@/lib/prioritize";
-import { suggestStuck, suggestReview, suggestReady, needsReview, stuckGroupKeys, reviewDecisionLabel } from "@/lib/suggest";
+import { suggestStuck, suggestReview, suggestReady, suggestComment, needsReview, stuckGroupKeys, reviewDecisionLabel } from "@/lib/suggest";
 import { PrList } from "./PrList";
 import { PrRow } from "./PrRow";
 import { Header } from "./Header";
@@ -24,6 +24,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [selectedOrg, setSelectedOrg] = useState<string>(ALL);
   const [hydrated, setHydrated] = useState(false);
   const [hideDrafts, setHideDrafts] = useState(false);
+  // Bots author the large majority of unanswered review threads, so they are
+  // hidden by default; the filter is client-side to keep the toggle instant.
+  const [showBots, setShowBots] = useState(false);
   const [groupBy, setGroupBy] = useState<"flat" | "repo" | "check">("flat");
 
   const [tracked, setTracked] = useState<TrackedChecks>(EMPTY_TRACKED);
@@ -32,9 +35,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [stuckPrs, setStuckPrs] = useState<StuckPr[]>([]);
   const [reviewReqs, setReviewReqs] = useState<ReviewRequest[]>([]);
   const [readyPrs, setReadyPrs] = useState<ReadyPr[]>([]);
+  const [comments, setComments] = useState<PrComment[]>([]);
   const [stuckError, setStuckError] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [readyError, setReadyError] = useState<string | null>(null);
+  const [commentsError, setCommentsError] = useState<string | null>(null);
   const [partial, setPartial] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -52,7 +57,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             ? `?org=${encodeURIComponent(org)}`
             : "";
       startTransition(async () => {
-        const [stuckResult, reviewResult, readyResult] = await Promise.allSettled([
+        const [stuckResult, reviewResult, readyResult, commentsResult] = await Promise.allSettled([
           fetch(`/api/stuck-prs${qs}`).then(async (r) => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const partial = r.headers?.get?.("X-Partial") === "1";
@@ -69,6 +74,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const partial = r.headers?.get?.("X-Partial") === "1";
             const items = (await r.json()) as ReadyPr[];
+            return { items, partial };
+          }),
+          fetch(`/api/pr-comments${qs}`).then(async (r) => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const partial = r.headers?.get?.("X-Partial") === "1";
+            const items = (await r.json()) as PrComment[];
             return { items, partial };
           }),
         ]);
@@ -95,10 +106,17 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             : null,
         );
         setReadyPrs(readyResult.status === "fulfilled" ? readyResult.value.items : []);
+        setCommentsError(
+          commentsResult.status === "rejected"
+            ? "Failed to load comments. Please retry."
+            : null,
+        );
+        setComments(commentsResult.status === "fulfilled" ? commentsResult.value.items : []);
         const anyPartial =
           (stuckResult.status === "fulfilled" && stuckResult.value.partial) ||
           (reviewResult.status === "fulfilled" && reviewResult.value.partial) ||
-          (readyResult.status === "fulfilled" && readyResult.value.partial);
+          (readyResult.status === "fulfilled" && readyResult.value.partial) ||
+          (commentsResult.status === "fulfilled" && commentsResult.value.partial);
         setPartial(anyPartial);
       });
     },
@@ -110,6 +128,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   useEffect(() => {
     const stored = localStorage.getItem("prison.org");
     const storedHideDrafts = localStorage.getItem("prison.hideDrafts");
+    const storedShowBots = localStorage.getItem("prison.showBots");
     const storedGroupBy = localStorage.getItem("prison.groupBy");
     const storedTracked = localStorage.getItem("prison.trackedChecks");
     startTransition(() => {
@@ -122,6 +141,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       }
       if (storedHideDrafts === "true") {
         setHideDrafts(true);
+      }
+      if (storedShowBots === "true") {
+        setShowBots(true);
       }
       if (storedGroupBy === "repo" || storedGroupBy === "check") {
         setGroupBy(storedGroupBy);
@@ -142,6 +164,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     if (!hydrated) return;
     localStorage.setItem("prison.hideDrafts", String(hideDrafts));
   }, [hideDrafts, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.showBots", String(showBots));
+  }, [showBots, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -186,6 +213,19 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // A BLOCKED+approved+green PR with awaiting tracked checks belongs in stuck, not here.
   const visibleReady = sortedReady.filter(
     (pr) => !(pr.viaBlocked && isAwaiting(pr.repo, pr.checkNames)),
+  );
+
+  // Comments are only shown for PRs the dashboard is currently showing, so the
+  // column can never point at a PR that isn't on screen. Derived from the two
+  // author-owned lists AFTER arbitration, which is why it lives here and not in
+  // the route.
+  const visiblePrIds = new Set([
+    ...visibleStuck.map((pr) => pr.id),
+    ...visibleReady.map((pr) => pr.id),
+  ]);
+  const visibleComments = sortByAgeAsc(
+    comments.filter((c) => visiblePrIds.has(c.prId) && (showBots || !c.isBot)),
+    (c) => c.commentedAt,
   );
 
   return (
@@ -239,6 +279,15 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               className="h-4 w-4 rounded border-border bg-surface accent-accent"
             />
             Hide drafts
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showBots}
+              onChange={(e) => setShowBots(e.target.checked)}
+              className="h-4 w-4 rounded border-border bg-surface accent-accent"
+            />
+            Show bot comments
           </label>
           <div role="group" aria-label="Group by" className="flex rounded-md">
             <button
@@ -344,6 +393,67 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     Needs update
                   </span>
                 ) : undefined}
+              />
+            )}
+          />
+        </div>
+        {/* Comments awaiting your reply — full width: an inbox row needs room for
+            the comment preview AND the file path, which a grid column would clip. */}
+        <div className="flex flex-col gap-4">
+          {commentsError && (
+            <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+              <span>{commentsError}</span>
+              <button
+                onClick={() => fetchData(selectedOrg)}
+                className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          <PrList
+            title="Comments awaiting your reply"
+            items={visibleComments}
+            emptyMessage="No comments awaiting your reply 🎉"
+            keyExtractor={(c) => c.id}
+            countAccent="warning"
+            groupBy={groupBy === "repo" ? (c) => c.repo : undefined}
+            groupHref={
+              groupBy === "repo"
+                ? (repo) => `https://github.com/${repo}`
+                : undefined
+            }
+            renderRow={(c) => (
+              <PrRow
+                title={c.preview}
+                repo={c.repo}
+                number={c.number}
+                url={c.url}
+                since={c.commentedAt}
+                now={new Date()}
+                suggestion={suggestComment(c)}
+                accent="warning"
+                clampTitle
+                detail={
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 rounded bg-surface px-1.5 py-0.5 text-xs font-medium text-foreground ring-1 ring-inset ring-border">
+                      <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.3" />
+                        <path d="M1 10c0-2.21 1.79-4 4-4s4 1.79 4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                      </svg>
+                      {c.author}
+                    </span>
+                    {c.path && (
+                      <span className="inline-flex items-center gap-1 rounded bg-surface px-1.5 py-0.5 font-mono text-xs text-muted ring-1 ring-inset ring-border">
+                        <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M6.5 1H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.5L6.5 1Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+                          <path d="M6.5 1v3.5H10" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+                        </svg>
+                        {c.path}
+                      </span>
+                    )}
+                  </span>
+                }
               />
             )}
           />

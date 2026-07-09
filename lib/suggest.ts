@@ -1,4 +1,4 @@
-import type { StuckPr, ReviewRequest, ReadyPr } from "./types";
+import type { StuckPr, ReviewRequest, ReadyPr, PrComment } from "./types";
 import { awaitingChecks, type TrackedChecks } from "./tracked-checks";
 
 export type Suggestion = { text: string; href: string };
@@ -53,4 +53,9 @@ export function suggestReview(req: ReviewRequest): Suggestion {
 
 export function suggestReady(pr: ReadyPr): Suggestion {
   return { text: "Merge on GitHub", href: pr.url };
+}
+
+// c.url is the comment's own anchor, so this lands on the thread, not the PR top.
+export function suggestComment(c: PrComment): Suggestion {
+  return { text: `Reply to ${c.author}`, href: c.url };
 }

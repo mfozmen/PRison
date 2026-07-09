@@ -42,4 +42,20 @@ export type ReadyPr = {
   viaBlocked: boolean;    // true when qualified via isReadyViaBlocked (BLOCKED+APPROVED, no failing/pending check)
 };
 
+// An inline review-thread comment on one of the viewer's own PRs that is still
+// waiting on a reply: the thread is unresolved AND its last comment is not the
+// viewer's. See parsePrComments.
+export type PrComment = {
+  id: string;          // review-thread id
+  prId: string;        // PR node id — the Dashboard shows only comments on PRs visible in the stuck/ready lists
+  url: string;         // direct anchor to the comment, e.g. .../pull/90211#discussion_r9998887776
+  repo: string;
+  number: number;
+  author: string;
+  isBot: boolean;      // author.__typename === "Bot"; bots dominate the raw feed, so the client hides them by default
+  path: string;        // file the thread hangs on
+  preview: string;     // whitespace-normalized bodyText, at most PREVIEW_MAX chars, ellipsized when cut
+  commentedAt: string; // ISO — when the ball landed in the viewer's court; drives the age badge
+};
+
 export type AgeBucket = "fresh" | "warning" | "urgent";

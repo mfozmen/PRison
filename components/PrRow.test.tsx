@@ -195,4 +195,39 @@ describe("PrRow", () => {
     expect(screen.queryByText("Draft")).toBeNull();
   });
 
+  it("does not clamp the title by default, so a long PR title stays fully readable", () => {
+    render(
+      <PrRow
+        title="Fix the thing"
+        repo="org/repo"
+        number={42}
+        url="https://github.com/org/repo/pull/42"
+        since="2026-06-25T00:00:00Z"
+        now={now}
+        suggestion={suggestion}
+      />,
+    );
+    expect(screen.getByRole("link", { name: /open fix the thing on github/i })).not.toHaveClass(
+      "line-clamp-2",
+    );
+  });
+
+  it("clamps the title to two lines when clampTitle is set, bounding a comment-preview row", () => {
+    render(
+      <PrRow
+        title="Fix the thing"
+        repo="org/repo"
+        number={42}
+        url="https://github.com/org/repo/pull/42"
+        since="2026-06-25T00:00:00Z"
+        now={now}
+        suggestion={suggestion}
+        clampTitle
+      />,
+    );
+    expect(screen.getByRole("link", { name: /open fix the thing on github/i })).toHaveClass(
+      "line-clamp-2",
+    );
+  });
+
 });

@@ -51,19 +51,72 @@ const ORGS = [
   { login: "beta", avatarUrl: "b" },
 ];
 
+// An unanswered review-thread comment on STUCK_PR (prId matches STUCK_PR.id).
+const COMMENT = {
+  id: "t1",
+  prId: "2",
+  url: "https://github.com/acme/b/pull/2#discussion_r1",
+  repo: "acme/b",
+  number: 2,
+  author: "alice",
+  isBot: false,
+  path: "src/app.ts",
+  preview: "please fix the null check",
+  commentedAt: "2026-06-19T00:00:00Z",
+};
+
+const BOT_COMMENT = {
+  ...COMMENT,
+  id: "t2",
+  url: "https://github.com/acme/b/pull/2#discussion_r2",
+  author: "github-actions",
+  isBot: true,
+  preview: "bot says something",
+};
+
+// A comment on a PR that is in neither the stuck nor the ready list.
+const ORPHAN_COMMENT = {
+  ...COMMENT,
+  id: "t3",
+  prId: "not-visible",
+  preview: "comment on an invisible pr",
+};
+
 function okFetch() {
-  // THREE-WAY: ready → [READY_PR], stuck → [STUCK_PR], else (review) → [REVIEW_PR]
+  // FOUR-WAY: pr-comments → [], ready → [READY_PR], stuck → [STUCK_PR], else (review) → [REVIEW_PR]
   return vi.fn((url: string) =>
     Promise.resolve({
       ok: true,
       headers: { get: () => null },
       json: () =>
         Promise.resolve(
-          url.includes("ready")
-            ? [READY_PR]
-            : url.includes("stuck")
-              ? [STUCK_PR]
-              : [REVIEW_PR],
+          url.includes("pr-comments")
+            ? []
+            : url.includes("ready")
+              ? [READY_PR]
+              : url.includes("stuck")
+                ? [STUCK_PR]
+                : [REVIEW_PR],
+        ),
+    }),
+  ) as unknown as typeof fetch;
+}
+
+// Serves the four lists, with the comments list supplied per test.
+function fetchWithComments(comments: unknown[]) {
+  return vi.fn((url: string) =>
+    Promise.resolve({
+      ok: true,
+      headers: { get: () => null },
+      json: () =>
+        Promise.resolve(
+          url.includes("pr-comments")
+            ? comments
+            : url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [STUCK_PR]
+                : [],
         ),
     }),
   ) as unknown as typeof fetch;
@@ -1003,8 +1056,8 @@ describe("Dashboard", () => {
       await waitFor(() => {
         const after = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
           .length;
-        // One refresh = one stuck-prs fetch + one review-requests fetch + one ready-to-merge fetch.
-        expect(after).toBe(before + 3);
+        // One refresh = stuck-prs + review-requests + ready-to-merge + pr-comments.
+        expect(after).toBe(before + 4);
       });
     });
 
@@ -1479,10 +1532,10 @@ describe("Dashboard", () => {
       const refreshButton = screen.getByRole("button", { name: /^refresh$/i });
       await waitFor(() => expect(refreshButton).toBeEnabled());
       fireEvent.click(refreshButton);
-      // 3 fetches on mount + 3 on refresh (stuck + review + ready) = 6 total.
+      // 4 fetches on mount + 4 on refresh (stuck + review + ready + comments) = 8 total.
       // Use waitFor so the assertion retries until all async refresh fetches register.
       await waitFor(() =>
-        expect(global.fetch as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(6),
+        expect(global.fetch as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(8),
       );
     });
 
@@ -1540,6 +1593,112 @@ describe("Dashboard", () => {
         ).toBeInTheDocument(),
       );
       expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+    });
+  });
+});
+
+describe("Dashboard — comments awaiting your reply", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    global.fetch = okFetch();
+  });
+
+  it("fetches the comments list alongside the other three", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() => {
+      const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
+      expect(calls.some((c) => String(c[0]).includes("/api/pr-comments"))).toBe(true);
+    });
+  });
+
+  it("shows the empty state when nothing awaits a reply", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(
+      await screen.findByText(/no comments awaiting your reply/i),
+    ).toBeInTheDocument();
+  });
+
+  it("renders a comment preview and links straight to the comment anchor", async () => {
+    global.fetch = fetchWithComments([COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    const link = await screen.findByRole("link", {
+      name: /open please fix the null check on github/i,
+    });
+    expect(link).toHaveAttribute(
+      "href",
+      "https://github.com/acme/b/pull/2#discussion_r1",
+    );
+    expect(screen.getByText("alice")).toBeInTheDocument();
+    expect(screen.getByText("src/app.ts")).toBeInTheDocument();
+    expect(screen.getByText("Reply to alice")).toBeInTheDocument();
+  });
+
+  it("hides comments on PRs that are not visible in the stuck or ready lists", async () => {
+    global.fetch = fetchWithComments([ORPHAN_COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("comment on an invisible pr")).not.toBeInTheDocument();
+    expect(screen.getByText(/no comments awaiting your reply/i)).toBeInTheDocument();
+  });
+
+  it("hides bot comments by default and reveals them when 'Show bot comments' is checked", async () => {
+    global.fetch = fetchWithComments([COMMENT, BOT_COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("please fix the null check")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("bot says something")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText(/show bot comments/i));
+    await waitFor(() =>
+      expect(screen.getByText("bot says something")).toBeInTheDocument(),
+    );
+  });
+
+  it("persists the 'Show bot comments' toggle to localStorage", async () => {
+    global.fetch = fetchWithComments([BOT_COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    const toggle = await screen.findByLabelText(/show bot comments/i);
+    fireEvent.click(toggle);
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.showBots")).toBe("true"),
+    );
+  });
+
+  it("restores the persisted 'Show bot comments' toggle on mount", async () => {
+    localStorage.setItem("prison.showBots", "true");
+    global.fetch = fetchWithComments([BOT_COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("bot says something")).toBeInTheDocument();
+  });
+
+  it("shows an error banner and retry when the comments fetch fails, without breaking the other lists", async () => {
+    global.fetch = vi.fn((url: string) =>
+      url.includes("pr-comments")
+        ? Promise.reject(new Error("network error"))
+        : url.includes("stuck")
+          ? Promise.resolve({ ok: true, json: () => Promise.resolve([STUCK_PR]) })
+          : Promise.resolve({ ok: true, json: () => Promise.resolve([]) }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText(/failed to load comments/i)).toBeInTheDocument(),
+    );
+    expect(screen.getByText("stuck pr")).toBeInTheDocument();
+  });
+
+  it("groups comments by repo in the By-repo view", async () => {
+    global.fetch = fetchWithComments([COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("please fix the null check")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "By repo" }));
+    await waitFor(() => {
+      const headers = screen.getAllByTestId("group-header");
+      expect(headers.some((h) => h.textContent?.includes("acme/b"))).toBe(true);
     });
   });
 });

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Raw GraphQL responses are intentionally untyped at the boundary; parsers
 // convert them to domain types as the first step.
-import type { Org, StuckPr, ReviewRequest, ReadyPr } from "@/lib/types";
+import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment } from "@/lib/types";
 
 // scope is optional: when omitted, the search spans every repo the token can
 // see (the user's personal account plus all accessible organizations).
@@ -200,6 +200,66 @@ export function parseReviewRequests(raw: any, viewerLogin: string): ReviewReques
         isDraft: n.isDraft ?? false,
       } as ReviewRequest;
     });
+}
+
+export const PR_COMMENTS_QUERY = `
+  query($q: String!) {
+    search(query: $q, type: ISSUE, first: 50) {
+      nodes { ... on PullRequest {
+        id number url repository { nameWithOwner }
+        reviewThreads(first: 50) { nodes {
+          id isResolved path
+          comments(last: 1) { nodes {
+            author { login __typename }
+            bodyText createdAt url
+          } }
+        } }
+      } }
+    }
+  }`;
+
+// Long enough to convey what the comment asks for, short enough that a row stays
+// a scannable inbox line. The card also clamps to two lines (see PrRow).
+const PREVIEW_MAX = 140;
+
+// bodyText carries the comment's newlines and indentation; a two-line clamp on
+// raw text would render mostly blank, so collapse whitespace before truncating.
+function previewOf(bodyText: string): string {
+  const flat = bodyText.replace(/\s+/g, " ").trim();
+  return flat.length > PREVIEW_MAX ? `${flat.slice(0, PREVIEW_MAX)}…` : flat;
+}
+
+/**
+ * Inline review comments on the viewer's own PRs that are still waiting on a reply.
+ *
+ * A thread awaits the viewer when it is unresolved AND its most recent comment is
+ * someone else's — replying adds a comment, so a viewer-authored last comment means
+ * the ball is back in the reviewer's court even while the thread stays unresolved.
+ *
+ * Bot comments are kept (with isBot set) rather than dropped here: the Dashboard
+ * hides them behind a toggle, so filtering server-side would make the toggle a no-op.
+ */
+export function parsePrComments(raw: any, viewerLogin: string): PrComment[] {
+  return (raw?.search?.nodes ?? [])
+    .filter((pr: any) => pr?.id)
+    .flatMap((pr: any) =>
+      (pr.reviewThreads?.nodes ?? [])
+        .filter((t: any) => t?.isResolved === false)
+        .map((thread: any) => ({ thread, last: thread.comments?.nodes?.[0] }))
+        .filter(({ last }: any) => last?.author?.login && last.author.login !== viewerLogin)
+        .map(({ thread, last }: any) => ({
+          id: thread.id,
+          prId: pr.id,
+          url: last.url ?? pr.url,
+          repo: pr.repository?.nameWithOwner ?? "",
+          number: pr.number,
+          author: last.author.login,
+          isBot: last.author.__typename === "Bot",
+          path: thread.path ?? "",
+          preview: previewOf(last.bodyText ?? ""),
+          commentedAt: last.createdAt ?? "",
+        } as PrComment)),
+    );
 }
 
 export function parseOrgs(raw: any): Org[] {

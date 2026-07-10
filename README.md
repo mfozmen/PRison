@@ -3,6 +3,7 @@
 [![CI](https://github.com/mfozmen/PRison/actions/workflows/ci.yml/badge.svg)](https://github.com/mfozmen/PRison/actions/workflows/ci.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=mfozmen_PRison&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=mfozmen_PRison)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=mfozmen_PRison&metric=coverage)](https://sonarcloud.io/summary/new_code?id=mfozmen_PRison)
+[![Docker Pulls](https://img.shields.io/docker/pulls/mfozmen/prison)](https://hub.docker.com/r/mfozmen/prison)
 
 A read-only GitHub dashboard that shows which pull requests need your attention,
 and for how long — across your personal account and every organization you can
@@ -56,11 +57,23 @@ warning below is about.
 
 ### Run with Docker (recommended)
 
-Zero-config — `AUTH_SECRET` is auto-generated and persisted in a volume (nothing to set):
+Zero-config — `AUTH_SECRET` is auto-generated and persisted in a volume (nothing to set).
+
+From the published image, no clone needed:
+
+```sh
+docker run -p 3000:3000 -v prison-data:/data \
+  -e GITHUB_TOKEN="$(gh auth token)" mfozmen/prison   # http://localhost:3000
+```
+
+Or build it yourself from a checkout:
 
 ```sh
 GITHUB_TOKEN="$(gh auth token)" docker compose up --build   # http://localhost:3000
 ```
+
+The `prison-data` volume holds the generated `AUTH_SECRET`, so your session
+survives a restart. Images are published for `linux/amd64` and `linux/arm64`.
 
 Passing your `gh` token signs you in automatically — needed for SSO-restricted orgs
 (where SSO/SAML enforcement blocks classic PATs). The token rotates, so re-run when

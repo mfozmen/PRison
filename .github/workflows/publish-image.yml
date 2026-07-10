@@ -1,0 +1,87 @@
+name: Publish image
+
+# A GitHub release is the real trigger: the tag it carries becomes the image tag,
+# so the two can never disagree. workflow_dispatch exists for the case where the
+# release landed but this workflow did not — republishing without cutting a new
+# version.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build, e.g. v1.0.0"
+        required: true
+      latest:
+        description: "Also move :latest to this build (only for the newest stable tag)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - id: ref
+        # metadata-action's `type=semver` reads github.ref, which is a branch on a
+        # manual run and would yield no tags at all. Derive the version once, here.
+        # The tag reaches the shell as an env var, never as `${{ }}` inside the
+        # script, so it cannot be interpolated into the command line.
+        env:
+          TAG: ${{ inputs.tag || github.event.release.tag_name }}
+        run: |
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      # Third-party actions are pinned to an immutable commit SHA, not a mutable
+      # major tag: this job holds a token that can publish a public image under
+      # our name, so a retagged upstream release must not become our build step.
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: ${{ steps.ref.outputs.tag }}
+
+      # linux/arm64 is built under emulation on the amd64 runner.
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      # The token reaches Docker only through this action, never a build arg:
+      # `docker history` exposes ARG values, and this repository is public.
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: mfozmen/prison
+          # `latest` moves only forward. A real, non-prerelease release moves it;
+          # a manual run does not, because it may be rebuilding an OLD tag and
+          # would silently hand `docker run mfozmen/prison` an older image. When a
+          # manual run IS the recovery for the newest release, ask for it via the
+          # `latest` input.
+          #
+          # Two ways to get this wrong, both of which enable `latest` on every
+          # manual run — including a rebuild of an old tag:
+          #   * gating on `prerelease == false` alone: on a manual run
+          #     `github.event.release` is null, and GitHub casts `null == false`
+          #     to `0 == 0`, which is true.
+          #   * reading `github.event.inputs.latest`: that context stringifies, and
+          #     the non-empty string "false" is truthy. `inputs` keeps the boolean.
+          tags: |
+            type=raw,value=${{ steps.ref.outputs.version }}
+            type=raw,value=latest,enable=${{ (github.event_name == 'release' && github.event.release.prerelease == false) || (github.event_name == 'workflow_dispatch' && inputs.latest) }}
+
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Keep the Docker Hub tag page readable; attestations add unnamed entries.
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

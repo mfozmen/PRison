@@ -43,6 +43,20 @@ Add `--dry-run` to see every step without touching anything.
 6. Creates the GitHub release, which fires `.github/workflows/publish-image.yml`
    and pushes `mfozmen/prison:<version>` and `:latest` to Docker Hub.
 
+## If the image workflow didn't run
+
+The release is a separate thing from the image. If the release landed but
+`publish-image.yml` failed (a missing secret, a Docker Hub outage), republish
+without cutting a new version:
+
+```sh
+gh workflow run publish-image.yml -f tag=v1.2.0 -f latest=true
+```
+
+Set `latest=true` **only** when `v1.2.0` is the newest stable release — it moves
+the `:latest` tag, and `docker run mfozmen/prison` with no tag serves whatever
+`:latest` points at. Rebuilding an older tag? Leave it `false`.
+
 ## Where the version shows up
 
 `next.config.ts` reads `version` from `package.json` at build time and inlines it

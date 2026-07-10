@@ -8,6 +8,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          # The identity guard scans every commit message, not just the tip. A
+          # depth-1 checkout would hide all but one and pass vacuously — so
+          # `readCommitMessages` throws on a shallow clone rather than pretend.
+          fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
           node-version: 22

@@ -1,9 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { scanCommitMessages, scanRepo, scanSource } from "./generic-fixtures";
+import {
+  bareDependencyNames,
+  resolveGitBin,
+  scanCommitMessages,
+  scanRepo,
+  scanSource,
+  walk,
+} from "./generic-fixtures";
 
 describe("scanSource", () => {
   // The guard is only worth having if it actually fires. These pin the two
@@ -251,5 +258,42 @@ describe("scanRepo", () => {
       'expect(scanSource(\'login: "jdoe"\')).toEqual(["owner:jdoe"]); // #90210',
     );
     expect(scanRepo(root)).toEqual([]);
+  });
+});
+
+describe("walk", () => {
+  it("skips symlinks, skip-dirs, and non-source files", () => {
+    const root = mkdtempSync(join(tmpdir(), "prison-walk-"));
+    mkdirSync(join(root, "node_modules")); // a SKIP_DIRS entry
+    writeFileSync(join(root, "node_modules", "buried.ts"), "");
+    writeFileSync(join(root, "keep.ts"), ""); // scannable extension
+    writeFileSync(join(root, "notes.txt"), ""); // non-scannable extension
+    symlinkSync(join(root, "keep.ts"), join(root, "link.ts")); // followed would double-count
+    expect(walk(root).map((f) => f.slice(root.length + 1))).toEqual(["keep.ts"]);
+  });
+});
+
+describe("resolveGitBin", () => {
+  it("returns the first candidate that exists", () => {
+    expect(resolveGitBin(["/a/git", "/b/git"], (p) => p === "/b/git")).toBe("/b/git");
+  });
+
+  // The bare-name fallback is the only path that would resolve git via $PATH.
+  it("falls back to the bare name when no candidate exists", () => {
+    expect(resolveGitBin(["/a/git", "/b/git"], () => false)).toBe("git");
+  });
+});
+
+describe("bareDependencyNames", () => {
+  it("merges deps and devDeps, scoped names reduced and lowercased", () => {
+    const s = bareDependencyNames({
+      dependencies: { Next: "1" },
+      devDependencies: { "@scope/Vitest": "1" },
+    });
+    expect([...s].sort()).toEqual(["next", "vitest"]);
+  });
+
+  it("tolerates a package.json missing both dependency maps", () => {
+    expect(bareDependencyNames({}).size).toBe(0);
   });
 });

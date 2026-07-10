@@ -1053,20 +1053,13 @@ describe("parseReadyPrs", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("drops APPROVED + UNSTABLE mergeStateStatus", () => {
-    const result = parseReadyPrs({ search: { nodes: [makePr({ mergeStateStatus: "UNSTABLE" })] } });
-    expect(result).toHaveLength(0);
-  });
-
-  it("drops APPROVED + DIRTY mergeStateStatus", () => {
-    const result = parseReadyPrs({ search: { nodes: [makePr({ mergeStateStatus: "DIRTY" })] } });
-    expect(result).toHaveLength(0);
-  });
-
-  it("drops APPROVED + UNKNOWN mergeStateStatus", () => {
-    const result = parseReadyPrs({ search: { nodes: [makePr({ mergeStateStatus: "UNKNOWN" })] } });
-    expect(result).toHaveLength(0);
-  });
+  it.each(["UNSTABLE", "DIRTY", "UNKNOWN"])(
+    "drops APPROVED + %s mergeStateStatus",
+    (mergeStateStatus) => {
+      const result = parseReadyPrs({ search: { nodes: [makePr({ mergeStateStatus })] } });
+      expect(result).toHaveLength(0);
+    },
+  );
 
   // When review is required but not yet given, GitHub reports BLOCKED (not CLEAN).
   // REVIEW_REQUIRED + CLEAN is an impossible combo in practice, so we test the

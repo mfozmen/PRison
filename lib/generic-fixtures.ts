@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readdirSync, readFileSync, lstatSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, lstatSync } from "node:fs";
 import { join, relative } from "node:path";
 
 /**
@@ -175,6 +175,17 @@ export const TICKET_SCAN_EXEMPT = new Set([
 const ALLOWED_REPOS_LOWER = new Set([...ALLOWED_REPOS].map((r) => r.toLowerCase()));
 
 /**
+ * A trailing dot ends a sentence, not a name. Stripped character by character:
+ * `/\.+$/` backtracks super-linearly on a run of dots, and this is called per
+ * match on scanned text.
+ */
+function stripTrailingDots(s: string): string {
+  let end = s.length;
+  while (end > 0 && s[end - 1] === ".") end--;
+  return s.slice(0, end);
+}
+
+/**
  * Repo names are compared case-insensitively — `PRison` and `prison` are the same
  * repository, and a guard that passed the second would be theatre. A trailing dot,
  * as when a name ends a sentence, is stripped: it is punctuation, not the name.
@@ -183,8 +194,17 @@ const ALLOWED_REPOS_LOWER = new Set([...ALLOWED_REPOS].map((r) => r.toLowerCase(
  * prose detectors below. Two predicates over one set drift as the set grows.
  */
 function repoAllowed(name: string): boolean {
-  const bare = name.replace(/\.+$/, "").toLowerCase();
+  const bare = stripTrailingDots(name).toLowerCase();
   return ALLOWED_REPOS_LOWER.has(bare) || THROWAWAY_REPO.test(bare);
+}
+
+type PackageJson = { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+
+/** Dependency + devDependency names, each reduced to the bare form used in an issue link. */
+export function bareDependencyNames(pkg: PackageJson): Set<string> {
+  const names = [...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.devDependencies ?? {})];
+  // A scoped package `@scope/name` is referenced bare as `name`.
+  return new Set(names.map((n) => n.replace(/^@[^/]+\//, "").toLowerCase()));
 }
 
 /**
@@ -201,15 +221,9 @@ function repoAllowed(name: string): boolean {
  *     TICKET_PATTERNS regardless. Both surface as red CI on the PR, before merge,
  *     and are cleared by rewording the commit — friction, not a leak.
  */
-const DECLARED_DEPS: Set<string> = (() => {
-  const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as {
-    dependencies?: Record<string, string>;
-    devDependencies?: Record<string, string>;
-  };
-  const names = [...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.devDependencies ?? {})];
-  // A scoped package `@scope/name` is referenced bare as `name` in an issue link.
-  return new Set(names.map((n) => n.replace(/^@[^/]+\//, "").toLowerCase()));
-})();
+const DECLARED_DEPS = bareDependencyNames(
+  JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as PackageJson,
+);
 
 /**
  * A hex colour is `#` plus 3, 4, 6, or 8 hex digits. An all-digit one (`#334155`,
@@ -276,75 +290,87 @@ const SCRUB_SURVIVOR = new RegExp(
 );
 
 function escapeRegExp(literal: string): string {
-  return literal.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
+  return literal.replace(/[.*+?^${}()|[\]\\-]/g, String.raw`\$&`);
+}
+
+/** A single login — empty unless it is disallowed. */
+function ownerOffenders(owner: string): string[] {
+  return ALLOWED_OWNERS.has(owner) ? [] : [`owner:${owner}`];
+}
+
+/** An `owner/repo` pair — both halves validated. */
+function pairOffenders(owner: string, repo?: string): string[] {
+  const out = ownerOffenders(owner);
+  if (repo && !repoAllowed(repo)) out.push(`repo:${repo}`);
+  return out;
+}
+
+/**
+ * Shapes with a recognizable form rather than a name: ticket references, a
+ * name glued to a number (another repo), and a repo half under a scrub owner.
+ */
+function scanShapes(source: string): string[] {
+  const out: string[] = [];
+  const withoutColours = source.replace(HEX_COLOUR, "");
+  for (const re of TICKET_PATTERNS) {
+    for (const m of withoutColours.matchAll(re)) out.push(`ticket:${m[1]}`);
+  }
+  // A declared dependency is a public upstream (`next#456`), not a leak.
+  for (const m of source.matchAll(CROSS_REPO_REF)) {
+    if (!repoAllowed(m[1]) && !DECLARED_DEPS.has(m[1].toLowerCase())) out.push(`ticket:${m[0]}`);
+  }
+  for (const m of source.matchAll(SCRUB_SURVIVOR)) {
+    if (!repoAllowed(m[2])) out.push(`repo:${stripTrailingDots(m[2])}`);
+  }
+  return out;
+}
+
+/** Structured `owner/repo` fields: `nameWithOwner:`, `repo:`, and github.com URLs. */
+function scanStructuredFields(source: string): string[] {
+  const out: string[] = [];
+  for (const re of [
+    /nameWithOwner:\s*["']([\w.-]+)(?:\/([\w.-]+))?["']/g,
+    /\brepo:\s*["']([\w.-]+)(?:\/([\w.-]+))?["']/g,
+  ]) {
+    for (const m of source.matchAll(re)) out.push(...pairOffenders(m[1], m[2]));
+  }
+  for (const m of source.matchAll(/github\.com\/([\w.-]+)(?:\/([\w.-]+))?/g)) {
+    // github.com/<user>.png is an avatar, not a repo path.
+    const first = m[1].replace(/\.(png|jpe?g|gif|svg)$/i, "");
+    if (IDENTITY_IN_SECOND_SEGMENT.has(first)) {
+      if (m[2]) out.push(...ownerOffenders(m[2]));
+    } else if (!GITHUB_RESERVED_PATHS.has(first)) {
+      out.push(...pairOffenders(first, m[2]));
+    }
+  }
+  return out;
+}
+
+/** Login fields: `login:`, `author:`, and the bracketed `owners` prop. */
+function scanLoginFields(source: string): string[] {
+  const out: string[] = [];
+  for (const re of [/\blogin:\s*["']([^"']+)["']/g, /\bauthor:\s*["']([^"']+)["']/g]) {
+    for (const m of source.matchAll(re)) out.push(...ownerOffenders(m[1]));
+  }
+  for (const m of source.matchAll(/owners=\{\[([^\]]+)\]\}/g)) {
+    for (const raw of m[1].split(",")) {
+      const name = raw.trim().replace(/^["']|["']$/g, "");
+      if (name) out.push(...ownerOffenders(name));
+    }
+  }
+  return out;
 }
 
 /**
  * Every disallowed identifier in `source`, as `"<kind>:<name>"`, deduplicated.
  *
- * The rules deliberately overlap — a `github.com/acme/<repo>` URL is also a scrub
- * survivor — so an identifier found twice is reported once. Callers
- * list offenders; none of them counts.
+ * The phases deliberately overlap — a `github.com/acme/<repo>` URL is also a scrub
+ * survivor — so an identifier found twice is reported once.
  */
 export function scanSource(source: string): string[] {
-  const bad: string[] = [];
-
-  const withoutColours = source.replace(HEX_COLOUR, "");
-  for (const re of TICKET_PATTERNS) {
-    for (const m of withoutColours.matchAll(re)) bad.push(`ticket:${m[1]}`);
-  }
-
-  // Reported as `ticket:` — it IS a foreign tracker reference, and that kind
-  // already has the right exemptions for the files that document these shapes.
-  // A declared dependency is a public upstream (`next#456`), not a leak.
-  for (const m of source.matchAll(CROSS_REPO_REF)) {
-    if (!repoAllowed(m[1]) && !DECLARED_DEPS.has(m[1].toLowerCase())) bad.push(`ticket:${m[0]}`);
-  }
-
-  for (const m of source.matchAll(SCRUB_SURVIVOR)) {
-    if (!repoAllowed(m[2])) bad.push(`repo:${m[2].replace(/\.+$/, "")}`);
-  }
-
-  const checkOwner = (owner: string) => {
-    if (!ALLOWED_OWNERS.has(owner)) bad.push(`owner:${owner}`);
-  };
-  const checkPair = (owner: string, repo?: string) => {
-    checkOwner(owner);
-    if (repo && !repoAllowed(repo)) bad.push(`repo:${repo}`);
-  };
-
-  // "owner/repo" (repo half optional) — both halves are validated.
-  for (const re of [
-    /nameWithOwner:\s*["']([\w.-]+)(?:\/([\w.-]+))?["']/g,
-    /\brepo:\s*["']([\w.-]+)(?:\/([\w.-]+))?["']/g,
-  ]) {
-    for (const m of source.matchAll(re)) checkPair(m[1], m[2]);
-  }
-
-  for (const m of source.matchAll(/github\.com\/([\w.-]+)(?:\/([\w.-]+))?/g)) {
-    // github.com/<user>.png is an avatar, not a repo path.
-    const first = m[1].replace(/\.(png|jpe?g|gif|svg)$/i, "");
-    if (IDENTITY_IN_SECOND_SEGMENT.has(first)) {
-      if (m[2]) checkOwner(m[2]);
-      continue;
-    }
-    if (GITHUB_RESERVED_PATHS.has(first)) continue;
-    checkPair(first, m[2]);
-  }
-
-  for (const re of [/\blogin:\s*["']([^"']+)["']/g, /\bauthor:\s*["']([^"']+)["']/g]) {
-    for (const m of source.matchAll(re)) checkOwner(m[1]);
-  }
-
-  // The owners prop: a bracketed list of logins.
-  for (const m of source.matchAll(/owners=\{\[([^\]]+)\]\}/g)) {
-    for (const raw of m[1].split(",")) {
-      const name = raw.trim().replace(/^["']|["']$/g, "");
-      if (name) checkOwner(name);
-    }
-  }
-
-  return [...new Set(bad)];
+  return [
+    ...new Set([...scanShapes(source), ...scanStructuredFields(source), ...scanLoginFields(source)]),
+  ];
 }
 
 /**
@@ -388,6 +414,21 @@ const NUL = "\u0000";
 const UNIT = "\u001f";
 
 /**
+ * git resolved to an absolute path in a fixed system directory, not via `$PATH`.
+ * A guard against identity leaks must not itself execute whatever `git` an
+ * attacker-writable `PATH` entry resolves to; the first existing candidate wins,
+ * and the bare-name fallback applies only where none is present.
+ */
+export function resolveGitBin(candidates: string[], exists: (p: string) => boolean): string {
+  return candidates.find(exists) ?? "git";
+}
+
+const GIT_BIN = resolveGitBin(
+  ["/usr/bin/git", "/bin/git", "/usr/local/bin/git", "/opt/homebrew/bin/git"],
+  existsSync,
+);
+
+/**
  * Every commit message reachable from HEAD, as `[sha, message]`.
  *
  * Throws on a shallow clone rather than scanning the single commit it can see. A
@@ -398,7 +439,7 @@ const UNIT = "\u001f";
  */
 export function readCommitMessages(root: string = ROOT): [string, string][] {
   const git = (...args: string[]) =>
-    execFileSync("git", ["-C", root, ...args], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
+    execFileSync(GIT_BIN, ["-C", root, ...args], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
 
   if (git("rev-parse", "--is-shallow-repository").trim() === "true") {
     throw new Error(

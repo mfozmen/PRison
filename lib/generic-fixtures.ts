@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, lstatSync } from "node:fs";
 import { join, relative } from "node:path";
 
@@ -22,9 +23,26 @@ import { join, relative } from "node:path";
  * is where a fixture copied from a live GraphQL `search` node keeps the real PR
  * number long after its `nameWithOwner` and `login` have been genericized.
  *
+ * Two further shapes are checked, both learned from a real escape: a private
+ * repository name reached the public repo in two commit messages.
+ *
+ *   * CROSS_REPO_REF — `some-service#66`. A number glued to a name is a reference
+ *     to *another* repository, and the name is right there. Note this needs no
+ *     digit floor: TICKET_PATTERNS requires four digits because a bare `#66`
+ *     could be anything, but `some-service#66` is unambiguous.
+ *   * SCRUB_SURVIVOR — `acme/<repo>`. A scrub rewrites the owner to a
+ *     fictional company and can leave the repository half behind; an unknown repo
+ *     under a *placeholder* owner is that half-finished rewrite, and nothing else.
+ *
+ * The guard also reads COMMIT MESSAGES, not just files (see scanCommitMessages).
+ * That is where the escaped name hid: no blob ever contained it, so a file-only
+ * scan was green while the identifier sat in the public history — and `release-it`
+ * was about to copy it into CHANGELOG.md.
+ *
  * Names in prose remain the reviewer's job, per REVIEW.md §1. A green run means
- * "no real name in a structured fixture field, and no foreign ticket reference
- * anywhere", not "no real name in the repo".
+ * "no real name in a structured fixture field, no foreign ticket reference, and
+ * no cross-repo reference or scrub survivor anywhere — in any file or commit
+ * message", not "no real name in the repo".
  *
  * Adding a name below is a deliberate act — do not add a real one.
  */
@@ -85,7 +103,25 @@ export const ALLOWED_REPOS = new Set([
   "PRison",
   // github.com/release-it/release-it — the tool's own repo, linked from RELEASING.md.
   "release-it",
+  // Generic dummy repositories in tracked-checks fixtures: acme/app, acme/backend, …
+  "app",
+  "backend",
+  "frontend",
 ]);
+
+/**
+ * The owners a scrub substitutes IN — fictional companies, never real ones.
+ * A repository name under one of these that is not in ALLOWED_REPOS is the
+ * signature of a rewrite that replaced the owner and forgot the repo.
+ *
+ * Deliberately a strict subset of ALLOWED_OWNERS, because every member also
+ * claims the token before a `/`:
+ *   * `mfozmen` — `mfozmen/<branch>` is how a merge commit names a branch.
+ *   * `org`     — `Org/StuckPr` is how a TypeScript union names two types.
+ *   * `example` — a common word and directory: `example/Button.tsx` is a path,
+ *                 not a leak, and no scrub of ours substitutes it.
+ */
+export const SCRUB_OWNERS = new Set(["acme", "globex", "initech", "widgets-inc"]);
 
 // Single-letter throwaway repos: acme/a, acme/b, …
 const THROWAWAY_REPO = /^[a-z]$/;
@@ -136,9 +172,44 @@ export const TICKET_SCAN_EXEMPT = new Set([
   "REVIEW.md",
 ]);
 
+const ALLOWED_REPOS_LOWER = new Set([...ALLOWED_REPOS].map((r) => r.toLowerCase()));
+
+/**
+ * Repo names are compared case-insensitively — `PRison` and `prison` are the same
+ * repository, and a guard that passed the second would be theatre. A trailing dot,
+ * as when a name ends a sentence, is stripped: it is punctuation, not the name.
+ *
+ * One predicate for every path: the structured `owner/repo` fields and the two
+ * prose detectors below. Two predicates over one set drift as the set grows.
+ */
 function repoAllowed(name: string): boolean {
-  return ALLOWED_REPOS.has(name) || THROWAWAY_REPO.test(name);
+  const bare = name.replace(/\.+$/, "").toLowerCase();
+  return ALLOWED_REPOS_LOWER.has(bare) || THROWAWAY_REPO.test(bare);
 }
+
+/**
+ * Names this repository legitimately references: its own declared dependencies.
+ * `next#456` or `vitest#42` in a commit is an upstream issue link, not a leaked
+ * private repo — but `some-service#456` is. Derived from package.json so the set
+ * never drifts from what the project actually depends on.
+ *
+ * Two accepted blind spots, both erring toward a harmless false negative:
+ *   * a private repo that happens to share a public dependency's exact name slips
+ *     through — negligible, and the collision would be a strange coincidence.
+ *   * a public project this repo does NOT depend on (`webpack#12`) is still
+ *     flagged, and a 4+ digit dependency ref (`next#12345`) is caught by
+ *     TICKET_PATTERNS regardless. Both surface as red CI on the PR, before merge,
+ *     and are cleared by rewording the commit — friction, not a leak.
+ */
+const DECLARED_DEPS: Set<string> = (() => {
+  const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as {
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  };
+  const names = [...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.devDependencies ?? {})];
+  // A scoped package `@scope/name` is referenced bare as `name` in an issue link.
+  return new Set(names.map((n) => n.replace(/^@[^/]+\//, "").toLowerCase()));
+})();
 
 /**
  * A hex colour is `#` plus 3, 4, 6, or 8 hex digits. An all-digit one (`#334155`,
@@ -174,13 +245,64 @@ const TICKET_PATTERNS: RegExp[] = [
   /\bnumber["']?\s*:\s*(\d{4,})/g,
 ];
 
-/** Every disallowed identifier in `source`, as `"<kind>:<name>"`. */
+/**
+ * `some-service#66` — a number glued to a name. The name IS the other repository,
+ * so it is caught however small the number: a bare `#66` could be anything, but
+ * `some-service#66` says which repo outright. This is the shape that escaped.
+ *
+ * Only 1–3 digits, because TICKET_PATTERNS already claims four or more. Splitting
+ * the range stops both rules from reporting `some-service#90210` twice.
+ *
+ * The lookbehind blocks a match starting mid-token — without it `some-service#66`
+ * would also match at `service#66`. It excludes `#`, so a `## Heading` cannot
+ * start one, and `/`, so a URL path cannot.
+ *
+ * A *spaced* `#66` is this repo's own PR, not a cross-repo reference, so only the
+ * glued form is caught. A name in DECLARED_DEPS is a public upstream link, not a
+ * leak, and is skipped (see the loop in scanSource).
+ */
+const CROSS_REPO_REF = /(?<![\w/#-])([A-Za-z][\w.-]*)#\d{1,3}\b/g;
+
+/**
+ * `acme/<repo>` — a placeholder owner still carrying a real repository name.
+ *
+ * Owners are escaped before they reach the alternation. None needs it today, but
+ * an owner with a `.` in it would otherwise become a wildcard, and a guard that
+ * silently widens is the failure this file exists to prevent.
+ */
+const SCRUB_SURVIVOR = new RegExp(
+  String.raw`(?<![\w/.-])(${[...SCRUB_OWNERS].map(escapeRegExp).join("|")})/([A-Za-z][\w.-]*)`,
+  "gi",
+);
+
+function escapeRegExp(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
+}
+
+/**
+ * Every disallowed identifier in `source`, as `"<kind>:<name>"`, deduplicated.
+ *
+ * The rules deliberately overlap — a `github.com/acme/<repo>` URL is also a scrub
+ * survivor — so an identifier found twice is reported once. Callers
+ * list offenders; none of them counts.
+ */
 export function scanSource(source: string): string[] {
   const bad: string[] = [];
 
   const withoutColours = source.replace(HEX_COLOUR, "");
   for (const re of TICKET_PATTERNS) {
     for (const m of withoutColours.matchAll(re)) bad.push(`ticket:${m[1]}`);
+  }
+
+  // Reported as `ticket:` — it IS a foreign tracker reference, and that kind
+  // already has the right exemptions for the files that document these shapes.
+  // A declared dependency is a public upstream (`next#456`), not a leak.
+  for (const m of source.matchAll(CROSS_REPO_REF)) {
+    if (!repoAllowed(m[1]) && !DECLARED_DEPS.has(m[1].toLowerCase())) bad.push(`ticket:${m[0]}`);
+  }
+
+  for (const m of source.matchAll(SCRUB_SURVIVOR)) {
+    if (!repoAllowed(m[2])) bad.push(`repo:${m[2].replace(/\.+$/, "")}`);
   }
 
   const checkOwner = (owner: string) => {
@@ -222,7 +344,7 @@ export function scanSource(source: string): string[] {
     }
   }
 
-  return bad;
+  return [...new Set(bad)];
 }
 
 /**
@@ -254,6 +376,57 @@ export function scanRepo(root: string = ROOT): string[] {
       if (!isTicket && NAME_SCAN_EXEMPT.has(rel)) continue;
       offenders.push(`${rel}: ${bad}`);
     }
+  }
+  return offenders;
+}
+
+// A commit message is free-form and contains blank lines, so records are separated
+// by NUL and the sha is split from the body by a unit separator — neither byte can
+// occur in a message. Both are emitted by git's own `%x00` / `%x1f` placeholders:
+// an argv string cannot carry a NUL, so the separator cannot come from this side.
+const NUL = "\u0000";
+const UNIT = "\u001f";
+
+/**
+ * Every commit message reachable from HEAD, as `[sha, message]`.
+ *
+ * Throws on a shallow clone rather than scanning the single commit it can see. A
+ * `git clone --depth 1` — which is what `actions/checkout` does by default — would
+ * otherwise make this guard silently vacuous, and a vacuous guard is worse than
+ * none: a green check that means nothing. `.github/workflows/ci.yml` therefore sets
+ * `fetch-depth: 0`.
+ */
+export function readCommitMessages(root: string = ROOT): [string, string][] {
+  const git = (...args: string[]) =>
+    execFileSync("git", ["-C", root, ...args], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
+
+  if (git("rev-parse", "--is-shallow-repository").trim() === "true") {
+    throw new Error(
+      "generic-fixtures: refusing to scan a shallow clone — it would pass vacuously. " +
+        "Fetch the full history (actions/checkout with `fetch-depth: 0`).",
+    );
+  }
+
+  return git("log", "--format=%H%x1f%B%x00")
+    .split(NUL)
+    .filter((entry) => entry.includes(UNIT))
+    .map((entry) => {
+      const cut = entry.indexOf(UNIT);
+      return [entry.slice(0, cut).trim().slice(0, 8), entry.slice(cut + 1)] as [string, string];
+    });
+}
+
+/**
+ * Disallowed identifiers in commit messages, as `"<sha>: <kind>:<name>"`.
+ *
+ * No exemptions: a commit message is never the place to document a leak pattern,
+ * and — unlike a file — it cannot be corrected afterwards without rewriting history
+ * and force-pushing. Catch it here, or retract the whole repository.
+ */
+export function scanCommitMessages(root: string = ROOT): string[] {
+  const offenders: string[] = [];
+  for (const [sha, message] of readCommitMessages(root)) {
+    for (const bad of scanSource(message)) offenders.push(`${sha}: ${bad}`);
   }
   return offenders;
 }

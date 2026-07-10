@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { scanRepo, scanSource } from "./generic-fixtures";
+import { scanCommitMessages, scanRepo, scanSource } from "./generic-fixtures";
 
 describe("scanSource", () => {
   // The guard is only worth having if it actually fires. These pin the two
@@ -112,7 +113,107 @@ describe("scanSource", () => {
     expect(scanSource("const PORT = 3000; const TIMEOUT_MS = 86_400_000;")).toEqual([]);
     expect(scanSource("zIndex: 1000")).toEqual([]);
   });
+
+  // A reference of this shape reached the public repo. Its number was two digits,
+  // so the four-digit ticket floor never saw it — but the name was glued to the "#".
+  it("catches a cross-repo reference however short its number", () => {
+    expect(scanSource('(e.g. some-service#66 showed "6d")')).toEqual(["ticket:some-service#66"]);
+    expect(scanSource("fixed by other-repo#7")).toEqual(["ticket:other-repo#7"]);
+  });
+
+  it("reports a glued four-digit reference once, not twice", () => {
+    expect(scanSource("regression: some-service#90210")).toEqual(["ticket:90210"]);
+  });
+
+  // This repo is a Next.js app; `next#456` is a public upstream issue link, not a
+  // private-repo leak. Declared dependencies are excluded so they don't brick CI.
+  it("lets a reference to a declared dependency through, but not an unknown repo", () => {
+    expect(scanSource("workaround for next#456")).toEqual([]);
+    expect(scanSource("bump after vitest#42")).toEqual([]);
+    expect(scanSource("see some-service#456")).toEqual(["ticket:some-service#456"]);
+  });
+
+  it("leaves a spaced reference and this repo's own name alone", () => {
+    expect(scanSource("this repo's own PRs are #67 and #68")).toEqual([]);
+    expect(scanSource("see PRison#3 and prison#4")).toEqual([]);
+    expect(scanSource("## Heading")).toEqual([]);
+    expect(scanSource("alpha#66")).toEqual([]);
+  });
+
+  // The other half of the same escape: the scrub replaced the owner and left the
+  // repository name standing.
+  it("catches a repo name left under a placeholder owner, in bare prose", () => {
+    expect(scanSource("typing it returned repos instead of acme/some-service.")).toEqual([
+      "repo:some-service",
+    ]);
+    expect(scanSource("globex/secret-service")).toEqual(["repo:secret-service"]);
+  });
+
+  it("does not read a branch name or a type union as owner/repo", () => {
+    // `mfozmen` is deliberately not a scrub owner: this is how merges name branches.
+    expect(scanSource("Merge pull request #1 from mfozmen/ci/publish-image")).toEqual([]);
+    // `org` is deliberately not a scrub owner: this is a TypeScript union.
+    expect(scanSource("function f(x: Org/StuckPr) {}")).toEqual([]);
+    expect(scanSource("the light/dark toggle")).toEqual([]);
+    expect(scanSource("acme/app and acme/api are placeholders")).toEqual([]);
+  });
 });
+
+describe("scanCommitMessages", () => {
+  // The escaped name never appeared in a blob, so the file scan was green while
+  // the identifier sat in two public commit messages — and release-it was about to
+  // copy one into CHANGELOG.md.
+  it("finds no real repository, org, or ticket in this repository's history", () => {
+    expect(scanCommitMessages()).toEqual([]);
+  });
+
+  it("scans every commit, not just the tip", () => {
+    const root = gitInit();
+    commit(root, "feat: first\n\nnothing to see here");
+    commit(root, "fix: second\n\n(e.g. some-service#66 showed the wrong age)");
+    commit(root, "chore: third\n\nstill clean");
+
+    const offenders = scanCommitMessages(root);
+    expect(offenders).toHaveLength(1);
+    expect(offenders[0]).toMatch(/^[0-9a-f]{8}: ticket:some-service#66$/);
+  });
+
+  // A vacuous guard is worse than none: it is a green check that means nothing.
+  it("refuses to scan a shallow clone rather than passing on one commit", () => {
+    const source = gitInit();
+    commit(source, "fix: leak\n\nsee some-service#66");
+    commit(source, "chore: innocent tip");
+
+    const shallow = mkdtempSync(join(tmpdir(), "prison-shallow-"));
+    execFileSync("git", ["clone", "--depth", "1", `file://${source}`, shallow], {
+      stdio: "ignore",
+    });
+
+    // Proof the shallow clone would otherwise hide the leak: it holds only the tip.
+    expect(execFileSync("git", ["-C", shallow, "rev-list", "--count", "HEAD"], {
+      encoding: "utf8",
+    }).trim()).toBe("1");
+
+    expect(() => scanCommitMessages(shallow)).toThrow(/shallow clone/);
+  });
+});
+
+function gitInit(): string {
+  const root = mkdtempSync(join(tmpdir(), "prison-git-"));
+  const run = (...args: string[]) => execFileSync("git", ["-C", root, ...args], { stdio: "ignore" });
+  run("init", "--initial-branch=main");
+  run("config", "user.email", "test@example.com");
+  run("config", "user.name", "Test");
+  // `git clone --depth 1` refuses a local path; file:// makes it a real fetch.
+  run("config", "uploadpack.allowFilter", "true");
+  return root;
+}
+
+function commit(root: string, message: string): void {
+  writeFileSync(join(root, "f.txt"), message);
+  execFileSync("git", ["-C", root, "add", "f.txt"], { stdio: "ignore" });
+  execFileSync("git", ["-C", root, "commit", "--no-gpg-sign", "-m", message], { stdio: "ignore" });
+}
 
 describe("scanRepo", () => {
   it("finds no real GitHub org, repo, or user login in any structured fixture field", () => {

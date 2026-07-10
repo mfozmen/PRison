@@ -26,23 +26,41 @@ literals by hand. `lib/generic-fixtures.test.ts` checks this with an
 out. If that test fails, do not add the offending name to the allowlist: change
 the fixture.
 
+**Where the guard looks.** Every scannable file, **and every commit message
+reachable from `HEAD`**. A file-only scan was green while a real repository name
+sat in two commit messages of the published history — no blob ever contained it.
+CI checks out with `fetch-depth: 0` for this; on a shallow clone the guard throws
+rather than pass on the one commit it can see.
+
 **What the guard covers.** *Names* only in structured fields — the owner and
 repository halves of `nameWithOwner:` / `repo:` / `github.com/<owner>/<repo>`,
 plus `login:`, `author:`, and the `owners` prop. *Ticket references* anywhere, because
-those have a shape rather than a name: `service#90210`, `Fixes #90210`,
-`/pull/90211`, `number: 90210`, `"number": 90210`, and GitHub-minted anchor ids
-(`discussion_r…`, `issuecomment-…`, `pullrequestreview-…`).
+those have a shape rather than a name: `service#NNNNN`, `Fixes #NNNNN`,
+`/pull/NNNNN`, `number: NNNNN`, `"number": NNNNN`, and GitHub-minted anchor ids
+(`discussion_r…`, `issuecomment-…`, `pullrequestreview-…`). Plus two shapes that
+carry a *name*, learned from a real escape:
 
-**What it cannot cover:** a *name* in free-form prose — a code comment, an
-`it(...)` description, a commit message, or a string like
-`` message: "`someone` forbids access" ``. No allowlist can. A green run means
-"no real name in a structured field, and no foreign ticket reference anywhere",
-not "no real name in the repo". **Names in prose are the reviewer's job** — that
-is rule 1's main reason for existing.
+- **`service#66`** — a number glued to a name references another repository, and
+  names it. Any number of digits; a *spaced* `#66` is one of ours, and a name that
+  is a declared dependency (`next#456`) is a public upstream link, not a leak.
+- **`acme/<repo>`** — a placeholder owner with an unknown repository half is a
+  scrub that rewrote the owner and forgot the repo.
+
+Write invented numbers as `NNNNN`, not as a plausible five-digit one. Everything
+here documents a shape; the guard reads its own documentation.
+
+**What it cannot cover:** a bare *name* in free-form prose — a code comment, an
+`it(...)` description, or a string like `` message: "`someone` forbids access" ``.
+No allowlist can. A green run means "no real name in a structured field, no
+foreign ticket reference, and no cross-repo reference or scrub survivor — in any
+file or commit message", not "no real name in the repo". **Bare names in prose are
+the reviewer's job** — that is rule 1's main reason for existing.
 
 > A commit message cannot be un-published. Git history is rewritable only with a
-> force-push, and GitHub keeps orphaned commits reachable by SHA long after. Catch
-> these before the commit, not after.
+> force-push, and GitHub keeps orphaned commits reachable by SHA long after — a
+> merged PR's `refs/pull/N/head` holds every ancestor, so a force-push of `main`
+> retracts nothing. Deleting and recreating the repository is the only full
+> retraction, and it has been needed once. Catch these before the commit.
 
 Reviewer: read the diff for identifiers that look real. A name that is plausibly a
 private repo (`some-service`, `internal-api`) or a person (`jdoe`, `mfahri`) is a

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.0](https://github.com/mfozmen/PRison/compare/v1.0.0...v1.1.0) (2026-07-27)
+
+### Features
+
+* add a Recently merged / closed PR history section ([#3](https://github.com/mfozmen/PRison/issues/3)) ([7c11311](https://github.com/mfozmen/PRison/commit/7c113116e6d5d92fe54da6613b7b8fb7ad980471))
+
 ## 1.0.0 (2026-07-10)
 
 ### Features

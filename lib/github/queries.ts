@@ -1,19 +1,25 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Raw GraphQL responses are intentionally untyped at the boundary; parsers
 // convert them to domain types as the first step.
-import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment } from "@/lib/types";
+import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr } from "@/lib/types";
 
 // scope is optional: when omitted, the search spans every repo the token can
 // see (the user's personal account plus all accessible organizations).
 // Callers pass a ready-made qualifier string such as "org:acme" or "user:mfozmen".
-export function searchQuery(kind: "author" | "review" | "ready", scope?: string): string {
+export function searchQuery(kind: "author" | "review" | "ready" | "closed", scope?: string): string {
   const scopePart = scope ? ` ${scope}` : "";
   // "ready" fetches all of the user's open PRs; parseReadyPrs then keeps the
   // ones GitHub reports as mergeable now (mergeStateStatus CLEAN, not draft).
   // We do NOT filter on review:approved here — a CLEAN PR is already mergeable
   // (including any required review), and some repos don't require review.
   const who = kind === "review" ? "review-requested:@me" : "author:@me";
-  return `is:open is:pr ${who}${scopePart}`;
+  // "closed" fetches the user's finished PRs (merged is a subset of closed).
+  const state = kind === "closed" ? "is:closed" : "is:open";
+  // GitHub search has no merge-order sort; sort:updated-desc just biases the
+  // fixed 50-row window toward recent activity. parseClosedPrs' consumer
+  // re-sorts by endedAt client-side for true newest-close-first order.
+  const sort = kind === "closed" ? " sort:updated-desc" : "";
+  return `${state} is:pr ${who}${scopePart}${sort}`;
 }
 
 export const VIEWER_QUERY = `query { viewer { login } }`;
@@ -285,6 +291,30 @@ export const READY_PRS_QUERY = `
       } }
     }
   }`;
+
+export const CLOSED_PRS_QUERY = `
+  query($q: String!) {
+    search(query: $q, type: ISSUE, first: 50) {
+      nodes { ... on PullRequest {
+        id title url number merged mergedAt closedAt
+        repository { nameWithOwner }
+      } }
+    }
+  }`;
+
+export function parseClosedPrs(raw: any): ClosedPr[] {
+  return (raw?.search?.nodes ?? [])
+    .filter((n: any) => n?.id)
+    .map((n: any) => ({
+      id: n.id,
+      title: n.title,
+      url: n.url,
+      number: n.number,
+      repo: n.repository?.nameWithOwner ?? "",
+      merged: !!n.merged,
+      endedAt: n.mergedAt ?? n.closedAt ?? "",
+    } as ClosedPr));
+}
 
 export const REPO_SEARCH_QUERY = `
   query($q: String!) {

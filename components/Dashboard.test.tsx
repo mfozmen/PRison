@@ -83,20 +83,22 @@ const ORPHAN_COMMENT = {
 };
 
 function okFetch() {
-  // FOUR-WAY: pr-comments → [], ready → [READY_PR], stuck → [STUCK_PR], else (review) → [REVIEW_PR]
+  // FIVE-WAY: closed-prs → [], pr-comments → [], ready → [READY_PR], stuck → [STUCK_PR], else (review) → [REVIEW_PR]
   return vi.fn((url: string) =>
     Promise.resolve({
       ok: true,
       headers: { get: () => null },
       json: () =>
         Promise.resolve(
-          url.includes("pr-comments")
+          url.includes("closed")
             ? []
-            : url.includes("ready")
-              ? [READY_PR]
-              : url.includes("stuck")
-                ? [STUCK_PR]
-                : [REVIEW_PR],
+            : url.includes("pr-comments")
+              ? []
+              : url.includes("ready")
+                ? [READY_PR]
+                : url.includes("stuck")
+                  ? [STUCK_PR]
+                  : [REVIEW_PR],
         ),
     }),
   ) as unknown as typeof fetch;
@@ -110,13 +112,15 @@ function fetchWithComments(comments: unknown[]) {
       headers: { get: () => null },
       json: () =>
         Promise.resolve(
-          url.includes("pr-comments")
-            ? comments
-            : url.includes("ready")
-              ? []
-              : url.includes("stuck")
-                ? [STUCK_PR]
-                : [],
+          url.includes("closed")
+            ? []
+            : url.includes("pr-comments")
+              ? comments
+              : url.includes("ready")
+                ? []
+                : url.includes("stuck")
+                  ? [STUCK_PR]
+                  : [],
         ),
     }),
   ) as unknown as typeof fetch;
@@ -129,7 +133,43 @@ function partialFetch() {
       headers: { get: (h: string) => (url.includes("stuck") && h === "X-Partial" ? "1" : null) },
       json: () =>
         Promise.resolve(
-          url.includes("ready") ? [READY_PR] : url.includes("stuck") ? [STUCK_PR] : [REVIEW_PR],
+          url.includes("closed")
+            ? []
+            : url.includes("ready") ? [READY_PR] : url.includes("stuck") ? [STUCK_PR] : [REVIEW_PR],
+        ),
+    }),
+  ) as unknown as typeof fetch;
+}
+
+// N closed PRs, newest-close first (endedAt decreases as the index grows), so
+// sortByAgeDesc keeps "closed pr 0" at the top.
+function makeClosed(n: number) {
+  const base = Date.UTC(2026, 5, 25, 0, 0, 0);
+  return Array.from({ length: n }, (_, i) => ({
+    id: `c${i}`,
+    title: `closed pr ${i}`,
+    url: `https://github.com/acme/b/pull/${100 + i}`,
+    number: 100 + i,
+    repo: "acme/b",
+    merged: i % 2 === 0,
+    endedAt: new Date(base - i * 86_400_000).toISOString(),
+  }));
+}
+
+// Serves the closed list on /api/closed-prs; the other four lists stay empty
+// except stuck, so unrelated sections don't interfere.
+function fetchWithClosed(closed: unknown[]) {
+  return vi.fn((url: string) =>
+    Promise.resolve({
+      ok: true,
+      headers: { get: () => null },
+      json: () =>
+        Promise.resolve(
+          url.includes("closed")
+            ? closed
+            : url.includes("stuck")
+              ? [STUCK_PR]
+              : [],
         ),
     }),
   ) as unknown as typeof fetch;
@@ -1056,8 +1096,8 @@ describe("Dashboard", () => {
       await waitFor(() => {
         const after = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
           .length;
-        // One refresh = stuck-prs + review-requests + ready-to-merge + pr-comments.
-        expect(after).toBe(before + 4);
+        // One refresh = stuck-prs + review-requests + ready-to-merge + pr-comments + closed-prs.
+        expect(after).toBe(before + 5);
       });
     });
 
@@ -1532,10 +1572,10 @@ describe("Dashboard", () => {
       const refreshButton = screen.getByRole("button", { name: /^refresh$/i });
       await waitFor(() => expect(refreshButton).toBeEnabled());
       fireEvent.click(refreshButton);
-      // 4 fetches on mount + 4 on refresh (stuck + review + ready + comments) = 8 total.
+      // 5 fetches on mount + 5 on refresh (stuck + review + ready + comments + closed) = 10 total.
       // Use waitFor so the assertion retries until all async refresh fetches register.
       await waitFor(() =>
-        expect(global.fetch as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(8),
+        expect(global.fetch as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(10),
       );
     });
 
@@ -1700,5 +1740,91 @@ describe("Dashboard — comments awaiting your reply", () => {
       const headers = screen.getAllByTestId("group-header");
       expect(headers.some((h) => h.textContent?.includes("acme/b"))).toBe(true);
     });
+  });
+
+  it("shows the closed-PR section collapsed by default with a total count", async () => {
+    global.fetch = fetchWithClosed(makeClosed(20));
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("closed-count-badge")).toHaveTextContent("20"),
+    );
+    // Collapsed: no rows rendered.
+    expect(screen.queryByText("closed pr 0")).not.toBeInTheDocument();
+  });
+
+  it("expands to the first 15, then Load more reveals the rest (newest first)", async () => {
+    global.fetch = fetchWithClosed(makeClosed(20));
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("closed-count-badge")).toHaveTextContent("20"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /recently merged/i }));
+    expect(screen.getByText("closed pr 0")).toBeInTheDocument();
+    expect(screen.getByText("closed pr 14")).toBeInTheDocument();
+    expect(screen.queryByText("closed pr 15")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /load more/i }));
+    expect(screen.getByText("closed pr 15")).toBeInTheDocument();
+    expect(screen.getByText("closed pr 19")).toBeInTheDocument();
+  });
+
+  it("persists the closed-section open state to localStorage", async () => {
+    global.fetch = fetchWithClosed(makeClosed(3));
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("closed-count-badge")).toHaveTextContent("3"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /recently merged/i }));
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.closedOpen")).toBe("true"),
+    );
+  });
+
+  it("hydrates the closed section open from localStorage", async () => {
+    localStorage.setItem("prison.closedOpen", "true");
+    global.fetch = fetchWithClosed(makeClosed(2));
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("closed pr 0")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("closed pr 1")).toBeInTheDocument();
+  });
+
+  it("shows an empty state when the section is open with no closed PRs", async () => {
+    localStorage.setItem("prison.closedOpen", "true");
+    global.fetch = fetchWithClosed([]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText("No closed PRs")).toBeInTheDocument(),
+    );
+  });
+
+  it("shows an error banner when the closed-PRs fetch fails", async () => {
+    global.fetch = vi.fn((url: string) =>
+      url.includes("closed")
+        ? Promise.reject(new Error("network error"))
+        : url.includes("stuck")
+          ? Promise.resolve({ ok: true, headers: { get: () => null }, json: () => Promise.resolve([STUCK_PR]) })
+          : Promise.resolve({ ok: true, headers: { get: () => null }, json: () => Promise.resolve([]) }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText(/failed to load closed PRs/i)).toBeInTheDocument(),
+    );
+    // Unrelated sections still render.
+    expect(screen.getByText("stuck pr")).toBeInTheDocument();
+  });
+
+  it("shows an error banner on a non-ok closed-PRs response", async () => {
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve(
+        url.includes("closed")
+          ? { ok: false, status: 502, headers: { get: () => null }, json: () => Promise.resolve([]) }
+          : { ok: true, headers: { get: () => null }, json: () => Promise.resolve(url.includes("stuck") ? [STUCK_PR] : []) },
+      ),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByText(/failed to load closed PRs/i)).toBeInTheDocument(),
+    );
   });
 });

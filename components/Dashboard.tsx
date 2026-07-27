@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useTransition } from "react";
-import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment } from "@/lib/types";
-import { sortByAgeAsc } from "@/lib/prioritize";
+import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr } from "@/lib/types";
+import { sortByAgeAsc, sortByAgeDesc } from "@/lib/prioritize";
 import { suggestStuck, suggestReview, suggestReady, suggestComment, needsReview, stuckGroupKeys, reviewDecisionLabel } from "@/lib/suggest";
 import { PrList } from "./PrList";
 import { PrRow } from "./PrRow";
+import { ClosedPrRow } from "./ClosedPrRow";
 import { Header } from "./Header";
 import { TrackedChecksSettings } from "./TrackedChecksSettings";
 import { type TrackedChecks, EMPTY_TRACKED, parseTracked, awaitingChecks } from "@/lib/tracked-checks";
@@ -19,6 +20,11 @@ export interface DashboardProps {
 // (the user's personal account plus all accessible orgs). Selecting an org
 // narrows the view.
 const ALL = "";
+
+// Client-side page size for the closed-PR list: initial rows shown and the
+// "Load more" increment. The whole list is fetched up front (see CLOSED_PRS_QUERY,
+// first: 50), so this only governs how much is revealed at once.
+const CLOSED_PAGE_SIZE = 15;
 
 export function Dashboard({ orgs, login }: DashboardProps) {
   const [selectedOrg, setSelectedOrg] = useState<string>(ALL);
@@ -36,10 +42,16 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [reviewReqs, setReviewReqs] = useState<ReviewRequest[]>([]);
   const [readyPrs, setReadyPrs] = useState<ReadyPr[]>([]);
   const [comments, setComments] = useState<PrComment[]>([]);
+  const [closedPrs, setClosedPrs] = useState<ClosedPr[]>([]);
   const [stuckError, setStuckError] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [readyError, setReadyError] = useState<string | null>(null);
   const [commentsError, setCommentsError] = useState<string | null>(null);
+  const [closedError, setClosedError] = useState<string | null>(null);
+  // Closed PRs are history, not a work queue, so the section starts collapsed;
+  // closedVisible drives the client-side "Load more" (15 at a time).
+  const [closedOpen, setClosedOpen] = useState(false);
+  const [closedVisible, setClosedVisible] = useState(CLOSED_PAGE_SIZE);
   const [partial, setPartial] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -57,7 +69,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             ? `?org=${encodeURIComponent(org)}`
             : "";
       startTransition(async () => {
-        const [stuckResult, reviewResult, readyResult, commentsResult] = await Promise.allSettled([
+        const [stuckResult, reviewResult, readyResult, commentsResult, closedResult] = await Promise.allSettled([
           fetch(`/api/stuck-prs${qs}`).then(async (r) => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const partial = r.headers?.get?.("X-Partial") === "1";
@@ -80,6 +92,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const partial = r.headers?.get?.("X-Partial") === "1";
             const items = (await r.json()) as PrComment[];
+            return { items, partial };
+          }),
+          fetch(`/api/closed-prs${qs}`).then(async (r) => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const partial = r.headers?.get?.("X-Partial") === "1";
+            const items = (await r.json()) as ClosedPr[];
             return { items, partial };
           }),
         ]);
@@ -112,11 +130,20 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             : null,
         );
         setComments(commentsResult.status === "fulfilled" ? commentsResult.value.items : []);
+        setClosedError(
+          closedResult.status === "rejected"
+            ? "Failed to load closed PRs. Please retry."
+            : null,
+        );
+        setClosedPrs(closedResult.status === "fulfilled" ? closedResult.value.items : []);
+        // Fresh list for this scope, so collapse the reveal back to the first page.
+        setClosedVisible(CLOSED_PAGE_SIZE);
         const anyPartial =
           (stuckResult.status === "fulfilled" && stuckResult.value.partial) ||
           (reviewResult.status === "fulfilled" && reviewResult.value.partial) ||
           (readyResult.status === "fulfilled" && readyResult.value.partial) ||
-          (commentsResult.status === "fulfilled" && commentsResult.value.partial);
+          (commentsResult.status === "fulfilled" && commentsResult.value.partial) ||
+          (closedResult.status === "fulfilled" && closedResult.value.partial);
         setPartial(anyPartial);
       });
     },
@@ -131,6 +158,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     const storedShowBots = localStorage.getItem("prison.showBots");
     const storedGroupBy = localStorage.getItem("prison.groupBy");
     const storedTracked = localStorage.getItem("prison.trackedChecks");
+    const storedClosedOpen = localStorage.getItem("prison.closedOpen");
     startTransition(() => {
       if (
         stored === ALL ||
@@ -147,6 +175,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       }
       if (storedGroupBy === "repo" || storedGroupBy === "check") {
         setGroupBy(storedGroupBy);
+      }
+      if (storedClosedOpen === "true") {
+        setClosedOpen(true);
       }
       // "blocker" (old value) falls through → stays "flat" (default)
       setTracked(parseTracked(storedTracked));
@@ -179,6 +210,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     if (!hydrated) return;
     localStorage.setItem("prison.trackedChecks", JSON.stringify(tracked));
   }, [tracked, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.closedOpen", String(closedOpen));
+  }, [closedOpen, hydrated]);
 
   const availableRepos = Array.from(
     new Set([
@@ -227,6 +263,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     comments.filter((c) => visiblePrIds.has(c.prId) && (showBots || !c.isBot)),
     (c) => c.commentedAt,
   );
+
+  // Newest-close first; the section renders only the first closedVisible rows.
+  const sortedClosed = sortByAgeDesc(closedPrs, (pr) => pr.endedAt);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -670,6 +709,75 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               }}
             />
           </div>
+        </div>
+        {/* Recently merged / closed — history, collapsed by default. Not a PrList:
+            its count badge would show the sliced (revealed) count, but the header
+            shows how many were fetched — the most recent up to CLOSED_PRS_QUERY's
+            first: 50, not necessarily the user's all-time total. */}
+        <div className="flex flex-col gap-4">
+          <button
+            type="button"
+            aria-expanded={closedOpen}
+            onClick={() => setClosedOpen((o) => !o)}
+            className="flex min-h-[44px] w-full items-center gap-2 rounded-md text-left focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+          >
+            <svg
+              aria-hidden="true"
+              className={`shrink-0 text-muted transition-transform ${closedOpen ? "rotate-90" : ""}`}
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M4 2.5 8 6l-4 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+              Recently merged / closed
+            </h2>
+            <span
+              data-testid="closed-count-badge"
+              className="rounded-full bg-border px-2 py-0.5 font-mono text-xs tabular-nums text-foreground ring-1 ring-inset ring-border"
+            >
+              {sortedClosed.length}
+            </span>
+          </button>
+          {closedError && (
+            <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+              <span>{closedError}</span>
+              <button
+                onClick={() => fetchData(selectedOrg)}
+                className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {closedOpen &&
+            (sortedClosed.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">
+                No closed PRs
+              </p>
+            ) : (
+              <>
+                <ul className="flex flex-col gap-2">
+                  {sortedClosed.slice(0, closedVisible).map((pr) => (
+                    <li key={pr.id}>
+                      <ClosedPrRow pr={pr} now={new Date()} />
+                    </li>
+                  ))}
+                </ul>
+                {sortedClosed.length > closedVisible && (
+                  <button
+                    type="button"
+                    onClick={() => setClosedVisible((v) => v + CLOSED_PAGE_SIZE)}
+                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-95 dark:hover:brightness-110 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                  >
+                    Load more (showing {closedVisible} of {sortedClosed.length})
+                  </button>
+                )}
+              </>
+            ))}
         </div>
       </main>
     </div>

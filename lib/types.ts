@@ -58,4 +58,17 @@ export type PrComment = {
   commentedAt: string; // ISO — when the ball landed in the viewer's court; drives the age badge
 };
 
+// One of the viewer's own closed PRs (author:@me is:closed) — merged or closed
+// without merging. Powers the "Recently merged / closed" history section, newest
+// close first. See parseClosedPrs.
+export type ClosedPr = {
+  id: string;
+  title: string;
+  url: string;
+  number: number;
+  repo: string;
+  merged: boolean;   // true = merged, false = closed without merging
+  endedAt: string;   // ISO — mergedAt ?? closedAt; drives sort + "merged/closed Xd ago"
+};
+
 export type AgeBucket = "fresh" | "warning" | "urgent";

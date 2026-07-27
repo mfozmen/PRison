@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs, parseReadyPrs, parseRepoSearch, parsePrComments } from "./queries";
+import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs, parseReadyPrs, parseRepoSearch, parsePrComments, parseClosedPrs } from "./queries";
 
 describe("searchQuery", () => {
   it("scopes author search to the org", () => {
@@ -23,6 +23,74 @@ describe("searchQuery", () => {
   });
   it("ready kind with user scope appends user qualifier", () => {
     expect(searchQuery("ready", "user:mfozmen")).toBe("is:open is:pr author:@me user:mfozmen");
+  });
+  it("closed kind emits is:closed author:@me sorted by recent update, scoped", () => {
+    expect(searchQuery("closed", "org:acme")).toBe(
+      "is:closed is:pr author:@me org:acme sort:updated-desc",
+    );
+  });
+  it("closed kind without scope spans everything, still sorted", () => {
+    expect(searchQuery("closed")).toBe("is:closed is:pr author:@me sort:updated-desc");
+  });
+});
+
+describe("parseClosedPrs", () => {
+  it("maps merged and closed-unmerged PRs, preferring mergedAt for endedAt", () => {
+    const raw = {
+      search: {
+        nodes: [
+          {
+            id: "1",
+            title: "merged one",
+            url: "https://github.com/acme/b/pull/1",
+            number: 1,
+            merged: true,
+            mergedAt: "2026-06-25T00:00:00Z",
+            closedAt: "2026-06-25T00:00:01Z",
+            repository: { nameWithOwner: "acme/b" },
+          },
+          {
+            id: "2",
+            title: "closed unmerged",
+            url: "https://github.com/acme/b/pull/2",
+            number: 2,
+            merged: false,
+            mergedAt: null,
+            closedAt: "2026-06-20T00:00:00Z",
+            repository: { nameWithOwner: "acme/b" },
+          },
+        ],
+      },
+    };
+    expect(parseClosedPrs(raw)).toEqual([
+      {
+        id: "1",
+        title: "merged one",
+        url: "https://github.com/acme/b/pull/1",
+        number: 1,
+        repo: "acme/b",
+        merged: true,
+        endedAt: "2026-06-25T00:00:00Z",
+      },
+      {
+        id: "2",
+        title: "closed unmerged",
+        url: "https://github.com/acme/b/pull/2",
+        number: 2,
+        repo: "acme/b",
+        merged: false,
+        endedAt: "2026-06-20T00:00:00Z",
+      },
+    ]);
+  });
+  it("drops nodes without an id (non-PR search hits)", () => {
+    const raw = { search: { nodes: [{}, { title: "no id" }, { id: "3", number: 3 }] } };
+    const parsed = parseClosedPrs(raw);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].id).toBe("3");
+  });
+  it("returns an empty array when search is missing", () => {
+    expect(parseClosedPrs({})).toEqual([]);
   });
 });
 

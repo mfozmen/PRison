@@ -1077,6 +1077,35 @@ describe("parseReadyPrs", () => {
     expect(result[0].viaBlocked).toBe(true);
   });
 
+  it("tolerates a CLEAN PR with no commits/repository: empty repo, empty readySince from updatedAt fallback chain", () => {
+    const pr = makePr({ commits: undefined, repository: undefined, updatedAt: undefined });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result).toHaveLength(1);
+    expect(result[0].repo).toBe("");
+    expect(result[0].readySince).toBe("");
+    expect(result[0].checkNames).toEqual([]);
+  });
+
+  it("falls back to updatedAt for readySince when the commit has no pushedDate/committedDate", () => {
+    const pr = makePr({ commits: { nodes: [{ commit: {} }] } });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result[0].readySince).toBe("2026-06-20T00:00:00Z");
+  });
+
+  it("treats a CheckRun with an empty-string name as unnamed (excluded from checkNames)", () => {
+    const pr = makePr({
+      commits: { nodes: [{ commit: {
+        pushedDate: "2026-06-25T00:00:00Z",
+        statusCheckRollup: { state: "SUCCESS", contexts: { nodes: [
+          { name: "", status: "COMPLETED", conclusion: "SUCCESS" },
+          { name: "build", status: "COMPLETED", conclusion: "SUCCESS" },
+        ] } },
+      } }] },
+    });
+    const result = parseReadyPrs({ search: { nodes: [pr] } });
+    expect(result[0].checkNames).toEqual(["build"]);
+  });
+
   it("BLOCKED + PENDING rollupState + CHANGES_REQUESTED → excluded from ready", () => {
     const pr = makePr({
       mergeStateStatus: "BLOCKED",
@@ -1373,5 +1402,46 @@ describe("parsePrComments", () => {
   it("returns [] when search nodes are absent", () => {
     expect(parsePrComments({}, "mfozmen")).toEqual([]);
     expect(parsePrComments(null, "mfozmen")).toEqual([]);
+  });
+
+  it("skips a PR with no reviewThreads key without crashing", () => {
+    const noThreads = { search: { nodes: [{ id: "PR_1", number: 2, url: "u" }] } };
+    expect(parsePrComments(noThreads, "mfozmen")).toEqual([]);
+  });
+
+  it("falls back for every nullable field: comment url → PR url, missing repo/path/body/createdAt → empty", () => {
+    const sparse = {
+      search: {
+        nodes: [
+          {
+            id: "PR_1",
+            number: 2,
+            url: "https://gh/acme/b/pull/2",
+            reviewThreads: {
+              nodes: [
+                {
+                  id: "t1",
+                  isResolved: false,
+                  comments: { nodes: [{ author: { login: "alice", __typename: "User" } }] },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    };
+    const [c] = parsePrComments(sparse, "mfozmen");
+    expect(c).toEqual({
+      id: "t1",
+      prId: "PR_1",
+      url: "https://gh/acme/b/pull/2",
+      repo: "",
+      number: 2,
+      author: "alice",
+      isBot: false,
+      path: "",
+      preview: "",
+      commentedAt: "",
+    });
   });
 });

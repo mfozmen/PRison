@@ -37,11 +37,7 @@ describe("EnvSignIn", () => {
 
     render(<EnvSignIn />);
 
-    await waitFor(() =>
-      expect(
-        screen.getByLabelText(/personal access token/i),
-      ).toBeInTheDocument(),
-    );
+    expect(await screen.findByLabelText(/personal access token/i)).toBeInTheDocument();
 
     expect(window.location.reload).not.toHaveBeenCalled();
   });
@@ -56,11 +52,7 @@ describe("EnvSignIn", () => {
 
     render(<EnvSignIn />);
 
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: /sign in with github cli/i }),
-      ).toBeInTheDocument(),
-    );
+    expect(await screen.findByRole("button", { name: /sign in with github cli/i })).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /sign in with the host token/i }),
     ).toBeNull();
@@ -73,11 +65,7 @@ describe("EnvSignIn", () => {
 
     render(<EnvSignIn />);
 
-    await waitFor(() =>
-      expect(
-        screen.getByLabelText(/personal access token/i),
-      ).toBeInTheDocument(),
-    );
+    expect(await screen.findByLabelText(/personal access token/i)).toBeInTheDocument();
 
     expect(window.location.reload).not.toHaveBeenCalled();
   });

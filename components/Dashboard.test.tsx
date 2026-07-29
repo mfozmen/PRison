@@ -183,9 +183,7 @@ beforeEach(() => {
 describe("Dashboard", () => {
   it("loads both lists across all orgs on mount (no org scope)", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     expect(screen.getByText("review pr")).toBeInTheDocument();
     // Default selection is "All", so requests carry no org param.
     const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
@@ -195,9 +193,7 @@ describe("Dashboard", () => {
 
   it("scopes the fetch and persists when an org is selected", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "beta" } });
     await waitFor(() =>
       expect(localStorage.getItem("prison.org")).toBe("beta"),
@@ -225,9 +221,7 @@ describe("Dashboard", () => {
           : Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("review pr")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("review pr")).toBeInTheDocument();
     expect(screen.getByText(/failed to load stuck prs/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
   });
@@ -241,9 +235,7 @@ describe("Dashboard", () => {
           : Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText(/failed to load stuck prs/i)).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/failed to load stuck prs/i)).toBeInTheDocument();
   });
 
   it("shows an error banner when the review fetch fails", async () => {
@@ -255,9 +247,7 @@ describe("Dashboard", () => {
           : Promise.resolve({ ok: true, json: () => Promise.resolve([STUCK_PR]) }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     expect(screen.getByText(/failed to load review requests/i)).toBeInTheDocument();
   });
 
@@ -278,9 +268,7 @@ describe("Dashboard", () => {
     const retry = await screen.findByRole("button", { name: /retry/i });
     fail = false;
     fireEvent.click(retry);
-    await waitFor(() =>
-      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     expect(screen.queryByText(/failed to load stuck prs/i)).not.toBeInTheDocument();
   });
 
@@ -327,22 +315,16 @@ describe("Dashboard", () => {
     await waitFor(() => expect(resolvers["beta"]).toBeDefined());
 
     resolvers["beta"]();
-    await waitFor(() =>
-      expect(screen.getByText("stuck-beta")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("stuck-beta")).toBeInTheDocument();
     // The stale "All" response now resolves and must be ignored.
     resolvers["all"]();
-    await waitFor(() =>
-      expect(screen.getByText("stuck-beta")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("stuck-beta")).toBeInTheDocument();
     expect(screen.queryByText("stuck-all")).not.toBeInTheDocument();
   });
 
   it("selecting the personal option fetches with ?user= and persists", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "testuser" } });
     await waitFor(() =>
       expect(localStorage.getItem("prison.org")).toBe("testuser"),
@@ -368,9 +350,7 @@ describe("Dashboard", () => {
 
   it("encodes the org name in the request URLs", async () => {
     render(<Dashboard orgs={[{ login: "a b", avatarUrl: "x" }]} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "a b" } });
     await waitFor(() => {
       const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
@@ -380,9 +360,7 @@ describe("Dashboard", () => {
 
   it("shows a failing check name in the stuck detail", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("build")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("build")).toBeInTheDocument();
   });
 
   it("shows a pending check name in the stuck detail", async () => {
@@ -402,9 +380,7 @@ describe("Dashboard", () => {
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("lint")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("lint")).toBeInTheDocument();
   });
 
   it("truncates to 4 named checks and shows a +N more overflow", async () => {
@@ -424,9 +400,7 @@ describe("Dashboard", () => {
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("f1")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("f1")).toBeInTheDocument();
     // First 2 failing + first 2 pending shown; the rest collapse into overflow.
     expect(screen.getByText("f2")).toBeInTheDocument();
     expect(screen.getByText("p1")).toBeInTheDocument();
@@ -454,9 +428,7 @@ describe("Dashboard", () => {
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("f1")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("f1")).toBeInTheDocument();
     // 4 total (not > 4): every name is shown, no truncation, no overflow chip.
     expect(screen.getByText("f2")).toBeInTheDocument();
     expect(screen.getByText("f3")).toBeInTheDocument();
@@ -481,9 +453,7 @@ describe("Dashboard", () => {
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("f1")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("f1")).toBeInTheDocument();
     // 5 total (> 4): only 2 failing chips render (no pending to fill the other
     // 2 slots), so 3 are hidden — the overflow must reflect that, not 5 - 4.
     expect(screen.getByText("f2")).toBeInTheDocument();
@@ -510,9 +480,7 @@ describe("Dashboard", () => {
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("3 failing · 2 pending")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("3 failing · 2 pending")).toBeInTheDocument();
   });
 
   it("blocked-no-checks PR shows the inline note detail", async () => {
@@ -536,9 +504,7 @@ describe("Dashboard", () => {
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("Some required checks run on GitHub and aren't shown here.")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("Some required checks run on GitHub and aren't shown here.")).toBeInTheDocument();
     // The blocked PR still appears in the list (its title row is rendered)
     expect(screen.getByText("stuck pr")).toBeInTheDocument();
   });
@@ -567,9 +533,7 @@ describe("Dashboard", () => {
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("Review required")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("Review required")).toBeInTheDocument();
     // The misleading "required checks" note must NOT be shown — the blocker is review, not CI.
     expect(
       screen.queryByText("Some required checks run on GitHub and aren't shown here."),
@@ -600,9 +564,7 @@ describe("Dashboard", () => {
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("Changes requested")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("Changes requested")).toBeInTheDocument();
     expect(screen.queryByText("Review required")).not.toBeInTheDocument();
   });
 
@@ -630,9 +592,7 @@ describe("Dashboard", () => {
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("Has merge conflicts — resolve them on GitHub.")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("Has merge conflicts — resolve them on GitHub.")).toBeInTheDocument();
     expect(screen.queryByText("Review required")).not.toBeInTheDocument();
   });
 
@@ -657,9 +617,7 @@ describe("Dashboard", () => {
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("ci")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("ci")).toBeInTheDocument();
     expect(
       screen.queryByText("Some required checks run on GitHub and aren't shown here."),
     ).not.toBeInTheDocument();
@@ -689,9 +647,7 @@ describe("Dashboard", () => {
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     // Out-of-date note is gone — BEHIND arm was removed
     expect(
       screen.queryByText("Out of date with the base branch — update it to merge."),
@@ -723,9 +679,7 @@ describe("Dashboard", () => {
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("Has merge conflicts — resolve them on GitHub.")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("Has merge conflicts — resolve them on GitHub.")).toBeInTheDocument();
     expect(
       screen.queryByText("Out of date with the base branch — update it to merge."),
     ).not.toBeInTheDocument();
@@ -755,9 +709,7 @@ describe("Dashboard", () => {
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("Some required checks run on GitHub and aren't shown here.")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("Some required checks run on GitHub and aren't shown here.")).toBeInTheDocument();
     expect(
       screen.queryByText("Out of date with the base branch — update it to merge."),
     ).not.toBeInTheDocument();
@@ -780,9 +732,7 @@ describe("Dashboard", () => {
 
     render(<Dashboard orgs={ORGS} login="testuser" />);
     // Both drafts visible initially
-    await waitFor(() =>
-      expect(screen.getByText("draft stuck pr")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("draft stuck pr")).toBeInTheDocument();
     expect(screen.getByText("draft review pr")).toBeInTheDocument();
 
     // Check the hide-drafts checkbox
@@ -798,9 +748,7 @@ describe("Dashboard", () => {
 
   it("persists hideDrafts toggle to localStorage", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("checkbox", { name: /hide drafts/i }));
     await waitFor(() =>
       expect(localStorage.getItem("prison.hideDrafts")).toBe("true"),
@@ -824,9 +772,7 @@ describe("Dashboard", () => {
     ) as unknown as typeof fetch;
 
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     expect(screen.queryByText("draft stuck pr")).not.toBeInTheDocument();
     expect(screen.queryByText("draft review pr")).not.toBeInTheDocument();
   });
@@ -834,9 +780,7 @@ describe("Dashboard", () => {
   describe("prioritize-blocking", () => {
     it("review list renders before the stuck list in the DOM", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       const html = document.body.innerHTML;
       expect(html.indexOf("PRs waiting on your review")).toBeLessThan(
         html.indexOf("PRs stuck on checks"),
@@ -845,9 +789,7 @@ describe("Dashboard", () => {
 
     it("review list count badge uses warning style when items are present", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("review pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("review pr")).toBeInTheDocument();
       const heading = screen.getByRole("heading", { name: /prs waiting on your review/i });
       const badge = heading.closest("section")?.querySelector('[data-testid="count-badge"]');
       expect(badge).toHaveClass("bg-warning");
@@ -855,18 +797,14 @@ describe("Dashboard", () => {
 
     it("review row shows 'Blocking @author' with amber styling", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("review pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("review pr")).toBeInTheDocument();
       expect(screen.getByText(/Blocking @alice/)).toBeInTheDocument();
       expect(screen.queryByText(/Requested by/)).not.toBeInTheDocument();
     });
 
     it("By check button is present in the toggle", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /^by check$/i }),
       ).toBeInTheDocument();
@@ -874,9 +812,7 @@ describe("Dashboard", () => {
 
     it("By check button toggles groupBy to check and persists", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /^by check$/i }));
       expect(
         screen.getByRole("button", { name: /^by check$/i }),
@@ -889,9 +825,7 @@ describe("Dashboard", () => {
     it("hydrates old 'blocker' value from localStorage as flat", async () => {
       localStorage.setItem("prison.groupBy", "blocker");
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /^by check$/i }),
       ).toHaveAttribute("aria-pressed", "false");
@@ -959,9 +893,7 @@ describe("Dashboard", () => {
       ) as unknown as typeof fetch;
       render(<Dashboard orgs={ORGS} login="testuser" />);
       fireEvent.click(screen.getByRole("button", { name: /^by check$/i }));
-      await waitFor(() =>
-        expect(screen.getByTestId("group-header")).toBeInTheDocument(),
-      );
+      expect(await screen.findByTestId("group-header")).toBeInTheDocument();
       expect(screen.getByTestId("group-header").textContent).toContain("Other");
     });
 
@@ -988,18 +920,14 @@ describe("Dashboard", () => {
       ) as unknown as typeof fetch;
       render(<Dashboard orgs={ORGS} login="testuser" />);
       fireEvent.click(screen.getByRole("button", { name: /^by check$/i }));
-      await waitFor(() =>
-        expect(screen.getByTestId("group-header")).toBeInTheDocument(),
-      );
+      expect(await screen.findByTestId("group-header")).toBeInTheDocument();
       expect(screen.getByTestId("group-header").textContent).toContain("Review required");
       expect(screen.getByTestId("group-header").textContent).not.toContain("Other");
     });
 
     it("review list stays flat in By check mode (no group headers in review section)", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("review pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("review pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /^by check$/i }));
       // STUCK_PR has failing: ["build"] → "build" check → 1 group header
       // Review list is flat in check mode → 0 group headers from review
@@ -1012,9 +940,7 @@ describe("Dashboard", () => {
 
     it("By check — persists 'check' to localStorage", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /^by check$/i }));
       await waitFor(() =>
         expect(localStorage.getItem("prison.groupBy")).toBe("check"),
@@ -1023,9 +949,7 @@ describe("Dashboard", () => {
 
     it("By-repo subheaders are links to the repo on GitHub", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
       await waitFor(() =>
         expect(screen.getAllByTestId("group-header")).toHaveLength(2),
@@ -1049,9 +973,7 @@ describe("Dashboard", () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       fireEvent.click(screen.getByRole("button", { name: /^by check$/i }));
       // STUCK_PR has failing: ["build"] → a "build" group header appears
-      await waitFor(() =>
-        expect(screen.getByTestId("group-header")).toBeInTheDocument(),
-      );
+      expect(await screen.findByTestId("group-header")).toBeInTheDocument();
       // The group header for "build" should not be a link
       expect(
         screen.queryByRole("link", { name: /build/i }),
@@ -1061,9 +983,7 @@ describe("Dashboard", () => {
 
   it("stuck list count badge uses danger style when items are present", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     const heading = screen.getByRole("heading", { name: /prs stuck on checks/i });
     const badge = heading.closest("section")?.querySelector('[data-testid="count-badge"]');
     expect(badge).toHaveClass("bg-danger");
@@ -1072,9 +992,7 @@ describe("Dashboard", () => {
   describe("refresh button", () => {
     it("renders a Refresh button", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /^refresh$/i }),
       ).toBeInTheDocument();
@@ -1082,9 +1000,7 @@ describe("Dashboard", () => {
 
     it("re-fetches all lists when Refresh is clicked", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       // Wait for the mount fetches to settle so the button is enabled —
       // clicking while it is still disabled (mount load in flight) is a no-op
       // and races under full-suite concurrency.
@@ -1138,18 +1054,14 @@ describe("Dashboard", () => {
   describe("groupBy toggle", () => {
     it("renders both Flat and By repo buttons", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /^flat$/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /^by repo$/i })).toBeInTheDocument();
     });
 
     it('defaults to Flat: "Flat" is pressed, "By repo" is not', async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /^flat$/i })).toHaveAttribute(
         "aria-pressed",
         "true",
@@ -1162,9 +1074,7 @@ describe("Dashboard", () => {
 
     it('clicking "By repo" sets its aria-pressed to true', async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
       expect(screen.getByRole("button", { name: /^by repo$/i })).toHaveAttribute(
         "aria-pressed",
@@ -1178,9 +1088,7 @@ describe("Dashboard", () => {
 
     it('clicking "Flat" after "By repo" switches back', async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
       fireEvent.click(screen.getByRole("button", { name: /^flat$/i }));
       expect(screen.getByRole("button", { name: /^flat$/i })).toHaveAttribute(
@@ -1195,9 +1103,7 @@ describe("Dashboard", () => {
 
     it('persists "repo" to localStorage when "By repo" is clicked', async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
       await waitFor(() =>
         expect(localStorage.getItem("prison.groupBy")).toBe("repo"),
@@ -1206,9 +1112,7 @@ describe("Dashboard", () => {
 
     it('persists "flat" to localStorage when "Flat" is clicked after "By repo"', async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
       fireEvent.click(screen.getByRole("button", { name: /^flat$/i }));
       await waitFor(() =>
@@ -1219,9 +1123,7 @@ describe("Dashboard", () => {
     it('hydrates "By repo" from localStorage', async () => {
       localStorage.setItem("prison.groupBy", "repo");
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /^by repo$/i })).toHaveAttribute(
         "aria-pressed",
         "true",
@@ -1234,9 +1136,7 @@ describe("Dashboard", () => {
 
     it('defaults to "Flat" when no localStorage key is present', async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /^flat$/i })).toHaveAttribute(
         "aria-pressed",
         "true",
@@ -1265,9 +1165,7 @@ describe("Dashboard", () => {
       ) as unknown as typeof fetch;
 
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
 
       // In Flat mode: no group headers visible
       expect(screen.queryByTestId("group-header")).not.toBeInTheDocument();
@@ -1290,9 +1188,7 @@ describe("Dashboard", () => {
         JSON.stringify({ orgs: { acme: ["qa/smoke"] }, repos: {} }),
       );
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       // Chip renders the name as text content and carries an accessible label
       expect(screen.getByText("qa/smoke")).toBeInTheDocument();
       expect(screen.getByLabelText("Awaiting: qa/smoke")).toBeInTheDocument();
@@ -1304,9 +1200,7 @@ describe("Dashboard", () => {
         JSON.stringify({ orgs: { acme: ["build"] }, repos: {} }),
       );
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       // No visible "Awaiting:" label and no accessible awaiting chip
       expect(screen.queryByText("Awaiting:")).not.toBeInTheDocument();
       expect(screen.queryByLabelText(/^Awaiting:/)).not.toBeInTheDocument();
@@ -1314,11 +1208,18 @@ describe("Dashboard", () => {
 
     it("opening settings via gear button renders the tracked checks panel", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Tracked checks settings" }));
       expect(screen.getByText("Tracked checks")).toBeInTheDocument();
+    });
+
+    it("closing the settings panel via its close button hides it", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Tracked checks settings" }));
+      expect(screen.getByText("Tracked checks")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Close tracked checks settings" }));
+      expect(screen.queryByText("Tracked checks")).not.toBeInTheDocument();
     });
 
     it("hydrates tracked config from localStorage and persists it back", async () => {
@@ -1327,9 +1228,7 @@ describe("Dashboard", () => {
         JSON.stringify({ orgs: { acme: ["qa/smoke"] }, repos: {} }),
       );
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       const stored = localStorage.getItem("prison.trackedChecks");
       expect(stored).not.toBeNull();
       const parsed = JSON.parse(stored!);
@@ -1338,9 +1237,7 @@ describe("Dashboard", () => {
 
     it("passes distinct repos from loaded PR lists as suggestions to the settings modal", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       // STUCK_PR.repo = "acme/b", REVIEW_PR.repo = "acme/c", READY_PR.repo = "acme/d"
       fireEvent.click(screen.getByRole("button", { name: "Tracked checks settings" }));
       const addButton = screen.getByRole("button", { name: /add override/i });
@@ -1363,7 +1260,7 @@ describe("Dashboard", () => {
         // STUCK_PR has repo "acme/b", failing: ["build"], checkNames: ["build"]
         // awaitingChecks("acme/b", ["build"], ...) = ["Automation Result"]
         render(<Dashboard orgs={ORGS} login="testuser" />);
-        await waitFor(() => expect(screen.getByText("build")).toBeInTheDocument());
+        expect(await screen.findByText("build")).toBeInTheDocument();
         expect(screen.getByText("Automation Result")).toBeInTheDocument();
         expect(
           screen.queryByText("Some required checks run on GitHub and aren't shown here."),
@@ -1397,7 +1294,7 @@ describe("Dashboard", () => {
           }),
         ) as unknown as typeof fetch;
         render(<Dashboard orgs={ORGS} login="testuser" />);
-        await waitFor(() => expect(screen.getByText("ci/required")).toBeInTheDocument());
+        expect(await screen.findByText("ci/required")).toBeInTheDocument();
         expect(
           screen.queryByText("Some required checks run on GitHub and aren't shown here."),
         ).not.toBeInTheDocument();
@@ -1475,9 +1372,7 @@ describe("Dashboard", () => {
         render(<Dashboard orgs={ORGS} login="testuser" />);
 
         // Wait for PR-A to appear in the ready section
-        await waitFor(() =>
-          expect(screen.getByText("PR A ready-via-blocked")).toBeInTheDocument(),
-        );
+        expect(await screen.findByText("PR A ready-via-blocked")).toBeInTheDocument();
 
         // PR-B should be in the stuck section (awaiting chips visible)
         expect(screen.getByText("PR B awaiting-via-blocked")).toBeInTheDocument();
@@ -1498,13 +1393,48 @@ describe("Dashboard", () => {
     });
   });
 
+  describe("error banners and retry", () => {
+    it("shows an error banner per list on non-ok responses, and each Retry refetches", async () => {
+      global.fetch = vi.fn(() =>
+        Promise.resolve({ ok: false, status: 500 }),
+      ) as unknown as typeof fetch;
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText(/failed to load stuck prs/i)).toBeInTheDocument();
+      expect(screen.getByText(/failed to load review requests/i)).toBeInTheDocument();
+      expect(screen.getByText(/failed to load ready-to-merge prs/i)).toBeInTheDocument();
+      expect(screen.getByText(/failed to load comments/i)).toBeInTheDocument();
+      expect(screen.getByText(/failed to load closed prs/i)).toBeInTheDocument();
+
+      const before = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
+      const retries = screen.getAllByRole("button", { name: /retry/i });
+      expect(retries).toHaveLength(5);
+      for (const retry of retries) fireEvent.click(retry);
+      await waitFor(() =>
+        expect(
+          (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+        ).toBe(before + 5 * retries.length),
+      );
+    });
+
+    it("the partial-data notice Retry refetches all lists", async () => {
+      global.fetch = partialFetch();
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText(/Some data couldn't be loaded/i)).toBeInTheDocument();
+      const notice = screen.getByRole("status");
+      fireEvent.click(within(notice).getByRole("button", { name: /retry/i }));
+      await waitFor(() =>
+        expect(
+          (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+        ).toBe(10),
+      );
+    });
+  });
+
   describe("partial-data notice", () => {
     it("shows the partial-data notice when a list responds with X-Partial", async () => {
       global.fetch = partialFetch();
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText(/Some data couldn't be loaded/i)).toBeInTheDocument(),
-      );
+      expect(await screen.findByText(/Some data couldn't be loaded/i)).toBeInTheDocument();
       // Retry button present and clickable
       const notice = screen.getByRole("status");
       expect(within(notice).getByRole("button", { name: /retry/i })).toBeInTheDocument();
@@ -1513,9 +1443,7 @@ describe("Dashboard", () => {
     it("shows no partial-data notice when no list is partial", async () => {
       // okFetch (default from beforeEach) returns X-Partial: null everywhere
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       expect(screen.queryByText(/Some data couldn't be loaded/i)).not.toBeInTheDocument();
     });
   });
@@ -1524,9 +1452,7 @@ describe("Dashboard", () => {
     it("renders the ready-to-merge list with its fetched items", async () => {
       // beforeEach okFetch returns [READY_PR] for ready endpoints
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("ready pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("ready pr")).toBeInTheDocument();
       expect(screen.getByText("Ready to merge")).toBeInTheDocument();
     });
 
@@ -1545,16 +1471,12 @@ describe("Dashboard", () => {
         }),
       ) as unknown as typeof fetch;
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("Nothing ready to merge")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("Nothing ready to merge")).toBeInTheDocument();
     });
 
     it("renders the ready list above the two columns", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("Ready to merge")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("Ready to merge")).toBeInTheDocument();
       const html = document.body.innerHTML;
       expect(html.indexOf("Ready to merge")).toBeLessThan(
         html.indexOf("PRs waiting on your review"),
@@ -1563,9 +1485,7 @@ describe("Dashboard", () => {
 
     it("includes ready-to-merge in a Refresh", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("ready pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("ready pr")).toBeInTheDocument();
       // Wait for the mount fetches to settle so the button is enabled — clicking
       // while it is still disabled (mount load in flight) is a no-op and races
       // under full-suite concurrency.
@@ -1582,16 +1502,12 @@ describe("Dashboard", () => {
     it("shows a 'Merge on GitHub' link on a ready row", async () => {
       // okFetch returns [READY_PR]; suggestReady returns { text: "Merge on GitHub", href: pr.url }
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("Merge on GitHub")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("Merge on GitHub")).toBeInTheDocument();
     });
 
     it("ready list count badge uses success style when items are present", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("ready pr")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("ready pr")).toBeInTheDocument();
       const heading = screen.getByRole("heading", { name: /ready to merge/i });
       const badge = heading.closest("section")?.querySelector('[data-testid="count-badge"]');
       expect(badge).toHaveClass("bg-success");
@@ -1613,9 +1529,7 @@ describe("Dashboard", () => {
         }),
       ) as unknown as typeof fetch;
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(screen.getByText("Needs update")).toBeInTheDocument(),
-      );
+      expect(await screen.findByText("Needs update")).toBeInTheDocument();
     });
 
     it("shows an error banner and retry when the ready fetch fails", async () => {
@@ -1627,11 +1541,7 @@ describe("Dashboard", () => {
             : Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) }),
       ) as unknown as typeof fetch;
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      await waitFor(() =>
-        expect(
-          screen.getByText(/failed to load ready-to-merge/i),
-        ).toBeInTheDocument(),
-      );
+      expect(await screen.findByText(/failed to load ready-to-merge/i)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
     });
   });
@@ -1676,9 +1586,7 @@ describe("Dashboard — comments awaiting your reply", () => {
   it("hides comments on PRs that are not visible in the stuck or ready lists", async () => {
     global.fetch = fetchWithComments([ORPHAN_COMMENT]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("stuck pr")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     expect(screen.queryByText("comment on an invisible pr")).not.toBeInTheDocument();
     expect(screen.getByText(/no comments awaiting your reply/i)).toBeInTheDocument();
   });
@@ -1686,15 +1594,11 @@ describe("Dashboard — comments awaiting your reply", () => {
   it("hides bot comments by default and reveals them when 'Show bot comments' is checked", async () => {
     global.fetch = fetchWithComments([COMMENT, BOT_COMMENT]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("please fix the null check")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("please fix the null check")).toBeInTheDocument();
     expect(screen.queryByText("bot says something")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText(/show bot comments/i));
-    await waitFor(() =>
-      expect(screen.getByText("bot says something")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("bot says something")).toBeInTheDocument();
   });
 
   it("persists the 'Show bot comments' toggle to localStorage", async () => {
@@ -1723,18 +1627,14 @@ describe("Dashboard — comments awaiting your reply", () => {
           : Promise.resolve({ ok: true, json: () => Promise.resolve([]) }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText(/failed to load comments/i)).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/failed to load comments/i)).toBeInTheDocument();
     expect(screen.getByText("stuck pr")).toBeInTheDocument();
   });
 
   it("groups comments by repo in the By-repo view", async () => {
     global.fetch = fetchWithComments([COMMENT]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("please fix the null check")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("please fix the null check")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "By repo" }));
     await waitFor(() => {
       const headers = screen.getAllByTestId("group-header");
@@ -1783,9 +1683,7 @@ describe("Dashboard — comments awaiting your reply", () => {
     localStorage.setItem("prison.closedOpen", "true");
     global.fetch = fetchWithClosed(makeClosed(2));
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("closed pr 0")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("closed pr 0")).toBeInTheDocument();
     expect(screen.getByText("closed pr 1")).toBeInTheDocument();
   });
 
@@ -1793,9 +1691,7 @@ describe("Dashboard — comments awaiting your reply", () => {
     localStorage.setItem("prison.closedOpen", "true");
     global.fetch = fetchWithClosed([]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText("No closed PRs")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("No closed PRs")).toBeInTheDocument();
   });
 
   it("shows an error banner when the closed-PRs fetch fails", async () => {
@@ -1807,9 +1703,7 @@ describe("Dashboard — comments awaiting your reply", () => {
           : Promise.resolve({ ok: true, headers: { get: () => null }, json: () => Promise.resolve([]) }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText(/failed to load closed PRs/i)).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/failed to load closed PRs/i)).toBeInTheDocument();
     // Unrelated sections still render.
     expect(screen.getByText("stuck pr")).toBeInTheDocument();
   });
@@ -1823,8 +1717,6 @@ describe("Dashboard — comments awaiting your reply", () => {
       ),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    await waitFor(() =>
-      expect(screen.getByText(/failed to load closed PRs/i)).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/failed to load closed PRs/i)).toBeInTheDocument();
   });
 });

@@ -7,7 +7,7 @@
 
 A read-only GitHub dashboard that shows which pull requests need your attention,
 and for how long — across your personal account and every organization you can
-access. Four lists, oldest first:
+access. Four lists, oldest first, plus a history section:
 
 - **Ready to merge** — PRs GitHub reports as mergeable now. Out-of-date branches
   still count and get a **"Needs update"** hint (a bot/manual update handles them).
@@ -16,8 +16,11 @@ access. Four lists, oldest first:
 - **Waiting on your review** — PRs you're blocking others on.
 - **Stuck on checks** — your open PRs with failing/pending checks, or otherwise
   blocked from merging (required checks, review, or conflicts).
+- **Recently merged / closed** — your own PRs that were merged or closed, newest
+  first, so finished work confirms itself. Collapsed by default with a count;
+  expands to the latest 15 with **Load more** for the rest.
 
-![The PRison dashboard showing the four PR lists in dark mode](docs/screenshot.png)
+![The PRison dashboard showing the four PR lists and the recently merged / closed history in dark mode](docs/screenshot.png)
 
 ### Features
 
@@ -32,7 +35,12 @@ access. Four lists, oldest first:
   checks you care about — org defaults plus per-repo overrides, with a
   type-to-search repo picker — and PRison shows them as **"⏳ Awaiting: &lt;name&gt;"**
   on a blocked PR until they report.
+- **Recently merged / closed history.** Merged and closed-without-merging PRs,
+  each badged **Merged** or **Closed** with how long ago it ended.
 - **Grouping** — flat, by repository, or by check.
+- **Partial-data notice.** When GitHub drops part of a response (an org restricts
+  the token, a search times out), a banner says so instead of silently showing
+  less — with a Retry button, like every failed list.
 - **Light / dark theme**, responsive two-column layout, minute-level ages,
   color-coded lists, and a Refresh button.
 - **Personal account + per-org filter** in the top-right switcher.

@@ -1,0 +1,35 @@
+name: Sync Docker Hub description
+
+# The Docker Hub overview IS the README — pushed to Hub on every merge that
+# touches it, so the Hub page can never drift from the repository.
+# workflow_dispatch exists for the case where a sync run failed and needs
+# replaying without another README change.
+on:
+  push:
+    branches: [main]
+    paths:
+      - README.md
+      - .github/workflows/dockerhub-description.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      # Third-party actions are pinned to an immutable commit SHA, not a mutable
+      # major tag: this job holds a token that can rewrite our public Docker Hub
+      # page, so a retagged upstream release must not become our build step.
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: mfozmen/prison
+          short-description: "Read-only GitHub dashboard: which PRs need your attention, and for how long."
+          # Rewrite the README's repo-relative links (docs/screenshot.png,
+          # CONTRIBUTING.md, LICENSE) to absolute GitHub URLs so they work on Hub.
+          enable-url-completion: true

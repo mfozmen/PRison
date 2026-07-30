@@ -227,6 +227,83 @@ describe("RepoCombobox", () => {
     expect(onChange).toHaveBeenCalledWith("org/a");
   });
 
+  it("a stale rejected fetch is ignored — the latest results stay rendered", async () => {
+    let rejectFirst!: (e: unknown) => void;
+    const firstFetchResponse = new Promise((_r, rej) => {
+      rejectFirst = rej;
+    });
+
+    (global.fetch as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce(firstFetchResponse)
+      .mockResolvedValueOnce({
+        json: () => Promise.resolve(["abc/repo"]),
+      });
+
+    render(<RepoCombobox value="" onChange={vi.fn()} />);
+    const input = screen.getByRole("combobox", { name: "Repository" });
+
+    fireEvent.change(input, { target: { value: "ab" } });
+    act(() => vi.advanceTimersByTime(300));
+
+    fireEvent.change(input, { target: { value: "abc" } });
+    await drainDebounce();
+
+    expect(screen.getByRole("option", { name: "abc/repo" })).toBeInTheDocument();
+
+    // The stale request failing must not clear the fresher results.
+    rejectFirst(new Error("network down"));
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    expect(screen.getByRole("option", { name: "abc/repo" })).toBeInTheDocument();
+  });
+
+  it("a failed fetch clears the results and stops the searching state", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("network down"));
+    render(<RepoCombobox value="" onChange={vi.fn()} />);
+    const input = screen.getByRole("combobox", { name: "Repository" });
+    fireEvent.change(input, { target: { value: "acme" } });
+    await drainDebounce();
+    expect(screen.queryByText("Searching…")).not.toBeInTheDocument();
+    expect(screen.getByText("No matches")).toBeInTheDocument();
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+  });
+
+  it("keydown is a no-op while the dropdown is closed", () => {
+    const onChange = vi.fn();
+    render(<RepoCombobox value="" onChange={onChange} suggestions={["org/a"]} />);
+    const input = screen.getByRole("combobox", { name: "Repository" });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
+  it("ArrowDown clamps at the last fetched item", async () => {
+    const onChange = vi.fn();
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      json: () => Promise.resolve(["acme/web"]),
+    });
+    render(<RepoCombobox value="" onChange={onChange} />);
+    const input = screen.getByRole("combobox", { name: "Repository" });
+    fireEvent.change(input, { target: { value: "acme" } });
+    await drainDebounce();
+    fireEvent.keyDown(input, { key: "ArrowDown" }); // -> acme/web
+    fireEvent.keyDown(input, { key: "ArrowDown" }); // clamps at acme/web
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onChange).toHaveBeenCalledWith("acme/web");
+  });
+
+  it("hovering an option moves the highlight to it", () => {
+    render(<RepoCombobox value="" onChange={vi.fn()} suggestions={["org/a", "org/b"]} />);
+    const input = screen.getByRole("combobox", { name: "Repository" });
+    fireEvent.focus(input);
+    const second = screen.getByRole("option", { name: "org/b" });
+    fireEvent.mouseEnter(second);
+    expect(second).toHaveAttribute("aria-selected", "true");
+  });
+
   it("clicking outside the component closes the dropdown", () => {
     render(
       <div>

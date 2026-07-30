@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { Header } from "./Header";
 
 const orgs = [
@@ -64,10 +65,8 @@ describe("Header", () => {
 });
 
 describe("Header theme toggle", () => {
-  it("shows moon icon (light mode) and aria-label 'Switch to dark theme' when dark class is absent", async () => {
-    await act(async () => {
-      render(<Header orgs={[]} selectedOrg="" onOrgChange={() => {}} login="testuser" onOpenSettings={() => {}} />);
-    });
+  it("shows moon icon (light mode) and aria-label 'Switch to dark theme' when dark class is absent", () => {
+    render(<Header orgs={[]} selectedOrg="" onOrgChange={() => {}} login="testuser" onOpenSettings={() => {}} />);
     const toggle = screen.getByRole("button", { name: "Switch to dark theme" });
     expect(toggle).toBeInTheDocument();
     // Moon SVG has a path element with d starting with "M14"
@@ -76,37 +75,37 @@ describe("Header theme toggle", () => {
     expect(svg?.querySelector("path[d^='M14']")).not.toBeNull();
   });
 
-  it("clicking toggle adds dark class to documentElement and sets localStorage to dark", async () => {
-    await act(async () => {
-      render(<Header orgs={[]} selectedOrg="" onOrgChange={() => {}} login="testuser" onOpenSettings={() => {}} />);
-    });
+  it("clicking toggle adds dark class to documentElement and sets localStorage to dark", () => {
+    render(<Header orgs={[]} selectedOrg="" onOrgChange={() => {}} login="testuser" onOpenSettings={() => {}} />);
     const toggle = screen.getByRole("button", { name: "Switch to dark theme" });
-    await act(async () => {
-      fireEvent.click(toggle);
-    });
+    fireEvent.click(toggle);
     expect(document.documentElement.classList.contains("dark")).toBe(true);
     expect(localStorage.getItem("prison.theme")).toBe("dark");
   });
 
-  it("clicking toggle removes dark class and sets localStorage to light when dark mode is active", async () => {
+  it("clicking toggle removes dark class and sets localStorage to light when dark mode is active", () => {
     document.documentElement.classList.add("dark");
-    await act(async () => {
-      render(<Header orgs={[]} selectedOrg="" onOrgChange={() => {}} login="testuser" onOpenSettings={() => {}} />);
-    });
+    render(<Header orgs={[]} selectedOrg="" onOrgChange={() => {}} login="testuser" onOpenSettings={() => {}} />);
     const toggle = screen.getByRole("button", { name: "Switch to light theme" });
-    await act(async () => {
-      fireEvent.click(toggle);
-    });
+    fireEvent.click(toggle);
     expect(document.documentElement.classList.contains("dark")).toBe(false);
     expect(localStorage.getItem("prison.theme")).toBe("light");
   });
 
-  it("initializes in dark state (sun icon) when dark class is present on documentElement at mount", async () => {
+  // Server render can't see documentElement, so the SSR snapshot is always
+  // light mode — even when the client would hydrate into dark.
+  it("server-renders in light mode regardless of the client theme", () => {
+    document.documentElement.classList.add("dark");
+    const html = renderToString(
+      <Header orgs={[]} selectedOrg="" onOrgChange={() => {}} login="testuser" onOpenSettings={() => {}} />,
+    );
+    expect(html).toContain("Switch to dark theme");
+  });
+
+  it("initializes in dark state (sun icon) when dark class is present on documentElement at mount", () => {
     document.documentElement.classList.add("dark");
     localStorage.setItem("prison.theme", "dark");
-    await act(async () => {
-      render(<Header orgs={[]} selectedOrg="" onOrgChange={() => {}} login="testuser" onOpenSettings={() => {}} />);
-    });
+    render(<Header orgs={[]} selectedOrg="" onOrgChange={() => {}} login="testuser" onOpenSettings={() => {}} />);
     const toggle = screen.getByRole("button", { name: "Switch to light theme" });
     expect(toggle).toBeInTheDocument();
     // Sun SVG has a circle element

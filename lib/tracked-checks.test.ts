@@ -93,6 +93,12 @@ describe("parseTracked", () => {
     expect(parseTracked("42")).toEqual(EMPTY_TRACKED);
   });
 
+  it("valid JSON with only repos key coerces orgs to {}", () => {
+    const result = parseTracked(JSON.stringify({ repos: { "acme/app": ["lint"] } }));
+    expect(result.orgs).toEqual({});
+    expect(result.repos).toEqual({ "acme/app": ["lint"] });
+  });
+
   it("valid JSON with only orgs key coerces repos to {}", () => {
     const result = parseTracked(JSON.stringify({ orgs: { acme: ["build"] } }));
     expect(result.orgs).toEqual({ acme: ["build"] });

@@ -43,9 +43,32 @@ describe("TokenForm", () => {
       target: { value: "bad" },
     });
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
-    await waitFor(() =>
-      expect(screen.getByText(/didn't work/i)).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/didn't work/i)).toBeInTheDocument();
+  });
+
+  it("shows a generic error on a non-401 failure", async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({ ok: false, status: 500 }),
+    ) as unknown as typeof fetch;
+    render(<TokenForm />);
+    fireEvent.change(screen.getByLabelText(/personal access token/i), {
+      target: { value: "ghp_abc" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    expect(await screen.findByText(/something went wrong/i)).toBeInTheDocument();
+  });
+
+  it("shows a network error when the token request rejects", async () => {
+    global.fetch = vi.fn(() =>
+      Promise.reject(new Error("network down")),
+    ) as unknown as typeof fetch;
+    render(<TokenForm />);
+    fireEvent.change(screen.getByLabelText(/personal access token/i), {
+      target: { value: "ghp_abc" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    expect(await screen.findByText(/couldn't reach the server/i)).toBeInTheDocument();
+    expect(window.location.reload).not.toHaveBeenCalled();
   });
 
   it("renders the CLI sign-in button", () => {
@@ -88,9 +111,7 @@ describe("TokenForm", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /sign in with github cli/i }),
     );
-    await waitFor(() =>
-      expect(screen.getByText(/github cli not found/i)).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/github cli not found/i)).toBeInTheDocument();
   });
 
   it("shows the not-signed-in message with the gh auth login hint", async () => {
@@ -143,9 +164,7 @@ describe("TokenForm", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /sign in with github cli/i }),
     );
-    await waitFor(() =>
-      expect(screen.getByText(/github cli not found/i)).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/github cli not found/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/personal access token/i)).toBeInTheDocument();
   });
 
@@ -161,11 +180,7 @@ describe("TokenForm", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /sign in with github cli/i }),
     );
-    await waitFor(() =>
-      expect(
-        screen.getByText(/couldn't sign in with the github cli/i),
-      ).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/couldn't sign in with the github cli/i)).toBeInTheDocument();
   });
 
   it("shows the generic message for a prototype-key reason (e.g. toString)", async () => {
@@ -180,11 +195,7 @@ describe("TokenForm", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /sign in with github cli/i }),
     );
-    await waitFor(() =>
-      expect(
-        screen.getByText(/couldn't sign in with the github cli/i),
-      ).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/couldn't sign in with the github cli/i)).toBeInTheDocument();
   });
 
   it("shows the generic message when the response body is not JSON", async () => {
@@ -201,11 +212,7 @@ describe("TokenForm", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /sign in with github cli/i }),
     );
-    await waitFor(() =>
-      expect(
-        screen.getByText(/couldn't sign in with the github cli/i),
-      ).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/couldn't sign in with the github cli/i)).toBeInTheDocument();
   });
 
   it("shows the generic message when the request rejects (network error)", async () => {
@@ -216,11 +223,7 @@ describe("TokenForm", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /sign in with github cli/i }),
     );
-    await waitFor(() =>
-      expect(
-        screen.getByText(/couldn't sign in with the github cli/i),
-      ).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/couldn't sign in with the github cli/i)).toBeInTheDocument();
   });
 });
 
@@ -247,9 +250,7 @@ describe("TokenForm — host token (Docker, no gh in the container)", () => {
     ) as unknown as typeof fetch;
     render(<TokenForm hasEnvToken />);
     fireEvent.click(screen.getByRole("button", { name: /sign in with the host token/i }));
-    await waitFor(() =>
-      expect(screen.getByText(/github rejected the host token/i)).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/github rejected the host token/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/personal access token/i)).toBeInTheDocument();
   });
 
@@ -261,9 +262,7 @@ describe("TokenForm — host token (Docker, no gh in the container)", () => {
     ) as unknown as typeof fetch;
     render(<TokenForm hasEnvToken />);
     fireEvent.click(screen.getByRole("button", { name: /sign in with the host token/i }));
-    await waitFor(() =>
-      expect(screen.getByText(/couldn't sign in with the host token/i)).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/couldn't sign in with the host token/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sign in with the host token/i })).toBeEnabled();
   });
 
@@ -271,9 +270,7 @@ describe("TokenForm — host token (Docker, no gh in the container)", () => {
     global.fetch = vi.fn(() => Promise.reject(new Error("offline"))) as unknown as typeof fetch;
     render(<TokenForm hasEnvToken />);
     fireEvent.click(screen.getByRole("button", { name: /sign in with the host token/i }));
-    await waitFor(() =>
-      expect(screen.getByText(/couldn't sign in with the host token/i)).toBeInTheDocument(),
-    );
+    expect(await screen.findByText(/couldn't sign in with the host token/i)).toBeInTheDocument();
   });
 
   it("keeps the CLI button when there is no env token", () => {

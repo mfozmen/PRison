@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import type { Org } from "@/lib/types";
 import type { TrackedChecks } from "@/lib/tracked-checks";
 import { RepoCombobox } from "./RepoCombobox";
 
-export interface TrackedChecksSettingsProps {
+export interface SettingsModalProps {
   orgs: Org[];
   availableRepos: string[];
   /** Owner logins (orgs + personal) used to scope the repo search. */
@@ -14,6 +14,14 @@ export interface TrackedChecksSettingsProps {
   onChange: (next: TrackedChecks) => void;
   open: boolean;
   onClose: () => void;
+  hideDrafts: boolean;
+  onHideDraftsChange: (v: boolean) => void;
+  showBots: boolean;
+  onShowBotsChange: (v: boolean) => void;
+  hideReacted: boolean;
+  onHideReactedChange: (v: boolean) => void;
+  autoRefresh: boolean;
+  onAutoRefreshChange: (v: boolean) => void;
 }
 
 interface RepoRow {
@@ -43,7 +51,29 @@ function seedRows(repos: Record<string, string[]>): RepoRow[] {
   }));
 }
 
-export function TrackedChecksSettings({
+function SettingCheckbox({
+  checked,
+  onChange,
+  children,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  children: ReactNode;
+}) {
+  return (
+    <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-4 w-4 rounded border-border bg-surface accent-accent"
+      />
+      {children}
+    </label>
+  );
+}
+
+export function SettingsModal({
   orgs,
   availableRepos,
   owners = [],
@@ -51,7 +81,15 @@ export function TrackedChecksSettings({
   onChange,
   open,
   onClose,
-}: TrackedChecksSettingsProps) {
+  hideDrafts,
+  onHideDraftsChange,
+  showBots,
+  onShowBotsChange,
+  hideReacted,
+  onHideReactedChange,
+  autoRefresh,
+  onAutoRefreshChange,
+}: SettingsModalProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // Raw input drafts are buffered locally so the user can freely type
@@ -150,16 +188,16 @@ export function TrackedChecksSettings({
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="tracked-checks-title"
-        className="relative z-10 w-full max-w-lg rounded-xl border border-border bg-background p-6 shadow-xl"
+        aria-labelledby="settings-title"
+        className="relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl border border-border bg-background p-6 shadow-xl"
       >
         {/* Header row */}
         <div className="mb-4 flex items-center justify-between">
-          <h2 id="tracked-checks-title" className="font-semibold text-foreground">Tracked checks</h2>
+          <h2 id="settings-title" className="font-semibold text-foreground">Settings</h2>
           <button
             ref={closeButtonRef}
             type="button"
-            aria-label="Close tracked checks settings"
+            aria-label="Close settings"
             onClick={onClose}
             className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
@@ -181,7 +219,44 @@ export function TrackedChecksSettings({
           </button>
         </div>
 
-        {/* Intro */}
+        {/* View filters */}
+        <section className="mb-6">
+          <h3 className="mb-2 text-sm font-medium text-foreground">View filters</h3>
+          <div className="space-y-2">
+            <SettingCheckbox checked={hideDrafts} onChange={onHideDraftsChange}>
+              Hide drafts
+            </SettingCheckbox>
+            <SettingCheckbox checked={showBots} onChange={onShowBotsChange}>
+              Show bot comments
+            </SettingCheckbox>
+            <SettingCheckbox checked={hideReacted} onChange={onHideReactedChange}>
+              Hide comments I reacted to
+            </SettingCheckbox>
+          </div>
+        </section>
+
+        {/* Auto refresh */}
+        <section className="mb-6">
+          <h3 className="mb-2 text-sm font-medium text-foreground">Auto refresh</h3>
+          <SettingCheckbox checked={autoRefresh} onChange={onAutoRefreshChange}>
+            Auto refresh (every 60s)
+          </SettingCheckbox>
+          <p className="mt-2 text-xs text-muted">
+            Checks for new items every minute and sends a desktop notification
+            while a PRison tab is open.
+          </p>
+          {autoRefresh &&
+            typeof Notification !== "undefined" &&
+            Notification.permission === "denied" && (
+              <p className="mt-1 text-xs text-muted">
+                Notifications are blocked in your browser — you&apos;ll still get
+                the tab badge.
+              </p>
+            )}
+        </section>
+
+        {/* Tracked checks */}
+        <h3 className="mb-2 text-sm font-medium text-foreground">Tracked checks</h3>
         <p className="mb-6 text-sm text-muted">
           Name the required checks each PR needs (e.g. a manual qa/smoke).
           We&apos;ll show them as Awaiting until they report — handy for gates
@@ -191,9 +266,9 @@ export function TrackedChecksSettings({
         {/* Organization defaults */}
         {orgs.length > 0 && (
           <section className="mb-6">
-            <h3 className="mb-2 text-sm font-medium text-foreground">
+            <h4 className="mb-2 text-sm font-medium text-foreground">
               Organization defaults
-            </h3>
+            </h4>
             <div className="space-y-3">
               {orgs.map((org) => (
                 <div key={org.login} className="flex flex-col gap-1">
@@ -220,9 +295,9 @@ export function TrackedChecksSettings({
 
         {/* Repository overrides */}
         <section>
-          <h3 className="mb-2 text-sm font-medium text-foreground">
+          <h4 className="mb-2 text-sm font-medium text-foreground">
             Repository overrides
-          </h3>
+          </h4>
           <p className="mb-3 text-xs text-muted">
             A repo override replaces the org default for that repo.
           </p>

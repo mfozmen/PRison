@@ -38,6 +38,11 @@ access. Four lists, oldest first, plus a history section:
 - **Recently merged / closed history.** Merged and closed-without-merging PRs,
   each badged **Merged** or **Closed** with how long ago it ended.
 - **Grouping** — flat, by repository, or by check.
+- **Auto refresh with notifications (opt-in).** Turn it on in Settings and PRison
+  polls every minute; when something new lands while you're on another tab, you
+  get a desktop notification and a **`(3) PRison`** tab-title badge that clears
+  the moment you come back. Works only while a PRison tab is open — there's no
+  background service.
 - **Partial-data notice.** When GitHub drops part of a response (an org restricts
   the token, a search times out), a banner says so instead of silently showing
   less — with a Retry button, like every failed list.
@@ -115,11 +120,13 @@ If `gh` isn't installed or signed in, the app falls back to a paste-a-token form
 
 Sign in with the GitHub CLI or paste a token. In the top-right: the **switcher**
 scopes to All / your personal account / a single org; the **sliders icon** opens
-**Tracked checks** (name the required checks to see as "Awaiting"); the **sun/moon**
-toggles the theme; **Sign Out** clears the stored token. Click a **PR title** (or a
+**Settings** — view filters (**Hide drafts**, **Show bot comments**, **Hide
+comments I reacted to**), **Auto refresh**, and **Tracked checks** (name the
+required checks to see as "Awaiting"); the **sun/moon** toggles the theme;
+**Sign Out** clears the stored token. Click a **PR title** (or a
 suggested-action link) to jump to GitHub — a comment row lands on that exact
-thread. Use **Flat / By repo / By check** to group, **Hide drafts** and **Show bot
-comments** to filter, and **Refresh** to re-fetch without reloading.
+thread. Use **Flat / By repo / By check** to group, and **Refresh** to re-fetch
+without reloading.
 
 ## Documentation
 

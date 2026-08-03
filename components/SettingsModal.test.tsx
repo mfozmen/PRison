@@ -1,8 +1,21 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { TrackedChecksSettings } from "./TrackedChecksSettings";
+import { SettingsModal } from "./SettingsModal";
 import type { Org } from "@/lib/types";
 import type { TrackedChecks } from "@/lib/tracked-checks";
+
+// Defaults for the filter/auto-refresh props so the tracked-checks tests stay
+// focused on their own concern.
+const filterProps = {
+  hideDrafts: false,
+  onHideDraftsChange: vi.fn(),
+  showBots: false,
+  onShowBotsChange: vi.fn(),
+  hideReacted: true,
+  onHideReactedChange: vi.fn(),
+  autoRefresh: false,
+  onAutoRefreshChange: vi.fn(),
+};
 
 const orgs: Org[] = [
   { login: "acme", avatarUrl: "https://example.com/acme.png" },
@@ -12,10 +25,11 @@ const orgs: Org[] = [
 const emptyValue: TrackedChecks = { orgs: {}, repos: {} };
 const someRepos = ["acme/web", "beta/api"];
 
-describe("TrackedChecksSettings", () => {
+describe("SettingsModal", () => {
   it("renders nothing when closed", () => {
     const { container } = render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={orgs}
         availableRepos={[]}
         value={emptyValue}
@@ -33,7 +47,8 @@ describe("TrackedChecksSettings", () => {
       repos: {},
     };
     render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={orgs}
         availableRepos={[]}
         value={value}
@@ -51,7 +66,8 @@ describe("TrackedChecksSettings", () => {
   it("editing an org input calls onChange with correct shape", () => {
     const onChange = vi.fn();
     render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[{ login: "acme", avatarUrl: "" }]}
         availableRepos={[]}
         value={emptyValue}
@@ -71,7 +87,8 @@ describe("TrackedChecksSettings", () => {
   it("lets the user type comma-separated org check names across keystrokes", () => {
     const onChange = vi.fn();
     render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[{ login: "acme", avatarUrl: "" }]}
         availableRepos={[]}
         value={emptyValue}
@@ -99,7 +116,8 @@ describe("TrackedChecksSettings", () => {
       repos: { "acme/web": ["Automation Result"] },
     };
     const { rerender } = render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[{ login: "acme", avatarUrl: "" }]}
         availableRepos={[]}
         value={emptyValue}
@@ -111,7 +129,8 @@ describe("TrackedChecksSettings", () => {
     // Open with a populated value (e.g. parent hydrated from localStorage).
     // "acme/web" is in value.repos so it appears in repoOptions even with availableRepos=[].
     rerender(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[{ login: "acme", avatarUrl: "" }]}
         availableRepos={[]}
         value={value}
@@ -131,7 +150,8 @@ describe("TrackedChecksSettings", () => {
 
   it("clicking 'Add override' renders a new repo/checks input row", () => {
     render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[]}
         availableRepos={someRepos}
         value={emptyValue}
@@ -148,7 +168,8 @@ describe("TrackedChecksSettings", () => {
   it("editing a repo override calls onChange with correct shape", () => {
     const onChange = vi.fn();
     render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[]}
         availableRepos={["acme/web"]}
         value={emptyValue}
@@ -173,7 +194,8 @@ describe("TrackedChecksSettings", () => {
   it("skips an override row whose repo field is left empty", () => {
     const onChange = vi.fn();
     render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[]}
         availableRepos={someRepos}
         value={emptyValue}
@@ -193,7 +215,8 @@ describe("TrackedChecksSettings", () => {
 
   it("clicking the remove button on an override removes that row", () => {
     render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[]}
         availableRepos={someRepos}
         value={emptyValue}
@@ -211,7 +234,8 @@ describe("TrackedChecksSettings", () => {
   it("clicking the close button calls onClose", () => {
     const onClose = vi.fn();
     render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[]}
         availableRepos={[]}
         value={emptyValue}
@@ -220,16 +244,15 @@ describe("TrackedChecksSettings", () => {
         onClose={onClose}
       />,
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: /close tracked checks settings/i }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: /^close settings$/i }));
     expect(onClose).toHaveBeenCalled();
   });
 
   it("clicking the backdrop does NOT call onClose", () => {
     const onClose = vi.fn();
     const { container } = render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[]}
         availableRepos={[]}
         value={emptyValue}
@@ -246,7 +269,8 @@ describe("TrackedChecksSettings", () => {
   it("pressing Escape calls onClose", () => {
     const onClose = vi.fn();
     render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[]}
         availableRepos={[]}
         value={emptyValue}
@@ -261,7 +285,8 @@ describe("TrackedChecksSettings", () => {
 
   it("panel has dialog role when open", () => {
     render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[]}
         availableRepos={[]}
         value={emptyValue}
@@ -275,7 +300,8 @@ describe("TrackedChecksSettings", () => {
 
   it("repo override field shows availableRepos as suggestions on focus", () => {
     render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[]}
         availableRepos={["acme/web", "beta/api"]}
         value={emptyValue}
@@ -298,7 +324,8 @@ describe("TrackedChecksSettings", () => {
       repos: { "legacy/repo": ["ci"] },
     };
     render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[]}
         availableRepos={[]}
         value={value}
@@ -315,7 +342,8 @@ describe("TrackedChecksSettings", () => {
   it("selecting a repo and entering checks calls onChange with the right repos shape", () => {
     const onChange = vi.fn();
     render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[]}
         availableRepos={["acme/web"]}
         value={emptyValue}
@@ -340,7 +368,8 @@ describe("TrackedChecksSettings", () => {
   it("merges checks from two rows targeting the same repo (union, de-duplicated)", () => {
     const onChange = vi.fn();
     render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[]}
         availableRepos={["acme/web"]}
         value={emptyValue}
@@ -381,7 +410,8 @@ describe("TrackedChecksSettings", () => {
   it("distinct repos still map independently with no cross-contamination", () => {
     const onChange = vi.fn();
     render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[]}
         availableRepos={["acme/web", "beta/api"]}
         value={emptyValue}
@@ -418,7 +448,8 @@ describe("TrackedChecksSettings", () => {
 
   it("shows empty-state hint and Add override button when availableRepos and configured repos are both empty", () => {
     render(
-      <TrackedChecksSettings
+      <SettingsModal
+        {...filterProps}
         orgs={[]}
         availableRepos={[]}
         value={emptyValue}
@@ -432,5 +463,95 @@ describe("TrackedChecksSettings", () => {
     ).toBeInTheDocument();
     // Add override is always available so the user can search server-side
     expect(screen.getByRole("button", { name: /add override/i })).toBeInTheDocument();
+  });
+
+  it("shows the Settings title", () => {
+    render(
+      <SettingsModal
+        {...filterProps}
+        orgs={[]}
+        availableRepos={[]}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
+  });
+
+  it.each([
+    ["Hide drafts", "hideDrafts", "onHideDraftsChange", false],
+    ["Show bot comments", "showBots", "onShowBotsChange", false],
+    ["Hide comments I reacted to", "hideReacted", "onHideReactedChange", true],
+    ["Auto refresh (every 60s)", "autoRefresh", "onAutoRefreshChange", false],
+  ] as const)(
+    "%s checkbox reflects its prop and calls its setter",
+    (label, propName, setterName, initial) => {
+      const setter = vi.fn();
+      render(
+        <SettingsModal
+          {...filterProps}
+          {...{ [propName]: initial, [setterName]: setter }}
+          orgs={[]}
+          availableRepos={[]}
+          value={emptyValue}
+          onChange={vi.fn()}
+          open={true}
+          onClose={vi.fn()}
+        />,
+      );
+      const checkbox = screen.getByRole("checkbox", { name: label });
+      if (initial) expect(checkbox).toBeChecked();
+      else expect(checkbox).not.toBeChecked();
+      fireEvent.click(checkbox);
+      expect(setter).toHaveBeenCalledWith(!initial);
+    },
+  );
+
+  it("shows the blocked-notifications hint when permission is denied and auto refresh is on", () => {
+    vi.stubGlobal("Notification", { permission: "denied" });
+    try {
+      render(
+        <SettingsModal
+          {...filterProps}
+          autoRefresh={true}
+          orgs={[]}
+          availableRepos={[]}
+          value={emptyValue}
+          onChange={vi.fn()}
+          open={true}
+          onClose={vi.fn()}
+        />,
+      );
+      expect(
+        screen.getByText(/notifications are blocked in your browser/i),
+      ).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("hides the blocked-notifications hint when auto refresh is off", () => {
+    vi.stubGlobal("Notification", { permission: "denied" });
+    try {
+      render(
+        <SettingsModal
+          {...filterProps}
+          autoRefresh={false}
+          orgs={[]}
+          availableRepos={[]}
+          value={emptyValue}
+          onChange={vi.fn()}
+          open={true}
+          onClose={vi.fn()}
+        />,
+      );
+      expect(
+        screen.queryByText(/notifications are blocked in your browser/i),
+      ).not.toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

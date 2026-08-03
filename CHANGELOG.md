@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.0](https://github.com/mfozmen/PRison/compare/v1.1.1...v1.2.0) (2026-08-03)
+
+### Features
+
+* hide review threads I acknowledged with an emoji reaction ([#7](https://github.com/mfozmen/PRison/issues/7)) ([49bc08c](https://github.com/mfozmen/PRison/commit/49bc08c))
+
 ## [1.1.1](https://github.com/mfozmen/PRison/compare/v1.1.0...v1.1.1) (2026-07-30)
 
 ## [1.1.0](https://github.com/mfozmen/PRison/compare/v1.0.0...v1.1.0) (2026-07-27)

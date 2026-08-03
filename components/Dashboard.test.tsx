@@ -2048,3 +2048,104 @@ describe("Dashboard — auto refresh", () => {
     expect(constructed).toHaveLength(0);
   });
 });
+
+// The stuck branch of the silent-poll guard is covered above; these cover the
+// other four, which have the same "keep the list, stay quiet" contract.
+describe("Dashboard — silent poll failure on the non-stuck lists", () => {
+  // Every list serves one item so a failed poll has something to preserve;
+  // `failPath` makes exactly one endpoint answer 500 from the next poll on.
+  let failPath: string | null;
+
+  function pollFetch() {
+    return vi.fn((url: string) => {
+      if (failPath && url.includes(failPath)) {
+        return Promise.resolve({ ok: false, status: 500 });
+      }
+      return Promise.resolve({
+        ok: true,
+        headers: { get: () => null },
+        json: () =>
+          Promise.resolve(
+            url.includes("closed")
+              ? makeClosed(1)
+              : url.includes("pr-comments")
+                ? [COMMENT]
+                : url.includes("ready")
+                  ? [READY_PR]
+                  : url.includes("stuck")
+                    ? [STUCK_PR]
+                    : [REVIEW_PR],
+          ),
+      });
+    }) as unknown as typeof fetch;
+  }
+
+  const CASES = [
+    {
+      list: "review-requests",
+      path: "review-requests",
+      item: "review pr",
+      banner: /failed to load review requests/i,
+    },
+    {
+      list: "ready-prs",
+      path: "ready-to-merge",
+      item: "ready pr",
+      banner: /failed to load ready-to-merge prs/i,
+    },
+    {
+      list: "pr-comments",
+      path: "pr-comments",
+      item: "please fix the null check",
+      banner: /failed to load comments/i,
+    },
+    {
+      list: "closed-prs",
+      path: "closed-prs",
+      item: "closed pr 0",
+      banner: /failed to load closed prs/i,
+    },
+  ];
+
+  beforeEach(() => {
+    failPath = null;
+    localStorage.setItem("prison.autoRefresh", "true");
+    localStorage.setItem("prison.closedOpen", "true");
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    global.fetch = pollFetch();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it.each(CASES)("keeps the $list list on screen when its silent poll fails", async ({ path, item }) => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText(item)).toBeInTheDocument();
+
+    failPath = path;
+    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    expect(screen.getByText(item)).toBeInTheDocument();
+  });
+
+  it.each(CASES)("raises no $list error banner when its silent poll fails", async ({ path, item, banner }) => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText(item)).toBeInTheDocument();
+
+    failPath = path;
+    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    expect(screen.queryByText(banner)).not.toBeInTheDocument();
+  });
+
+  it.each(CASES)("restores the $list list from the next successful poll", async ({ path, item }) => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText(item)).toBeInTheDocument();
+
+    failPath = path;
+    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    failPath = null;
+    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    expect(screen.getByText(item)).toBeInTheDocument();
+  });
+});

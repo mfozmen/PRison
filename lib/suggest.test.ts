@@ -123,7 +123,7 @@ describe("suggestComment", () => {
     const c: PrComment = {
       id: "t1", prId: "PR_1", url: "https://github.com/acme/b/pull/2#discussion_r1",
       repo: "acme/b", number: 2, author: "alice", isBot: false,
-      path: "src/app.ts", preview: "please fix", commentedAt: "x",
+      path: "src/app.ts", preview: "please fix", commentedAt: "x", viewerReacted: false,
     };
     expect(suggestComment(c)).toEqual({
       text: "Reply to alice",

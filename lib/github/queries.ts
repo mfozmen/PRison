@@ -218,6 +218,7 @@ export const PR_COMMENTS_QUERY = `
           comments(last: 1) { nodes {
             author { login __typename }
             bodyText createdAt url
+            reactionGroups { viewerHasReacted }
           } }
         } }
       } }
@@ -244,6 +245,10 @@ function previewOf(bodyText: string): string {
  *
  * Bot comments are kept (with isBot set) rather than dropped here: the Dashboard
  * hides them behind a toggle, so filtering server-side would make the toggle a no-op.
+ *
+ * A viewer emoji reaction on the last comment (viewerReacted) is surfaced the same
+ * way: reacting is how the viewer acknowledges a comment without replying, and the
+ * Dashboard hides acknowledged threads behind a toggle.
  */
 export function parsePrComments(raw: any, viewerLogin: string): PrComment[] {
   return (raw?.search?.nodes ?? [])
@@ -264,6 +269,7 @@ export function parsePrComments(raw: any, viewerLogin: string): PrComment[] {
           path: thread.path ?? "",
           preview: previewOf(last.bodyText ?? ""),
           commentedAt: last.createdAt ?? "",
+          viewerReacted: (last.reactionGroups ?? []).some((g: any) => g?.viewerHasReacted === true),
         } as PrComment)),
     );
 }

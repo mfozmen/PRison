@@ -63,6 +63,16 @@ const COMMENT = {
   path: "src/app.ts",
   preview: "please fix the null check",
   commentedAt: "2026-06-19T00:00:00Z",
+  viewerReacted: false,
+};
+
+// A comment the viewer acknowledged with an emoji reaction (on STUCK_PR).
+const REACTED_COMMENT = {
+  ...COMMENT,
+  id: "t4",
+  url: "https://github.com/acme/b/pull/2#discussion_r4",
+  preview: "reacted with a thumbs up",
+  viewerReacted: true,
 };
 
 const BOT_COMMENT = {
@@ -1616,6 +1626,33 @@ describe("Dashboard — comments awaiting your reply", () => {
     global.fetch = fetchWithComments([BOT_COMMENT]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("bot says something")).toBeInTheDocument();
+  });
+
+  it("hides comments I reacted to by default and reveals them when the toggle is unchecked", async () => {
+    global.fetch = fetchWithComments([COMMENT, REACTED_COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("please fix the null check")).toBeInTheDocument();
+    expect(screen.queryByText("reacted with a thumbs up")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText(/hide comments i reacted to/i));
+    expect(await screen.findByText("reacted with a thumbs up")).toBeInTheDocument();
+  });
+
+  it("persists unchecking 'Hide comments I reacted to' to localStorage", async () => {
+    global.fetch = fetchWithComments([REACTED_COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    const toggle = await screen.findByLabelText(/hide comments i reacted to/i);
+    fireEvent.click(toggle);
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.hideReacted")).toBe("false"),
+    );
+  });
+
+  it("restores the disabled 'Hide comments I reacted to' toggle on mount", async () => {
+    localStorage.setItem("prison.hideReacted", "false");
+    global.fetch = fetchWithComments([REACTED_COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("reacted with a thumbs up")).toBeInTheDocument();
   });
 
   it("shows an error banner and retry when the comments fetch fails, without breaking the other lists", async () => {

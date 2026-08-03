@@ -33,6 +33,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // Bots author the large majority of unanswered review threads, so they are
   // hidden by default; the filter is client-side to keep the toggle instant.
   const [showBots, setShowBots] = useState(false);
+  // Reacting with an emoji is how the user acknowledges a comment without replying,
+  // so reacted threads are hidden by default; client-side to keep the toggle instant.
+  const [hideReacted, setHideReacted] = useState(true);
   const [groupBy, setGroupBy] = useState<"flat" | "repo" | "check">("flat");
 
   const [tracked, setTracked] = useState<TrackedChecks>(EMPTY_TRACKED);
@@ -156,6 +159,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     const stored = localStorage.getItem("prison.org");
     const storedHideDrafts = localStorage.getItem("prison.hideDrafts");
     const storedShowBots = localStorage.getItem("prison.showBots");
+    const storedHideReacted = localStorage.getItem("prison.hideReacted");
     const storedGroupBy = localStorage.getItem("prison.groupBy");
     const storedTracked = localStorage.getItem("prison.trackedChecks");
     const storedClosedOpen = localStorage.getItem("prison.closedOpen");
@@ -172,6 +176,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       }
       if (storedShowBots === "true") {
         setShowBots(true);
+      }
+      if (storedHideReacted === "false") {
+        setHideReacted(false);
       }
       if (storedGroupBy === "repo" || storedGroupBy === "check") {
         setGroupBy(storedGroupBy);
@@ -200,6 +207,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     if (!hydrated) return;
     localStorage.setItem("prison.showBots", String(showBots));
   }, [showBots, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.hideReacted", String(hideReacted));
+  }, [hideReacted, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -260,7 +272,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     ...visibleReady.map((pr) => pr.id),
   ]);
   const visibleComments = sortByAgeAsc(
-    comments.filter((c) => visiblePrIds.has(c.prId) && (showBots || !c.isBot)),
+    comments.filter(
+      (c) =>
+        visiblePrIds.has(c.prId) &&
+        (showBots || !c.isBot) &&
+        !(hideReacted && c.viewerReacted),
+    ),
     (c) => c.commentedAt,
   );
 
@@ -327,6 +344,15 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               className="h-4 w-4 rounded border-border bg-surface accent-accent"
             />
             Show bot comments
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={hideReacted}
+              onChange={(e) => setHideReacted(e.target.checked)}
+              className="h-4 w-4 rounded border-border bg-surface accent-accent"
+            />
+            Hide comments I reacted to
           </label>
           <div role="group" aria-label="Group by" className="flex rounded-md">
             <button

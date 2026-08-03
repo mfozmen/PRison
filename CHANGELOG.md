@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.0](https://github.com/mfozmen/PRison/compare/v1.3.0...v1.4.0) (2026-08-03)
+
+### Features
+
+* make the auto-refresh interval selectable and show when data last landed ([#9](https://github.com/mfozmen/PRison/issues/9)) ([11fc200](https://github.com/mfozmen/PRison/commit/11fc2006a03e42352684507ca733589b04f46493))
+
 ## [1.3.0](https://github.com/mfozmen/PRison/compare/v1.2.0...v1.3.0) (2026-08-03)
 
 ### Features

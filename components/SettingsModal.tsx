@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, type ReactNode } from "react";
 import type { Org } from "@/lib/types";
 import type { TrackedChecks } from "@/lib/tracked-checks";
 import { RepoCombobox } from "./RepoCombobox";
+import { POLL_INTERVAL_OPTIONS } from "@/lib/notify";
 
 export interface SettingsModalProps {
   orgs: Org[];
@@ -22,6 +23,8 @@ export interface SettingsModalProps {
   onHideReactedChange: (v: boolean) => void;
   autoRefresh: boolean;
   onAutoRefreshChange: (v: boolean) => void;
+  pollInterval: number;
+  onPollIntervalChange: (ms: number) => void;
 }
 
 interface RepoRow {
@@ -89,6 +92,8 @@ export function SettingsModal({
   onHideReactedChange,
   autoRefresh,
   onAutoRefreshChange,
+  pollInterval,
+  onPollIntervalChange,
 }: SettingsModalProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -239,11 +244,27 @@ export function SettingsModal({
         <section className="mb-6">
           <h3 className="mb-2 text-sm font-medium text-foreground">Auto refresh</h3>
           <SettingCheckbox checked={autoRefresh} onChange={onAutoRefreshChange}>
-            Auto refresh (every 60s)
+            Auto refresh
           </SettingCheckbox>
+          <label className="mt-2 flex items-center gap-2 text-sm text-muted">
+            <span>Check</span>
+            <select
+              value={pollInterval}
+              onChange={(e) => onPollIntervalChange(Number(e.target.value))}
+              disabled={!autoRefresh}
+              aria-label="Auto refresh interval"
+              className="min-h-[36px] rounded-md border border-border bg-surface px-2 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {POLL_INTERVAL_OPTIONS.map((o) => (
+                <option key={o.ms} value={o.ms}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <p className="mt-2 text-xs text-muted">
-            Checks for new items every minute and sends a desktop notification
-            while a PRison tab is open.
+            Looks for new items on this schedule and sends a desktop
+            notification while a PRison tab is open.
           </p>
           {autoRefresh &&
             typeof Notification !== "undefined" &&

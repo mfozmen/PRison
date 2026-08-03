@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { SettingsModal } from "./SettingsModal";
 import type { Org } from "@/lib/types";
 import type { TrackedChecks } from "@/lib/tracked-checks";
+import { DEFAULT_POLL_INTERVAL_MS, POLL_INTERVAL_OPTIONS } from "@/lib/notify";
 
 // Defaults for the filter/auto-refresh props so the tracked-checks tests stay
 // focused on their own concern.
@@ -15,6 +16,8 @@ const filterProps = {
   onHideReactedChange: vi.fn(),
   autoRefresh: false,
   onAutoRefreshChange: vi.fn(),
+  pollInterval: DEFAULT_POLL_INTERVAL_MS,
+  onPollIntervalChange: vi.fn(),
 };
 
 const orgs: Org[] = [
@@ -484,7 +487,7 @@ describe("SettingsModal", () => {
     ["Hide drafts", "hideDrafts", "onHideDraftsChange", false],
     ["Show bot comments", "showBots", "onShowBotsChange", false],
     ["Hide comments I reacted to", "hideReacted", "onHideReactedChange", true],
-    ["Auto refresh (every 60s)", "autoRefresh", "onAutoRefreshChange", false],
+    ["Auto refresh", "autoRefresh", "onAutoRefreshChange", false],
   ] as const)(
     "%s checkbox reflects its prop and calls its setter",
     (label, propName, setterName, initial) => {
@@ -508,6 +511,68 @@ describe("SettingsModal", () => {
       expect(setter).toHaveBeenCalledWith(!initial);
     },
   );
+
+  it("offers every poll interval and reflects the selected one", () => {
+    render(
+      <SettingsModal
+        {...filterProps}
+        autoRefresh={true}
+        pollInterval={POLL_INTERVAL_OPTIONS[0].ms}
+        orgs={[]}
+        availableRepos={[]}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    const select = screen.getByRole("combobox", { name: /auto refresh interval/i });
+    expect(select).toHaveValue(String(POLL_INTERVAL_OPTIONS[0].ms));
+    for (const o of POLL_INTERVAL_OPTIONS) {
+      expect(screen.getByRole("option", { name: o.label })).toBeInTheDocument();
+    }
+  });
+
+  it("reports the chosen interval as a number", () => {
+    const onPollIntervalChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        autoRefresh={true}
+        onPollIntervalChange={onPollIntervalChange}
+        orgs={[]}
+        availableRepos={[]}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    const target = POLL_INTERVAL_OPTIONS[POLL_INTERVAL_OPTIONS.length - 1];
+    fireEvent.change(
+      screen.getByRole("combobox", { name: /auto refresh interval/i }),
+      { target: { value: String(target.ms) } },
+    );
+    expect(onPollIntervalChange).toHaveBeenCalledWith(target.ms);
+  });
+
+  it("disables the interval select while auto refresh is off", () => {
+    render(
+      <SettingsModal
+        {...filterProps}
+        autoRefresh={false}
+        orgs={[]}
+        availableRepos={[]}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole("combobox", { name: /auto refresh interval/i }),
+    ).toBeDisabled();
+  });
 
   it("shows the blocked-notifications hint when permission is denied and auto refresh is on", () => {
     vi.stubGlobal("Notification", { permission: "denied" });

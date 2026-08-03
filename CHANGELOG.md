@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.0](https://github.com/mfozmen/PRison/compare/v1.2.0...v1.3.0) (2026-08-03)
+
+### Features
+
+* auto refresh with desktop notifications and a Settings modal ([#8](https://github.com/mfozmen/PRison/issues/8)) ([d099f89](https://github.com/mfozmen/PRison/commit/d099f89cbb2cd37a2c3cad0debc228849a32a692))
+
 ## [1.2.0](https://github.com/mfozmen/PRison/compare/v1.1.1...v1.2.0) (2026-08-03)
 
 ### Features

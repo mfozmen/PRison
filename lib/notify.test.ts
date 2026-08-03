@@ -6,11 +6,34 @@ import {
   withoutBadge,
   showNewItemsNotification,
   maybeRequestNotificationPermission,
+  parsePollInterval,
+  POLL_INTERVAL_OPTIONS,
+  DEFAULT_POLL_INTERVAL_MS,
 } from "./notify";
 import { stubNotification } from "./fixtures";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("parsePollInterval", () => {
+  it("accepts any offered option", () => {
+    for (const o of POLL_INTERVAL_OPTIONS) {
+      expect(parsePollInterval(String(o.ms))).toBe(o.ms);
+    }
+  });
+
+  it.each([null, "", "abc", "0", "12345", "-60000"])(
+    "falls back to the default for %o",
+    (stored) => {
+      expect(parsePollInterval(stored)).toBe(DEFAULT_POLL_INTERVAL_MS);
+    },
+  );
+
+  it("defaults to 30 minutes", () => {
+    expect(DEFAULT_POLL_INTERVAL_MS).toBe(30 * 60_000);
+    expect(POLL_INTERVAL_OPTIONS.some((o) => o.ms === DEFAULT_POLL_INTERVAL_MS)).toBe(true);
+  });
 });
 
 describe("collectIds", () => {

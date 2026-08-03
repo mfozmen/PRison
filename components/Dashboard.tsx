@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useTransition } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, useTransition } from "react";
 import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr } from "@/lib/types";
-import { sortByAgeAsc, sortByAgeDesc } from "@/lib/prioritize";
+import { sortByAgeAsc, sortByAgeDesc, relativeAge } from "@/lib/prioritize";
 import { suggestStuck, suggestReview, suggestReady, suggestComment, needsReview, stuckGroupKeys, reviewDecisionLabel } from "@/lib/suggest";
 import { PrList } from "./PrList";
 import { PrRow } from "./PrRow";
@@ -11,7 +11,8 @@ import { Header } from "./Header";
 import { SettingsModal } from "./SettingsModal";
 import { type TrackedChecks, EMPTY_TRACKED, parseTracked, awaitingChecks } from "@/lib/tracked-checks";
 import {
-  POLL_INTERVAL_MS,
+  DEFAULT_POLL_INTERVAL_MS,
+  parsePollInterval,
   collectIds,
   countNewIds,
   withBadge,
@@ -47,6 +48,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [hideReacted, setHideReacted] = useState(true);
   const [groupBy, setGroupBy] = useState<"flat" | "repo" | "check">("flat");
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [pollInterval, setPollInterval] = useState(DEFAULT_POLL_INTERVAL_MS);
+  // Stamped on every completed fetch (manual or silent). Null until the first
+  // one lands, so the server render has nothing time-dependent in it.
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
+  // Ticks once a minute so the "Updated Xm ago" label ages on its own.
+  const [nowTick, setNowTick] = useState(0);
 
   const [tracked, setTracked] = useState<TrackedChecks>(EMPTY_TRACKED);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -135,6 +142,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         // Batched with the data setters, so they land in the same commit.
         if (silent) setPollGen((g) => g + 1);
 
+        // The label answers "how stale is what I'm looking at", so it only
+        // moves when something actually landed. A fetch where every endpoint
+        // rejected refreshed nothing, and claiming otherwise would hide the
+        // staleness the label exists to show.
+        if ([stuckResult, reviewResult, readyResult, commentsResult, closedResult].some((r) => r.status === "fulfilled")) {
+          setLastRefreshedAt(new Date().toISOString());
+        }
+
         // A silent poll runs unattended, so a rejected endpoint must not
         // clobber the good list already on screen or raise an error banner
         // nobody asked for — it keeps the previous state and self-heals on
@@ -211,6 +226,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     const storedHideReacted = localStorage.getItem("prison.hideReacted");
     const storedGroupBy = localStorage.getItem("prison.groupBy");
     const storedAutoRefresh = localStorage.getItem("prison.autoRefresh");
+    const storedPollInterval = localStorage.getItem("prison.pollInterval");
     const storedTracked = localStorage.getItem("prison.trackedChecks");
     const storedClosedOpen = localStorage.getItem("prison.closedOpen");
     startTransition(() => {
@@ -236,6 +252,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       if (storedAutoRefresh === "true") {
         setAutoRefresh(true);
       }
+      setPollInterval(parsePollInterval(storedPollInterval));
       if (storedClosedOpen === "true") {
         setClosedOpen(true);
       }
@@ -286,14 +303,27 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     localStorage.setItem("prison.autoRefresh", String(autoRefresh));
   }, [autoRefresh, hydrated]);
 
-  // Auto refresh: poll silently at a fixed interval. Keeps polling while the
-  // tab is hidden — that's the point (badge + desktop notification). No
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.pollInterval", String(pollInterval));
+  }, [pollInterval, hydrated]);
+
+  // Auto refresh: poll silently at the chosen interval. Keeps polling while
+  // the tab is hidden — that's the point (badge + desktop notification). No
   // immediate fire, so it never double-fetches with the org effect above.
   useEffect(() => {
     if (!hydrated || !autoRefresh) return;
-    const id = setInterval(() => fetchData(selectedOrg, true), POLL_INTERVAL_MS);
+    const id = setInterval(() => fetchData(selectedOrg, true), pollInterval);
     return () => clearInterval(id);
-  }, [hydrated, autoRefresh, selectedOrg, fetchData]);
+  }, [hydrated, autoRefresh, pollInterval, selectedOrg, fetchData]);
+
+  // Age the "Updated Xm ago" label without a fetch. Only runs once there is
+  // something to age.
+  useEffect(() => {
+    if (!lastRefreshedAt) return;
+    const id = setInterval(() => setNowTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, [lastRefreshedAt]);
 
   // Returning to the tab means the new items are on screen: clear the badge.
   useEffect(() => {
@@ -311,6 +341,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
+
+  // nowTick is only a re-render trigger — it makes the label age between
+  // fetches instead of freezing at whatever it said when the data landed.
+  const lastRefreshedLabel = useMemo(() => {
+    if (!lastRefreshedAt) return null;
+    const age = relativeAge(lastRefreshedAt, new Date());
+    return age === "0m" ? "Updated just now" : `Updated ${age} ago`;
+  }, [lastRefreshedAt, nowTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Request notification permission only on an explicit enable (a user
   // gesture) — restoring the setting from localStorage must not prompt.
@@ -442,6 +480,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         onHideReactedChange={setHideReacted}
         autoRefresh={autoRefresh}
         onAutoRefreshChange={handleAutoRefreshChange}
+        pollInterval={pollInterval}
+        onPollIntervalChange={setPollInterval}
       />
       <main className="mx-auto w-full max-w-screen-2xl flex-1 space-y-8 px-4 sm:px-6 lg:px-8 py-8">
         {isPending && (
@@ -489,11 +529,22 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               By check
             </button>
           </div>
+          {/* Deliberately not a live region: the label re-renders every minute
+              as it ages, and announcing "Updated 4m ago" on a loop would talk
+              over everything else for as long as the tab is open. */}
+          {lastRefreshedAt && (
+            <p
+              className="ml-auto text-sm text-muted"
+              title={new Date(lastRefreshedAt).toLocaleString()}
+            >
+              {lastRefreshedLabel}
+            </p>
+          )}
           <button
             type="button"
             onClick={() => fetchData(selectedOrg)}
             disabled={isPending}
-            className="ml-auto flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-95 dark:hover:brightness-110 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            className={`flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-95 dark:hover:brightness-110 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${lastRefreshedAt ? "" : "ml-auto"}`}
           >
             <svg
               aria-hidden="true"

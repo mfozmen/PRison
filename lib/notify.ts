@@ -3,9 +3,26 @@
 // Notifications fire only while a PRison tab is open — there is no service
 // worker, so closing the last tab stops both polling and notifications.
 
-/** Poll interval for auto refresh. 5 API calls per poll stays well within
- * GitHub's limits, and background tabs throttle timers to ~1/min anyway. */
-export const POLL_INTERVAL_MS = 60_000;
+/** Selectable auto-refresh intervals. Each poll costs 5 API calls, so the
+ * shortest option is 5 minutes — enough to notice a blocked PR without
+ * burning rate limit on a tab left open all day. */
+export const POLL_INTERVAL_OPTIONS = [
+  { ms: 5 * 60_000, label: "Every 5 minutes" },
+  { ms: 15 * 60_000, label: "Every 15 minutes" },
+  { ms: 30 * 60_000, label: "Every 30 minutes" },
+  { ms: 60 * 60_000, label: "Every hour" },
+] as const;
+
+export const DEFAULT_POLL_INTERVAL_MS = 30 * 60_000;
+
+/** Read a stored interval back, falling back to the default for anything
+ * that isn't one of the offered options (missing, stale, or hand-edited). */
+export function parsePollInterval(stored: string | null): number {
+  const ms = Number(stored);
+  return POLL_INTERVAL_OPTIONS.some((o) => o.ms === ms)
+    ? ms
+    : DEFAULT_POLL_INTERVAL_MS;
+}
 
 /** Flatten item lists into a set of stable ids. Callers pass the four work
  * queues (stuck, review requests, ready, comments); closed PRs are history,

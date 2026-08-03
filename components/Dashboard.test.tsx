@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent, within, act } from "@testing-library/react";
 import { Dashboard } from "./Dashboard";
 import { stubNotification } from "@/lib/fixtures";
+import { POLL_INTERVAL_OPTIONS, DEFAULT_POLL_INTERVAL_MS } from "@/lib/notify";
+
+/** Shortest offered interval — keeps the fake-timer arithmetic short. */
+const POLL_MS = POLL_INTERVAL_OPTIONS[0].ms;
 
 const STUCK_PR = {
   id: "2",
@@ -1820,6 +1824,9 @@ describe("Dashboard — auto refresh", () => {
     closedList = [];
     document.title = "PRison";
     useNotificationStub("granted");
+    // Pin the shortest offered interval so the timer maths stay readable;
+    // the default (30 min) is exercised separately below.
+    localStorage.setItem("prison.pollInterval", String(POLL_MS));
     vi.useFakeTimers({ shouldAdvanceTime: true });
     global.fetch = mutableFetch();
   });
@@ -1834,15 +1841,108 @@ describe("Dashboard — auto refresh", () => {
     return (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
   }
 
-  it("polls all five endpoints every 60s when enabled, without the loading banner", async () => {
+  it("polls all five endpoints once per interval when enabled, without the loading banner", async () => {
     localStorage.setItem("prison.autoRefresh", "true");
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     expect(fetchCalls()).toBe(5);
 
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(fetchCalls()).toBe(10);
     expect(screen.queryByText(/loading/i)).not.toBeInTheDocument();
+  });
+
+  it("waits the stored interval, not the shortest one", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
+    const longest = POLL_INTERVAL_OPTIONS[POLL_INTERVAL_OPTIONS.length - 1].ms;
+    localStorage.setItem("prison.pollInterval", String(longest));
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    expect(fetchCalls()).toBe(5);
+
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    expect(fetchCalls()).toBe(5);
+
+    await act(() => vi.advanceTimersByTimeAsync(longest));
+    expect(fetchCalls()).toBe(10);
+  });
+
+  it("defaults to 30 minutes when nothing is stored", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
+    localStorage.removeItem("prison.pollInterval");
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    await act(() => vi.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS - 1000));
+    expect(fetchCalls()).toBe(5);
+
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(fetchCalls()).toBe(10);
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.pollInterval")).toBe(
+        String(DEFAULT_POLL_INTERVAL_MS),
+      ),
+    );
+  });
+
+  it("persists a new interval and restarts polling on it", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    const longest = POLL_INTERVAL_OPTIONS[POLL_INTERVAL_OPTIONS.length - 1].ms;
+    openSettings();
+    fireEvent.change(
+      screen.getByRole("combobox", { name: /auto refresh interval/i }),
+      { target: { value: String(longest) } },
+    );
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.pollInterval")).toBe(String(longest)),
+    );
+
+    // The old (shorter) timer must not survive the change.
+    const before = fetchCalls();
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    expect(fetchCalls()).toBe(before);
+  });
+
+  it("shows when the data was last refreshed and ages the label", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    expect(await screen.findByText("Updated just now")).toBeInTheDocument();
+
+    // The label ages on its own minute tick, with no further fetching.
+    const before = fetchCalls();
+    await act(() => vi.advanceTimersByTimeAsync(3 * 60_000));
+    expect(screen.getByText("Updated 3m ago")).toBeInTheDocument();
+    expect(fetchCalls()).toBe(before);
+  });
+
+  it("resets the last-refreshed label after a silent poll", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    expect(await screen.findByText("Updated just now")).toBeInTheDocument();
+  });
+
+  it("keeps the last-refreshed label stale when every endpoint fails on a silent poll", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    expect(await screen.findByText("Updated just now")).toBeInTheDocument();
+
+    // Every one of the five endpoints answers 500, so the poll fetches nothing.
+    global.fetch = vi.fn(() =>
+      Promise.resolve({ ok: false, status: 500 }),
+    ) as unknown as typeof fetch;
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+
+    // The list is untouched (silent-poll policy) and the label keeps aging from
+    // the last fetch that actually landed, instead of claiming fresh data.
+    expect(screen.getByText("stuck pr")).toBeInTheDocument();
+    expect(screen.getByText(`Updated ${POLL_MS / 60_000}m ago`)).toBeInTheDocument();
   });
 
   it("keeps the displayed list and raises no error banner when a silent poll fails", async () => {
@@ -1851,7 +1951,7 @@ describe("Dashboard — auto refresh", () => {
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
 
     failStuck = true;
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(screen.getByText("stuck pr")).toBeInTheDocument();
     expect(
       screen.queryByText(/failed to load stuck prs/i),
@@ -1860,7 +1960,7 @@ describe("Dashboard — auto refresh", () => {
     // The next successful poll updates in place as usual.
     failStuck = false;
     stuckList = [STUCK_PR, NEW_STUCK_PR];
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(screen.getByText("brand new stuck pr")).toBeInTheDocument();
   });
 
@@ -1873,14 +1973,14 @@ describe("Dashboard — auto refresh", () => {
     fireEvent.click(screen.getByRole("button", { name: /load more/i }));
     expect(screen.getByText("closed pr 19")).toBeInTheDocument();
 
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(screen.getByText("closed pr 19")).toBeInTheDocument();
   });
 
   it("does not poll when auto refresh is off", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    await act(() => vi.advanceTimersByTimeAsync(120_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS * 2));
     expect(fetchCalls()).toBe(5);
   });
 
@@ -1903,12 +2003,12 @@ describe("Dashboard — auto refresh", () => {
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
 
     // First poll with unchanged data: nothing to announce.
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(document.title).toBe("PRison");
     expect(constructed).toHaveLength(0);
 
     stuckList = [STUCK_PR, NEW_STUCK_PR];
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(document.title).toBe("(1) PRison");
     expect(constructed).toHaveLength(1);
     expect(constructed[0].options?.tag).toBe("prison-new-items");
@@ -1925,7 +2025,7 @@ describe("Dashboard — auto refresh", () => {
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
 
     stuckList = [STUCK_PR, NEW_STUCK_PR];
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(document.title).toBe("(1) PRison");
 
     // jsdom's document.hidden is false, so this exercises the visible branch.
@@ -1942,7 +2042,7 @@ describe("Dashboard — auto refresh", () => {
     // A bot comment arrives, but showBots defaults to false — it is not on
     // screen, so it must not badge or notify.
     extraBotComment = true;
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(document.title).toBe("PRison");
     expect(constructed).toHaveLength(0);
   });
@@ -1954,7 +2054,7 @@ describe("Dashboard — auto refresh", () => {
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
 
     stuckList = [STUCK_PR, NEW_STUCK_PR];
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(await screen.findByText("brand new stuck pr")).toBeInTheDocument();
     expect(document.title).toBe("PRison");
     expect(constructed).toHaveLength(0);
@@ -1976,7 +2076,7 @@ describe("Dashboard — auto refresh", () => {
     expect(constructed).toHaveLength(0);
 
     // The next poll sees the same data — still nothing new.
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(document.title).toBe("PRison");
     expect(constructed).toHaveLength(0);
   });
@@ -1993,12 +2093,12 @@ describe("Dashboard — auto refresh", () => {
     localStorage.setItem("prison.autoRefresh", "true");
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(fetchCalls()).toBe(10);
 
     openSettings();
     fireEvent.click(screen.getByRole("checkbox", { name: /auto refresh/i }));
-    await act(() => vi.advanceTimersByTimeAsync(120_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS * 2));
     expect(fetchCalls()).toBe(10);
   });
 
@@ -2009,11 +2109,11 @@ describe("Dashboard — auto refresh", () => {
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
 
     stuckList = [STUCK_PR, NEW_STUCK_PR];
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(document.title).toBe("(1) PRison");
 
     stuckList = [STUCK_PR, NEW_STUCK_PR, { ...STUCK_PR, id: "new-2", title: "second new stuck pr" }];
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(document.title).toBe("(2) PRison");
     expect(constructed.at(-1)?.options?.body).toBe("2 new items need your attention");
   });
@@ -2027,9 +2127,9 @@ describe("Dashboard — auto refresh", () => {
 
     // The item vanishes on one poll and returns on the next.
     stuckList = [STUCK_PR];
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     stuckList = [STUCK_PR, NEW_STUCK_PR];
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
 
     expect(document.title).toBe("PRison");
     expect(constructed).toHaveLength(0);
@@ -2043,7 +2143,7 @@ describe("Dashboard — auto refresh", () => {
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
 
     stuckList = [STUCK_PR, NEW_STUCK_PR];
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(document.title).toBe("(1) PRison");
     expect(constructed).toHaveLength(0);
   });
@@ -2110,6 +2210,7 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
   beforeEach(() => {
     failPath = null;
     localStorage.setItem("prison.autoRefresh", "true");
+    localStorage.setItem("prison.pollInterval", String(POLL_MS));
     localStorage.setItem("prison.closedOpen", "true");
     vi.useFakeTimers({ shouldAdvanceTime: true });
     global.fetch = pollFetch();
@@ -2125,7 +2226,7 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
     expect(await screen.findByText(item)).toBeInTheDocument();
 
     failPath = path;
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(screen.getByText(item)).toBeInTheDocument();
   });
 
@@ -2134,7 +2235,7 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
     expect(await screen.findByText(item)).toBeInTheDocument();
 
     failPath = path;
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(screen.queryByText(banner)).not.toBeInTheDocument();
   });
 
@@ -2143,9 +2244,9 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
     expect(await screen.findByText(item)).toBeInTheDocument();
 
     failPath = path;
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     failPath = null;
-    await act(() => vi.advanceTimersByTimeAsync(60_000));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(screen.getByText(item)).toBeInTheDocument();
   });
 });

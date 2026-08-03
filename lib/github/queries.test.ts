@@ -1358,6 +1358,7 @@ describe("parsePrComments", () => {
       path: "src/app.ts",
       preview: "please fix",
       commentedAt: "2026-07-01T00:00:00Z",
+      viewerReacted: false,
     });
   });
 
@@ -1442,6 +1443,28 @@ describe("parsePrComments", () => {
       path: "",
       preview: "",
       commentedAt: "",
+      viewerReacted: false,
     });
+  });
+
+  it("marks viewerReacted when the viewer has an emoji reaction on the last comment", () => {
+    const [c] = parsePrComments(
+      raw([thread({}, { reactionGroups: [{ viewerHasReacted: true }] })]),
+      "mfozmen",
+    );
+    expect(c.viewerReacted).toBe(true);
+  });
+
+  it("leaves viewerReacted false when a reaction group exists but the viewer hasn't reacted", () => {
+    const [c] = parsePrComments(
+      raw([thread({}, { reactionGroups: [{ viewerHasReacted: false }] })]),
+      "mfozmen",
+    );
+    expect(c.viewerReacted).toBe(false);
+  });
+
+  it("leaves viewerReacted false when reactionGroups is absent", () => {
+    const [c] = parsePrComments(raw([thread()]), "mfozmen");
+    expect(c.viewerReacted).toBe(false);
   });
 });

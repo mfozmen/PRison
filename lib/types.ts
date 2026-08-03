@@ -56,6 +56,7 @@ export type PrComment = {
   path: string;        // file the thread hangs on
   preview: string;     // whitespace-normalized bodyText, at most PREVIEW_MAX chars, ellipsized when cut
   commentedAt: string; // ISO — when the ball landed in the viewer's court; drives the age badge
+  viewerReacted: boolean; // viewer has an emoji reaction on the last comment; the client can treat that as an acknowledgement and hide the thread
 };
 
 // One of the viewer's own closed PRs (author:@me is:closed) — merged or closed

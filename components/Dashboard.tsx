@@ -8,8 +8,17 @@ import { PrList } from "./PrList";
 import { PrRow } from "./PrRow";
 import { ClosedPrRow } from "./ClosedPrRow";
 import { Header } from "./Header";
-import { TrackedChecksSettings } from "./TrackedChecksSettings";
+import { SettingsModal } from "./SettingsModal";
 import { type TrackedChecks, EMPTY_TRACKED, parseTracked, awaitingChecks } from "@/lib/tracked-checks";
+import {
+  POLL_INTERVAL_MS,
+  collectIds,
+  countNewIds,
+  withBadge,
+  withoutBadge,
+  showNewItemsNotification,
+  maybeRequestNotificationPermission,
+} from "@/lib/notify";
 
 export interface DashboardProps {
   orgs: Org[];
@@ -37,6 +46,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // so reacted threads are hidden by default; client-side to keep the toggle instant.
   const [hideReacted, setHideReacted] = useState(true);
   const [groupBy, setGroupBy] = useState<"flat" | "repo" | "check">("flat");
+  const [autoRefresh, setAutoRefresh] = useState(false);
 
   const [tracked, setTracked] = useState<TrackedChecks>(EMPTY_TRACKED);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -61,9 +71,21 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // Tracks the most recently requested org so stale in-flight responses are
   // discarded instead of overwriting the current view.
   const latestOrgRef = useRef<string>(ALL);
+  // Ids the user has already had on screen; unioned whenever new ids become
+  // visible, so items that flap out and back never re-notify and a new scope's
+  // initial items are marked seen by their first (non-silent) fetch.
+  const seenIdsRef = useRef<Set<string>>(new Set());
+  // Bumped in the same state batch as a silent poll's results, so the commit
+  // where it changes is guaranteed to carry that poll's data — an interleaving
+  // commit can't consume the signal the way a ref flag could.
+  const [pollGen, setPollGen] = useState(0);
+  const lastPollGenRef = useRef(0);
+  // Running total of unseen new items across polls while the tab is unfocused,
+  // so the badge shows the accumulated count, not just the last poll's delta.
+  const unseenCountRef = useRef(0);
 
   const fetchData = useCallback(
-    (org: string) => {
+    (org: string, silent = false) => {
       latestOrgRef.current = org;
       const qs =
         org === login
@@ -71,7 +93,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           : org
             ? `?org=${encodeURIComponent(org)}`
             : "";
-      startTransition(async () => {
+      const run = async () => {
         const [stuckResult, reviewResult, readyResult, commentsResult, closedResult] = await Promise.allSettled([
           fetch(`/api/stuck-prs${qs}`).then(async (r) => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -107,40 +129,63 @@ export function Dashboard({ orgs, login }: DashboardProps) {
 
         if (latestOrgRef.current !== org) return;
 
-        setStuckError(
-          stuckResult.status === "rejected"
-            ? "Failed to load stuck PRs. Please retry."
-            : null,
-        );
-        setStuckPrs(stuckResult.status === "fulfilled" ? stuckResult.value.items : []);
-        setReviewError(
-          reviewResult.status === "rejected"
-            ? "Failed to load review requests. Please retry."
-            : null,
-        );
-        setReviewReqs(
-          reviewResult.status === "fulfilled" ? reviewResult.value.items : [],
-        );
-        setReadyError(
-          readyResult.status === "rejected"
-            ? "Failed to load ready-to-merge PRs. Please retry."
-            : null,
-        );
-        setReadyPrs(readyResult.status === "fulfilled" ? readyResult.value.items : []);
-        setCommentsError(
-          commentsResult.status === "rejected"
-            ? "Failed to load comments. Please retry."
-            : null,
-        );
-        setComments(commentsResult.status === "fulfilled" ? commentsResult.value.items : []);
-        setClosedError(
-          closedResult.status === "rejected"
-            ? "Failed to load closed PRs. Please retry."
-            : null,
-        );
-        setClosedPrs(closedResult.status === "fulfilled" ? closedResult.value.items : []);
-        // Fresh list for this scope, so collapse the reveal back to the first page.
-        setClosedVisible(CLOSED_PAGE_SIZE);
+        // Mark this commit for the detection effect below, which diffs the
+        // *visible* (filtered) lists rather than these raw results — so a
+        // badge or notification always maps to an item actually on screen.
+        // Batched with the data setters, so they land in the same commit.
+        if (silent) setPollGen((g) => g + 1);
+
+        // A silent poll runs unattended, so a rejected endpoint must not
+        // clobber the good list already on screen or raise an error banner
+        // nobody asked for — it keeps the previous state and self-heals on
+        // the next successful poll. User-initiated fetches keep reporting
+        // failures loudly.
+        if (!silent || stuckResult.status === "fulfilled") {
+          setStuckError(
+            stuckResult.status === "rejected"
+              ? "Failed to load stuck PRs. Please retry."
+              : null,
+          );
+          setStuckPrs(stuckResult.status === "fulfilled" ? stuckResult.value.items : []);
+        }
+        if (!silent || reviewResult.status === "fulfilled") {
+          setReviewError(
+            reviewResult.status === "rejected"
+              ? "Failed to load review requests. Please retry."
+              : null,
+          );
+          setReviewReqs(
+            reviewResult.status === "fulfilled" ? reviewResult.value.items : [],
+          );
+        }
+        if (!silent || readyResult.status === "fulfilled") {
+          setReadyError(
+            readyResult.status === "rejected"
+              ? "Failed to load ready-to-merge PRs. Please retry."
+              : null,
+          );
+          setReadyPrs(readyResult.status === "fulfilled" ? readyResult.value.items : []);
+        }
+        if (!silent || commentsResult.status === "fulfilled") {
+          setCommentsError(
+            commentsResult.status === "rejected"
+              ? "Failed to load comments. Please retry."
+              : null,
+          );
+          setComments(commentsResult.status === "fulfilled" ? commentsResult.value.items : []);
+        }
+        if (!silent || closedResult.status === "fulfilled") {
+          setClosedError(
+            closedResult.status === "rejected"
+              ? "Failed to load closed PRs. Please retry."
+              : null,
+          );
+          setClosedPrs(closedResult.status === "fulfilled" ? closedResult.value.items : []);
+        }
+        // Fresh list for this scope, so collapse the reveal back to the first
+        // page — but never on a silent poll, which refreshes in place and must
+        // not fold a "Load more" expansion the user is reading.
+        if (!silent) setClosedVisible(CLOSED_PAGE_SIZE);
         const anyPartial =
           (stuckResult.status === "fulfilled" && stuckResult.value.partial) ||
           (reviewResult.status === "fulfilled" && reviewResult.value.partial) ||
@@ -148,7 +193,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           (commentsResult.status === "fulfilled" && commentsResult.value.partial) ||
           (closedResult.status === "fulfilled" && closedResult.value.partial);
         setPartial(anyPartial);
-      });
+      };
+      // Silent polls skip the transition so isPending (the "Loading…" banner
+      // and the Refresh button's disabled state) never flashes every interval.
+      if (silent) void run();
+      else startTransition(run);
     },
     [startTransition, login],
   );
@@ -161,6 +210,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     const storedShowBots = localStorage.getItem("prison.showBots");
     const storedHideReacted = localStorage.getItem("prison.hideReacted");
     const storedGroupBy = localStorage.getItem("prison.groupBy");
+    const storedAutoRefresh = localStorage.getItem("prison.autoRefresh");
     const storedTracked = localStorage.getItem("prison.trackedChecks");
     const storedClosedOpen = localStorage.getItem("prison.closedOpen");
     startTransition(() => {
@@ -182,6 +232,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       }
       if (storedGroupBy === "repo" || storedGroupBy === "check") {
         setGroupBy(storedGroupBy);
+      }
+      if (storedAutoRefresh === "true") {
+        setAutoRefresh(true);
       }
       if (storedClosedOpen === "true") {
         setClosedOpen(true);
@@ -227,6 +280,44 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     if (!hydrated) return;
     localStorage.setItem("prison.closedOpen", String(closedOpen));
   }, [closedOpen, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.autoRefresh", String(autoRefresh));
+  }, [autoRefresh, hydrated]);
+
+  // Auto refresh: poll silently at a fixed interval. Keeps polling while the
+  // tab is hidden — that's the point (badge + desktop notification). No
+  // immediate fire, so it never double-fetches with the org effect above.
+  useEffect(() => {
+    if (!hydrated || !autoRefresh) return;
+    const id = setInterval(() => fetchData(selectedOrg, true), POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [hydrated, autoRefresh, selectedOrg, fetchData]);
+
+  // Returning to the tab means the new items are on screen: clear the badge.
+  useEffect(() => {
+    const clear = () => {
+      unseenCountRef.current = 0;
+      document.title = withoutBadge(document.title);
+    };
+    const onVisibility = () => {
+      if (!document.hidden) clear();
+    };
+    window.addEventListener("focus", clear);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", clear);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  // Request notification permission only on an explicit enable (a user
+  // gesture) — restoring the setting from localStorage must not prompt.
+  const handleAutoRefreshChange = useCallback((on: boolean) => {
+    setAutoRefresh(on);
+    if (on) maybeRequestNotificationPermission();
+  }, []);
 
   const availableRepos = Array.from(
     new Set([
@@ -284,6 +375,31 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // Newest-close first; the section renders only the first closedVisible rows.
   const sortedClosed = sortByAgeDesc(closedPrs, (pr) => pr.endedAt);
 
+  // New-item detection, against the visible (filtered) lists — a hidden bot
+  // comment, a reacted thread, or a filtered draft must never announce itself.
+  // Closed PRs are history, not a work queue, so they never notify. Runs after
+  // every commit: ordinary commits (filter toggles, manual refreshes, org
+  // switches) just mark what's on screen as seen; only the commit that carries
+  // a silent poll's results (pollGen changed) while the tab is unfocused may
+  // badge and notify — when focused the user sees the live update, and a badge
+  // set while focused would never clear.
+  useEffect(() => {
+    const prev = seenIdsRef.current;
+    const visible = collectIds([visibleStuck, visibleReviews, visibleReady, visibleComments]);
+    const newCount = countNewIds(prev, visible);
+    if (newCount > 0) {
+      seenIdsRef.current = new Set([...prev, ...visible]);
+    }
+    if (pollGen !== lastPollGenRef.current) {
+      lastPollGenRef.current = pollGen;
+      if (newCount > 0 && !document.hasFocus()) {
+        unseenCountRef.current += newCount;
+        document.title = withBadge(document.title, unseenCountRef.current);
+        showNewItemsNotification(unseenCountRef.current);
+      }
+    }
+  });
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header
@@ -310,7 +426,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           </div>
         </div>
       )}
-      <TrackedChecksSettings
+      <SettingsModal
         orgs={orgs}
         availableRepos={availableRepos}
         owners={repoOwners}
@@ -318,6 +434,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         onChange={setTracked}
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+        hideDrafts={hideDrafts}
+        onHideDraftsChange={setHideDrafts}
+        showBots={showBots}
+        onShowBotsChange={setShowBots}
+        hideReacted={hideReacted}
+        onHideReactedChange={setHideReacted}
+        autoRefresh={autoRefresh}
+        onAutoRefreshChange={handleAutoRefreshChange}
       />
       <main className="mx-auto w-full max-w-screen-2xl flex-1 space-y-8 px-4 sm:px-6 lg:px-8 py-8">
         {isPending && (
@@ -327,33 +451,6 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           </p>
         )}
         <div className="flex flex-wrap items-center gap-4">
-          <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={hideDrafts}
-              onChange={(e) => setHideDrafts(e.target.checked)}
-              className="h-4 w-4 rounded border-border bg-surface accent-accent"
-            />
-            Hide drafts
-          </label>
-          <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={showBots}
-              onChange={(e) => setShowBots(e.target.checked)}
-              className="h-4 w-4 rounded border-border bg-surface accent-accent"
-            />
-            Show bot comments
-          </label>
-          <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={hideReacted}
-              onChange={(e) => setHideReacted(e.target.checked)}
-              className="h-4 w-4 rounded border-border bg-surface accent-accent"
-            />
-            Hide comments I reacted to
-          </label>
           <div role="group" aria-label="Group by" className="flex rounded-md">
             <button
               type="button"

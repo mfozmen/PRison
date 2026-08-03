@@ -59,7 +59,7 @@ describe("Header", () => {
   it("clicking the gear button calls onOpenSettings", () => {
     const onOpenSettings = vi.fn();
     render(<Header orgs={orgs} selectedOrg="acme" onOrgChange={() => {}} login="mehmet" onOpenSettings={onOpenSettings} />);
-    fireEvent.click(screen.getByRole("button", { name: "Tracked checks settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,3 +1,4 @@
+import { vi } from "vitest";
 import type { StuckPr, ReviewRequest, ReadyPr } from "./types";
 
 /**
@@ -64,4 +65,23 @@ export function readyPr(overrides: Partial<ReadyPr> = {}): ReadyPr {
     viaBlocked: false,
     ...overrides,
   };
+}
+
+/**
+ * Shared Notification stub for jsdom (which has no Notification at all).
+ * Returns the constructed notifications and the requestPermission spy; callers
+ * clean up with `vi.unstubAllGlobals()`.
+ */
+export function stubNotification(permission: NotificationPermission) {
+  const constructed: Array<{ title: string; options?: NotificationOptions }> = [];
+  const requestPermission = vi.fn().mockResolvedValue(permission);
+  class FakeNotification {
+    static permission = permission;
+    static requestPermission = requestPermission;
+    constructor(title: string, options?: NotificationOptions) {
+      constructed.push({ title, options });
+    }
+  }
+  vi.stubGlobal("Notification", FakeNotification);
+  return { constructed, requestPermission };
 }

@@ -73,7 +73,7 @@ export function Header({ orgs, selectedOrg, onOrgChange, login, onOpenSettings }
         </span>
         <button
           type="button"
-          aria-label="Tracked checks settings"
+          aria-label="Settings"
           onClick={onOpenSettings}
           className="cursor-pointer rounded-md border border-border bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors hover:brightness-95 dark:hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >

@@ -90,10 +90,17 @@ describe("snapshotStatuses", () => {
     ["changes-requested", stuckPr({ reviewDecision: "CHANGES_REQUESTED", failing: ["build"] })],
     ["failing", stuckPr({ failing: ["build"], pending: ["lint"] })],
     ["pending", stuckPr({ pending: ["lint"] })],
-    ["blocked", stuckPr({ failing: [], pending: [] })],
   ] as const)("reports a stuck PR as %s", (status, pr) => {
     const snapshot = snapshotStatuses({ ...EMPTY, stuck: [pr] });
     expect(snapshot.get(pr.id)?.status).toBe(status);
+  });
+
+  it("does not distinguish waiting on CI from waiting on a review gate", () => {
+    // Splitting them would fire a notification the moment CI went green on a
+    // PR still awaiting review — announcing progress as a setback.
+    const running = snapshotStatuses({ ...EMPTY, stuck: [stuckPr({ pending: ["build"] })] });
+    const green = snapshotStatuses({ ...EMPTY, stuck: [stuckPr({ failing: [], pending: [] })] });
+    expect(diffStatuses(running, green)).toEqual([]);
   });
 
   it("stamps a comment thread with when it was last replied to", () => {
@@ -173,8 +180,7 @@ describe("describeEvents", () => {
     ["merged", "acme/api #2 was merged"],
     ["changes-requested", "acme/api #2 — changes requested"],
     ["failing", "acme/api #2 — checks failing"],
-    ["pending", "acme/api #2 — waiting on checks"],
-    ["blocked", "acme/api #2 — blocked from merging"],
+    ["pending", "acme/api #2 — waiting on checks or review"],
     ["review", "acme/api #2 needs your review"],
     ["comment", "acme/api #2 — new reply"],
   ] as const)("phrases %s", (status, expected) => {

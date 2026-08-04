@@ -35,7 +35,6 @@ export type ItemStatus =
   | "changes-requested"
   | "failing"
   | "pending"
-  | "blocked"
   | "review"
   | "comment";
 
@@ -53,12 +52,15 @@ export type StatusEvent = {
 export type StatusSnapshot = Map<string, StatusEvent>;
 
 /** A stuck PR's status: a human blocking it outranks a red check, which
- * outranks a running one. With neither, something else blocks the merge —
- * a required review, a conflict — and saying "waiting on checks" would lie. */
+ * outranks everything else that merely holds the merge up.
+ *
+ * Waiting on CI and waiting on a review gate deliberately share one status.
+ * They are the same news to the reader, and splitting them would fire a
+ * notification the moment CI finished green on a PR still awaiting review —
+ * announcing a step forward as if it were a setback. */
 function stuckStatus(pr: StuckPr): ItemStatus {
   if (pr.reviewDecision === "CHANGES_REQUESTED") return "changes-requested";
-  if (pr.failing.length > 0) return "failing";
-  return pr.pending.length > 0 ? "pending" : "blocked";
+  return pr.failing.length > 0 ? "failing" : "pending";
 }
 
 /** Snapshot what every visible item is doing, keyed by id.
@@ -123,8 +125,7 @@ const PHRASES: Record<ItemStatus, string> = {
   merged: "was merged",
   "changes-requested": "— changes requested",
   failing: "— checks failing",
-  pending: "— waiting on checks",
-  blocked: "— blocked from merging",
+  pending: "— waiting on checks or review",
   review: "needs your review",
   comment: "— new reply",
 };

@@ -305,6 +305,9 @@ export function SettingsModal({
                 role="tab"
                 id={`settings-tab-${s.id}`}
                 aria-selected={section === s.id}
+                // Only the selected section is mounted, so only the selected
+                // tab has a panel to point at.
+                aria-controls={section === s.id ? "settings-panel" : undefined}
                 tabIndex={section === s.id ? 0 : -1}
                 onClick={() => setSection(s.id)}
                 className={`min-h-[44px] cursor-pointer whitespace-nowrap rounded-md px-3 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
@@ -320,6 +323,7 @@ export function SettingsModal({
 
           <div
             role="tabpanel"
+            id="settings-panel"
             aria-labelledby={`settings-tab-${section}`}
             tabIndex={0}
             className="min-w-0 flex-1 overflow-y-auto px-6 pt-4 pb-6 sm:pt-0"
@@ -514,7 +518,7 @@ export function SettingsModal({
                     rel="noopener noreferrer"
                     className="text-accent underline underline-offset-2 hover:brightness-110"
                   >
-                    github.com/mfozmen/PRison
+                    {REPO_URL.replace("https://", "")}
                   </a>{" "}
                   — open source, MIT licensed. Issues and pull requests welcome.
                 </p>

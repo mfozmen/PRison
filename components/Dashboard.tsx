@@ -96,9 +96,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // commit can't consume the signal the way a ref flag could.
   const [pollGen, setPollGen] = useState(0);
   const lastPollGenRef = useRef(0);
-  // Running total of unseen new items across polls while the tab is unfocused,
-  // so the badge shows the accumulated count, not just the last poll's delta.
-  const unseenCountRef = useRef(0);
+  // Everything that moved while the tab was away, latest status per item.
+  // It feeds both the badge count and the notification body: the notification
+  // carries a fixed tag so successive polls replace rather than stack, and a
+  // replacement built from one poll's delta alone would hide the earlier
+  // polls' events while the badge went on counting them.
+  const unseenRef = useRef<StatusSnapshot>(new Map());
 
   const fetchData = useCallback(
     (org: string, silent = false) => {
@@ -338,7 +341,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // Returning to the tab means the new items are on screen: clear the badge.
   useEffect(() => {
     const clear = () => {
-      unseenCountRef.current = 0;
+      unseenRef.current.clear();
       document.title = withoutBadge(document.title);
     };
     const onVisibility = () => {
@@ -366,6 +369,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     void requestNotificationPermission()
       .then(setNotifPermission)
       .catch(() => setNotifPermission(notificationPermission()));
+  }, []);
+
+  // Permission can be revoked in site settings without a reload, which would
+  // leave a Test button that silently does nothing. Re-read it on the click so
+  // the pane falls back to the blocked hint instead.
+  const handleTestNotification = useCallback(() => {
+    setNotifPermission(notificationPermission());
+    showTestNotification();
   }, []);
 
   const handleAutoRefreshChange = useCallback(
@@ -460,9 +471,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     if (pollGen !== lastPollGenRef.current) {
       lastPollGenRef.current = pollGen;
       if (events.length > 0 && !document.hasFocus()) {
-        unseenCountRef.current += events.length;
-        document.title = withBadge(document.title, unseenCountRef.current);
-        showChangeNotification(events);
+        for (const event of events) unseenRef.current.set(event.id, event);
+        document.title = withBadge(document.title, unseenRef.current.size);
+        showChangeNotification([...unseenRef.current.values()]);
       }
     }
   });
@@ -511,7 +522,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         onPollIntervalChange={setPollInterval}
         notifPermission={notifPermission}
         onEnableNotifications={handleEnableNotifications}
-        onTestNotification={showTestNotification}
+        onTestNotification={handleTestNotification}
       />
       <main className="mx-auto w-full max-w-screen-2xl flex-1 space-y-8 px-4 sm:px-6 lg:px-8 py-8">
         {isPending && (

@@ -2215,10 +2215,45 @@ describe("Dashboard — auto refresh", () => {
       { ...STUCK_PR, id: "new-2", title: "second new stuck pr", number: 7 },
     ];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
-    // The badge accumulates (1 + 1), while the notification describes only what
-    // this poll brought — the earlier one was already delivered.
+    // The badge accumulates (1 + 1), and so does the notification: it carries a
+    // fixed tag, so this one REPLACES the previous in the tray. Describing only
+    // this poll's delta would lose the earlier PR while the badge still counted it.
     expect(document.title).toBe("(2) PRison");
-    expect(constructed.at(-1)?.options?.body).toBe("acme/b #7 — checks failing");
+    expect(constructed.at(-1)?.options?.body).toBe(
+      "acme/b #2 — checks failing\nacme/b #7 — checks failing",
+    );
+  });
+
+  it("re-reads permission when the test notification is sent", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    openSettings("Auto refresh");
+    fireEvent.click(screen.getByRole("button", { name: /send a test notification/i }));
+    expect(constructed).toHaveLength(1);
+
+    // Revoked in site settings without a reload: the button would silently do
+    // nothing, so the next click swaps it for the blocked hint.
+    useNotificationStub("denied");
+    fireEvent.click(screen.getByRole("button", { name: /send a test notification/i }));
+    expect(await screen.findByText(/notifications are blocked/i)).toBeInTheDocument();
+  });
+
+  it("counts an item that moves twice while away only once", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    stuckList = [{ ...STUCK_PR, failing: [], pending: ["build"] }];
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    stuckList = [];
+    readyList = [{ ...READY_PR, id: STUCK_PR.id, repo: "acme/b", number: 2 }];
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+
+    // Same PR, two transitions: the badge is a count of items needing a look,
+    // and the notification carries only its latest state.
+    expect(document.title).toBe("(1) PRison");
+    expect(constructed.at(-1)?.options?.body).toBe("acme/b #2 is ready to merge");
   });
 
   it("does not re-notify an item that flaps out and back", async () => {

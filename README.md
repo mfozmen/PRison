@@ -45,7 +45,8 @@ access. Four lists, oldest first, plus a history section:
   became ready to merge, checks that went red, changes requested, a review asked
   of you, a fresh reply on a thread, or one of your own PRs getting merged. The notification
   names them — `acme/web #42 is ready to merge` — up to three at a time, then
-  `+N more`. While you're on another tab you also get a **`(3) PRison`**
+  `+N more`, and it keeps naming everything that moved while you were away,
+  not just the latest poll. While you're on another tab you also get a **`(3) PRison`**
   tab-title badge that clears the moment you come back. Settings shows whether
   your browser has actually granted permission, and offers a test notification
   so you can confirm it. Works only while a PRison tab is open — there's no

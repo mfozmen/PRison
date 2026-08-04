@@ -68,8 +68,8 @@ describe("snapshotStatuses", () => {
       closed: [closedPr()],
     });
     expect([...snapshot.values()].map((e) => e.status)).toEqual([
-      "ready",
       "merged",
+      "ready",
       "pending",
       "review",
       "comment",
@@ -124,16 +124,23 @@ describe("snapshotStatuses", () => {
     expect(snapshot.size).toBe(0);
   });
 
-  it("keeps the first status when an id appears in two lists", () => {
-    // A merged PR can still linger in the stuck list until the next fetch;
-    // "was merged" is the news, not "checks failing".
-    const snapshot = snapshotStatuses({
-      ...EMPTY,
-      stuck: [stuckPr({ id: "PR_x", failing: ["build"] })],
-      closed: [closedPr({ id: "PR_x" })],
-    });
-    expect(snapshot.get("PR_x")?.status).toBe("merged");
-  });
+  it.each(["stuck", "ready"] as const)(
+    "reports a merge even while the PR lingers in the %s list",
+    (list) => {
+      // GitHub's search index lags, so an is:open query can still return a PR
+      // that closed-prs already reports merged. "Was merged" is the news.
+      const snapshot = snapshotStatuses({
+        ...EMPTY,
+        [list]: [
+          list === "stuck"
+            ? stuckPr({ id: "PR_x", failing: ["build"] })
+            : readyPr({ id: "PR_x" }),
+        ],
+        closed: [closedPr({ id: "PR_x" })],
+      });
+      expect(snapshot.get("PR_x")?.status).toBe("merged");
+    },
+  );
 });
 
 describe("diffStatuses", () => {
@@ -163,6 +170,18 @@ describe("diffStatuses", () => {
     const before = snapshot(event({ status: "comment", at: "2026-06-25T09:00:00Z" }));
     const after = event({ status: "comment", at: "2026-06-25T11:00:00Z" });
     expect(diffStatuses(before, snapshot(after))).toEqual([after]);
+  });
+
+  it("stays quiet when a PR falls back to waiting", () => {
+    // Pushing a fix resets the checks; that is not news, and the red run that
+    // follows will announce itself.
+    const before = snapshot(event({ status: "failing" }));
+    expect(diffStatuses(before, snapshot(event({ status: "pending" })))).toEqual([]);
+  });
+
+  it("still reports a PR that shows up waiting for the first time", () => {
+    const fresh = event({ status: "pending" });
+    expect(diffStatuses(new Map(), snapshot(fresh))).toEqual([fresh]);
   });
 
   it("stays quiet when the same reply is still the latest one", () => {
@@ -196,14 +215,28 @@ describe("describeEvents", () => {
     expect(describeEvents(events).split("\n")).toHaveLength(3);
   });
 
+  it("spells out the newest events, not the oldest", () => {
+    // The notification replaces its predecessor, so the event that raised it
+    // must be visible — burying it under three older ones defeats the point.
+    const events = Array.from({ length: 4 }, (_, i) =>
+      event({ id: String(i), number: i }),
+    );
+    expect(describeEvents(events).split("\n")).toEqual([
+      "acme/api #1 is ready to merge",
+      "acme/api #2 is ready to merge",
+      "acme/api #3 is ready to merge",
+      "+1 more",
+    ]);
+  });
+
   it("collapses the rest into a count so the notification stays glanceable", () => {
     const events = Array.from({ length: 6 }, (_, i) =>
       event({ id: String(i), number: i }),
     );
     expect(describeEvents(events).split("\n")).toEqual([
-      "acme/api #0 is ready to merge",
-      "acme/api #1 is ready to merge",
-      "acme/api #2 is ready to merge",
+      "acme/api #3 is ready to merge",
+      "acme/api #4 is ready to merge",
+      "acme/api #5 is ready to merge",
       "+3 more",
     ]);
   });

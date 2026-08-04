@@ -43,7 +43,8 @@ access. Four lists, oldest first, plus a history section:
   how often to check — every 5, 15, or 30 minutes, or hourly (30 minutes by
   default). PRison then tells you what *moved*, not just what's new: a PR that
   became ready to merge, checks that went red, changes requested, a review asked
-  of you, a fresh reply on a thread, or one of your own PRs getting merged. The notification
+  of you, a fresh reply on a thread, or one of your own PRs getting merged —
+  while a PR simply falling back to waiting (you pushed a fix) stays quiet. The notification
   names them — `acme/web #42 is ready to merge` — up to three at a time, then
   `+N more`, and it keeps naming everything that moved while you were away,
   not just the latest poll. While you're on another tab you also get a **`(3) PRison`**

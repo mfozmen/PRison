@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import type { Org } from "@/lib/types";
 import { OrgSwitcher } from "./OrgSwitcher";
+import { releaseUrl } from "@/lib/repo";
 
 async function signOut() {
   await fetch("/api/token", { method: "DELETE" });
@@ -100,7 +101,7 @@ export function Header({ orgs, selectedOrg, onOrgChange, login, onOpenSettings }
         </button>
         {version && (
           <a
-            href={`https://github.com/mfozmen/PRison/releases/tag/v${version}`}
+            href={releaseUrl(version)}
             target="_blank"
             rel="noopener noreferrer"
             className="hidden text-xs text-muted transition-colors hover:text-accent sm:inline"

@@ -2225,6 +2225,7 @@ describe("Dashboard — auto refresh", () => {
   });
 
   it("re-reads permission when the test notification is sent", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     openSettings("Auto refresh");
@@ -2247,7 +2248,9 @@ describe("Dashboard — auto refresh", () => {
     stuckList = [{ ...STUCK_PR, failing: [], pending: ["build"] }];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     stuckList = [];
-    readyList = [{ ...READY_PR, id: STUCK_PR.id, repo: "acme/b", number: 2 }];
+    readyList = [
+      { ...READY_PR, id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number },
+    ];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
 
     // Same PR, two transitions: the badge is a count of items needing a look,

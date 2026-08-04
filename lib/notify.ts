@@ -89,10 +89,13 @@ export function snapshotStatuses(lists: {
   ) => {
     if (!snapshot.has(id)) snapshot.set(id, { id, repo, number, status, at });
   };
-  for (const pr of lists.ready) add(pr.id, pr.repo, pr.number, "ready");
+  // Closed goes first: GitHub's search index lags, so a PR merged moments ago
+  // can still come back from the is:open ready query. First-wins means the
+  // merge would otherwise be held back a whole poll interval.
   for (const pr of lists.closed) {
     if (pr.merged) add(pr.id, pr.repo, pr.number, "merged");
   }
+  for (const pr of lists.ready) add(pr.id, pr.repo, pr.number, "ready");
   for (const pr of lists.stuck) add(pr.id, pr.repo, pr.number, stuckStatus(pr));
   for (const req of lists.reviews) {
     add(req.id, req.repo, req.number, "review", req.requestedAt);
@@ -105,7 +108,9 @@ export function snapshotStatuses(lists: {
 
 /** Items that appeared, plus items whose status or freshness stamp changed.
  * Items that vanished report nothing — they left the board because they were
- * dealt with. */
+ * dealt with. Falling back to "pending" reports nothing either: that is what
+ * pushing a fix looks like from here, and the red checks that follow will
+ * announce themselves soon enough. */
 export function diffStatuses(
   prev: StatusSnapshot,
   next: StatusSnapshot,
@@ -113,7 +118,12 @@ export function diffStatuses(
   const events: StatusEvent[] = [];
   for (const [id, event] of next) {
     const seen = prev.get(id);
-    if (seen?.status !== event.status || seen.at !== event.at) {
+    if (!seen) {
+      events.push(event);
+    } else if (
+      (seen.status !== event.status || seen.at !== event.at) &&
+      event.status !== "pending"
+    ) {
       events.push(event);
     }
   }
@@ -135,10 +145,12 @@ const PHRASES: Record<ItemStatus, string> = {
 const MAX_LINES = 3;
 
 /** One line per event, so the notification says what actually happened
- * instead of just how many things did. */
+ * instead of just how many things did. The tail is what gets spelled out —
+ * the event that raised this notification is in it, and burying that under
+ * three older ones is the one thing a replacement notification must not do. */
 export function describeEvents(events: readonly StatusEvent[]): string {
   const lines = events
-    .slice(0, MAX_LINES)
+    .slice(-MAX_LINES)
     .map((e) => `${e.repo} #${e.number} ${PHRASES[e.status]}`);
   if (events.length > MAX_LINES) {
     lines.push(`+${events.length - MAX_LINES} more`);

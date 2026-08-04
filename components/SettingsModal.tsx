@@ -5,6 +5,7 @@ import type { Org } from "@/lib/types";
 import type { TrackedChecks } from "@/lib/tracked-checks";
 import { RepoCombobox } from "./RepoCombobox";
 import { POLL_INTERVAL_OPTIONS } from "@/lib/notify";
+import { REPO_URL } from "@/lib/repo";
 
 export interface SettingsModalProps {
   orgs: Org[];
@@ -36,8 +37,6 @@ const SECTIONS = [
   { id: "tracked-checks", label: "Tracked checks" },
   { id: "about", label: "About" },
 ] as const;
-
-const REPO_URL = "https://github.com/mfozmen/PRison";
 
 type SectionId = (typeof SECTIONS)[number]["id"];
 
@@ -370,7 +369,10 @@ export function SettingsModal({
                   of your PRs getting merged. Works while a PRison tab is open;
                   there is no background service.
                 </p>
-                {notifPermission === "default" && (
+                {/* All three only apply while auto refresh is on: with it off
+                    nothing polls, so there is no tab badge to promise and no
+                    notification to test. */}
+                {autoRefresh && notifPermission === "default" && (
                   <div className="mt-3">
                     <p className="mb-2 text-xs text-muted">
                       Your browser hasn&apos;t been asked yet, so you&apos;ll get
@@ -381,13 +383,13 @@ export function SettingsModal({
                     </SettingButton>
                   </div>
                 )}
-                {notifPermission === "denied" && (
+                {autoRefresh && notifPermission === "denied" && (
                   <p className="mt-3 text-xs text-muted">
                     Notifications are blocked in your browser — you&apos;ll still
                     get the tab badge.
                   </p>
                 )}
-                {notifPermission === "granted" && (
+                {autoRefresh && notifPermission === "granted" && (
                   <SettingButton onClick={onTestNotification} className="mt-3">
                     Send a test notification
                   </SettingButton>
@@ -490,13 +492,9 @@ export function SettingsModal({
                       </div>
                     ))}
                   </div>
-                  <button
-                    type="button"
-                    onClick={addRow}
-                    className="min-h-[44px] cursor-pointer rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:hover:brightness-110"
-                  >
+                  <SettingButton onClick={addRow} className="py-1.5">
                     Add override
-                  </button>
+                  </SettingButton>
                 </section>
               </div>
             )}

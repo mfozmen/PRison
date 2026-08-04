@@ -720,6 +720,8 @@ describe("SettingsModal", () => {
         <SettingsModal
           {...filterProps}
           notifPermission={notifPermission}
+          // The permission controls only apply while something is polling.
+          autoRefresh={true}
           orgs={[]}
           availableRepos={[]}
           value={emptyValue}
@@ -738,6 +740,14 @@ describe("SettingsModal", () => {
       expect(screen.getByText(/browser hasn't been asked yet/i)).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /enable notifications/i }));
       expect(onEnableNotifications).toHaveBeenCalled();
+    });
+
+    it("keeps the permission controls out of the way while auto refresh is off", () => {
+      // Nothing polls, so there is no tab badge to promise and nothing to test.
+      renderWithPermission("denied", { autoRefresh: false });
+      expect(
+        screen.queryByText(/notifications are blocked in your browser/i),
+      ).not.toBeInTheDocument();
     });
 
     it("says so when the browser has blocked notifications", () => {

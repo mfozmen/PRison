@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.0](https://github.com/mfozmen/PRison/compare/v1.4.0...v1.5.0) (2026-08-04)
+
+### Features
+
+* put Hide drafts back on the bar, give Settings a menu, notify on what changed ([#10](https://github.com/mfozmen/PRison/issues/10)) ([4ce5a27](https://github.com/mfozmen/PRison/commit/4ce5a272e2c22e59a24ad0aca4d7df626a4d9636))
+
 ## [1.4.0](https://github.com/mfozmen/PRison/compare/v1.3.0...v1.4.0) (2026-08-03)
 
 ### Features

@@ -465,13 +465,22 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       closed: sortedClosed,
     });
     const events = diffStatuses(prev, visible);
-    if (events.length > 0) {
-      seenStatusRef.current = new Map([...prev, ...visible]);
-    }
+    // Unconditionally, including when nothing was reported: diffStatuses
+    // deliberately swallows a fall back to waiting, and leaving the old status
+    // on record would then swallow the *next* failure too, because it would
+    // match what we last saw. The union keeps ids that have left the board, so
+    // an item that flaps out and back still doesn't re-announce itself.
+    seenStatusRef.current = new Map([...prev, ...visible]);
     if (pollGen !== lastPollGenRef.current) {
       lastPollGenRef.current = pollGen;
       if (events.length > 0 && !document.hasFocus()) {
-        for (const event of events) unseenRef.current.set(event.id, event);
+        // Delete first: a Map keeps a re-set key in its original position, and
+        // the notification spells out the tail, so an item moving again has to
+        // move to the back of the queue or its news never gets shown.
+        for (const event of events) {
+          unseenRef.current.delete(event.id);
+          unseenRef.current.set(event.id, event);
+        }
         document.title = withBadge(document.title, unseenRef.current.size);
         showChangeNotification([...unseenRef.current.values()]);
       }

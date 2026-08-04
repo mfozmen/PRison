@@ -5,7 +5,7 @@ import type { Org } from "@/lib/types";
 import type { TrackedChecks } from "@/lib/tracked-checks";
 import { RepoCombobox } from "./RepoCombobox";
 import { POLL_INTERVAL_OPTIONS } from "@/lib/notify";
-import { REPO_URL } from "@/lib/repo";
+import { PROJECT_URL, appVersion } from "@/lib/project";
 
 export interface SettingsModalProps {
   orgs: Org[];
@@ -129,9 +129,8 @@ export function SettingsModal({
   onEnableNotifications,
   onTestNotification,
 }: SettingsModalProps) {
-  // Same env var the header's release link reads; absent in a dev build, in
-  // which case About just drops the version line.
-  const version = process.env.NEXT_PUBLIC_APP_VERSION;
+  // Read inside the component, not at module scope, so tests can stub it.
+  const version = appVersion();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const tabRefs = useRef<Partial<Record<SectionId, HTMLButtonElement | null>>>({});
 
@@ -511,12 +510,12 @@ export function SettingsModal({
                 </p>
                 <p>
                   <a
-                    href={REPO_URL}
+                    href={PROJECT_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-accent underline underline-offset-2 hover:brightness-110"
                   >
-                    {REPO_URL.replace("https://", "")}
+                    {PROJECT_URL.replace("https://", "")}
                   </a>{" "}
                   — open source, MIT licensed. Issues and pull requests welcome.
                 </p>

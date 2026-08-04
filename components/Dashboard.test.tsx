@@ -2239,6 +2239,23 @@ describe("Dashboard — auto refresh", () => {
     expect(await screen.findByText(/notifications are blocked/i)).toBeInTheDocument();
   });
 
+  it("announces the second failure after a push reset the checks", async () => {
+    // The quiet middle step still has to be recorded as seen, or the PR looks
+    // like it never left "failing" and the re-run's failure goes unreported.
+    localStorage.setItem("prison.autoRefresh", "true");
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    stuckList = [{ ...STUCK_PR, failing: [], pending: ["build"] }];
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    expect(constructed).toHaveLength(0);
+
+    stuckList = [STUCK_PR];
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    expect(constructed.at(-1)?.options?.body).toBe("acme/b #2 — checks failing");
+  });
+
   it("counts an item that moves twice while away only once", async () => {
     localStorage.setItem("prison.autoRefresh", "true");
     vi.spyOn(document, "hasFocus").mockReturnValue(false);

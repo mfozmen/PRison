@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import type { Org } from "@/lib/types";
 import { OrgSwitcher } from "./OrgSwitcher";
-import { releaseUrl } from "@/lib/repo";
+import { releaseUrl, appVersion } from "@/lib/project";
 
 async function signOut() {
   await fetch("/api/token", { method: "DELETE" });
@@ -38,7 +38,7 @@ export interface HeaderProps {
 export function Header({ orgs, selectedOrg, onOrgChange, login, onOpenSettings }: HeaderProps) {
   // Read inside the component, not at module scope, so tests can stub it.
   // next.config.ts inlines it from package.json; absent in a bare `next dev`.
-  const version = process.env.NEXT_PUBLIC_APP_VERSION;
+  const version = appVersion();
 
   const isDark = useSyncExternalStore(
     subscribeToTheme,

@@ -121,14 +121,14 @@ export function diffStatuses(
   const events: StatusEvent[] = [];
   for (const [id, event] of next) {
     const seen = prev.get(id);
-    if (!seen) {
-      events.push(event);
-    } else if (
+    // A first sighting always reports, "pending" included — whatever the item
+    // is doing, its arrival is the news. Only afterwards does a fall back to
+    // waiting go unmentioned.
+    const moved =
+      !!seen &&
       (seen.status !== event.status || seen.at !== event.at) &&
-      event.status !== "pending"
-    ) {
-      events.push(event);
-    }
+      event.status !== "pending";
+    if (!seen || moved) events.push(event);
   }
   return events;
 }

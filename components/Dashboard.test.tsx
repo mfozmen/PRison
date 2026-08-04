@@ -2015,6 +2015,41 @@ describe("Dashboard — auto refresh", () => {
     );
   });
 
+  it("shows the granted controls once the user answers the prompt", async () => {
+    // Nothing re-renders when the browser prompt is answered, so the answer has
+    // to travel from the promise into state — a re-read of Notification.permission
+    // would still say "default" here.
+    localStorage.setItem("prison.autoRefresh", "true");
+    useNotificationStub("default");
+    requestPermission.mockResolvedValue("granted");
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    openSettings("Auto refresh");
+
+    fireEvent.click(screen.getByRole("button", { name: /enable notifications/i }));
+    expect(
+      await screen.findByRole("button", { name: /send a test notification/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("falls back to the live permission when the prompt rejects", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
+    useNotificationStub("default");
+    // A prompt that throws (non-secure context, callback-only Safari) leaves the
+    // answer only on Notification.permission; without the fallback read the pane
+    // would keep offering an Enable button that can never succeed.
+    requestPermission.mockImplementation(() => {
+      (Notification as unknown as { permission: NotificationPermission }).permission = "denied";
+      return Promise.reject(new Error("prompt failed"));
+    });
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    openSettings("Auto refresh");
+
+    fireEvent.click(screen.getByRole("button", { name: /enable notifications/i }));
+    expect(await screen.findByText(/notifications are blocked/i)).toBeInTheDocument();
+  });
+
   it("badges the title and notifies when a poll finds new items while unfocused", async () => {
     localStorage.setItem("prison.autoRefresh", "true");
     vi.spyOn(document, "hasFocus").mockReturnValue(false);

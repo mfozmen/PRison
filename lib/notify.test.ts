@@ -90,9 +90,26 @@ describe("snapshotStatuses", () => {
     ["changes-requested", stuckPr({ reviewDecision: "CHANGES_REQUESTED", failing: ["build"] })],
     ["failing", stuckPr({ failing: ["build"], pending: ["lint"] })],
     ["pending", stuckPr({ pending: ["lint"] })],
+    ["blocked", stuckPr({ failing: [], pending: [] })],
   ] as const)("reports a stuck PR as %s", (status, pr) => {
     const snapshot = snapshotStatuses({ ...EMPTY, stuck: [pr] });
     expect(snapshot.get(pr.id)?.status).toBe(status);
+  });
+
+  it("stamps a comment thread with when it was last replied to", () => {
+    // The status alone never changes, so the timestamp is what makes a second
+    // reply on an already-seen thread visible to diffStatuses.
+    const c = prComment({ commentedAt: "2026-06-25T09:00:00Z" });
+    expect(snapshotStatuses({ ...EMPTY, comments: [c] }).get(c.id)?.at).toBe(
+      "2026-06-25T09:00:00Z",
+    );
+  });
+
+  it("stamps a review request with when it was asked for", () => {
+    const r = reviewRequest({ requestedAt: "2026-06-25T09:00:00Z" });
+    expect(snapshotStatuses({ ...EMPTY, reviews: [r] }).get(r.id)?.at).toBe(
+      "2026-06-25T09:00:00Z",
+    );
   });
 
   it("ignores a PR closed without merging — that is not progress", () => {
@@ -134,6 +151,17 @@ describe("diffStatuses", () => {
   it("says nothing about an item that vanished", () => {
     expect(diffStatuses(snapshot(event()), new Map())).toEqual([]);
   });
+
+  it("reports a fresh reply on a thread it has already seen", () => {
+    const before = snapshot(event({ status: "comment", at: "2026-06-25T09:00:00Z" }));
+    const after = event({ status: "comment", at: "2026-06-25T11:00:00Z" });
+    expect(diffStatuses(before, snapshot(after))).toEqual([after]);
+  });
+
+  it("stays quiet when the same reply is still the latest one", () => {
+    const seen = event({ status: "comment", at: "2026-06-25T09:00:00Z" });
+    expect(diffStatuses(snapshot(seen), snapshot(seen))).toEqual([]);
+  });
 });
 
 describe("describeEvents", () => {
@@ -146,6 +174,7 @@ describe("describeEvents", () => {
     ["changes-requested", "acme/api #2 — changes requested"],
     ["failing", "acme/api #2 — checks failing"],
     ["pending", "acme/api #2 — waiting on checks"],
+    ["blocked", "acme/api #2 — blocked from merging"],
     ["review", "acme/api #2 needs your review"],
     ["comment", "acme/api #2 — new reply"],
   ] as const)("phrases %s", (status, expected) => {
@@ -244,7 +273,8 @@ describe("showTestNotification", () => {
         title: "PRison",
         options: {
           body: "Notifications are on — you'll get one when a PR changes state.",
-          tag: "prison-changes",
+          // Its own tag, so a test send never replaces a real notification.
+          tag: "prison-test",
         },
       },
     ]);
@@ -278,6 +308,14 @@ describe("requestNotificationPermission", () => {
     requestPermission.mockResolvedValue("granted");
     await expect(requestNotificationPermission()).resolves.toBe("granted");
     expect(requestPermission).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the live permission on a callback-only browser", async () => {
+    // Safari before 16 resolves with nothing; without the fallback the caller
+    // would put `undefined` into state and lose all three branches.
+    const { requestPermission } = stubNotification("default");
+    requestPermission.mockResolvedValue(undefined);
+    await expect(requestNotificationPermission()).resolves.toBe("default");
   });
 
   it.each(["granted", "denied"] as const)(

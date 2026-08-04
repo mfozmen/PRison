@@ -554,6 +554,7 @@ describe("SettingsModal", () => {
         "Comments",
         "Auto refresh",
         "Tracked checks",
+        "About",
       ]);
       expect(tabs[0]).toHaveAttribute("aria-selected", "true");
     });
@@ -585,16 +586,35 @@ describe("SettingsModal", () => {
       // Wrapping backwards off the first item lands on the last.
       fireEvent.keyDown(tabs[1], { key: "ArrowUp" });
       fireEvent.keyDown(tabs[0], { key: "ArrowLeft" });
-      expect(screen.getByRole("tab", { name: "Tracked checks" })).toHaveAttribute(
+      expect(screen.getByRole("tab", { name: "About" })).toHaveAttribute(
         "aria-selected",
         "true",
       );
       // ArrowRight is wired too, for the horizontal (mobile) menu.
-      fireEvent.keyDown(tabs[2], { key: "ArrowRight" });
+      fireEvent.keyDown(tabs[3], { key: "ArrowRight" });
       expect(screen.getByRole("tab", { name: "Comments" })).toHaveAttribute(
         "aria-selected",
         "true",
       );
+    });
+
+    it("points About at the repository, with the running version", () => {
+      vi.stubEnv("NEXT_PUBLIC_APP_VERSION", "1.5.0");
+      renderOpen();
+      selectSection("About");
+      expect(screen.getByText("PRison v1.5.0")).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: "github.com/mfozmen/PRison" }),
+      ).toHaveAttribute("href", "https://github.com/mfozmen/PRison");
+      vi.unstubAllEnvs();
+    });
+
+    it("drops the version line when the build doesn't carry one", () => {
+      vi.stubEnv("NEXT_PUBLIC_APP_VERSION", "");
+      renderOpen();
+      selectSection("About");
+      expect(screen.getByText("PRison")).toBeInTheDocument();
+      vi.unstubAllEnvs();
     });
 
     it("ignores keys that aren't arrows", () => {

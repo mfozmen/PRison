@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, type ReactNode, type KeyboardEvent } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import type { Org } from "@/lib/types";
 import type { TrackedChecks } from "@/lib/tracked-checks";
 import { RepoCombobox } from "./RepoCombobox";
@@ -34,7 +34,10 @@ const SECTIONS = [
   { id: "comments", label: "Comments" },
   { id: "auto-refresh", label: "Auto refresh" },
   { id: "tracked-checks", label: "Tracked checks" },
+  { id: "about", label: "About" },
 ] as const;
+
+const REPO_URL = "https://github.com/mfozmen/PRison";
 
 type SectionId = (typeof SECTIONS)[number]["id"];
 
@@ -87,6 +90,26 @@ function SettingCheckbox({
   );
 }
 
+function SettingButton({
+  onClick,
+  className = "",
+  children,
+}: {
+  onClick: () => void;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`min-h-[44px] cursor-pointer rounded-md border border-border bg-surface px-3 text-sm font-medium text-foreground transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none dark:hover:brightness-110 ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function SettingsModal({
   orgs,
   availableRepos,
@@ -107,6 +130,9 @@ export function SettingsModal({
   onEnableNotifications,
   onTestNotification,
 }: SettingsModalProps) {
+  // Same env var the header's release link reads; absent in a dev build, in
+  // which case About just drops the version line.
+  const version = process.env.NEXT_PUBLIC_APP_VERSION;
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const tabRefs = useRef<Partial<Record<SectionId, HTMLButtonElement | null>>>({});
 
@@ -139,7 +165,7 @@ export function SettingsModal({
   // Escape key handler
   useEffect(() => {
     if (!open) return;
-    function handleKeyDown(e: globalThis.KeyboardEvent) {
+    function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
     document.addEventListener("keydown", handleKeyDown);
@@ -200,7 +226,7 @@ export function SettingsModal({
 
   // Arrow keys move between sections. The menu is a horizontal strip below the
   // `sm` breakpoint and a vertical column above it, so both axes are wired.
-  function handleMenuKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+  function handleMenuKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     const step =
       e.key === "ArrowDown" || e.key === "ArrowRight"
         ? 1
@@ -260,9 +286,11 @@ export function SettingsModal({
         {/* Menu + the one visible section. Only the section scrolls, so the
             menu and the close button stay put however long the content is. */}
         <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
+          {/* No aria-orientation: the menu is a vertical column at sm and up
+              and a horizontal strip below it, and there is no responsive way
+              to say so. Arrow keys move on both axes regardless. */}
           <div
             role="tablist"
-            aria-orientation="vertical"
             aria-label="Settings sections"
             onKeyDown={handleMenuKeyDown}
             className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-6 pb-3 sm:w-52 sm:flex-col sm:overflow-x-visible sm:border-b-0 sm:border-r sm:pr-3 sm:pb-6"
@@ -277,7 +305,6 @@ export function SettingsModal({
                 role="tab"
                 id={`settings-tab-${s.id}`}
                 aria-selected={section === s.id}
-                aria-controls={`settings-panel-${s.id}`}
                 tabIndex={section === s.id ? 0 : -1}
                 onClick={() => setSection(s.id)}
                 className={`min-h-[44px] cursor-pointer whitespace-nowrap rounded-md px-3 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
@@ -293,7 +320,6 @@ export function SettingsModal({
 
           <div
             role="tabpanel"
-            id={`settings-panel-${section}`}
             aria-labelledby={`settings-tab-${section}`}
             tabIndex={0}
             className="min-w-0 flex-1 overflow-y-auto px-6 pt-4 pb-6 sm:pt-0"
@@ -346,13 +372,9 @@ export function SettingsModal({
                       Your browser hasn&apos;t been asked yet, so you&apos;ll get
                       the tab badge but no desktop notification.
                     </p>
-                    <button
-                      type="button"
-                      onClick={onEnableNotifications}
-                      className="min-h-[44px] cursor-pointer rounded-md border border-border bg-surface px-3 text-sm font-medium text-foreground transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none dark:hover:brightness-110"
-                    >
+                    <SettingButton onClick={onEnableNotifications}>
                       Enable notifications
-                    </button>
+                    </SettingButton>
                   </div>
                 )}
                 {notifPermission === "denied" && (
@@ -362,13 +384,9 @@ export function SettingsModal({
                   </p>
                 )}
                 {notifPermission === "granted" && (
-                  <button
-                    type="button"
-                    onClick={onTestNotification}
-                    className="mt-3 min-h-[44px] cursor-pointer rounded-md border border-border bg-surface px-3 text-sm font-medium text-foreground transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none dark:hover:brightness-110"
-                  >
+                  <SettingButton onClick={onTestNotification} className="mt-3">
                     Send a test notification
-                  </button>
+                  </SettingButton>
                 )}
               </div>
             )}
@@ -476,6 +494,30 @@ export function SettingsModal({
                     Add override
                   </button>
                 </section>
+              </div>
+            )}
+
+            {section === "about" && (
+              <div className="space-y-3 text-sm text-muted">
+                <p className="text-base font-semibold text-foreground">
+                  PRison{version ? ` v${version}` : ""}
+                </p>
+                <p>
+                  A read-only GitHub dashboard for the pull requests waiting on
+                  you — and how long they&apos;ve been waiting. It runs on your
+                  own machine and never writes anything back to GitHub.
+                </p>
+                <p>
+                  <a
+                    href={REPO_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent underline underline-offset-2 hover:brightness-110"
+                  >
+                    github.com/mfozmen/PRison
+                  </a>{" "}
+                  — open source, MIT licensed. Issues and pull requests welcome.
+                </p>
               </div>
             )}
           </div>

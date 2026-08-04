@@ -35,6 +35,7 @@ export type ItemStatus =
   | "changes-requested"
   | "failing"
   | "pending"
+  | "blocked"
   | "review"
   | "comment";
 
@@ -43,24 +44,32 @@ export type StatusEvent = {
   repo: string;
   number: number;
   status: ItemStatus;
+  /** Freshness stamp for the two statuses that never change on their own:
+   * a thread stays "comment" and a request stays "review" no matter how many
+   * replies land, so without this a second reply would be invisible. */
+  at?: string;
 };
 
 export type StatusSnapshot = Map<string, StatusEvent>;
 
 /** A stuck PR's status: a human blocking it outranks a red check, which
- * outranks merely waiting. */
+ * outranks a running one. With neither, something else blocks the merge —
+ * a required review, a conflict — and saying "waiting on checks" would lie. */
 function stuckStatus(pr: StuckPr): ItemStatus {
   if (pr.reviewDecision === "CHANGES_REQUESTED") return "changes-requested";
-  return pr.failing.length > 0 ? "failing" : "pending";
+  if (pr.failing.length > 0) return "failing";
+  return pr.pending.length > 0 ? "pending" : "blocked";
 }
 
 /** Snapshot what every visible item is doing, keyed by id.
  *
  * Callers pass the *visible* (filtered, post-arbitration) lists, so a hidden
- * bot comment or a filtered draft can never announce itself. Insertion order
- * is the order events are reported in: good news first, then things that need
- * a human, then the inbox. Closed PRs contribute only when merged — a close
- * without a merge isn't progress. */
+ * bot comment or a filtered draft can never announce itself. The closed list
+ * is the one exception: it is collapsed by default, and a merge is worth
+ * hearing about whether or not the section happens to be expanded. Insertion
+ * order is the order events are reported in: good news first, then things
+ * that need a human, then the inbox. Closed PRs contribute only when merged
+ * — a close without a merge isn't progress. */
 export function snapshotStatuses(lists: {
   ready: readonly ReadyPr[];
   stuck: readonly StuckPr[];
@@ -69,28 +78,42 @@ export function snapshotStatuses(lists: {
   closed: readonly ClosedPr[];
 }): StatusSnapshot {
   const snapshot: StatusSnapshot = new Map();
-  const add = (id: string, repo: string, number: number, status: ItemStatus) => {
-    if (!snapshot.has(id)) snapshot.set(id, { id, repo, number, status });
+  const add = (
+    id: string,
+    repo: string,
+    number: number,
+    status: ItemStatus,
+    at?: string,
+  ) => {
+    if (!snapshot.has(id)) snapshot.set(id, { id, repo, number, status, at });
   };
   for (const pr of lists.ready) add(pr.id, pr.repo, pr.number, "ready");
   for (const pr of lists.closed) {
     if (pr.merged) add(pr.id, pr.repo, pr.number, "merged");
   }
   for (const pr of lists.stuck) add(pr.id, pr.repo, pr.number, stuckStatus(pr));
-  for (const req of lists.reviews) add(req.id, req.repo, req.number, "review");
-  for (const c of lists.comments) add(c.id, c.repo, c.number, "comment");
+  for (const req of lists.reviews) {
+    add(req.id, req.repo, req.number, "review", req.requestedAt);
+  }
+  for (const c of lists.comments) {
+    add(c.id, c.repo, c.number, "comment", c.commentedAt);
+  }
   return snapshot;
 }
 
-/** Items that appeared, plus items whose status changed. Items that vanished
- * report nothing — they left the board because they were dealt with. */
+/** Items that appeared, plus items whose status or freshness stamp changed.
+ * Items that vanished report nothing — they left the board because they were
+ * dealt with. */
 export function diffStatuses(
   prev: StatusSnapshot,
   next: StatusSnapshot,
 ): StatusEvent[] {
   const events: StatusEvent[] = [];
   for (const [id, event] of next) {
-    if (prev.get(id)?.status !== event.status) events.push(event);
+    const seen = prev.get(id);
+    if (seen?.status !== event.status || seen.at !== event.at) {
+      events.push(event);
+    }
   }
   return events;
 }
@@ -101,6 +124,7 @@ const PHRASES: Record<ItemStatus, string> = {
   "changes-requested": "— changes requested",
   failing: "— checks failing",
   pending: "— waiting on checks",
+  blocked: "— blocked from merging",
   review: "needs your review",
   comment: "— new reply",
 };
@@ -121,24 +145,28 @@ export function describeEvents(events: readonly StatusEvent[]): string {
   return lines.join("\n");
 }
 
-/** The fixed tag makes successive polls replace the notification rather than
- * stack a pile of them up while the user is away. */
-function notify(body: string): void {
+/** A fixed tag per kind makes successive polls replace the notification
+ * rather than stack a pile of them up while the user is away — and keeps the
+ * test send from swallowing a real one. */
+function notify(body: string, tag: string): void {
   if (typeof Notification === "undefined") return;
   if (Notification.permission !== "granted") return;
-  new Notification("PRison", { body, tag: "prison-changes" });
+  new Notification("PRison", { body, tag });
 }
 
 /** Show a desktop notification describing what changed, if permitted. */
 export function showChangeNotification(events: readonly StatusEvent[]): void {
   if (events.length === 0) return;
-  notify(describeEvents(events));
+  notify(describeEvents(events), "prison-changes");
 }
 
 /** Prove to the user that notifications reach them, from the UI rather than
  * from a console. */
 export function showTestNotification(): void {
-  notify("Notifications are on — you'll get one when a PR changes state.");
+  notify(
+    "Notifications are on — you'll get one when a PR changes state.",
+    "prison-test",
+  );
 }
 
 /** The current permission, guarded for environments without the API (jsdom,
@@ -155,7 +183,9 @@ export function notificationPermission(): NotificationPermission {
 export async function requestNotificationPermission(): Promise<NotificationPermission> {
   if (typeof Notification === "undefined") return "denied";
   if (Notification.permission !== "default") return Notification.permission;
-  return Notification.requestPermission();
+  // Callback-only implementations (Safari before 16) resolve with nothing.
+  const answer = await Notification.requestPermission();
+  return answer ?? notificationPermission();
 }
 
 const BADGE_RE = /^\(\d+\) /;

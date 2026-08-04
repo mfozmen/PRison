@@ -363,7 +363,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // Request notification permission only on an explicit enable (a user
   // gesture) — restoring the setting from localStorage must not prompt.
   const handleEnableNotifications = useCallback(() => {
-    void requestNotificationPermission().then(setNotifPermission);
+    void requestNotificationPermission()
+      .then(setNotifPermission)
+      .catch(() => setNotifPermission(notificationPermission()));
   }, []);
 
   const handleAutoRefreshChange = useCallback(
@@ -432,6 +434,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
 
   // Change detection, against the visible (filtered) lists — a hidden bot
   // comment, a reacted thread, or a filtered draft must never announce itself.
+  // The closed list is passed whole rather than as its rendered slice: the
+  // section is collapsed by default, and a merge is worth hearing about
+  // regardless of whether it happens to be on screen.
   // What counts is a *status* change, not just a new id: a PR that goes from
   // stuck to ready keeps its id, and that transition is the whole point.
   // Runs after every commit: ordinary commits (filter toggles, manual

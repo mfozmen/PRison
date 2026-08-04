@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent, within, act } from "@testing-library/react";
 import { Dashboard } from "./Dashboard";
-import { stubNotification } from "@/lib/fixtures";
+import { closedPr, stubNotification } from "@/lib/fixtures";
 import { POLL_INTERVAL_OPTIONS, DEFAULT_POLL_INTERVAL_MS } from "@/lib/notify";
 
 /** Shortest offered interval — keeps the fake-timer arithmetic short. */
@@ -1807,6 +1807,7 @@ describe("Dashboard — auto refresh", () => {
   let failStuck: boolean;
   let closedList: unknown[];
   let readyList: unknown[];
+  let commentList: unknown[];
   function mutableFetch() {
     return vi.fn((url: string) => {
       if (failStuck && url.includes("stuck")) {
@@ -1820,7 +1821,7 @@ describe("Dashboard — auto refresh", () => {
             url.includes("pr-comments")
               ? extraBotComment
                 ? [BOT_COMMENT]
-                : []
+                : commentList
               : url.includes("stuck")
                 ? stuckList
                 : url.includes("closed")
@@ -1839,6 +1840,7 @@ describe("Dashboard — auto refresh", () => {
     failStuck = false;
     closedList = [];
     readyList = [];
+    commentList = [];
     document.title = "PRison";
     useNotificationStub("granted");
     // Pin the shortest offered interval so the timer maths stay readable;
@@ -2064,6 +2066,21 @@ describe("Dashboard — auto refresh", () => {
     expect(constructed.at(-1)?.options?.body).toBe("acme/b #2 — checks failing");
   });
 
+  it("announces a fresh reply on a thread it already knows about", async () => {
+    // The thread id never changes, so only its timestamp separates "already
+    // seen" from "they replied again".
+    commentList = [COMMENT];
+    localStorage.setItem("prison.autoRefresh", "true");
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText(/please fix the null check/)).toBeInTheDocument();
+    constructed.length = 0;
+
+    commentList = [{ ...COMMENT, commentedAt: "2026-06-21T00:00:00Z" }];
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    expect(constructed.at(-1)?.options?.body).toBe("acme/b #2 — new reply");
+  });
+
   it("announces one of the user's own PRs being merged", async () => {
     localStorage.setItem("prison.autoRefresh", "true");
     vi.spyOn(document, "hasFocus").mockReturnValue(false);
@@ -2072,15 +2089,7 @@ describe("Dashboard — auto refresh", () => {
 
     stuckList = [];
     closedList = [
-      {
-        id: STUCK_PR.id,
-        title: "stuck pr",
-        url: "u",
-        repo: "acme/b",
-        number: 2,
-        merged: true,
-        endedAt: "2026-06-25T00:00:00Z",
-      },
+      closedPr({ id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number }),
     ];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(constructed.at(-1)?.options?.body).toBe("acme/b #2 was merged");
@@ -2094,15 +2103,12 @@ describe("Dashboard — auto refresh", () => {
 
     stuckList = [];
     closedList = [
-      {
+      closedPr({
         id: STUCK_PR.id,
-        title: "stuck pr",
-        url: "u",
-        repo: "acme/b",
-        number: 2,
+        repo: STUCK_PR.repo,
+        number: STUCK_PR.number,
         merged: false,
-        endedAt: "2026-06-25T00:00:00Z",
-      },
+      }),
     ];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(document.title).toBe("PRison");

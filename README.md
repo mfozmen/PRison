@@ -43,7 +43,7 @@ access. Four lists, oldest first, plus a history section:
   how often to check — every 5, 15, or 30 minutes, or hourly (30 minutes by
   default). PRison then tells you what *moved*, not just what's new: a PR that
   became ready to merge, checks that went red, changes requested, a review asked
-  of you, a new reply, or one of your own PRs getting merged. The notification
+  of you, a fresh reply on a thread, or one of your own PRs getting merged. The notification
   names them — `acme/web #42 is ready to merge` — up to three at a time, then
   `+N more`. While you're on another tab you also get a **`(3) PRison`**
   tab-title badge that clears the moment you come back. Settings shows whether
@@ -129,10 +129,11 @@ If `gh` isn't installed or signed in, the app falls back to a paste-a-token form
 
 Sign in with the GitHub CLI or paste a token. In the top-right: the **switcher**
 scopes to All / your personal account / a single org; the **sliders icon** opens
-**Settings**, whose menu has three sections — **Comments** (show bot comments,
+**Settings**, whose menu has four sections — **Comments** (show bot comments,
 hide comments you reacted to), **Auto refresh** (on/off, how often to check, and
-the notification permission), and **Tracked checks** (name the required checks to
-see as "Awaiting"); the **sun/moon** toggles the theme; **Sign Out** clears the
+the notification permission), **Tracked checks** (name the required checks to
+see as "Awaiting"), and **About** (version, repository, license); the
+**sun/moon** toggles the theme; **Sign Out** clears the
 stored token. Click a **PR title** (or a suggested-action link) to jump to
 GitHub — a comment row lands on that exact thread. In the filter bar: **Flat / By
 repo / By check** to group, **Hide drafts** to drop draft PRs from the lists, and

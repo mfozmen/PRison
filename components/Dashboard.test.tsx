@@ -1446,8 +1446,8 @@ describe("Dashboard", () => {
       for (const retry of retries) fireEvent.click(retry);
       await waitFor(() =>
         expect(
-          (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
-        ).toBe(before + 5 * retries.length),
+          (global.fetch as ReturnType<typeof vi.fn>).mock.calls,
+        ).toHaveLength(before + 5 * retries.length),
       );
     });
 
@@ -1459,8 +1459,8 @@ describe("Dashboard", () => {
       fireEvent.click(within(notice).getByRole("button", { name: /retry/i }));
       await waitFor(() =>
         expect(
-          (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
-        ).toBe(10),
+          (global.fetch as ReturnType<typeof vi.fn>).mock.calls,
+        ).toHaveLength(10),
       );
     });
   });
@@ -1792,9 +1792,10 @@ describe("Dashboard — auto refresh", () => {
 
   let constructed: Array<{ title: string; options?: NotificationOptions }>;
   let requestPermission: ReturnType<typeof vi.fn>;
+  let setPermission: (next: NotificationPermission) => void;
 
   function useNotificationStub(permission: NotificationPermission) {
-    ({ constructed, requestPermission } = stubNotification(permission));
+    ({ constructed, requestPermission, setPermission } = stubNotification(permission));
   }
 
   // Serves whatever `stuckList` holds at request time — tests mutate it to
@@ -2039,7 +2040,7 @@ describe("Dashboard — auto refresh", () => {
     // answer only on Notification.permission; without the fallback read the pane
     // would keep offering an Enable button that can never succeed.
     requestPermission.mockImplementation(() => {
-      (Notification as unknown as { permission: NotificationPermission }).permission = "denied";
+      setPermission("denied");
       return Promise.reject(new Error("prompt failed"));
     });
     render(<Dashboard orgs={ORGS} login="testuser" />);

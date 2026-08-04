@@ -102,19 +102,29 @@ export function closedPr(overrides: Partial<ClosedPr> = {}): ClosedPr {
 
 /**
  * Shared Notification stub for jsdom (which has no Notification at all).
- * Returns the constructed notifications and the requestPermission spy; callers
- * clean up with `vi.unstubAllGlobals()`.
+ * Returns the constructed notifications, the requestPermission spy, and a
+ * setter for the permission — the browser can change it out from under the
+ * page, and a test that models that needs to as well. Callers clean up with
+ * `vi.unstubAllGlobals()`.
  */
 export function stubNotification(permission: NotificationPermission) {
   const constructed: Array<{ title: string; options?: NotificationOptions }> = [];
   const requestPermission = vi.fn().mockResolvedValue(permission);
+  let current = permission;
   class FakeNotification {
-    static permission = permission;
-    static requestPermission = requestPermission;
+    // A getter, not a field: the real Notification.permission is read-only to
+    // the page too — only the browser moves it.
+    static get permission(): NotificationPermission {
+      return current;
+    }
+    static readonly requestPermission = requestPermission;
     constructor(title: string, options?: NotificationOptions) {
       constructed.push({ title, options });
     }
   }
   vi.stubGlobal("Notification", FakeNotification);
-  return { constructed, requestPermission };
+  const setPermission = (next: NotificationPermission) => {
+    current = next;
+  };
+  return { constructed, requestPermission, setPermission };
 }

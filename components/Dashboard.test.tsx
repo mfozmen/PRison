@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent, within, act } from "@testing-library/react";
 import { Dashboard } from "./Dashboard";
-import { stubNotification } from "@/lib/fixtures";
+import { closedPr, stubNotification } from "@/lib/fixtures";
 import { POLL_INTERVAL_OPTIONS, DEFAULT_POLL_INTERVAL_MS } from "@/lib/notify";
 
 /** Shortest offered interval — keeps the fake-timer arithmetic short. */
@@ -195,9 +195,11 @@ beforeEach(() => {
   global.fetch = okFetch();
 });
 
-/** The filter checkboxes live in the Settings modal; open it first. */
-function openSettings() {
+/** Comment filters, auto refresh, and tracked checks live in the Settings
+ * modal; open it first, then pick the section under test. */
+function openSettings(section?: string) {
   fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+  if (section) fireEvent.click(screen.getByRole("tab", { name: section }));
 }
 
 describe("Dashboard", () => {
@@ -755,9 +757,11 @@ describe("Dashboard", () => {
     expect(await screen.findByText("draft stuck pr")).toBeInTheDocument();
     expect(screen.getByText("draft review pr")).toBeInTheDocument();
 
-    // Check the hide-drafts checkbox in the Settings modal
-    openSettings();
-    fireEvent.click(screen.getByRole("checkbox", { name: /hide drafts/i }));
+    // Hide drafts is a filter-bar toggle, not a Settings checkbox.
+    const toggle = screen.getByRole("button", { name: /hide drafts/i });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
 
     await waitFor(() =>
       expect(screen.queryByText("draft stuck pr")).not.toBeInTheDocument(),
@@ -770,10 +774,19 @@ describe("Dashboard", () => {
   it("persists hideDrafts toggle to localStorage", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    openSettings();
-    fireEvent.click(screen.getByRole("checkbox", { name: /hide drafts/i }));
+    fireEvent.click(screen.getByRole("button", { name: /hide drafts/i }));
     await waitFor(() =>
       expect(localStorage.getItem("prison.hideDrafts")).toBe("true"),
+    );
+  });
+
+  it("restores the pressed state of the hide-drafts toggle on mount", async () => {
+    localStorage.setItem("prison.hideDrafts", "true");
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /hide drafts/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
     );
   });
 
@@ -1261,7 +1274,7 @@ describe("Dashboard", () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       // STUCK_PR.repo = "acme/b", REVIEW_PR.repo = "acme/c", READY_PR.repo = "acme/d"
-      fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+      openSettings("Tracked checks");
       const addButton = screen.getByRole("button", { name: /add override/i });
       expect(addButton).toBeInTheDocument();
       fireEvent.click(addButton);
@@ -1433,8 +1446,8 @@ describe("Dashboard", () => {
       for (const retry of retries) fireEvent.click(retry);
       await waitFor(() =>
         expect(
-          (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
-        ).toBe(before + 5 * retries.length),
+          (global.fetch as ReturnType<typeof vi.fn>).mock.calls,
+        ).toHaveLength(before + 5 * retries.length),
       );
     });
 
@@ -1446,8 +1459,8 @@ describe("Dashboard", () => {
       fireEvent.click(within(notice).getByRole("button", { name: /retry/i }));
       await waitFor(() =>
         expect(
-          (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
-        ).toBe(10),
+          (global.fetch as ReturnType<typeof vi.fn>).mock.calls,
+        ).toHaveLength(10),
       );
     });
   });
@@ -1779,9 +1792,10 @@ describe("Dashboard — auto refresh", () => {
 
   let constructed: Array<{ title: string; options?: NotificationOptions }>;
   let requestPermission: ReturnType<typeof vi.fn>;
+  let setPermission: (next: NotificationPermission) => void;
 
   function useNotificationStub(permission: NotificationPermission) {
-    ({ constructed, requestPermission } = stubNotification(permission));
+    ({ constructed, requestPermission, setPermission } = stubNotification(permission));
   }
 
   // Serves whatever `stuckList` holds at request time — tests mutate it to
@@ -1793,6 +1807,8 @@ describe("Dashboard — auto refresh", () => {
   let extraBotComment: boolean;
   let failStuck: boolean;
   let closedList: unknown[];
+  let readyList: unknown[];
+  let commentList: unknown[];
   function mutableFetch() {
     return vi.fn((url: string) => {
       if (failStuck && url.includes("stuck")) {
@@ -1806,12 +1822,14 @@ describe("Dashboard — auto refresh", () => {
             url.includes("pr-comments")
               ? extraBotComment
                 ? [BOT_COMMENT]
-                : []
+                : commentList
               : url.includes("stuck")
                 ? stuckList
                 : url.includes("closed")
                   ? closedList
-                  : [],
+                  : url.includes("ready")
+                    ? readyList
+                    : [],
           ),
       });
     }) as unknown as typeof fetch;
@@ -1822,6 +1840,8 @@ describe("Dashboard — auto refresh", () => {
     extraBotComment = false;
     failStuck = false;
     closedList = [];
+    readyList = [];
+    commentList = [];
     document.title = "PRison";
     useNotificationStub("granted");
     // Pin the shortest offered interval so the timer maths stay readable;
@@ -1891,7 +1911,7 @@ describe("Dashboard — auto refresh", () => {
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
 
     const longest = POLL_INTERVAL_OPTIONS[POLL_INTERVAL_OPTIONS.length - 1].ms;
-    openSettings();
+    openSettings("Auto refresh");
     fireEvent.change(
       screen.getByRole("combobox", { name: /auto refresh interval/i }),
       { target: { value: String(longest) } },
@@ -1988,12 +2008,47 @@ describe("Dashboard — auto refresh", () => {
     useNotificationStub("default");
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    openSettings();
+    openSettings("Auto refresh");
     fireEvent.click(screen.getByRole("checkbox", { name: /auto refresh/i }));
     expect(requestPermission).toHaveBeenCalledTimes(1);
     await waitFor(() =>
       expect(localStorage.getItem("prison.autoRefresh")).toBe("true"),
     );
+  });
+
+  it("shows the granted controls once the user answers the prompt", async () => {
+    // Nothing re-renders when the browser prompt is answered, so the answer has
+    // to travel from the promise into state — a re-read of Notification.permission
+    // would still say "default" here.
+    localStorage.setItem("prison.autoRefresh", "true");
+    useNotificationStub("default");
+    requestPermission.mockResolvedValue("granted");
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    openSettings("Auto refresh");
+
+    fireEvent.click(screen.getByRole("button", { name: /enable notifications/i }));
+    expect(
+      await screen.findByRole("button", { name: /send a test notification/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("falls back to the live permission when the prompt rejects", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
+    useNotificationStub("default");
+    // A prompt that throws (non-secure context, callback-only Safari) leaves the
+    // answer only on Notification.permission; without the fallback read the pane
+    // would keep offering an Enable button that can never succeed.
+    requestPermission.mockImplementation(() => {
+      setPermission("denied");
+      return Promise.reject(new Error("prompt failed"));
+    });
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    openSettings("Auto refresh");
+
+    fireEvent.click(screen.getByRole("button", { name: /enable notifications/i }));
+    expect(await screen.findByText(/notifications are blocked/i)).toBeInTheDocument();
   });
 
   it("badges the title and notifies when a poll finds new items while unfocused", async () => {
@@ -2011,11 +2066,89 @@ describe("Dashboard — auto refresh", () => {
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(document.title).toBe("(1) PRison");
     expect(constructed).toHaveLength(1);
-    expect(constructed[0].options?.tag).toBe("prison-new-items");
+    expect(constructed[0].options?.tag).toBe("prison-changes");
+    // The body names the PR and what happened, not just a count.
+    expect(constructed[0].options?.body).toBe("acme/b #2 — checks failing");
 
     // Returning to the tab clears the badge.
     fireEvent(window, new Event("focus"));
     expect(document.title).toBe("PRison");
+  });
+
+  it("announces a PR that moved from stuck to ready — the id is not new, the news is", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    // Same PR id, now merge-ready: checks went green and it left the stuck list.
+    stuckList = [];
+    readyList = [{ ...READY_PR, id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number }];
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+
+    expect(document.title).toBe("(1) PRison");
+    expect(constructed.at(-1)?.options?.body).toBe("acme/b #2 is ready to merge");
+  });
+
+  it("announces a check going red on a PR that was merely waiting", async () => {
+    stuckList = [{ ...STUCK_PR, failingChecks: 0, pendingChecks: 1, failing: [], pending: ["build"] }];
+    localStorage.setItem("prison.autoRefresh", "true");
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    stuckList = [STUCK_PR];
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    expect(constructed.at(-1)?.options?.body).toBe("acme/b #2 — checks failing");
+  });
+
+  it("announces a fresh reply on a thread it already knows about", async () => {
+    // The thread id never changes, so only its timestamp separates "already
+    // seen" from "they replied again".
+    commentList = [COMMENT];
+    localStorage.setItem("prison.autoRefresh", "true");
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText(/please fix the null check/)).toBeInTheDocument();
+    constructed.length = 0;
+
+    commentList = [{ ...COMMENT, commentedAt: "2026-06-21T00:00:00Z" }];
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    expect(constructed.at(-1)?.options?.body).toBe("acme/b #2 — new reply");
+  });
+
+  it("announces one of the user's own PRs being merged", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    stuckList = [];
+    closedList = [
+      closedPr({ id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number }),
+    ];
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    expect(constructed.at(-1)?.options?.body).toBe("acme/b #2 was merged");
+  });
+
+  it("stays quiet about a PR closed without merging — that is not progress", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    stuckList = [];
+    closedList = [
+      closedPr({
+        id: STUCK_PR.id,
+        repo: STUCK_PR.repo,
+        number: STUCK_PR.number,
+        merged: false,
+      }),
+    ];
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    expect(document.title).toBe("PRison");
+    expect(constructed).toHaveLength(0);
   });
 
   it("clears the badge when the tab becomes visible again", async () => {
@@ -2096,7 +2229,7 @@ describe("Dashboard — auto refresh", () => {
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(fetchCalls()).toBe(10);
 
-    openSettings();
+    openSettings("Auto refresh");
     fireEvent.click(screen.getByRole("checkbox", { name: /auto refresh/i }));
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS * 2));
     expect(fetchCalls()).toBe(10);
@@ -2112,10 +2245,90 @@ describe("Dashboard — auto refresh", () => {
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(document.title).toBe("(1) PRison");
 
-    stuckList = [STUCK_PR, NEW_STUCK_PR, { ...STUCK_PR, id: "new-2", title: "second new stuck pr" }];
+    stuckList = [
+      STUCK_PR,
+      NEW_STUCK_PR,
+      { ...STUCK_PR, id: "new-2", title: "second new stuck pr", number: 7 },
+    ];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    // The badge accumulates (1 + 1), and so does the notification: it carries a
+    // fixed tag, so this one REPLACES the previous in the tray. Describing only
+    // this poll's delta would lose the earlier PR while the badge still counted it.
     expect(document.title).toBe("(2) PRison");
-    expect(constructed.at(-1)?.options?.body).toBe("2 new items need your attention");
+    expect(constructed.at(-1)?.options?.body).toBe(
+      "acme/b #2 — checks failing\nacme/b #7 — checks failing",
+    );
+  });
+
+  it("re-reads permission when the test notification is sent", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    openSettings("Auto refresh");
+    fireEvent.click(screen.getByRole("button", { name: /send a test notification/i }));
+    expect(constructed).toHaveLength(1);
+
+    // Revoked in site settings without a reload: the button would silently do
+    // nothing, so the next click swaps it for the blocked hint.
+    useNotificationStub("denied");
+    fireEvent.click(screen.getByRole("button", { name: /send a test notification/i }));
+    expect(await screen.findByText(/notifications are blocked/i)).toBeInTheDocument();
+  });
+
+  it("re-reads permission when Settings is opened", async () => {
+    // Unblocking PRison in site settings is a change nothing in the page can
+    // hear, so a permission read once at mount would keep claiming it is
+    // blocked while notifications actually work.
+    useNotificationStub("denied");
+    localStorage.setItem("prison.autoRefresh", "true");
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    openSettings("Auto refresh");
+    expect(screen.getByText(/notifications are blocked/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /close settings/i }));
+    useNotificationStub("granted");
+    openSettings("Auto refresh");
+    expect(
+      screen.getByRole("button", { name: /send a test notification/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("announces the second failure after a push reset the checks", async () => {
+    // The quiet middle step still has to be recorded as seen, or the PR looks
+    // like it never left "failing" and the re-run's failure goes unreported.
+    localStorage.setItem("prison.autoRefresh", "true");
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    stuckList = [{ ...STUCK_PR, failingChecks: 0, pendingChecks: 1, failing: [], pending: ["build"] }];
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    expect(constructed).toHaveLength(0);
+
+    stuckList = [STUCK_PR];
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    expect(constructed.at(-1)?.options?.body).toBe("acme/b #2 — checks failing");
+  });
+
+  it("counts an item that moves twice while away only once", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    stuckList = [{ ...STUCK_PR, failingChecks: 0, pendingChecks: 1, failing: [], pending: ["build"] }];
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    stuckList = [];
+    readyList = [
+      { ...READY_PR, id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number },
+    ];
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+
+    // Same PR, two transitions: the badge is a count of items needing a look,
+    // and the notification carries only its latest state.
+    expect(document.title).toBe("(1) PRison");
+    expect(constructed.at(-1)?.options?.body).toBe("acme/b #2 is ready to merge");
   });
 
   it("does not re-notify an item that flaps out and back", async () => {

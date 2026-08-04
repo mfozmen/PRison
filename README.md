@@ -37,12 +37,20 @@ access. Four lists, oldest first, plus a history section:
   on a blocked PR until they report.
 - **Recently merged / closed history.** Merged and closed-without-merging PRs,
   each badged **Merged** or **Closed** with how long ago it ended.
-- **Grouping** — flat, by repository, or by check.
+- **Grouping** — flat, by repository, or by check, with a **Hide drafts** toggle
+  next to them in the filter bar.
 - **Auto refresh with notifications (opt-in).** Turn it on in Settings and pick
   how often to check — every 5, 15, or 30 minutes, or hourly (30 minutes by
-  default). When something new lands while you're on another tab, you get a
-  desktop notification and a **`(3) PRison`** tab-title badge that clears the
-  moment you come back. Works only while a PRison tab is open — there's no
+  default). PRison then tells you what *moved*, not just what's new: a PR that
+  became ready to merge, checks that went red, changes requested, a review asked
+  of you, a fresh reply on a thread, or one of your own PRs getting merged —
+  while a PR simply falling back to waiting (you pushed a fix) stays quiet. The notification
+  names them — `acme/web #42 is ready to merge` — up to three at a time, then
+  `+N more`, and it keeps naming everything that moved while you were away,
+  not just the latest poll. While you're on another tab you also get a **`(3) PRison`**
+  tab-title badge that clears the moment you come back. Settings shows whether
+  your browser has actually granted permission, and offers a test notification
+  so you can confirm it. Works only while a PRison tab is open — there's no
   background service.
 - **Last refreshed indicator.** The filter bar says how long ago the data
   landed, so you always know whether you're looking at something stale.
@@ -123,12 +131,14 @@ If `gh` isn't installed or signed in, the app falls back to a paste-a-token form
 
 Sign in with the GitHub CLI or paste a token. In the top-right: the **switcher**
 scopes to All / your personal account / a single org; the **sliders icon** opens
-**Settings** — view filters (**Hide drafts**, **Show bot comments**, **Hide
-comments I reacted to**), **Auto refresh** (on/off plus how often to check), and
-**Tracked checks** (name the required checks to see as "Awaiting"); the
-**sun/moon** toggles the theme; **Sign Out** clears the stored token. Click a
-**PR title** (or a suggested-action link) to jump to GitHub — a comment row
-lands on that exact thread. Use **Flat / By repo / By check** to group, and
+**Settings**, whose menu has four sections — **Comments** (show bot comments,
+hide comments you reacted to), **Auto refresh** (on/off, how often to check, and
+the notification permission), **Tracked checks** (name the required checks to
+see as "Awaiting"), and **About** (version, repository, license); the
+**sun/moon** toggles the theme; **Sign Out** clears the
+stored token. Click a **PR title** (or a suggested-action link) to jump to
+GitHub — a comment row lands on that exact thread. In the filter bar: **Flat / By
+repo / By check** to group, **Hide drafts** to drop draft PRs from the lists, and
 **Refresh** to re-fetch without reloading — next to it, **Updated Xm ago** tells
 you how fresh the data is.
 

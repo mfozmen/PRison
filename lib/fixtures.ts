@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { StuckPr, ReviewRequest, ReadyPr } from "./types";
+import type { StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr } from "./types";
 
 /**
  * Test data builders. PRison is a public repository: fixtures must never carry a
@@ -23,8 +23,11 @@ export function stuckPr(overrides: Partial<StuckPr> = {}): StuckPr {
     url: "https://github.com/acme/api/pull/2",
     repo: "acme/api",
     number: 2,
-    failingChecks: 0,
-    pendingChecks: 0,
+    // Counts follow the names by default — GitHub can report a check with no
+    // name, so the count may exceed the list, but it can never fall below it.
+    // Override the count explicitly to model those unnamed checks.
+    failingChecks: overrides.failing?.length ?? 0,
+    pendingChecks: overrides.pending?.length ?? 0,
     failing: [],
     pending: [],
     checkNames: [],
@@ -67,21 +70,61 @@ export function readyPr(overrides: Partial<ReadyPr> = {}): ReadyPr {
   };
 }
 
+export function prComment(overrides: Partial<PrComment> = {}): PrComment {
+  return {
+    id: "THREAD_1",
+    prId: "PR_stuck",
+    url: "https://github.com/acme/api/pull/2#discussion_r1",
+    repo: "acme/api",
+    number: 2,
+    author: "bob",
+    isBot: false,
+    path: "src/index.ts",
+    preview: "Could you split this into two functions?",
+    commentedAt: "2026-06-23T00:00:00Z",
+    viewerReacted: false,
+    ...overrides,
+  };
+}
+
+export function closedPr(overrides: Partial<ClosedPr> = {}): ClosedPr {
+  return {
+    id: "PR_closed",
+    title: "Drop the legacy exporter",
+    url: "https://github.com/acme/web/pull/4",
+    repo: "acme/web",
+    number: 4,
+    merged: true,
+    endedAt: "2026-06-24T00:00:00Z",
+    ...overrides,
+  };
+}
+
 /**
  * Shared Notification stub for jsdom (which has no Notification at all).
- * Returns the constructed notifications and the requestPermission spy; callers
- * clean up with `vi.unstubAllGlobals()`.
+ * Returns the constructed notifications, the requestPermission spy, and a
+ * setter for the permission — the browser can change it out from under the
+ * page, and a test that models that needs to as well. Callers clean up with
+ * `vi.unstubAllGlobals()`.
  */
 export function stubNotification(permission: NotificationPermission) {
   const constructed: Array<{ title: string; options?: NotificationOptions }> = [];
   const requestPermission = vi.fn().mockResolvedValue(permission);
+  let current = permission;
   class FakeNotification {
-    static permission = permission;
-    static requestPermission = requestPermission;
+    // A getter, not a field: the real Notification.permission is read-only to
+    // the page too — only the browser moves it.
+    static get permission(): NotificationPermission {
+      return current;
+    }
+    static readonly requestPermission = requestPermission;
     constructor(title: string, options?: NotificationOptions) {
       constructed.push({ title, options });
     }
   }
   vi.stubGlobal("Notification", FakeNotification);
-  return { constructed, requestPermission };
+  const setPermission = (next: NotificationPermission) => {
+    current = next;
+  };
+  return { constructed, requestPermission, setPermission };
 }

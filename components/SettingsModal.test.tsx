@@ -8,8 +8,6 @@ import { DEFAULT_POLL_INTERVAL_MS, POLL_INTERVAL_OPTIONS } from "@/lib/notify";
 // Defaults for the filter/auto-refresh props so the tracked-checks tests stay
 // focused on their own concern.
 const filterProps = {
-  hideDrafts: false,
-  onHideDraftsChange: vi.fn(),
   showBots: false,
   onShowBotsChange: vi.fn(),
   hideReacted: true,
@@ -18,7 +16,15 @@ const filterProps = {
   onAutoRefreshChange: vi.fn(),
   pollInterval: DEFAULT_POLL_INTERVAL_MS,
   onPollIntervalChange: vi.fn(),
+  notifPermission: "granted" as NotificationPermission,
+  onEnableNotifications: vi.fn(),
+  onTestNotification: vi.fn(),
 };
+
+/** Only one section is mounted at a time; open the one under test. */
+function selectSection(label: string) {
+  fireEvent.click(screen.getByRole("tab", { name: label }));
+}
 
 const orgs: Org[] = [
   { login: "acme", avatarUrl: "https://example.com/acme.png" },
@@ -60,6 +66,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
+    selectSection("Tracked checks");
     const acmeInput = screen.getByRole("textbox", { name: "acme check names" });
     expect(acmeInput).toHaveValue("qa/smoke, lint");
     const betaInput = screen.getByRole("textbox", { name: "beta check names" });
@@ -79,6 +86,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
+    selectSection("Tracked checks");
     const input = screen.getByRole("textbox", { name: "acme check names" });
     fireEvent.change(input, { target: { value: "qa/smoke, lint" } });
     expect(onChange).toHaveBeenCalledWith({
@@ -100,6 +108,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
+    selectSection("Tracked checks");
     const input = screen.getByRole("textbox", { name: "acme check names" });
     // Parent does not feed `value` back; the input must keep the raw draft so a
     // trailing comma survives long enough to type the second token.
@@ -142,6 +151,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
+    selectSection("Tracked checks");
     expect(
       screen.getByRole("textbox", { name: "acme check names" }),
     ).toHaveValue("qa/smoke");
@@ -163,6 +173,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
+    selectSection("Tracked checks");
     expect(screen.queryByRole("combobox", { name: "Repository" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /add override/i }));
     expect(screen.getByRole("combobox", { name: "Repository" })).toBeInTheDocument();
@@ -181,6 +192,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
+    selectSection("Tracked checks");
     fireEvent.click(screen.getByRole("button", { name: /add override/i }));
     const repoInput = screen.getByRole("combobox", { name: "Repository" });
     const checksInput = screen.getByPlaceholderText("e.g. qa/smoke");
@@ -207,6 +219,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
+    selectSection("Tracked checks");
     fireEvent.click(screen.getByRole("button", { name: /add override/i }));
     // Fill only the checks field, leaving the repo select on the blank placeholder:
     // the row must not emit an empty-string repo key.
@@ -228,6 +241,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
+    selectSection("Tracked checks");
     fireEvent.click(screen.getByRole("button", { name: /add override/i }));
     expect(screen.getByRole("combobox", { name: "Repository" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /remove repo override/i }));
@@ -313,6 +327,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
+    selectSection("Tracked checks");
     fireEvent.click(screen.getByRole("button", { name: /add override/i }));
     const combobox = screen.getByRole("combobox", { name: "Repository" });
     // Focus opens the suggestion dropdown; empty input shows availableRepos
@@ -337,6 +352,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
+    selectSection("Tracked checks");
     // The row is seeded from value.repos; the combobox input displays the repo name
     const combobox = screen.getByRole("combobox", { name: "Repository" });
     expect(combobox).toHaveValue("legacy/repo");
@@ -355,6 +371,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
+    selectSection("Tracked checks");
     fireEvent.click(screen.getByRole("button", { name: /add override/i }));
     const repoInput = screen.getByRole("combobox", { name: "Repository" });
     // Focus to show suggestions, then pick one
@@ -381,6 +398,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
+    selectSection("Tracked checks");
 
     // Add first row: acme/web → qa/smoke
     fireEvent.click(screen.getByRole("button", { name: /add override/i }));
@@ -423,6 +441,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
+    selectSection("Tracked checks");
 
     // Row 1: acme/web → qa/smoke
     fireEvent.click(screen.getByRole("button", { name: /add override/i }));
@@ -461,6 +480,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
+    selectSection("Tracked checks");
     expect(
       screen.getByText(/no repositories loaded yet/i),
     ).toBeInTheDocument();
@@ -484,13 +504,12 @@ describe("SettingsModal", () => {
   });
 
   it.each([
-    ["Hide drafts", "hideDrafts", "onHideDraftsChange", false],
-    ["Show bot comments", "showBots", "onShowBotsChange", false],
-    ["Hide comments I reacted to", "hideReacted", "onHideReactedChange", true],
-    ["Auto refresh", "autoRefresh", "onAutoRefreshChange", false],
+    ["Show bot comments", "showBots", "onShowBotsChange", false, "Comments"],
+    ["Hide comments I reacted to", "hideReacted", "onHideReactedChange", true, "Comments"],
+    ["Auto refresh", "autoRefresh", "onAutoRefreshChange", false, "Auto refresh"],
   ] as const)(
     "%s checkbox reflects its prop and calls its setter",
-    (label, propName, setterName, initial) => {
+    (label, propName, setterName, initial, section) => {
       const setter = vi.fn();
       render(
         <SettingsModal
@@ -504,6 +523,7 @@ describe("SettingsModal", () => {
           onClose={vi.fn()}
         />,
       );
+      selectSection(section);
       const checkbox = screen.getByRole("checkbox", { name: label });
       if (initial) expect(checkbox).toBeChecked();
       else expect(checkbox).not.toBeChecked();
@@ -511,6 +531,120 @@ describe("SettingsModal", () => {
       expect(setter).toHaveBeenCalledWith(!initial);
     },
   );
+
+  describe("section menu", () => {
+    function renderOpen() {
+      render(
+        <SettingsModal
+          {...filterProps}
+          orgs={[]}
+          availableRepos={[]}
+          value={emptyValue}
+          onChange={vi.fn()}
+          open={true}
+          onClose={vi.fn()}
+        />,
+      );
+    }
+
+    it("offers every section and opens on the first one", () => {
+      renderOpen();
+      const tabs = screen.getAllByRole("tab");
+      expect(tabs.map((t) => t.textContent)).toEqual([
+        "Comments",
+        "Auto refresh",
+        "Tracked checks",
+        "About",
+      ]);
+      expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+    });
+
+    it("shows only the selected section", () => {
+      renderOpen();
+      expect(screen.getByRole("checkbox", { name: "Show bot comments" })).toBeInTheDocument();
+      expect(
+        screen.queryByRole("combobox", { name: /auto refresh interval/i }),
+      ).not.toBeInTheDocument();
+
+      selectSection("Auto refresh");
+      expect(
+        screen.getByRole("combobox", { name: /auto refresh interval/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("checkbox", { name: "Show bot comments" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("moves between sections with the arrow keys, wrapping at the ends", () => {
+      renderOpen();
+      const tabs = screen.getAllByRole("tab");
+      fireEvent.keyDown(tabs[0], { key: "ArrowDown" });
+      expect(screen.getByRole("tab", { name: "Auto refresh" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      // Wrapping backwards off the first item lands on the last.
+      fireEvent.keyDown(tabs[1], { key: "ArrowUp" });
+      fireEvent.keyDown(tabs[0], { key: "ArrowLeft" });
+      expect(screen.getByRole("tab", { name: "About" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      // ArrowRight is wired too, for the horizontal (mobile) menu.
+      fireEvent.keyDown(tabs[3], { key: "ArrowRight" });
+      expect(screen.getByRole("tab", { name: "Comments" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+    });
+
+    it("points About at the repository, with the running version", () => {
+      vi.stubEnv("NEXT_PUBLIC_APP_VERSION", "1.5.0");
+      renderOpen();
+      selectSection("About");
+      expect(screen.getByText("PRison v1.5.0")).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: "github.com/mfozmen/PRison" }),
+      ).toHaveAttribute("href", "https://github.com/mfozmen/PRison");
+      vi.unstubAllEnvs();
+    });
+
+    it("drops the version line when the build doesn't carry one", () => {
+      vi.stubEnv("NEXT_PUBLIC_APP_VERSION", "");
+      renderOpen();
+      selectSection("About");
+      expect(screen.getByText("PRison")).toBeInTheDocument();
+      vi.unstubAllEnvs();
+    });
+
+    it("ignores keys that aren't arrows", () => {
+      renderOpen();
+      fireEvent.keyDown(screen.getAllByRole("tab")[0], { key: "a" });
+      expect(screen.getByRole("tab", { name: "Comments" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+    });
+
+    it("reopens on the first section after being closed elsewhere", () => {
+      const props = {
+        ...filterProps,
+        orgs: [],
+        availableRepos: [],
+        value: emptyValue,
+        onChange: vi.fn(),
+        onClose: vi.fn(),
+      };
+      const { rerender } = render(<SettingsModal {...props} open={true} />);
+      selectSection("Tracked checks");
+      rerender(<SettingsModal {...props} open={false} />);
+      rerender(<SettingsModal {...props} open={true} />);
+      expect(screen.getByRole("tab", { name: "Comments" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+    });
+  });
 
   it("offers every poll interval and reflects the selected one", () => {
     render(
@@ -526,6 +660,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
+    selectSection("Auto refresh");
     const select = screen.getByRole("combobox", { name: /auto refresh interval/i });
     expect(select).toHaveValue(String(POLL_INTERVAL_OPTIONS[0].ms));
     for (const o of POLL_INTERVAL_OPTIONS) {
@@ -548,6 +683,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
+    selectSection("Auto refresh");
     const target = POLL_INTERVAL_OPTIONS[POLL_INTERVAL_OPTIONS.length - 1];
     fireEvent.change(
       screen.getByRole("combobox", { name: /auto refresh interval/i }),
@@ -569,17 +705,22 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
+    selectSection("Auto refresh");
     expect(
       screen.getByRole("combobox", { name: /auto refresh interval/i }),
     ).toBeDisabled();
   });
 
-  it("shows the blocked-notifications hint when permission is denied and auto refresh is on", () => {
-    vi.stubGlobal("Notification", { permission: "denied" });
-    try {
+  describe("notification permission", () => {
+    function renderWithPermission(
+      notifPermission: NotificationPermission,
+      overrides: Partial<React.ComponentProps<typeof SettingsModal>> = {},
+    ) {
       render(
         <SettingsModal
           {...filterProps}
+          notifPermission={notifPermission}
+          // The permission controls only apply while something is polling.
           autoRefresh={true}
           orgs={[]}
           availableRepos={[]}
@@ -587,36 +728,53 @@ describe("SettingsModal", () => {
           onChange={vi.fn()}
           open={true}
           onClose={vi.fn()}
+          {...overrides}
         />,
       );
-      expect(
-        screen.getByText(/notifications are blocked in your browser/i),
-      ).toBeInTheDocument();
-    } finally {
-      vi.unstubAllGlobals();
+      selectSection("Auto refresh");
     }
-  });
 
-  it("hides the blocked-notifications hint when auto refresh is off", () => {
-    vi.stubGlobal("Notification", { permission: "denied" });
-    try {
-      render(
-        <SettingsModal
-          {...filterProps}
-          autoRefresh={false}
-          orgs={[]}
-          availableRepos={[]}
-          value={emptyValue}
-          onChange={vi.fn()}
-          open={true}
-          onClose={vi.fn()}
-        />,
-      );
+    it("offers to ask the browser while the prompt is unanswered", () => {
+      const onEnableNotifications = vi.fn();
+      renderWithPermission("default", { onEnableNotifications });
+      expect(screen.getByText(/browser hasn't been asked yet/i)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /enable notifications/i }));
+      expect(onEnableNotifications).toHaveBeenCalled();
+    });
+
+    it("keeps the permission controls out of the way while auto refresh is off", () => {
+      // Nothing polls, so there is no tab badge to promise and nothing to test.
+      renderWithPermission("denied", { autoRefresh: false });
       expect(
         screen.queryByText(/notifications are blocked in your browser/i),
       ).not.toBeInTheDocument();
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    });
+
+    it("says so when the browser has blocked notifications", () => {
+      renderWithPermission("denied");
+      expect(
+        screen.getByText(/notifications are blocked in your browser/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /enable notifications/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("lets the user prove delivery once permission is granted", () => {
+      const onTestNotification = vi.fn();
+      renderWithPermission("granted", { onTestNotification });
+      expect(
+        screen.queryByText(/notifications are blocked in your browser/i),
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /send a test notification/i }));
+      expect(onTestNotification).toHaveBeenCalled();
+    });
+
+    it("offers no test button until permission is granted", () => {
+      renderWithPermission("default");
+      expect(
+        screen.queryByRole("button", { name: /send a test notification/i }),
+      ).not.toBeInTheDocument();
+    });
   });
 });

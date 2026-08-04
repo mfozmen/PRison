@@ -43,9 +43,9 @@ export type StatusEvent = {
   repo: string;
   number: number;
   status: ItemStatus;
-  /** Freshness stamp for the two statuses that never change on their own:
-   * a thread stays "comment" and a request stays "review" no matter how many
-   * replies land, so without this a second reply would be invisible. */
+  /** Freshness stamp for a status that never changes on its own: a thread
+   * stays "comment" no matter how many replies land, so without this a second
+   * reply would be invisible. */
   at?: string;
 };
 
@@ -60,7 +60,10 @@ export type StatusSnapshot = Map<string, StatusEvent>;
  * announcing a step forward as if it were a setback. */
 function stuckStatus(pr: StuckPr): ItemStatus {
   if (pr.reviewDecision === "CHANGES_REQUESTED") return "changes-requested";
-  return pr.failing.length > 0 ? "failing" : "pending";
+  // failingChecks, not failing.length: a red check that reports no name is
+  // counted but never named, and reading it as "waiting" would silence the
+  // notification for a PR the card itself shows as failing.
+  return pr.failingChecks > 0 ? "failing" : "pending";
 }
 
 /** Snapshot what every visible item is doing, keyed by id.
@@ -68,10 +71,8 @@ function stuckStatus(pr: StuckPr): ItemStatus {
  * Callers pass the *visible* (filtered, post-arbitration) lists, so a hidden
  * bot comment or a filtered draft can never announce itself. The closed list
  * is the one exception: it is collapsed by default, and a merge is worth
- * hearing about whether or not the section happens to be expanded. Insertion
- * order is the order events are reported in: good news first, then things
- * that need a human, then the inbox. Closed PRs contribute only when merged
- * — a close without a merge isn't progress. */
+ * hearing about whether or not the section happens to be expanded. Closed PRs
+ * contribute only when merged — a close without a merge isn't progress. */
 export function snapshotStatuses(lists: {
   ready: readonly ReadyPr[];
   stuck: readonly StuckPr[];
@@ -97,9 +98,11 @@ export function snapshotStatuses(lists: {
   }
   for (const pr of lists.ready) add(pr.id, pr.repo, pr.number, "ready");
   for (const pr of lists.stuck) add(pr.id, pr.repo, pr.number, stuckStatus(pr));
-  for (const req of lists.reviews) {
-    add(req.id, req.repo, req.number, "review", req.requestedAt);
-  }
+  // No freshness stamp on a review request: requestedAt falls back to the PR's
+  // updatedAt when the request came through a team, and that moves on any
+  // activity at all — stamping it would re-announce "needs your review" every
+  // time someone so much as commented.
+  for (const req of lists.reviews) add(req.id, req.repo, req.number, "review");
   for (const c of lists.comments) {
     add(c.id, c.repo, c.number, "comment", c.commentedAt);
   }

@@ -4,6 +4,9 @@
 // never disagree about where the project lives or which build is running.
 export const PROJECT_URL = "https://github.com/mfozmen/PRison";
 
+/** How the URL reads as link text — the scheme is noise on screen. */
+export const PROJECT_LABEL = PROJECT_URL.replace("https://", "");
+
 export function releaseUrl(version: string): string {
   return `${PROJECT_URL}/releases/tag/v${version}`;
 }

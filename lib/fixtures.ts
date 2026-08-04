@@ -23,8 +23,11 @@ export function stuckPr(overrides: Partial<StuckPr> = {}): StuckPr {
     url: "https://github.com/acme/api/pull/2",
     repo: "acme/api",
     number: 2,
-    failingChecks: 0,
-    pendingChecks: 0,
+    // Counts follow the names by default — GitHub can report a check with no
+    // name, so the count may exceed the list, but it can never fall below it.
+    // Override the count explicitly to model those unnamed checks.
+    failingChecks: overrides.failing?.length ?? 0,
+    pendingChecks: overrides.pending?.length ?? 0,
     failing: [],
     pending: [],
     checkNames: [],

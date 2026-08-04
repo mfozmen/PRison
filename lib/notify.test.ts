@@ -112,10 +112,30 @@ describe("snapshotStatuses", () => {
     );
   });
 
-  it("stamps a review request with when it was asked for", () => {
-    const r = reviewRequest({ requestedAt: "2026-06-25T09:00:00Z" });
-    expect(snapshotStatuses({ ...EMPTY, reviews: [r] }).get(r.id)?.at).toBe(
-      "2026-06-25T09:00:00Z",
+  it("leaves a review request unstamped", () => {
+    // requestedAt falls back to the PR's updatedAt for a team-originated
+    // request, and that moves on any activity — stamping it would re-announce
+    // "needs your review" every time someone commented on the PR.
+    const first = snapshotStatuses({
+      ...EMPTY,
+      reviews: [reviewRequest({ requestedAt: "2026-06-25T09:00:00Z" })],
+    });
+    expect(first.get("PR_review")?.at).toBeUndefined();
+    const touched = snapshotStatuses({
+      ...EMPTY,
+      reviews: [reviewRequest({ requestedAt: "2026-06-25T11:30:00Z" })],
+    });
+    expect(diffStatuses(first, touched)).toEqual([]);
+  });
+
+  it("reports a red check that reports no name as failing", () => {
+    // computeCheckRollup counts an unnamed failing context into failingChecks
+    // but never into failing[], so reading the list would call this PR
+    // "waiting" — and diffStatuses swallows that, silencing the alert on a
+    // card the dashboard itself renders as failing.
+    const pr = stuckPr({ failingChecks: 1, failing: [] });
+    expect(snapshotStatuses({ ...EMPTY, stuck: [pr] }).get(pr.id)?.status).toBe(
+      "failing",
     );
   });
 

@@ -5,7 +5,7 @@ import type { Org } from "@/lib/types";
 import type { TrackedChecks } from "@/lib/tracked-checks";
 import { RepoCombobox } from "./RepoCombobox";
 import { POLL_INTERVAL_OPTIONS } from "@/lib/notify";
-import { PROJECT_URL, appVersion } from "@/lib/project";
+import { PROJECT_URL, PROJECT_LABEL, appVersion } from "@/lib/project";
 
 export interface SettingsModalProps {
   orgs: Org[];
@@ -515,7 +515,7 @@ export function SettingsModal({
                     rel="noopener noreferrer"
                     className="text-accent underline underline-offset-2 hover:brightness-110"
                   >
-                    {PROJECT_URL.replace("https://", "")}
+                    {PROJECT_LABEL}
                   </a>{" "}
                   — open source, MIT licensed. Issues and pull requests welcome.
                 </p>

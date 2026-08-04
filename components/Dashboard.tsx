@@ -379,6 +379,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     showTestNotification();
   }, []);
 
+  // Same in reverse: unblocking PRison in site settings is a change nothing in
+  // the page can hear, so the pane would keep claiming it is blocked. Opening
+  // Settings is the moment that reading matters, so take it fresh then.
+  const handleOpenSettings = useCallback(() => {
+    setNotifPermission(notificationPermission());
+    setSettingsOpen(true);
+  }, []);
+
   const handleAutoRefreshChange = useCallback(
     (on: boolean) => {
       setAutoRefresh(on);
@@ -494,7 +502,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         selectedOrg={selectedOrg}
         onOrgChange={setSelectedOrg}
         login={login}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={handleOpenSettings}
       />
       {partial && (
         <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 pt-4">

@@ -2055,7 +2055,7 @@ describe("Dashboard — auto refresh", () => {
   });
 
   it("announces a check going red on a PR that was merely waiting", async () => {
-    stuckList = [{ ...STUCK_PR, failing: [], pending: ["build"] }];
+    stuckList = [{ ...STUCK_PR, failingChecks: 0, pendingChecks: 1, failing: [], pending: ["build"] }];
     localStorage.setItem("prison.autoRefresh", "true");
     vi.spyOn(document, "hasFocus").mockReturnValue(false);
     render(<Dashboard orgs={ORGS} login="testuser" />);
@@ -2239,6 +2239,25 @@ describe("Dashboard — auto refresh", () => {
     expect(await screen.findByText(/notifications are blocked/i)).toBeInTheDocument();
   });
 
+  it("re-reads permission when Settings is opened", async () => {
+    // Unblocking PRison in site settings is a change nothing in the page can
+    // hear, so a permission read once at mount would keep claiming it is
+    // blocked while notifications actually work.
+    useNotificationStub("denied");
+    localStorage.setItem("prison.autoRefresh", "true");
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    openSettings("Auto refresh");
+    expect(screen.getByText(/notifications are blocked/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /close settings/i }));
+    useNotificationStub("granted");
+    openSettings("Auto refresh");
+    expect(
+      screen.getByRole("button", { name: /send a test notification/i }),
+    ).toBeInTheDocument();
+  });
+
   it("announces the second failure after a push reset the checks", async () => {
     // The quiet middle step still has to be recorded as seen, or the PR looks
     // like it never left "failing" and the re-run's failure goes unreported.
@@ -2247,7 +2266,7 @@ describe("Dashboard — auto refresh", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
 
-    stuckList = [{ ...STUCK_PR, failing: [], pending: ["build"] }];
+    stuckList = [{ ...STUCK_PR, failingChecks: 0, pendingChecks: 1, failing: [], pending: ["build"] }];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(constructed).toHaveLength(0);
 
@@ -2262,7 +2281,7 @@ describe("Dashboard — auto refresh", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
 
-    stuckList = [{ ...STUCK_PR, failing: [], pending: ["build"] }];
+    stuckList = [{ ...STUCK_PR, failingChecks: 0, pendingChecks: 1, failing: [], pending: ["build"] }];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     stuckList = [];
     readyList = [

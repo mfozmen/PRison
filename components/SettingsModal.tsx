@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useRef, type ReactNode, type KeyboardEvent } from "react";
 import type { Org } from "@/lib/types";
 import type { TrackedChecks } from "@/lib/tracked-checks";
 import { RepoCombobox } from "./RepoCombobox";
@@ -15,8 +15,6 @@ export interface SettingsModalProps {
   onChange: (next: TrackedChecks) => void;
   open: boolean;
   onClose: () => void;
-  hideDrafts: boolean;
-  onHideDraftsChange: (v: boolean) => void;
   showBots: boolean;
   onShowBotsChange: (v: boolean) => void;
   hideReacted: boolean;
@@ -25,7 +23,20 @@ export interface SettingsModalProps {
   onAutoRefreshChange: (v: boolean) => void;
   pollInterval: number;
   onPollIntervalChange: (ms: number) => void;
+  /** Owned by the Dashboard: the browser never re-renders us when the user
+   * answers its prompt, so the answer has to arrive as a prop. */
+  notifPermission: NotificationPermission;
+  onEnableNotifications: () => void;
+  onTestNotification: () => void;
 }
+
+const SECTIONS = [
+  { id: "comments", label: "Comments" },
+  { id: "auto-refresh", label: "Auto refresh" },
+  { id: "tracked-checks", label: "Tracked checks" },
+] as const;
+
+type SectionId = (typeof SECTIONS)[number]["id"];
 
 interface RepoRow {
   repo: string;
@@ -84,8 +95,6 @@ export function SettingsModal({
   onChange,
   open,
   onClose,
-  hideDrafts,
-  onHideDraftsChange,
   showBots,
   onShowBotsChange,
   hideReacted,
@@ -94,8 +103,14 @@ export function SettingsModal({
   onAutoRefreshChange,
   pollInterval,
   onPollIntervalChange,
+  notifPermission,
+  onEnableNotifications,
+  onTestNotification,
 }: SettingsModalProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const tabRefs = useRef<Partial<Record<SectionId, HTMLButtonElement | null>>>({});
+
+  const [section, setSection] = useState<SectionId>(SECTIONS[0].id);
 
   // Raw input drafts are buffered locally so the user can freely type
   // commas/spaces; we only parse into string[] when pushing changes up.
@@ -117,13 +132,14 @@ export function SettingsModal({
     if (open) {
       setOrgDrafts(seedOrgDrafts(value.orgs));
       setRows(seedRows(value.repos));
+      setSection(SECTIONS[0].id);
     }
   }
 
   // Escape key handler
   useEffect(() => {
     if (!open) return;
-    function handleKeyDown(e: KeyboardEvent) {
+    function handleKeyDown(e: globalThis.KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
     document.addEventListener("keydown", handleKeyDown);
@@ -182,6 +198,23 @@ export function SettingsModal({
     rebuildAndNotify(newRows);
   }
 
+  // Arrow keys move between sections. The menu is a horizontal strip below the
+  // `sm` breakpoint and a vertical column above it, so both axes are wired.
+  function handleMenuKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    const step =
+      e.key === "ArrowDown" || e.key === "ArrowRight"
+        ? 1
+        : e.key === "ArrowUp" || e.key === "ArrowLeft"
+          ? -1
+          : 0;
+    if (step === 0) return;
+    e.preventDefault();
+    const current = SECTIONS.findIndex((s) => s.id === section);
+    const next = SECTIONS[(current + step + SECTIONS.length) % SECTIONS.length];
+    setSection(next.id);
+    tabRefs.current[next.id]?.focus();
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-16"
@@ -194,10 +227,10 @@ export function SettingsModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className="relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl border border-border bg-background p-6 shadow-xl"
+        className="relative z-10 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border border-border bg-background shadow-xl"
       >
         {/* Header row */}
-        <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center justify-between px-6 pt-6 pb-4">
           <h2 id="settings-title" className="font-semibold text-foreground">Settings</h2>
           <button
             ref={closeButtonRef}
@@ -224,161 +257,229 @@ export function SettingsModal({
           </button>
         </div>
 
-        {/* View filters */}
-        <section className="mb-6">
-          <h3 className="mb-2 text-sm font-medium text-foreground">View filters</h3>
-          <div className="space-y-2">
-            <SettingCheckbox checked={hideDrafts} onChange={onHideDraftsChange}>
-              Hide drafts
-            </SettingCheckbox>
-            <SettingCheckbox checked={showBots} onChange={onShowBotsChange}>
-              Show bot comments
-            </SettingCheckbox>
-            <SettingCheckbox checked={hideReacted} onChange={onHideReactedChange}>
-              Hide comments I reacted to
-            </SettingCheckbox>
-          </div>
-        </section>
-
-        {/* Auto refresh */}
-        <section className="mb-6">
-          <h3 className="mb-2 text-sm font-medium text-foreground">Auto refresh</h3>
-          <SettingCheckbox checked={autoRefresh} onChange={onAutoRefreshChange}>
-            Auto refresh
-          </SettingCheckbox>
-          <label className="mt-2 flex items-center gap-2 text-sm text-muted">
-            <span>Check</span>
-            <select
-              value={pollInterval}
-              onChange={(e) => onPollIntervalChange(Number(e.target.value))}
-              disabled={!autoRefresh}
-              aria-label="Auto refresh interval"
-              className="min-h-[36px] rounded-md border border-border bg-surface px-2 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {POLL_INTERVAL_OPTIONS.map((o) => (
-                <option key={o.ms} value={o.ms}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p className="mt-2 text-xs text-muted">
-            Looks for new items on this schedule and sends a desktop
-            notification while a PRison tab is open.
-          </p>
-          {autoRefresh &&
-            typeof Notification !== "undefined" &&
-            Notification.permission === "denied" && (
-              <p className="mt-1 text-xs text-muted">
-                Notifications are blocked in your browser — you&apos;ll still get
-                the tab badge.
-              </p>
-            )}
-        </section>
-
-        {/* Tracked checks */}
-        <h3 className="mb-2 text-sm font-medium text-foreground">Tracked checks</h3>
-        <p className="mb-6 text-sm text-muted">
-          Name the required checks each PR needs (e.g. a manual qa/smoke).
-          We&apos;ll show them as Awaiting until they report — handy for gates
-          GitHub doesn&apos;t expose.
-        </p>
-
-        {/* Organization defaults */}
-        {orgs.length > 0 && (
-          <section className="mb-6">
-            <h4 className="mb-2 text-sm font-medium text-foreground">
-              Organization defaults
-            </h4>
-            <div className="space-y-3">
-              {orgs.map((org) => (
-                <div key={org.login} className="flex flex-col gap-1">
-                  <label
-                    className="text-sm text-muted"
-                    htmlFor={`org-input-${org.login}`}
-                  >
-                    {org.login}
-                  </label>
-                  <input
-                    id={`org-input-${org.login}`}
-                    type="text"
-                    aria-label={`${org.login} check names`}
-                    placeholder="e.g. qa/smoke, Automation Result"
-                    value={orgDrafts[org.login] ?? ""}
-                    onChange={(e) => handleOrgChange(org.login, e.target.value)}
-                    className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Repository overrides */}
-        <section>
-          <h4 className="mb-2 text-sm font-medium text-foreground">
-            Repository overrides
-          </h4>
-          <p className="mb-3 text-xs text-muted">
-            A repo override replaces the org default for that repo.
-          </p>
-          {availableRepos.length === 0 && rows.length === 0 && (
-            <p className="mb-3 text-xs text-muted">
-              No repositories loaded yet &mdash; you can search any repo by name below.
-            </p>
-          )}
-          <div className="mb-3 space-y-2">
-            {rows.map((row, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <RepoCombobox
-                  value={row.repo}
-                  onChange={(repo) => handleRowChange(index, "repo", repo)}
-                  suggestions={availableRepos}
-                  owners={owners}
-                />
-                <input
-                  type="text"
-                  aria-label="Check names for this repo override"
-                  placeholder="e.g. qa/smoke"
-                  value={row.checks}
-                  onChange={(e) =>
-                    handleRowChange(index, "checks", e.target.value)
-                  }
-                  className="flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                />
-                <button
-                  type="button"
-                  aria-label="Remove repo override"
-                  onClick={() => removeRow(index)}
-                  className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                >
-                  <svg
-                    aria-hidden="true"
-                    width="14"
-                    height="14"
-                    viewBox="0 0 14 14"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M11 3L3 11M3 3l8 8"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </button>
-              </div>
+        {/* Menu + the one visible section. Only the section scrolls, so the
+            menu and the close button stay put however long the content is. */}
+        <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
+          <div
+            role="tablist"
+            aria-orientation="vertical"
+            aria-label="Settings sections"
+            onKeyDown={handleMenuKeyDown}
+            className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-6 pb-3 sm:w-52 sm:flex-col sm:overflow-x-visible sm:border-b-0 sm:border-r sm:pr-3 sm:pb-6"
+          >
+            {SECTIONS.map((s) => (
+              <button
+                key={s.id}
+                ref={(el) => {
+                  tabRefs.current[s.id] = el;
+                }}
+                type="button"
+                role="tab"
+                id={`settings-tab-${s.id}`}
+                aria-selected={section === s.id}
+                aria-controls={`settings-panel-${s.id}`}
+                tabIndex={section === s.id ? 0 : -1}
+                onClick={() => setSection(s.id)}
+                className={`min-h-[44px] cursor-pointer whitespace-nowrap rounded-md px-3 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
+                  section === s.id
+                    ? "bg-accent text-background"
+                    : "text-muted hover:text-foreground"
+                }`}
+              >
+                {s.label}
+              </button>
             ))}
           </div>
-          <button
-            type="button"
-            onClick={addRow}
-            className="min-h-[44px] cursor-pointer rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:hover:brightness-110"
+
+          <div
+            role="tabpanel"
+            id={`settings-panel-${section}`}
+            aria-labelledby={`settings-tab-${section}`}
+            tabIndex={0}
+            className="min-w-0 flex-1 overflow-y-auto px-6 pt-4 pb-6 sm:pt-0"
           >
-            Add override
-          </button>
-        </section>
+            {section === "comments" && (
+              <div className="space-y-2">
+                <p className="mb-3 text-sm text-muted">
+                  What shows up in <strong className="font-medium text-foreground">Comments awaiting your reply</strong>.
+                </p>
+                <SettingCheckbox checked={showBots} onChange={onShowBotsChange}>
+                  Show bot comments
+                </SettingCheckbox>
+                <SettingCheckbox checked={hideReacted} onChange={onHideReactedChange}>
+                  Hide comments I reacted to
+                </SettingCheckbox>
+              </div>
+            )}
+
+            {section === "auto-refresh" && (
+              <div>
+                <SettingCheckbox checked={autoRefresh} onChange={onAutoRefreshChange}>
+                  Auto refresh
+                </SettingCheckbox>
+                <label className="mt-2 flex items-center gap-2 text-sm text-muted">
+                  <span>Check</span>
+                  <select
+                    value={pollInterval}
+                    onChange={(e) => onPollIntervalChange(Number(e.target.value))}
+                    disabled={!autoRefresh}
+                    aria-label="Auto refresh interval"
+                    className="min-h-[36px] rounded-md border border-border bg-surface px-2 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {POLL_INTERVAL_OPTIONS.map((o) => (
+                      <option key={o.ms} value={o.ms}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="mt-2 text-xs text-muted">
+                  On this schedule PRison re-checks the dashboard and tells you
+                  what moved — a PR that became ready, checks that went red,
+                  changes requested, a review asked of you, a new reply, or one
+                  of your PRs getting merged. Works while a PRison tab is open;
+                  there is no background service.
+                </p>
+                {notifPermission === "default" && (
+                  <div className="mt-3">
+                    <p className="mb-2 text-xs text-muted">
+                      Your browser hasn&apos;t been asked yet, so you&apos;ll get
+                      the tab badge but no desktop notification.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={onEnableNotifications}
+                      className="min-h-[44px] cursor-pointer rounded-md border border-border bg-surface px-3 text-sm font-medium text-foreground transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none dark:hover:brightness-110"
+                    >
+                      Enable notifications
+                    </button>
+                  </div>
+                )}
+                {notifPermission === "denied" && (
+                  <p className="mt-3 text-xs text-muted">
+                    Notifications are blocked in your browser — you&apos;ll still
+                    get the tab badge.
+                  </p>
+                )}
+                {notifPermission === "granted" && (
+                  <button
+                    type="button"
+                    onClick={onTestNotification}
+                    className="mt-3 min-h-[44px] cursor-pointer rounded-md border border-border bg-surface px-3 text-sm font-medium text-foreground transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none dark:hover:brightness-110"
+                  >
+                    Send a test notification
+                  </button>
+                )}
+              </div>
+            )}
+
+            {section === "tracked-checks" && (
+              <div>
+                <p className="mb-6 text-sm text-muted">
+                  Name the required checks each PR needs (e.g. a manual qa/smoke).
+                  We&apos;ll show them as Awaiting until they report — handy for gates
+                  GitHub doesn&apos;t expose.
+                </p>
+
+                {/* Organization defaults */}
+                {orgs.length > 0 && (
+                  <section className="mb-6">
+                    <h4 className="mb-2 text-sm font-medium text-foreground">
+                      Organization defaults
+                    </h4>
+                    <div className="space-y-3">
+                      {orgs.map((org) => (
+                        <div key={org.login} className="flex flex-col gap-1">
+                          <label
+                            className="text-sm text-muted"
+                            htmlFor={`org-input-${org.login}`}
+                          >
+                            {org.login}
+                          </label>
+                          <input
+                            id={`org-input-${org.login}`}
+                            type="text"
+                            aria-label={`${org.login} check names`}
+                            placeholder="e.g. qa/smoke, Automation Result"
+                            value={orgDrafts[org.login] ?? ""}
+                            onChange={(e) => handleOrgChange(org.login, e.target.value)}
+                            className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Repository overrides */}
+                <section>
+                  <h4 className="mb-2 text-sm font-medium text-foreground">
+                    Repository overrides
+                  </h4>
+                  <p className="mb-3 text-xs text-muted">
+                    A repo override replaces the org default for that repo.
+                  </p>
+                  {availableRepos.length === 0 && rows.length === 0 && (
+                    <p className="mb-3 text-xs text-muted">
+                      No repositories loaded yet &mdash; you can search any repo by name below.
+                    </p>
+                  )}
+                  <div className="mb-3 space-y-2">
+                    {rows.map((row, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <RepoCombobox
+                          value={row.repo}
+                          onChange={(repo) => handleRowChange(index, "repo", repo)}
+                          suggestions={availableRepos}
+                          owners={owners}
+                        />
+                        <input
+                          type="text"
+                          aria-label="Check names for this repo override"
+                          placeholder="e.g. qa/smoke"
+                          value={row.checks}
+                          onChange={(e) =>
+                            handleRowChange(index, "checks", e.target.value)
+                          }
+                          className="flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                        />
+                        <button
+                          type="button"
+                          aria-label="Remove repo override"
+                          onClick={() => removeRow(index)}
+                          className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            width="14"
+                            height="14"
+                            viewBox="0 0 14 14"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M11 3L3 11M3 3l8 8"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addRow}
+                    className="min-h-[44px] cursor-pointer rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:hover:brightness-110"
+                  >
+                    Add override
+                  </button>
+                </section>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

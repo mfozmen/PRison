@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { StuckPr, ReviewRequest, ReadyPr } from "./types";
+import type { StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr } from "./types";
 
 /**
  * Test data builders. PRison is a public repository: fixtures must never carry a
@@ -63,6 +63,36 @@ export function readyPr(overrides: Partial<ReadyPr> = {}): ReadyPr {
     needsUpdate: false,
     checkNames: [],
     viaBlocked: false,
+    ...overrides,
+  };
+}
+
+export function prComment(overrides: Partial<PrComment> = {}): PrComment {
+  return {
+    id: "THREAD_1",
+    prId: "PR_stuck",
+    url: "https://github.com/acme/api/pull/2#discussion_r1",
+    repo: "acme/api",
+    number: 2,
+    author: "bob",
+    isBot: false,
+    path: "src/index.ts",
+    preview: "Could you split this into two functions?",
+    commentedAt: "2026-06-23T00:00:00Z",
+    viewerReacted: false,
+    ...overrides,
+  };
+}
+
+export function closedPr(overrides: Partial<ClosedPr> = {}): ClosedPr {
+  return {
+    id: "PR_closed",
+    title: "Drop the legacy exporter",
+    url: "https://github.com/acme/web/pull/4",
+    repo: "acme/web",
+    number: 4,
+    merged: true,
+    endedAt: "2026-06-24T00:00:00Z",
     ...overrides,
   };
 }

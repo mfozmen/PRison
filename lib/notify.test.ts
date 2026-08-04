@@ -1,20 +1,37 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
-  collectIds,
-  countNewIds,
+  snapshotStatuses,
+  diffStatuses,
+  describeEvents,
   withBadge,
   withoutBadge,
-  showNewItemsNotification,
-  maybeRequestNotificationPermission,
+  showChangeNotification,
+  showTestNotification,
+  notificationPermission,
+  requestNotificationPermission,
   parsePollInterval,
   POLL_INTERVAL_OPTIONS,
   DEFAULT_POLL_INTERVAL_MS,
+  type StatusEvent,
 } from "./notify";
-import { stubNotification } from "./fixtures";
+import {
+  stubNotification,
+  stuckPr,
+  reviewRequest,
+  readyPr,
+  prComment,
+  closedPr,
+} from "./fixtures";
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
+
+const EMPTY = { ready: [], stuck: [], reviews: [], comments: [], closed: [] };
+
+function event(overrides: Partial<StatusEvent> = {}): StatusEvent {
+  return { id: "PR_1", repo: "acme/api", number: 2, status: "ready", ...overrides };
+}
 
 describe("parsePollInterval", () => {
   it("accepts any offered option", () => {
@@ -36,32 +53,128 @@ describe("parsePollInterval", () => {
   });
 });
 
-describe("collectIds", () => {
-  it("flattens and dedupes ids across lists", () => {
-    const ids = collectIds([
-      [{ id: "a" }, { id: "b" }],
-      [],
-      [{ id: "b" }, { id: "c" }],
-    ]);
-    expect(ids).toEqual(new Set(["a", "b", "c"]));
+describe("snapshotStatuses", () => {
+  it("is empty for empty lists", () => {
+    expect(snapshotStatuses(EMPTY).size).toBe(0);
   });
 
-  it("returns an empty set for no lists", () => {
-    expect(collectIds([])).toEqual(new Set());
+  it("labels each list with its own status", () => {
+    const snapshot = snapshotStatuses({
+      ...EMPTY,
+      ready: [readyPr()],
+      stuck: [stuckPr({ id: "PR_s", pending: ["build"] })],
+      reviews: [reviewRequest()],
+      comments: [prComment()],
+      closed: [closedPr()],
+    });
+    expect([...snapshot.values()].map((e) => e.status)).toEqual([
+      "ready",
+      "merged",
+      "pending",
+      "review",
+      "comment",
+    ]);
+  });
+
+  it("carries repo and number so the copy can name the PR", () => {
+    const snapshot = snapshotStatuses({ ...EMPTY, ready: [readyPr()] });
+    expect(snapshot.get("PR_ready")).toEqual({
+      id: "PR_ready",
+      repo: "acme/worker",
+      number: 5,
+      status: "ready",
+    });
+  });
+
+  it.each([
+    ["changes-requested", stuckPr({ reviewDecision: "CHANGES_REQUESTED", failing: ["build"] })],
+    ["failing", stuckPr({ failing: ["build"], pending: ["lint"] })],
+    ["pending", stuckPr({ pending: ["lint"] })],
+  ] as const)("reports a stuck PR as %s", (status, pr) => {
+    const snapshot = snapshotStatuses({ ...EMPTY, stuck: [pr] });
+    expect(snapshot.get(pr.id)?.status).toBe(status);
+  });
+
+  it("ignores a PR closed without merging — that is not progress", () => {
+    const snapshot = snapshotStatuses({ ...EMPTY, closed: [closedPr({ merged: false })] });
+    expect(snapshot.size).toBe(0);
+  });
+
+  it("keeps the first status when an id appears in two lists", () => {
+    // A merged PR can still linger in the stuck list until the next fetch;
+    // "was merged" is the news, not "checks failing".
+    const snapshot = snapshotStatuses({
+      ...EMPTY,
+      stuck: [stuckPr({ id: "PR_x", failing: ["build"] })],
+      closed: [closedPr({ id: "PR_x" })],
+    });
+    expect(snapshot.get("PR_x")?.status).toBe("merged");
   });
 });
 
-describe("countNewIds", () => {
-  it("counts only ids not previously seen", () => {
-    expect(countNewIds(new Set(["a"]), new Set(["a", "b", "c"]))).toBe(2);
+describe("diffStatuses", () => {
+  const snapshot = (...events: StatusEvent[]) =>
+    new Map(events.map((e) => [e.id, e]));
+
+  it("reports an item that appeared", () => {
+    expect(diffStatuses(new Map(), snapshot(event()))).toEqual([event()]);
   });
 
-  it("returns 0 when fresh is a subset of prev", () => {
-    expect(countNewIds(new Set(["a", "b"]), new Set(["a"]))).toBe(0);
+  it("reports an item whose status changed", () => {
+    const before = snapshot(event({ status: "failing" }));
+    const after = snapshot(event({ status: "ready" }));
+    expect(diffStatuses(before, after)).toEqual([event({ status: "ready" })]);
   });
 
-  it("does not count removed ids", () => {
-    expect(countNewIds(new Set(["a", "b"]), new Set(["b"]))).toBe(0);
+  it("stays quiet when nothing moved", () => {
+    const before = snapshot(event({ status: "failing" }));
+    expect(diffStatuses(before, snapshot(event({ status: "failing" })))).toEqual([]);
+  });
+
+  it("says nothing about an item that vanished", () => {
+    expect(diffStatuses(snapshot(event()), new Map())).toEqual([]);
+  });
+});
+
+describe("describeEvents", () => {
+  it("names the PR and what happened", () => {
+    expect(describeEvents([event()])).toBe("acme/api #2 is ready to merge");
+  });
+
+  it.each([
+    ["merged", "acme/api #2 was merged"],
+    ["changes-requested", "acme/api #2 — changes requested"],
+    ["failing", "acme/api #2 — checks failing"],
+    ["pending", "acme/api #2 — waiting on checks"],
+    ["review", "acme/api #2 needs your review"],
+    ["comment", "acme/api #2 — new reply"],
+  ] as const)("phrases %s", (status, expected) => {
+    expect(describeEvents([event({ status })])).toBe(expected);
+  });
+
+  it("spells out up to three events", () => {
+    const events = [
+      event({ id: "1", number: 1 }),
+      event({ id: "2", number: 2 }),
+      event({ id: "3", number: 3 }),
+    ];
+    expect(describeEvents(events).split("\n")).toHaveLength(3);
+  });
+
+  it("collapses the rest into a count so the notification stays glanceable", () => {
+    const events = Array.from({ length: 6 }, (_, i) =>
+      event({ id: String(i), number: i }),
+    );
+    expect(describeEvents(events).split("\n")).toEqual([
+      "acme/api #0 is ready to merge",
+      "acme/api #1 is ready to merge",
+      "acme/api #2 is ready to merge",
+      "+3 more",
+    ]);
+  });
+
+  it("is empty for no events", () => {
+    expect(describeEvents([])).toBe("");
   });
 });
 
@@ -83,47 +196,95 @@ describe("withBadge / withoutBadge", () => {
   });
 });
 
-describe("showNewItemsNotification", () => {
+describe("showChangeNotification", () => {
   it("does not throw when Notification is undefined", () => {
-    expect(() => showNewItemsNotification(1)).not.toThrow();
+    expect(() => showChangeNotification([event()])).not.toThrow();
   });
 
-  it("constructs a tagged notification when permission is granted", () => {
+  it("constructs one tagged notification describing the changes", () => {
     const { constructed } = stubNotification("granted");
-    showNewItemsNotification(1);
-    showNewItemsNotification(3);
+    showChangeNotification([event(), event({ id: "2", status: "review", number: 9 })]);
     expect(constructed).toEqual([
-      { title: "PRison", options: { body: "1 new item needs your attention", tag: "prison-new-items" } },
-      { title: "PRison", options: { body: "3 new items need your attention", tag: "prison-new-items" } },
+      {
+        title: "PRison",
+        options: {
+          body: "acme/api #2 is ready to merge\nacme/api #9 needs your review",
+          tag: "prison-changes",
+        },
+      },
     ]);
+  });
+
+  it("stays silent when nothing changed", () => {
+    const { constructed } = stubNotification("granted");
+    showChangeNotification([]);
+    expect(constructed).toEqual([]);
   });
 
   it.each(["default", "denied"] as const)(
     "stays silent when permission is %s",
     (permission) => {
       const { constructed } = stubNotification(permission);
-      showNewItemsNotification(2);
+      showChangeNotification([event()]);
       expect(constructed).toEqual([]);
     },
   );
 });
 
-describe("maybeRequestNotificationPermission", () => {
+describe("showTestNotification", () => {
   it("does not throw when Notification is undefined", () => {
-    expect(() => maybeRequestNotificationPermission()).not.toThrow();
+    expect(() => showTestNotification()).not.toThrow();
   });
 
-  it("requests permission only when undecided", () => {
+  it("confirms delivery to the user", () => {
+    const { constructed } = stubNotification("granted");
+    showTestNotification();
+    expect(constructed).toEqual([
+      {
+        title: "PRison",
+        options: {
+          body: "Notifications are on — you'll get one when a PR changes state.",
+          tag: "prison-changes",
+        },
+      },
+    ]);
+  });
+
+  it("stays silent without permission", () => {
+    const { constructed } = stubNotification("denied");
+    showTestNotification();
+    expect(constructed).toEqual([]);
+  });
+});
+
+describe("notificationPermission", () => {
+  it("reports an unsupported browser as denied", () => {
+    expect(notificationPermission()).toBe("denied");
+  });
+
+  it.each(["default", "granted", "denied"] as const)("reports %s", (permission) => {
+    stubNotification(permission);
+    expect(notificationPermission()).toBe(permission);
+  });
+});
+
+describe("requestNotificationPermission", () => {
+  it("resolves denied when Notification is undefined", async () => {
+    await expect(requestNotificationPermission()).resolves.toBe("denied");
+  });
+
+  it("prompts only when undecided, and resolves with the answer", async () => {
     const { requestPermission } = stubNotification("default");
-    maybeRequestNotificationPermission();
+    requestPermission.mockResolvedValue("granted");
+    await expect(requestNotificationPermission()).resolves.toBe("granted");
     expect(requestPermission).toHaveBeenCalledTimes(1);
   });
 
   it.each(["granted", "denied"] as const)(
     "never re-prompts when permission is %s",
-    (permission) => {
+    async (permission) => {
       const { requestPermission } = stubNotification(permission);
-      maybeRequestNotificationPermission();
+      await expect(requestNotificationPermission()).resolves.toBe(permission);
       expect(requestPermission).not.toHaveBeenCalled();
     },
   );

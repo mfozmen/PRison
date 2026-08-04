@@ -13,12 +13,15 @@ import { type TrackedChecks, EMPTY_TRACKED, parseTracked, awaitingChecks } from 
 import {
   DEFAULT_POLL_INTERVAL_MS,
   parsePollInterval,
-  collectIds,
-  countNewIds,
+  snapshotStatuses,
+  diffStatuses,
   withBadge,
   withoutBadge,
-  showNewItemsNotification,
-  maybeRequestNotificationPermission,
+  showChangeNotification,
+  showTestNotification,
+  notificationPermission,
+  requestNotificationPermission,
+  type StatusSnapshot,
 } from "@/lib/notify";
 
 export interface DashboardProps {
@@ -49,6 +52,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [groupBy, setGroupBy] = useState<"flat" | "repo" | "check">("flat");
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [pollInterval, setPollInterval] = useState(DEFAULT_POLL_INTERVAL_MS);
+  // Held here rather than read during render: the browser re-renders nothing
+  // when the user answers its permission prompt, so the answer has to be
+  // captured and pushed down. Seeded after mount — never during SSR.
+  const [notifPermission, setNotifPermission] =
+    useState<NotificationPermission>("denied");
   // Stamped on every completed fetch (manual or silent). Null until the first
   // one lands, so the server render has nothing time-dependent in it.
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
@@ -78,10 +86,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // Tracks the most recently requested org so stale in-flight responses are
   // discarded instead of overwriting the current view.
   const latestOrgRef = useRef<string>(ALL);
-  // Ids the user has already had on screen; unioned whenever new ids become
-  // visible, so items that flap out and back never re-notify and a new scope's
-  // initial items are marked seen by their first (non-silent) fetch.
-  const seenIdsRef = useRef<Set<string>>(new Set());
+  // What every item was doing the last time the user had it on screen. Merged
+  // in whenever something changes, so a new scope's initial items are marked
+  // seen by their first (non-silent) fetch and only genuine transitions after
+  // that count as news.
+  const seenStatusRef = useRef<StatusSnapshot>(new Map());
   // Bumped in the same state batch as a silent poll's results, so the commit
   // where it changes is guaranteed to carry that poll's data — an interleaving
   // commit can't consume the signal the way a ref flag could.
@@ -230,6 +239,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     const storedTracked = localStorage.getItem("prison.trackedChecks");
     const storedClosedOpen = localStorage.getItem("prison.closedOpen");
     startTransition(() => {
+      setNotifPermission(notificationPermission());
       if (
         stored === ALL ||
         stored === login ||
@@ -352,10 +362,17 @@ export function Dashboard({ orgs, login }: DashboardProps) {
 
   // Request notification permission only on an explicit enable (a user
   // gesture) — restoring the setting from localStorage must not prompt.
-  const handleAutoRefreshChange = useCallback((on: boolean) => {
-    setAutoRefresh(on);
-    if (on) maybeRequestNotificationPermission();
+  const handleEnableNotifications = useCallback(() => {
+    void requestNotificationPermission().then(setNotifPermission);
   }, []);
+
+  const handleAutoRefreshChange = useCallback(
+    (on: boolean) => {
+      setAutoRefresh(on);
+      if (on) handleEnableNotifications();
+    },
+    [handleEnableNotifications],
+  );
 
   const availableRepos = Array.from(
     new Set([
@@ -413,27 +430,34 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // Newest-close first; the section renders only the first closedVisible rows.
   const sortedClosed = sortByAgeDesc(closedPrs, (pr) => pr.endedAt);
 
-  // New-item detection, against the visible (filtered) lists — a hidden bot
+  // Change detection, against the visible (filtered) lists — a hidden bot
   // comment, a reacted thread, or a filtered draft must never announce itself.
-  // Closed PRs are history, not a work queue, so they never notify. Runs after
-  // every commit: ordinary commits (filter toggles, manual refreshes, org
-  // switches) just mark what's on screen as seen; only the commit that carries
-  // a silent poll's results (pollGen changed) while the tab is unfocused may
-  // badge and notify — when focused the user sees the live update, and a badge
-  // set while focused would never clear.
+  // What counts is a *status* change, not just a new id: a PR that goes from
+  // stuck to ready keeps its id, and that transition is the whole point.
+  // Runs after every commit: ordinary commits (filter toggles, manual
+  // refreshes, org switches) just mark what's on screen as seen; only the
+  // commit that carries a silent poll's results (pollGen changed) while the
+  // tab is unfocused may badge and notify — when focused the user sees the
+  // live update, and a badge set while focused would never clear.
   useEffect(() => {
-    const prev = seenIdsRef.current;
-    const visible = collectIds([visibleStuck, visibleReviews, visibleReady, visibleComments]);
-    const newCount = countNewIds(prev, visible);
-    if (newCount > 0) {
-      seenIdsRef.current = new Set([...prev, ...visible]);
+    const prev = seenStatusRef.current;
+    const visible = snapshotStatuses({
+      ready: visibleReady,
+      stuck: visibleStuck,
+      reviews: visibleReviews,
+      comments: visibleComments,
+      closed: sortedClosed,
+    });
+    const events = diffStatuses(prev, visible);
+    if (events.length > 0) {
+      seenStatusRef.current = new Map([...prev, ...visible]);
     }
     if (pollGen !== lastPollGenRef.current) {
       lastPollGenRef.current = pollGen;
-      if (newCount > 0 && !document.hasFocus()) {
-        unseenCountRef.current += newCount;
+      if (events.length > 0 && !document.hasFocus()) {
+        unseenCountRef.current += events.length;
         document.title = withBadge(document.title, unseenCountRef.current);
-        showNewItemsNotification(unseenCountRef.current);
+        showChangeNotification(events);
       }
     }
   });
@@ -472,8 +496,6 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         onChange={setTracked}
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
-        hideDrafts={hideDrafts}
-        onHideDraftsChange={setHideDrafts}
         showBots={showBots}
         onShowBotsChange={setShowBots}
         hideReacted={hideReacted}
@@ -482,6 +504,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         onAutoRefreshChange={handleAutoRefreshChange}
         pollInterval={pollInterval}
         onPollIntervalChange={setPollInterval}
+        notifPermission={notifPermission}
+        onEnableNotifications={handleEnableNotifications}
+        onTestNotification={showTestNotification}
       />
       <main className="mx-auto w-full max-w-screen-2xl flex-1 space-y-8 px-4 sm:px-6 lg:px-8 py-8">
         {isPending && (
@@ -529,6 +554,21 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               By check
             </button>
           </div>
+          {/* Drafts get toggled constantly — often enough that burying it in
+              Settings cost two clicks every time. It lives here, in the same
+              visual language as the group-by buttons. */}
+          <button
+            type="button"
+            aria-pressed={hideDrafts}
+            onClick={() => setHideDrafts((v) => !v)}
+            className={`min-h-[44px] cursor-pointer rounded-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
+              hideDrafts
+                ? "bg-accent text-background"
+                : "bg-surface text-foreground"
+            }`}
+          >
+            Hide drafts
+          </button>
           {/* Deliberately not a live region: the label re-renders every minute
               as it ages, and announcing "Updated 4m ago" on a loop would talk
               over everything else for as long as the tab is open. */}

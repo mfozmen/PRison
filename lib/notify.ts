@@ -260,7 +260,7 @@ export function parseSnapshot(raw: string | null): StatusSnapshot {
   return snapshot;
 }
 
-function isStatusEvent(value: unknown): value is StatusEvent {
+export function isStatusEvent(value: unknown): value is StatusEvent {
   if (typeof value !== "object" || value === null) return false;
   const e = value as Record<string, unknown>;
   return (

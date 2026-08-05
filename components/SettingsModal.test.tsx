@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { SettingsModal } from "./SettingsModal";
-import type { Org } from "@/lib/types";
 import type { TrackedChecks } from "@/lib/tracked-checks";
 import { DEFAULT_POLL_INTERVAL_MS, POLL_INTERVAL_OPTIONS } from "@/lib/notify";
 
@@ -26,10 +25,7 @@ function selectSection(label: string) {
   fireEvent.click(screen.getByRole("tab", { name: label }));
 }
 
-const orgs: Org[] = [
-  { login: "acme", avatarUrl: "https://example.com/acme.png" },
-  { login: "beta", avatarUrl: "https://example.com/beta.png" },
-];
+const owners = ["acme", "beta"];
 
 const emptyValue: TrackedChecks = { orgs: {}, repos: {} };
 const someRepos = ["acme/web", "beta/api"];
@@ -39,7 +35,7 @@ describe("SettingsModal", () => {
     const { container } = render(
       <SettingsModal
         {...filterProps}
-        orgs={orgs}
+        owners={owners}
         availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
@@ -58,7 +54,7 @@ describe("SettingsModal", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={orgs}
+        owners={owners}
         availableRepos={[]}
         value={value}
         onChange={vi.fn()}
@@ -78,7 +74,7 @@ describe("SettingsModal", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={[{ login: "acme", avatarUrl: "" }]}
+        owners={["acme"]}
         availableRepos={[]}
         value={emptyValue}
         onChange={onChange}
@@ -100,7 +96,7 @@ describe("SettingsModal", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={[{ login: "acme", avatarUrl: "" }]}
+        owners={["acme"]}
         availableRepos={[]}
         value={emptyValue}
         onChange={onChange}
@@ -130,7 +126,7 @@ describe("SettingsModal", () => {
     const { rerender } = render(
       <SettingsModal
         {...filterProps}
-        orgs={[{ login: "acme", avatarUrl: "" }]}
+        owners={["acme"]}
         availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
@@ -143,7 +139,7 @@ describe("SettingsModal", () => {
     rerender(
       <SettingsModal
         {...filterProps}
-        orgs={[{ login: "acme", avatarUrl: "" }]}
+        owners={["acme"]}
         availableRepos={[]}
         value={value}
         onChange={vi.fn()}
@@ -165,7 +161,6 @@ describe("SettingsModal", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={[]}
         availableRepos={someRepos}
         value={emptyValue}
         onChange={vi.fn()}
@@ -184,7 +179,6 @@ describe("SettingsModal", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={[]}
         availableRepos={["acme/web"]}
         value={emptyValue}
         onChange={onChange}
@@ -211,7 +205,6 @@ describe("SettingsModal", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={[]}
         availableRepos={someRepos}
         value={emptyValue}
         onChange={onChange}
@@ -233,7 +226,6 @@ describe("SettingsModal", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={[]}
         availableRepos={someRepos}
         value={emptyValue}
         onChange={vi.fn()}
@@ -253,7 +245,6 @@ describe("SettingsModal", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={[]}
         availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
@@ -270,7 +261,6 @@ describe("SettingsModal", () => {
     const { container } = render(
       <SettingsModal
         {...filterProps}
-        orgs={[]}
         availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
@@ -288,7 +278,6 @@ describe("SettingsModal", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={[]}
         availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
@@ -304,7 +293,6 @@ describe("SettingsModal", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={[]}
         availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
@@ -319,7 +307,6 @@ describe("SettingsModal", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={[]}
         availableRepos={["acme/web", "beta/api"]}
         value={emptyValue}
         onChange={vi.fn()}
@@ -344,7 +331,6 @@ describe("SettingsModal", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={[]}
         availableRepos={[]}
         value={value}
         onChange={vi.fn()}
@@ -363,7 +349,6 @@ describe("SettingsModal", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={[]}
         availableRepos={["acme/web"]}
         value={emptyValue}
         onChange={onChange}
@@ -390,7 +375,6 @@ describe("SettingsModal", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={[]}
         availableRepos={["acme/web"]}
         value={emptyValue}
         onChange={onChange}
@@ -433,7 +417,6 @@ describe("SettingsModal", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={[]}
         availableRepos={["acme/web", "beta/api"]}
         value={emptyValue}
         onChange={onChange}
@@ -472,7 +455,6 @@ describe("SettingsModal", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={[]}
         availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
@@ -492,7 +474,6 @@ describe("SettingsModal", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={[]}
         availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
@@ -515,7 +496,6 @@ describe("SettingsModal", () => {
         <SettingsModal
           {...filterProps}
           {...{ [propName]: initial, [setterName]: setter }}
-          orgs={[]}
           availableRepos={[]}
           value={emptyValue}
           onChange={vi.fn()}
@@ -537,7 +517,6 @@ describe("SettingsModal", () => {
       render(
         <SettingsModal
           {...filterProps}
-          orgs={[]}
           availableRepos={[]}
           value={emptyValue}
           onChange={vi.fn()}
@@ -629,8 +608,7 @@ describe("SettingsModal", () => {
     it("reopens on the first section after being closed elsewhere", () => {
       const props = {
         ...filterProps,
-        orgs: [],
-        availableRepos: [],
+                availableRepos: [],
         value: emptyValue,
         onChange: vi.fn(),
         onClose: vi.fn(),
@@ -652,7 +630,6 @@ describe("SettingsModal", () => {
         {...filterProps}
         autoRefresh={true}
         pollInterval={POLL_INTERVAL_OPTIONS[0].ms}
-        orgs={[]}
         availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
@@ -675,7 +652,6 @@ describe("SettingsModal", () => {
         {...filterProps}
         autoRefresh={true}
         onPollIntervalChange={onPollIntervalChange}
-        orgs={[]}
         availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
@@ -697,7 +673,6 @@ describe("SettingsModal", () => {
       <SettingsModal
         {...filterProps}
         autoRefresh={false}
-        orgs={[]}
         availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
@@ -722,7 +697,6 @@ describe("SettingsModal", () => {
           notifPermission={notifPermission}
           // The permission controls only apply while something is polling.
           autoRefresh={true}
-          orgs={[]}
           availableRepos={[]}
           value={emptyValue}
           onChange={vi.fn()}
@@ -794,7 +768,6 @@ describe("SettingsModal — check for updates", () => {
     render(
       <SettingsModal
         {...filterProps}
-        orgs={[]}
         availableRepos={[]}
         value={emptyValue}
         onChange={vi.fn()}
@@ -897,8 +870,7 @@ describe("SettingsModal — check for updates", () => {
     stubRelease("v1.6.0");
     const props = {
       ...filterProps,
-      orgs: [],
-      availableRepos: [],
+            availableRepos: [],
       value: emptyValue,
       onChange: vi.fn(),
       onClose: vi.fn(),
@@ -923,5 +895,52 @@ describe("SettingsModal — check for updates", () => {
     // The button label doesn't change, so nothing else would announce it.
     const result = await screen.findByText("You're on the latest version.");
     expect(result.closest("[aria-live]")).toHaveAttribute("aria-live", "polite");
+  });
+});
+
+describe("SettingsModal — owner defaults cover the personal account", () => {
+  function renderTracked(props: { owners: string[]; onChange?: () => void }) {
+    render(
+      <SettingsModal
+        {...filterProps}
+        availableRepos={[]}
+        owners={props.owners}
+        value={emptyValue}
+        onChange={props.onChange ?? vi.fn()}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+  }
+
+  it("offers a row for the personal account alongside the orgs", () => {
+    // Dashboard passes [login, ...orgs]; the personal account is the head of
+    // that list and used to be the one owner with no way to set a default.
+    renderTracked({ owners: ["mehmet", "acme"] });
+    expect(screen.getByRole("textbox", { name: "mehmet check names" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "acme check names" })).toBeInTheDocument();
+  });
+
+  it("stores a personal-account default under that login", () => {
+    const onChange = vi.fn();
+    renderTracked({ owners: ["mehmet"], onChange });
+    fireEvent.change(screen.getByRole("textbox", { name: "mehmet check names" }), {
+      target: { value: "qa/smoke" },
+    });
+    // resolveTracked keys on the owner segment of `owner/repo`, so this is the
+    // shape that makes mehmet/anything pick the default up.
+    expect(onChange).toHaveBeenCalledWith({ orgs: { mehmet: ["qa/smoke"] }, repos: {} });
+  });
+
+  it("calls the section what it now is", () => {
+    renderTracked({ owners: ["mehmet"] });
+    expect(screen.getByText("Owner defaults")).toBeInTheDocument();
+    expect(screen.queryByText("Organization defaults")).not.toBeInTheDocument();
+  });
+
+  it("shows no defaults section when there are no owners at all", () => {
+    renderTracked({ owners: [] });
+    expect(screen.queryByText("Owner defaults")).not.toBeInTheDocument();
   });
 });

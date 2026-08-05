@@ -547,7 +547,6 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         </div>
       )}
       <SettingsModal
-        orgs={orgs}
         availableRepos={availableRepos}
         owners={repoOwners}
         value={tracked}

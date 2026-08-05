@@ -32,13 +32,13 @@ afterEach(() => {
 
 describe("Header", () => {
   it("renders app name and user login", () => {
-    render(<Header orgs={orgs} selectedOrg="acme" onOrgChange={() => {}} login="mehmet" onOpenSettings={() => {}} {...activityProps} />);
+    render(<Header orgs={orgs} selectedOrg="acme" onOrgChange={() => {}} login="octocat" onOpenSettings={() => {}} {...activityProps} />);
     expect(screen.getByText("PRison")).toBeInTheDocument();
-    expect(screen.getByText("mehmet", { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByText("octocat", { selector: "span" })).toBeInTheDocument();
   });
 
   it("clears the token via the API on sign out", async () => {
-    render(<Header orgs={orgs} selectedOrg="acme" onOrgChange={() => {}} login="mehmet" onOpenSettings={() => {}} {...activityProps} />);
+    render(<Header orgs={orgs} selectedOrg="acme" onOrgChange={() => {}} login="octocat" onOpenSettings={() => {}} {...activityProps} />);
     fireEvent.click(screen.getByRole("button", { name: /sign out/i }));
     await waitFor(() =>
       expect(global.fetch).toHaveBeenCalledWith("/api/token", { method: "DELETE" }),
@@ -46,7 +46,7 @@ describe("Header", () => {
   });
 
   it("renders the OrgSwitcher with an All option and the orgs", () => {
-    render(<Header orgs={orgs} selectedOrg="acme" onOrgChange={() => {}} login="mehmet" onOpenSettings={() => {}} {...activityProps} />);
+    render(<Header orgs={orgs} selectedOrg="acme" onOrgChange={() => {}} login="octocat" onOpenSettings={() => {}} {...activityProps} />);
     expect(screen.getByRole("combobox")).toBeInTheDocument();
     expect(screen.getByText("All organizations")).toBeInTheDocument();
     expect(screen.getByText("acme")).toBeInTheDocument();
@@ -54,10 +54,10 @@ describe("Header", () => {
   });
 
   it("forwards login into the OrgSwitcher personal account option", () => {
-    render(<Header orgs={orgs} selectedOrg="acme" onOrgChange={() => {}} login="mehmet" onOpenSettings={() => {}} {...activityProps} />);
-    const personalOption = screen.getByText("mehmet (you)");
+    render(<Header orgs={orgs} selectedOrg="acme" onOrgChange={() => {}} login="octocat" onOpenSettings={() => {}} {...activityProps} />);
+    const personalOption = screen.getByText("octocat (you)");
     expect(personalOption).toBeInTheDocument();
-    expect((personalOption as HTMLOptionElement).value).toBe("mehmet");
+    expect((personalOption as HTMLOptionElement).value).toBe("octocat");
   });
 
   it("renders 'there' as fallback when login is empty", () => {
@@ -67,7 +67,7 @@ describe("Header", () => {
 
   it("clicking the gear button calls onOpenSettings", () => {
     const onOpenSettings = vi.fn();
-    render(<Header orgs={orgs} selectedOrg="acme" onOrgChange={() => {}} login="mehmet" onOpenSettings={onOpenSettings} {...activityProps} />);
+    render(<Header orgs={orgs} selectedOrg="acme" onOrgChange={() => {}} login="octocat" onOpenSettings={onOpenSettings} {...activityProps} />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
   });
@@ -157,7 +157,7 @@ describe("Header — activity bell", () => {
         orgs={orgs}
         selectedOrg="acme"
         onOrgChange={() => {}}
-        login="mehmet"
+        login="octocat"
         onOpenSettings={() => {}}
         {...activityProps}
         {...props}

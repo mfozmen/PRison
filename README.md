@@ -32,7 +32,8 @@ access. Four lists, oldest first, plus a history section:
   toggle.
 - **Tracked checks → Awaiting.** GitHub's API hides "expected" required checks
   (e.g. a manually-triggered `qa/smoke` or automation) from non-admins. Name the
-  checks you care about — org defaults plus per-repo overrides, with a
+  checks you care about — a default per owner (your personal account and every
+  org) plus per-repo overrides, with a
   type-to-search repo picker — and PRison shows them as **"⏳ Awaiting: &lt;name&gt;"**
   on a blocked PR until they report.
 - **Recently merged / closed history.** Merged and closed-without-merging PRs,

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, type ReactNode } from "react";
-import type { Org } from "@/lib/types";
 import type { TrackedChecks } from "@/lib/tracked-checks";
 import { RepoCombobox } from "./RepoCombobox";
 import { POLL_INTERVAL_OPTIONS } from "@/lib/notify";
@@ -14,9 +13,9 @@ import {
 } from "@/lib/project";
 
 export interface SettingsModalProps {
-  orgs: Org[];
   availableRepos: string[];
-  /** Owner logins (orgs + personal) used to scope the repo search. */
+  /** Owner logins — the personal account and every org. Scopes the repo
+   * search, and is the list the owner defaults are offered for. */
   owners?: string[];
   value: TrackedChecks;
   onChange: (next: TrackedChecks) => void;
@@ -145,7 +144,6 @@ function UpdateResult({ latest, version }: { latest: string | null; version?: st
 }
 
 export function SettingsModal({
-  orgs,
   availableRepos,
   owners = [],
   value,
@@ -473,28 +471,32 @@ export function SettingsModal({
                   GitHub doesn&apos;t expose.
                 </p>
 
-                {/* Organization defaults */}
-                {orgs.length > 0 && (
+                {/* Owner defaults — organizations *and* the personal account.
+                    A default is keyed by the owner segment of `owner/repo`,
+                    which is the login for a personal repo, so resolution has
+                    always handled these; only this list left them out, and a
+                    personal repo's only recourse was a per-repo override. */}
+                {owners.length > 0 && (
                   <section className="mb-6">
                     <h4 className="mb-2 text-sm font-medium text-foreground">
-                      Organization defaults
+                      Owner defaults
                     </h4>
                     <div className="space-y-3">
-                      {orgs.map((org) => (
-                        <div key={org.login} className="flex flex-col gap-1">
+                      {owners.map((owner) => (
+                        <div key={owner} className="flex flex-col gap-1">
                           <label
                             className="text-sm text-muted"
-                            htmlFor={`org-input-${org.login}`}
+                            htmlFor={`org-input-${owner}`}
                           >
-                            {org.login}
+                            {owner}
                           </label>
                           <input
-                            id={`org-input-${org.login}`}
+                            id={`org-input-${owner}`}
                             type="text"
-                            aria-label={`${org.login} check names`}
+                            aria-label={`${owner} check names`}
                             placeholder="e.g. qa/smoke, Automation Result"
-                            value={orgDrafts[org.login] ?? ""}
-                            onChange={(e) => handleOrgChange(org.login, e.target.value)}
+                            value={orgDrafts[owner] ?? ""}
+                            onChange={(e) => handleOrgChange(owner, e.target.value)}
                             className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
                           />
                         </div>
@@ -509,7 +511,7 @@ export function SettingsModal({
                     Repository overrides
                   </h4>
                   <p className="mb-3 text-xs text-muted">
-                    A repo override replaces the org default for that repo.
+                    A repo override replaces the owner default for that repo.
                   </p>
                   {availableRepos.length === 0 && rows.length === 0 && (
                     <p className="mb-3 text-xs text-muted">

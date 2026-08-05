@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { SettingsModal } from "./SettingsModal";
 import type { Org } from "@/lib/types";
 import type { TrackedChecks } from "@/lib/tracked-checks";
@@ -786,5 +786,142 @@ describe("SettingsModal", () => {
         screen.queryByRole("button", { name: /send a test notification/i }),
       ).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("SettingsModal — check for updates", () => {
+  function renderAbout() {
+    render(
+      <SettingsModal
+        {...filterProps}
+        orgs={[]}
+        availableRepos={[]}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("About");
+  }
+
+  /** One reply from /api/latest-release. */
+  function stubRelease(tagName: string | null) {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ tagName }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  function clickCheck() {
+    fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("asks GitHub only when the button is clicked", async () => {
+    const fetchMock = stubRelease("v1.6.0");
+    renderAbout();
+    // Opening Settings must not spend the user's rate limit on a question
+    // they did not ask.
+    expect(fetchMock).not.toHaveBeenCalled();
+    clickCheck();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/latest-release"));
+  });
+
+  it("says so when the running build is the latest release", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_VERSION", "1.6.0");
+    stubRelease("v1.6.0");
+    renderAbout();
+    clickCheck();
+    expect(await screen.findByText("You're on the latest version.")).toBeInTheDocument();
+  });
+
+  it("links to the release page when a newer one exists", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_VERSION", "1.5.0");
+    stubRelease("v1.6.0");
+    renderAbout();
+    clickCheck();
+    const link = await screen.findByRole("link", { name: "v1.6.0 is available" });
+    expect(link).toHaveAttribute(
+      "href",
+      "https://github.com/mfozmen/PRison/releases/tag/v1.6.0",
+    );
+    // The tag already carries the v; building the URL must not double it.
+    expect(link.getAttribute("href")).not.toContain("vv");
+  });
+
+  it("names the latest release when the build carries no version to compare", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_VERSION", "");
+    stubRelease("v1.6.0");
+    renderAbout();
+    clickCheck();
+    expect(await screen.findByRole("link", { name: "v1.6.0" })).toBeInTheDocument();
+  });
+
+  it("handles a repository with no published release", async () => {
+    stubRelease(null);
+    renderAbout();
+    clickCheck();
+    expect(await screen.findByText("No published release yet.")).toBeInTheDocument();
+  });
+
+  it("says the check failed rather than claiming the build is current", async () => {
+    // The dangerous failure mode is a silent one that reads as "up to date".
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 502 }));
+    renderAbout();
+    clickCheck();
+    expect(
+      await screen.findByText("Couldn't reach GitHub. Try again in a moment."),
+    ).toBeInTheDocument();
+  });
+
+  it("survives the request throwing outright", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    renderAbout();
+    clickCheck();
+    expect(
+      await screen.findByText("Couldn't reach GitHub. Try again in a moment."),
+    ).toBeInTheDocument();
+  });
+
+  it("drops a previous answer when Settings is reopened", async () => {
+    // The old answer is stale by an unknown amount — an hour later it would
+    // still read "You're on the latest version" without having asked anyone.
+    vi.stubEnv("NEXT_PUBLIC_APP_VERSION", "1.6.0");
+    stubRelease("v1.6.0");
+    const props = {
+      ...filterProps,
+      orgs: [],
+      availableRepos: [],
+      value: emptyValue,
+      onChange: vi.fn(),
+      onClose: vi.fn(),
+    };
+    const { rerender } = render(<SettingsModal {...props} open={true} />);
+    selectSection("About");
+    clickCheck();
+    expect(await screen.findByText("You're on the latest version.")).toBeInTheDocument();
+
+    rerender(<SettingsModal {...props} open={false} />);
+    rerender(<SettingsModal {...props} open={true} />);
+    selectSection("About");
+    expect(screen.queryByText("You're on the latest version.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check for updates" })).toBeInTheDocument();
+  });
+
+  it("announces the answer to a screen reader", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_VERSION", "1.6.0");
+    stubRelease("v1.6.0");
+    renderAbout();
+    clickCheck();
+    // The button label doesn't change, so nothing else would announce it.
+    const result = await screen.findByText("You're on the latest version.");
+    expect(result.closest("[aria-live]")).toHaveAttribute("aria-live", "polite");
   });
 });

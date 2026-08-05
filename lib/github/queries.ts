@@ -377,3 +377,15 @@ export function parseReadyPrs(raw: any): ReadyPr[] {
       } as ReadyPr;
     });
 }
+
+// PRison's own latest release, for the update check in Settings → About.
+// `latestRelease` is GitHub's own answer to "what should someone install",
+// so drafts and prereleases are excluded without us filtering for them.
+export const LATEST_RELEASE_QUERY = `
+  query($owner: String!, $name: String!) {
+    repository(owner: $owner, name: $name) { latestRelease { tagName } }
+  }`;
+
+export function parseLatestRelease(raw: any): string | undefined {
+  return raw?.repository?.latestRelease?.tagName ?? undefined;
+}

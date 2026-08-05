@@ -144,7 +144,9 @@ scopes to All / your personal account / a single org; the **bell** opens the
 **Settings**, whose menu has four sections — **Comments** (show bot comments,
 hide comments you reacted to), **Auto refresh** (on/off, how often to check, and
 the notification permission), **Tracked checks** (name the required checks to
-see as "Awaiting"), and **About** (version, repository, license); the
+see as "Awaiting"), and **About** (version, repository, license, and
+**Check for updates** — asked for, never automatic, and it links straight to
+the release when there's a newer one); the
 **sun/moon** toggles the theme; **Sign Out** clears the
 stored token. Click a **PR title** (or a suggested-action link) to jump to
 GitHub — a comment row lands on that exact thread. In the filter bar: **Flat / By

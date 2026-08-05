@@ -45,7 +45,11 @@ Add `--dry-run` to see every step without touching anything.
    ruleset requires an approving review, and the push clears it via the
    repository-admin bypass. This is the one place `main` is written without a PR.
 6. Creates the GitHub release, which fires `.github/workflows/publish-image.yml`
-   and pushes `mfozmen/prison:<version>` and `:latest` to Docker Hub.
+   and pushes `mfozmen/prison:<version>` and `:latest` to Docker Hub. That
+   workflow then appends the pull command and the Docker Hub link to the
+   release body — **after** the push, so the release never links to an image
+   that failed to build. A `workflow_dispatch` rerun skips the append, since it
+   may be rebuilding an older tag whose body already has the section.
 
 ## If the image workflow didn't run
 

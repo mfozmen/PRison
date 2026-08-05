@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs, parseReadyPrs, parseRepoSearch, parsePrComments, parseClosedPrs } from "./queries";
+import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs, parseReadyPrs, parseRepoSearch, parsePrComments, parseClosedPrs, parseLatestRelease } from "./queries";
 
 describe("searchQuery", () => {
   it("scopes author search to the org", () => {
@@ -1466,5 +1466,20 @@ describe("parsePrComments", () => {
   it("leaves viewerReacted false when reactionGroups is absent", () => {
     const [c] = parsePrComments(raw([thread()]), "mfozmen");
     expect(c.viewerReacted).toBe(false);
+  });
+});
+
+describe("parseLatestRelease", () => {
+  it("reads the tag off the latest release", () => {
+    expect(parseLatestRelease({ repository: { latestRelease: { tagName: "v1.6.0" } } })).toBe("v1.6.0");
+  });
+
+  it.each([
+    ["a repository with no release yet", { repository: { latestRelease: null } }],
+    ["a repository the token cannot see", { repository: null }],
+    ["a response that lost its data", undefined],
+  ])("reads %s as no release, rather than throwing", (_label, raw) => {
+    // The update check is a convenience; it must never take Settings down.
+    expect(parseLatestRelease(raw)).toBeUndefined();
   });
 });

@@ -17,8 +17,10 @@ on:
         type: boolean
         default: false
 
+# contents: write is for the last step only — appending the image links to the
+# release body once the image actually exists.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   publish:
@@ -85,3 +87,36 @@ jobs:
           provenance: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # GitHub attaches "Source code (zip)" to every release, but the artifact
+      # people actually install is the image — and it does not exist until the
+      # step above succeeds, which is why this appends rather than release-it
+      # writing the links when it creates the release.
+      #
+      # `release` only: a workflow_dispatch run may be rebuilding an OLD tag,
+      # and appending to that release again would just duplicate the section.
+      - if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # gh runs outside the checkout (below), so name the repo explicitly.
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.ref.outputs.tag }}
+          VERSION: ${{ steps.ref.outputs.version }}
+        run: |
+          BODY=$(gh release view "$TAG" --json body --jq .body)
+          # Re-running a failed release job from the Actions UI keeps
+          # event_name as `release`, so the `if` above does not stop a second
+          # append — the body itself has to say it already has the section.
+          case "$BODY" in
+            *"### Docker"*)
+              echo "Release body already links the image; leaving it alone."
+              exit 0
+              ;;
+          esac
+          {
+            printf '%s' "$BODY"
+            printf '\n\n---\n\n### Docker\n\n```sh\ndocker run -p 3000:3000 -v prison-data:/data \\\n  -e GITHUB_TOKEN="$(gh auth token)" mfozmen/prison:%s\n```\n\n' "$VERSION"
+            printf '[`mfozmen/prison:%s` on Docker Hub](https://hub.docker.com/r/mfozmen/prison/tags?name=%s) — linux/amd64 and linux/arm64.\n' "$VERSION" "$VERSION"
+          } > body.md
+          gh release edit "$TAG" --notes-file body.md
+        working-directory: ${{ runner.temp }}

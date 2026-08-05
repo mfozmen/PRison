@@ -16,3 +16,33 @@ export function releaseUrl(version: string): string {
 export function appVersion(): string | undefined {
   return process.env.NEXT_PUBLIC_APP_VERSION;
 }
+
+// Split out of PROJECT_URL rather than written again, so the update check can
+// never end up asking GitHub about a different repository than the one the
+// About pane links to.
+const [owner, name] = PROJECT_URL.split("/").slice(-2);
+export const PROJECT_OWNER = owner;
+export const PROJECT_NAME = name;
+
+/** Is `latest` a newer release than `current`?
+ *
+ * Compares the three numbers rather than the strings: "1.10.0" is newer than
+ * "1.9.0" but sorts before it. Anything that isn't a plain `major.minor.patch`
+ * — a prerelease suffix, a hand-typed tag, a dev build with no version at all
+ * — answers no. An update prompt that can't tell should stay quiet rather than
+ * send someone to a release page for nothing. */
+export function isNewerVersion(latest: string, current: string): boolean {
+  const parts = (v: string) => {
+    const nums = v.replace(/^v/, "").split(".");
+    if (nums.length !== 3) return null;
+    const parsed = nums.map((n) => (/^\d+$/.test(n) ? Number(n) : NaN));
+    return parsed.some(Number.isNaN) ? null : parsed;
+  };
+  const a = parts(latest);
+  const b = parts(current);
+  if (!a || !b) return false;
+  for (let i = 0; i < 3; i++) {
+    if (a[i] !== b[i]) return a[i] > b[i];
+  }
+  return false;
+}

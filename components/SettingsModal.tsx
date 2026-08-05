@@ -5,7 +5,13 @@ import type { Org } from "@/lib/types";
 import type { TrackedChecks } from "@/lib/tracked-checks";
 import { RepoCombobox } from "./RepoCombobox";
 import { POLL_INTERVAL_OPTIONS } from "@/lib/notify";
-import { PROJECT_URL, PROJECT_LABEL, appVersion } from "@/lib/project";
+import {
+  PROJECT_URL,
+  PROJECT_LABEL,
+  appVersion,
+  isNewerVersion,
+  releaseUrl,
+} from "@/lib/project";
 
 export interface SettingsModalProps {
   orgs: Org[];
@@ -109,6 +115,35 @@ function SettingButton({
   );
 }
 
+/** What the check found, in one sentence. Every branch that names a release
+ * links to it, because the next thing anyone wants is the release notes. */
+function UpdateResult({ latest, version }: { latest: string | null; version?: string }) {
+  if (!latest) return <>No published release yet.</>;
+  // releaseUrl builds the tag back from a bare version; tagName arrives with
+  // the `v` already on it.
+  const link = (text: string) => (
+    <a
+      href={releaseUrl(latest.replace(/^v/, ""))}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-accent underline underline-offset-2 hover:brightness-110"
+    >
+      {text}
+    </a>
+  );
+  // A dev build has no version inlined, so there is nothing to compare against.
+  // Naming the latest release still answers most of the question.
+  if (!version) return <>Latest release is {link(latest)}.</>;
+  if (isNewerVersion(latest, version)) {
+    return (
+      <>
+        {link(`${latest} is available`)} — you&apos;re on v{version}.
+      </>
+    );
+  }
+  return <>You&apos;re on the latest version.</>;
+}
+
 export function SettingsModal({
   orgs,
   availableRepos,
@@ -131,6 +166,25 @@ export function SettingsModal({
 }: SettingsModalProps) {
   // Read inside the component, not at module scope, so tests can stub it.
   const version = appVersion();
+
+  // Asked for, never volunteered: a dashboard that phones home on open would
+  // spend the user's rate limit to answer a question they didn't ask.
+  const [update, setUpdate] = useState<
+    | { status: "idle" | "checking" | "error" }
+    | { status: "done"; latest: string | null }
+  >({ status: "idle" });
+
+  async function checkForUpdates() {
+    setUpdate({ status: "checking" });
+    try {
+      const res = await fetch("/api/latest-release");
+      if (!res.ok) throw new Error(String(res.status));
+      const { tagName } = await res.json();
+      setUpdate({ status: "done", latest: typeof tagName === "string" ? tagName : null });
+    } catch {
+      setUpdate({ status: "error" });
+    }
+  }
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const tabRefs = useRef<Partial<Record<SectionId, HTMLButtonElement | null>>>({});
 
@@ -157,6 +211,9 @@ export function SettingsModal({
       setOrgDrafts(seedOrgDrafts(value.orgs));
       setRows(seedRows(value.repos));
       setSection(SECTIONS[0].id);
+      // A result from the last time the modal was open is stale by an unknown
+      // amount; better to offer the check again than to show an old answer.
+      setUpdate({ status: "idle" });
     }
   }
 
@@ -531,6 +588,19 @@ export function SettingsModal({
                   </a>{" "}
                   — open source, MIT licensed. Issues and pull requests welcome.
                 </p>
+                <div className="flex flex-col gap-2">
+                  <SettingButton onClick={checkForUpdates} className="self-start">
+                    Check for updates
+                  </SettingButton>
+                  {/* aria-live: the answer arrives after the click, and the
+                      button's own label doesn't change to announce it. */}
+                  <p aria-live="polite" className="text-xs">
+                    {update.status === "checking" && "Checking…"}
+                    {update.status === "error" &&
+                      "Couldn't reach GitHub. Try again in a moment."}
+                    {update.status === "done" && <UpdateResult latest={update.latest} version={version} />}
+                  </p>
+                </div>
               </div>
             )}
           </div>

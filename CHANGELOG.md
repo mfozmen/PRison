@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.6.0](https://github.com/mfozmen/PRison/compare/v1.5.0...v1.6.0) (2026-08-05)
+
+### Features
+
+* keep every detected change in an in-page activity feed ([#12](https://github.com/mfozmen/PRison/issues/12)) ([91718e2](https://github.com/mfozmen/PRison/commit/91718e25b83b08c1e3ad6556cbde7da0b391b0f4))
+
+### Bug Fixes
+
+* take the release token from gh, and make the test notification repeatable ([#11](https://github.com/mfozmen/PRison/issues/11)) ([8e1fcff](https://github.com/mfozmen/PRison/commit/8e1fcff0eec182f93c961703c6c3391e16146407))
+
 ## [1.5.0](https://github.com/mfozmen/PRison/compare/v1.4.0...v1.5.0) (2026-08-04)
 
 ### Features

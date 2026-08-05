@@ -389,9 +389,21 @@ export function SettingsModal({
                   </p>
                 )}
                 {autoRefresh && notifPermission === "granted" && (
-                  <SettingButton onClick={onTestNotification} className="mt-3">
-                    Send a test notification
-                  </SettingButton>
+                  <div className="mt-3">
+                    <SettingButton onClick={onTestNotification}>
+                      Send a test notification
+                    </SettingButton>
+                    {/* The browser having permission is only half the chain:
+                        the operating system decides separately whether the
+                        browser may show anything, and it refuses in silence.
+                        Without this line a swallowed notification is
+                        indistinguishable from a broken button. */}
+                    <p className="mt-2 text-xs text-muted">
+                      Nothing appeared? Your browser has permission, so check
+                      that your operating system allows notifications from it —
+                      and that Do Not Disturb or a Focus mode isn&apos;t on.
+                    </p>
+                  </div>
                 )}
               </div>
             )}

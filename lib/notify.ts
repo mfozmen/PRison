@@ -161,10 +161,10 @@ export function describeEvents(events: readonly StatusEvent[]): string {
   return lines.join("\n");
 }
 
-/** A fixed tag per kind makes successive polls replace the notification
- * rather than stack a pile of them up while the user is away — and keeps the
- * test send from swallowing a real one. */
-function notify(body: string, tag: string): void {
+/** A tag makes successive notifications replace one another rather than stack
+ * a pile of them up while the user is away. Omitting it opts out of that:
+ * without a tag every send is its own notification. */
+function notify(body: string, tag?: string): void {
   if (typeof Notification === "undefined") return;
   if (Notification.permission !== "granted") return;
   new Notification("PRison", { body, tag });
@@ -177,12 +177,15 @@ export function showChangeNotification(events: readonly StatusEvent[]): void {
 }
 
 /** Prove to the user that notifications reach them, from the UI rather than
- * from a console. */
+ * from a console.
+ *
+ * Deliberately untagged. A tag would mean the second click merely *replaces*
+ * the notification the first one left in the notification center, and both
+ * macOS and Windows apply that replacement silently — no banner, no sound. The
+ * button would work exactly once and then look broken. Stacking is right here:
+ * every click is a question the user just asked out loud. */
 export function showTestNotification(): void {
-  notify(
-    "Notifications are on — you'll get one when a PR changes state.",
-    "prison-test",
-  );
+  notify("Notifications are on — you'll get one when a PR changes state.");
 }
 
 /** The current permission, guarded for environments without the API (jsdom,

@@ -332,11 +332,22 @@ describe("showTestNotification", () => {
         title: "PRison",
         options: {
           body: "Notifications are on — you'll get one when a PR changes state.",
-          // Its own tag, so a test send never replaces a real notification.
-          tag: "prison-test",
+          // No tag, so it can neither replace a real notification nor be
+          // replaced by the next test send.
+          tag: undefined,
         },
       },
     ]);
+  });
+
+  it("stacks rather than replacing itself, so a second click is visible too", () => {
+    const { constructed } = stubNotification("granted");
+    showTestNotification();
+    showTestNotification();
+    expect(constructed).toHaveLength(2);
+    // A shared tag is what would make the second one replace the first, and
+    // the platforms do that replacement without alerting anyone.
+    expect(constructed.every((n) => n.options?.tag === undefined)).toBe(true);
   });
 
   it("stays silent without permission", () => {

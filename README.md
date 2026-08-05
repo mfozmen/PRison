@@ -64,6 +64,12 @@ access. Four lists, oldest first, plus a history section:
   operating system decides separately whether the browser may show anything, and
   it refuses in silence. Whatever the notification misses is in the activity
   feed regardless.
+- **Catch-up on open.** PRison remembers what everything was doing when you
+  last closed it, so a review that arrived overnight is still news in the
+  morning — the first load reports what moved while no tab was polling,
+  instead of quietly accepting it as the way things always were. It fills the
+  feed and the bell; it doesn't raise a notification about what the page in
+  front of you is already showing.
 - **Last refreshed indicator.** The filter bar says how long ago the data
   landed, so you always know whether you're looking at something stale.
 - **Partial-data notice.** When GitHub drops part of a response (an org restricts

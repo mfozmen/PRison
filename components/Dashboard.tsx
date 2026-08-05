@@ -21,6 +21,9 @@ import {
   showTestNotification,
   notificationPermission,
   requestNotificationPermission,
+  SNAPSHOT_KEY,
+  serializeSnapshot,
+  parseSnapshot,
   type StatusSnapshot,
 } from "@/lib/notify";
 import {
@@ -99,6 +102,16 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // seen by their first (non-silent) fetch and only genuine transitions after
   // that count as news.
   const seenStatusRef = useRef<StatusSnapshot>(new Map());
+  // The snapshot outlives the tab, so a change that lands while PRison is
+  // closed is still news when it opens. Without this the feed could only ever
+  // report what a live poll happened to watch happen: a review that arrived
+  // overnight was already the current state by morning, and the first fetch
+  // absorbed it silently. Armed by hydration when a stored snapshot came back,
+  // spent by the first fetch that delivers anything.
+  const catchUpRef = useRef(false);
+  // What was last written, so the every-render effect below rewrites storage
+  // only when the snapshot actually moved.
+  const lastSnapshotRef = useRef<string | null>(null);
   // Bumped in the same state batch as a silent poll's results, so the commit
   // where it changes is guaranteed to carry that poll's data — an interleaving
   // commit can't consume the signal the way a ref flag could.
@@ -249,6 +262,15 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     const storedTracked = localStorage.getItem("prison.trackedChecks");
     const storedClosedOpen = localStorage.getItem("prison.closedOpen");
     const storedActivity = localStorage.getItem(ACTIVITY_KEY);
+    // Refs, not state: the detection effect reads them, and a restored
+    // snapshot must be in place before the first fetch lands or that fetch
+    // diffs against nothing and the catch-up has no baseline.
+    const storedSnapshot = localStorage.getItem(SNAPSHOT_KEY);
+    lastSnapshotRef.current = storedSnapshot;
+    seenStatusRef.current = parseSnapshot(storedSnapshot);
+    // Only with a baseline. A first-ever run has none, and letting it report
+    // would write the entire board into the feed as news.
+    catchUpRef.current = seenStatusRef.current.size > 0;
     startTransition(() => {
       setNotifPermission(notificationPermission());
       setActivity(parseActivity(storedActivity));
@@ -500,8 +522,24 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     // on record would then swallow the *next* failure too, because it would
     // match what we last saw. The union keeps ids that have left the board, so
     // an item that flaps out and back still doesn't re-announce itself.
-    seenStatusRef.current = new Map([...prev, ...visible]);
-    if (pollGen !== lastPollGenRef.current) {
+    const merged = new Map([...prev, ...visible]);
+    seenStatusRef.current = merged;
+    if (hydrated) {
+      const serialized = serializeSnapshot(merged);
+      if (serialized !== lastSnapshotRef.current) {
+        lastSnapshotRef.current = serialized;
+        localStorage.setItem(SNAPSHOT_KEY, serialized);
+      }
+    }
+    // The first fetch after a mount that restored a snapshot reports too: what
+    // changed while PRison was closed is exactly what the user came to find
+    // out. Spent on the first commit that carries data, so the empty renders
+    // before it don't consume it. A desktop notification still needs an
+    // unfocused tab, so opening the app doesn't notify about what it is
+    // already showing.
+    const catchUp = catchUpRef.current && visible.size > 0;
+    if (catchUp) catchUpRef.current = false;
+    if (pollGen !== lastPollGenRef.current || catchUp) {
       lastPollGenRef.current = pollGen;
       if (events.length > 0) {
         // Recorded whether or not the tab is focused: the feed is a timeline,

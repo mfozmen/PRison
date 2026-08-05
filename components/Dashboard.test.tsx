@@ -2326,6 +2326,73 @@ describe("Dashboard — auto refresh", () => {
     expect(constructed.at(-1)?.options?.body).toBe("acme/b #7 — checks failing");
   });
 
+  it("stores the snapshot so a later mount has something to compare against", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.statusSnapshot")).toContain(STUCK_PR.id),
+    );
+  });
+
+  it("reports what changed while it was closed, on the first fetch after a mount", async () => {
+    // The whole point: nothing polls while the tab is shut, so the review that
+    // landed overnight is simply the current state by morning. Diffing the
+    // first fetch against the stored snapshot is what turns it back into news.
+    localStorage.setItem(
+      "prison.statusSnapshot",
+      JSON.stringify([
+        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "pending" },
+      ]),
+    );
+    stuckList = [];
+    readyList = [{ ...READY_PR, id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number }];
+
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("ready pr")).toBeInTheDocument();
+
+    expect(await screen.findByRole("button", { name: /^activity, 1 unseen$/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^activity, 1 unseen$/i }));
+    expect(screen.getByText(/is ready to merge/i)).toBeInTheDocument();
+  });
+
+  it("stays quiet on the first ever run, when there is no snapshot to compare against", async () => {
+    // Every item reads as new against an empty snapshot, so a catch-up here
+    // would write the whole board into the feed as news.
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    expect(document.title).toBe("PRison");
+    expect(screen.getByRole("button", { name: /^activity$/i })).toBeInTheDocument();
+  });
+
+  it("reports the catch-up once, not again on the next render", async () => {
+    localStorage.setItem(
+      "prison.statusSnapshot",
+      JSON.stringify([
+        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "pending" },
+      ]),
+    );
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByRole("button", { name: /^activity, 1 unseen$/i })).toBeInTheDocument();
+
+    // A re-render that carries no fetch — the badge must not climb.
+    fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
+    expect(screen.getByRole("button", { name: /^activity, 1 unseen$/i })).toBeInTheDocument();
+  });
+
+  it("does not notify about the catch-up while the tab is focused", async () => {
+    // Opening PRison and being told what PRison is already showing you.
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    localStorage.setItem(
+      "prison.statusSnapshot",
+      JSON.stringify([
+        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "pending" },
+      ]),
+    );
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByRole("button", { name: /^activity, 1 unseen$/i })).toBeInTheDocument();
+    expect(constructed).toHaveLength(0);
+  });
+
   it("re-reads permission when the test notification is sent", async () => {
     localStorage.setItem("prison.autoRefresh", "true");
     render(<Dashboard orgs={ORGS} login="testuser" />);

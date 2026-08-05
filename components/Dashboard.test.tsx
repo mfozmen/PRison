@@ -2070,9 +2070,11 @@ describe("Dashboard — auto refresh", () => {
     // The body names the PR and what happened, not just a count.
     expect(constructed[0].options?.body).toBe("acme/b #2 — checks failing");
 
-    // Returning to the tab clears the badge.
+    // Returning to the tab no longer clears the badge: that is the moment
+    // before the user has read anything, and the count used to reach zero
+    // without ever having been looked at.
     fireEvent(window, new Event("focus"));
-    expect(document.title).toBe("PRison");
+    expect(document.title).toBe("(1) PRison");
   });
 
   it("announces a PR that moved from stuck to ready — the id is not new, the news is", async () => {
@@ -2151,7 +2153,7 @@ describe("Dashboard — auto refresh", () => {
     expect(constructed).toHaveLength(0);
   });
 
-  it("clears the badge when the tab becomes visible again", async () => {
+  it("keeps the badge when the tab becomes visible again, and clears it when the feed is read", async () => {
     localStorage.setItem("prison.autoRefresh", "true");
     vi.spyOn(document, "hasFocus").mockReturnValue(false);
     render(<Dashboard orgs={ORGS} login="testuser" />);
@@ -2163,6 +2165,9 @@ describe("Dashboard — auto refresh", () => {
 
     // jsdom's document.hidden is false, so this exercises the visible branch.
     fireEvent(document, new Event("visibilitychange"));
+    expect(document.title).toBe("(1) PRison");
+
+    fireEvent.click(screen.getByRole("button", { name: /^activity/i }));
     expect(document.title).toBe("PRison");
   });
 
@@ -2180,7 +2185,7 @@ describe("Dashboard — auto refresh", () => {
     expect(constructed).toHaveLength(0);
   });
 
-  it("stays quiet while the tab is focused", async () => {
+  it("records to the feed while the tab is focused, but does not interrupt", async () => {
     localStorage.setItem("prison.autoRefresh", "true");
     vi.spyOn(document, "hasFocus").mockReturnValue(true);
     render(<Dashboard orgs={ORGS} login="testuser" />);
@@ -2189,8 +2194,13 @@ describe("Dashboard — auto refresh", () => {
     stuckList = [STUCK_PR, NEW_STUCK_PR];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(await screen.findByText("brand new stuck pr")).toBeInTheDocument();
-    expect(document.title).toBe("PRison");
+    // A desktop notification exists to interrupt, and interrupting someone who
+    // is already looking is noise. The feed is a timeline, so it takes the
+    // event either way — and the bell is what makes it noticeable on screen.
     expect(constructed).toHaveLength(0);
+    expect(
+      screen.getByRole("button", { name: /^activity, 1 unseen$/i }),
+    ).toBeInTheDocument();
   });
 
   it("marks a new scope's items as seen on org switch instead of announcing them", async () => {
@@ -2235,6 +2245,63 @@ describe("Dashboard — auto refresh", () => {
     expect(fetchCalls()).toBe(10);
   });
 
+  it("starts with an empty feed — the first load is a seed, not news", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    const bell = screen.getByRole("button", { name: /^activity$/i });
+    fireEvent.click(bell);
+    // Everything on screen reads as new against an empty snapshot, so without
+    // the seed guard the whole board would land in the feed on every load.
+    expect(screen.getByText(/nothing yet/i)).toBeInTheDocument();
+  });
+
+  it("lists what a poll found, linking each entry to where it happened", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    stuckList = [STUCK_PR, NEW_STUCK_PR];
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+
+    fireEvent.click(screen.getByRole("button", { name: /^activity, 1 unseen$/i }));
+    // Scoped to the panel: the PR is also on the board behind it.
+    const feed = within(screen.getByRole("region", { name: "Activity" }));
+    expect(feed.getByText("acme/b #2")).toBeInTheDocument();
+    expect(feed.getByText("— checks failing")).toBeInTheDocument();
+    expect(feed.getByRole("link")).toHaveAttribute("href", NEW_STUCK_PR.url);
+  });
+
+  it("keeps the feed across a remount", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
+    const { unmount } = render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    stuckList = [STUCK_PR, NEW_STUCK_PR];
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    unmount();
+
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    // Reloading is common enough that a session-only feed would mostly be empty.
+    fireEvent.click(screen.getByRole("button", { name: /^activity, 1 unseen$/i }));
+    const feed = within(screen.getByRole("region", { name: "Activity" }));
+    expect(feed.getByText("acme/b #2")).toBeInTheDocument();
+  });
+
+  it("empties the feed on request", async () => {
+    localStorage.setItem("prison.autoRefresh", "true");
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    stuckList = [STUCK_PR, NEW_STUCK_PR];
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+
+    fireEvent.click(screen.getByRole("button", { name: /^activity, 1 unseen$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
+    expect(screen.getByText(/nothing yet/i)).toBeInTheDocument();
+    expect(localStorage.getItem("prison.activity")).toBe("[]");
+  });
+
   it("accumulates the unseen count across polls", async () => {
     localStorage.setItem("prison.autoRefresh", "true");
     vi.spyOn(document, "hasFocus").mockReturnValue(false);
@@ -2251,13 +2318,12 @@ describe("Dashboard — auto refresh", () => {
       { ...STUCK_PR, id: "new-2", title: "second new stuck pr", number: 7 },
     ];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
-    // The badge accumulates (1 + 1), and so does the notification: it carries a
-    // fixed tag, so this one REPLACES the previous in the tray. Describing only
-    // this poll's delta would lose the earlier PR while the badge still counted it.
+    // The badge accumulates (1 + 1) because unseen now survives a return to the
+    // tab. The notification does not: it describes only the poll that raised
+    // it, since re-announcing everything still unseen would repeat older events
+    // on every poll. The accumulated history is in the feed.
     expect(document.title).toBe("(2) PRison");
-    expect(constructed.at(-1)?.options?.body).toBe(
-      "acme/b #2 — checks failing\nacme/b #7 — checks failing",
-    );
+    expect(constructed.at(-1)?.options?.body).toBe("acme/b #7 — checks failing");
   });
 
   it("re-reads permission when the test notification is sent", async () => {

@@ -3,7 +3,9 @@
 import { useSyncExternalStore } from "react";
 import type { Org } from "@/lib/types";
 import { OrgSwitcher } from "./OrgSwitcher";
+import { ActivityBell } from "./ActivityBell";
 import { releaseUrl, appVersion } from "@/lib/project";
+import type { ActivityEntry } from "@/lib/activity";
 
 async function signOut() {
   await fetch("/api/token", { method: "DELETE" });
@@ -33,9 +35,21 @@ export interface HeaderProps {
   onOrgChange: (login: string) => void;
   login: string;
   onOpenSettings: () => void;
+  activity: readonly ActivityEntry[];
+  onOpenActivity: () => void;
+  onClearActivity: () => void;
 }
 
-export function Header({ orgs, selectedOrg, onOrgChange, login, onOpenSettings }: HeaderProps) {
+export function Header({
+  orgs,
+  selectedOrg,
+  onOrgChange,
+  login,
+  onOpenSettings,
+  activity,
+  onOpenActivity,
+  onClearActivity,
+}: HeaderProps) {
   // Read inside the component, not at module scope, so tests can stub it.
   // next.config.ts inlines it from package.json; absent in a bare `next dev`.
   const version = appVersion();
@@ -72,6 +86,11 @@ export function Header({ orgs, selectedOrg, onOrgChange, login, onOpenSettings }
         <span className="hidden text-sm text-muted sm:inline">
           {login || "there"}
         </span>
+        <ActivityBell
+          entries={activity}
+          onOpen={onOpenActivity}
+          onClear={onClearActivity}
+        />
         <button
           type="button"
           aria-label="Settings"

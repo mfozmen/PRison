@@ -23,6 +23,14 @@ import {
   requestNotificationPermission,
   type StatusSnapshot,
 } from "@/lib/notify";
+import {
+  ACTIVITY_KEY,
+  appendEvents,
+  parseActivity,
+  unseenCount,
+  markAllSeen,
+  type ActivityEntry,
+} from "@/lib/activity";
 
 export interface DashboardProps {
   orgs: Org[];
@@ -96,12 +104,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // commit can't consume the signal the way a ref flag could.
   const [pollGen, setPollGen] = useState(0);
   const lastPollGenRef = useRef(0);
-  // Everything that moved while the tab was away, latest status per item.
-  // It feeds both the badge count and the notification body: the notification
-  // carries a fixed tag so successive polls replace rather than stack, and a
-  // replacement built from one poll's delta alone would hide the earlier
-  // polls' events while the badge went on counting them.
-  const unseenRef = useRef<StatusSnapshot>(new Map());
+  // Everything the polls have detected, newest first. One unseen count comes
+  // out of it and drives both the bell badge and the tab title, so the two can
+  // never disagree about how much is waiting.
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
+  const unseen = unseenCount(activity);
 
   const fetchData = useCallback(
     (org: string, silent = false) => {
@@ -241,8 +248,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     const storedPollInterval = localStorage.getItem("prison.pollInterval");
     const storedTracked = localStorage.getItem("prison.trackedChecks");
     const storedClosedOpen = localStorage.getItem("prison.closedOpen");
+    const storedActivity = localStorage.getItem(ACTIVITY_KEY);
     startTransition(() => {
       setNotifPermission(notificationPermission());
+      setActivity(parseActivity(storedActivity));
       if (
         stored === ALL ||
         stored === login ||
@@ -321,6 +330,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     localStorage.setItem("prison.pollInterval", String(pollInterval));
   }, [pollInterval, hydrated]);
 
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activity));
+  }, [activity, hydrated]);
+
   // Auto refresh: poll silently at the chosen interval. Keeps polling while
   // the tab is hidden — that's the point (badge + desktop notification). No
   // immediate fire, so it never double-fetches with the org effect above.
@@ -338,22 +352,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     return () => clearInterval(id);
   }, [lastRefreshedAt]);
 
-  // Returning to the tab means the new items are on screen: clear the badge.
+  // The title badge follows the same count the bell shows, so it survives a
+  // return to the tab. It used to clear on focus, which is the moment *before*
+  // the user has had a chance to read anything — the count reached zero without
+  // ever having been looked at. Opening the activity panel clears it now.
   useEffect(() => {
-    const clear = () => {
-      unseenRef.current.clear();
-      document.title = withoutBadge(document.title);
-    };
-    const onVisibility = () => {
-      if (!document.hidden) clear();
-    };
-    window.addEventListener("focus", clear);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      window.removeEventListener("focus", clear);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, []);
+    const base = withoutBadge(document.title);
+    document.title = unseen > 0 ? withBadge(base, unseen) : base;
+  }, [unseen]);
 
   // nowTick is only a re-render trigger — it makes the label age between
   // fetches instead of freezing at whatever it said when the data landed.
@@ -378,6 +384,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     setNotifPermission(notificationPermission());
     showTestNotification();
   }, []);
+
+  // Opening the panel is the only thing that marks the feed read — see the
+  // title-badge effect for why returning to the tab deliberately doesn't.
+  const handleOpenActivity = useCallback(() => {
+    setActivity(markAllSeen);
+  }, []);
+
+  const handleClearActivity = useCallback(() => setActivity([]), []);
 
   // Same in reverse: unblocking PRison in site settings is a change nothing in
   // the page can hear, so the pane would keep claiming it is blocked. Opening
@@ -460,9 +474,17 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // stuck to ready keeps its id, and that transition is the whole point.
   // Runs after every commit: ordinary commits (filter toggles, manual
   // refreshes, org switches) just mark what's on screen as seen; only the
-  // commit that carries a silent poll's results (pollGen changed) while the
-  // tab is unfocused may badge and notify — when focused the user sees the
-  // live update, and a badge set while focused would never clear.
+  // commit that carries a silent poll's results (pollGen changed) records
+  // anything. That guard is what keeps the first load from writing the whole
+  // board into the feed, since every item reads as new against an empty
+  // snapshot.
+  //
+  // No dependency array on purpose. The one the rule suggests lists the visible
+  // lists, which are rebuilt on every render and so carry a fresh identity each
+  // time — it would silence the rule without changing when this runs. The
+  // recording terminates by guard instead: lastPollGenRef is advanced before
+  // setActivity, so the render it causes finds the guard closed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const prev = seenStatusRef.current;
     const visible = snapshotStatuses({
@@ -481,16 +503,16 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     seenStatusRef.current = new Map([...prev, ...visible]);
     if (pollGen !== lastPollGenRef.current) {
       lastPollGenRef.current = pollGen;
-      if (events.length > 0 && !document.hasFocus()) {
-        // Delete first: a Map keeps a re-set key in its original position, and
-        // the notification spells out the tail, so an item moving again has to
-        // move to the back of the queue or its news never gets shown.
-        for (const event of events) {
-          unseenRef.current.delete(event.id);
-          unseenRef.current.set(event.id, event);
-        }
-        document.title = withBadge(document.title, unseenRef.current.size);
-        showChangeNotification([...unseenRef.current.values()]);
+      if (events.length > 0) {
+        // Recorded whether or not the tab is focused: the feed is a timeline,
+        // and something that moved while the user was looking still belongs in
+        // it. The notification keeps the focus condition — it exists to
+        // interrupt, and interrupting someone already looking is noise.
+        setActivity((log) => appendEvents(log, events, new Date()));
+        // This poll's events only. The accumulated history has a home now, and
+        // re-announcing everything still unseen would repeat older events on
+        // every poll, since unseen no longer clears when the tab regains focus.
+        if (!document.hasFocus()) showChangeNotification(events);
       }
     }
   });
@@ -503,6 +525,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         onOrgChange={setSelectedOrg}
         login={login}
         onOpenSettings={handleOpenSettings}
+        activity={activity}
+        onOpenActivity={handleOpenActivity}
+        onClearActivity={handleClearActivity}
       />
       {partial && (
         <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 pt-4">

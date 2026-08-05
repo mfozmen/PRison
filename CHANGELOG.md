@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.7.0](https://github.com/mfozmen/PRison/compare/v1.6.0...v1.7.0) (2026-08-05)
+
+### Features
+
+* check for updates from Settings, and link the image from the release ([#13](https://github.com/mfozmen/PRison/issues/13)) ([980af92](https://github.com/mfozmen/PRison/commit/980af92c125e293d890cb1beae7f2d128ee44142))
+
+### Bug Fixes
+
+* offer a tracked-checks default for the personal account too ([#14](https://github.com/mfozmen/PRison/issues/14)) ([7441bc4](https://github.com/mfozmen/PRison/commit/7441bc40cdf6c87667506a34c791286e15f9a0ca))
+
 ## [1.6.0](https://github.com/mfozmen/PRison/compare/v1.5.0...v1.6.0) (2026-08-05)
 
 ### Features

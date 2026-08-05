@@ -21,6 +21,7 @@ import {
   readyPr,
   prComment,
   closedPr,
+  statusEvent as event,
 } from "./fixtures";
 
 afterEach(() => {
@@ -28,10 +29,6 @@ afterEach(() => {
 });
 
 const EMPTY = { ready: [], stuck: [], reviews: [], comments: [], closed: [] };
-
-function event(overrides: Partial<StatusEvent> = {}): StatusEvent {
-  return { id: "PR_1", repo: "acme/api", number: 2, status: "ready", ...overrides };
-}
 
 describe("parsePollInterval", () => {
   it("accepts any offered option", () => {
@@ -76,14 +73,23 @@ describe("snapshotStatuses", () => {
     ]);
   });
 
-  it("carries repo and number so the copy can name the PR", () => {
+  it("carries repo, number, and url so the copy can name and link the PR", () => {
     const snapshot = snapshotStatuses({ ...EMPTY, ready: [readyPr()] });
     expect(snapshot.get("PR_ready")).toEqual({
       id: "PR_ready",
       repo: "acme/worker",
       number: 5,
+      url: "https://github.com/acme/worker/pull/5",
       status: "ready",
+      at: undefined,
     });
+  });
+
+  it("takes a comment's url, which anchors the thread rather than the PR", () => {
+    const snapshot = snapshotStatuses({ ...EMPTY, comments: [prComment()] });
+    expect(snapshot.get("THREAD_1")?.url).toBe(
+      "https://github.com/acme/api/pull/2#discussion_r1",
+    );
   });
 
   it.each([

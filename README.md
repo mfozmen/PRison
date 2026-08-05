@@ -39,19 +39,28 @@ access. Four lists, oldest first, plus a history section:
   each badged **Merged** or **Closed** with how long ago it ended.
 - **Grouping** — flat, by repository, or by check, with a **Hide drafts** toggle
   next to them in the filter bar.
-- **Auto refresh with notifications (opt-in).** Turn it on in Settings and pick
-  how often to check — every 5, 15, or 30 minutes, or hourly (30 minutes by
-  default). PRison then tells you what *moved*, not just what's new: a PR that
-  became ready to merge, checks that went red, changes requested, a review asked
-  of you, a fresh reply on a thread, or one of your own PRs getting merged —
-  while a PR simply falling back to waiting (you pushed a fix) stays quiet. The notification
-  names them — `acme/web #42 is ready to merge` — up to three at a time, then
-  `+N more`, and it keeps naming everything that moved while you were away,
-  not just the latest poll. While you're on another tab you also get a **`(3) PRison`**
-  tab-title badge that clears the moment you come back. Settings shows whether
-  your browser has actually granted permission, and offers a test notification
-  so you can confirm it. Works only while a PRison tab is open — there's no
-  background service.
+- **Auto refresh (opt-in).** Turn it on in Settings and pick how often to check
+  — every 5, 15, or 30 minutes, or hourly (30 minutes by default). PRison then
+  tells you what *moved*, not just what's new: a PR that became ready to merge,
+  checks that went red, changes requested, a review asked of you, a fresh reply
+  on a thread, or one of your own PRs getting merged — while a PR simply falling
+  back to waiting (you pushed a fix) stays quiet. Works only while a PRison tab
+  is open — there's no background service.
+- **Activity feed.** Everything a poll detects is kept, newest first, behind the
+  bell in the header. The bell carries an unseen count and pulses while there is
+  something new (never against a reduced-motion preference), and each row names
+  the PR, says what happened, and links straight to it — a comment lands on the
+  thread itself. The last 100 events survive a reload. Opening the panel is what
+  marks it read, so the count waits for you instead of vanishing the moment you
+  return to the tab; the **`(3) PRison`** tab-title badge follows the same count.
+- **Desktop notifications (opt-in).** On the same schedule, changes that land
+  while you're on another tab also raise a desktop notification naming them —
+  `acme/web #42 is ready to merge` — up to three at a time, then `+N more`.
+  Settings shows whether your browser has actually granted permission and offers
+  a test notification, and says where else to look if nothing appears: your
+  operating system decides separately whether the browser may show anything, and
+  it refuses in silence. Whatever the notification misses is in the activity
+  feed regardless.
 - **Last refreshed indicator.** The filter bar says how long ago the data
   landed, so you always know whether you're looking at something stale.
 - **Partial-data notice.** When GitHub drops part of a response (an org restricts
@@ -130,7 +139,8 @@ If `gh` isn't installed or signed in, the app falls back to a paste-a-token form
 ## Usage
 
 Sign in with the GitHub CLI or paste a token. In the top-right: the **switcher**
-scopes to All / your personal account / a single org; the **sliders icon** opens
+scopes to All / your personal account / a single org; the **bell** opens the
+**activity feed** and marks it read; the **sliders icon** opens
 **Settings**, whose menu has four sections — **Comments** (show bot comments,
 hide comments you reacted to), **Auto refresh** (on/off, how often to check, and
 the notification permission), **Tracked checks** (name the required checks to

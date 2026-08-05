@@ -43,6 +43,9 @@ export type StatusEvent = {
   repo: string;
   number: number;
   status: ItemStatus;
+  /** Where the event happened. Carried rather than rebuilt from repo and
+   * number, because a comment's url anchors the thread itself. */
+  url: string;
   /** Freshness stamp for a status that never changes on its own: a thread
    * stays "comment" no matter how many replies land, so without this a second
    * reply would be invisible. */
@@ -82,30 +85,27 @@ export function snapshotStatuses(lists: {
 }): StatusSnapshot {
   const snapshot: StatusSnapshot = new Map();
   const add = (
-    id: string,
-    repo: string,
-    number: number,
+    item: { id: string; repo: string; number: number; url: string },
     status: ItemStatus,
     at?: string,
   ) => {
-    if (!snapshot.has(id)) snapshot.set(id, { id, repo, number, status, at });
+    const { id, repo, number, url } = item;
+    if (!snapshot.has(id)) snapshot.set(id, { id, repo, number, url, status, at });
   };
   // Closed goes first: GitHub's search index lags, so a PR merged moments ago
   // can still come back from the is:open ready query. First-wins means the
   // merge would otherwise be held back a whole poll interval.
   for (const pr of lists.closed) {
-    if (pr.merged) add(pr.id, pr.repo, pr.number, "merged");
+    if (pr.merged) add(pr, "merged");
   }
-  for (const pr of lists.ready) add(pr.id, pr.repo, pr.number, "ready");
-  for (const pr of lists.stuck) add(pr.id, pr.repo, pr.number, stuckStatus(pr));
+  for (const pr of lists.ready) add(pr, "ready");
+  for (const pr of lists.stuck) add(pr, stuckStatus(pr));
   // No freshness stamp on a review request: requestedAt falls back to the PR's
   // updatedAt when the request came through a team, and that moves on any
   // activity at all — stamping it would re-announce "needs your review" every
   // time someone so much as commented.
-  for (const req of lists.reviews) add(req.id, req.repo, req.number, "review");
-  for (const c of lists.comments) {
-    add(c.id, c.repo, c.number, "comment", c.commentedAt);
-  }
+  for (const req of lists.reviews) add(req, "review");
+  for (const c of lists.comments) add(c, "comment", c.commentedAt);
   return snapshot;
 }
 
@@ -133,7 +133,10 @@ export function diffStatuses(
   return events;
 }
 
-const PHRASES: Record<ItemStatus, string> = {
+/** How each status reads in prose. Exported because the activity feed says the
+ * same things on screen, and two tables would eventually disagree about what a
+ * status means. */
+export const PHRASES: Record<ItemStatus, string> = {
   ready: "is ready to merge",
   merged: "was merged",
   "changes-requested": "— changes requested",

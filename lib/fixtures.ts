@@ -1,5 +1,7 @@
 import { vi } from "vitest";
 import type { StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr } from "./types";
+import type { StatusEvent } from "./notify";
+import type { ActivityEntry } from "./activity";
 
 /**
  * Test data builders. PRison is a public repository: fixtures must never carry a
@@ -96,6 +98,26 @@ export function closedPr(overrides: Partial<ClosedPr> = {}): ClosedPr {
     number: 4,
     merged: true,
     endedAt: "2026-06-24T00:00:00Z",
+    ...overrides,
+  };
+}
+
+export function statusEvent(overrides: Partial<StatusEvent> = {}): StatusEvent {
+  return {
+    id: "PR_1",
+    repo: "acme/api",
+    number: 2,
+    url: "https://github.com/acme/api/pull/2",
+    status: "ready",
+    ...overrides,
+  };
+}
+
+export function activityEntry(overrides: Partial<ActivityEntry> = {}): ActivityEntry {
+  return {
+    ...statusEvent(),
+    recordedAt: "2026-06-25T12:00:00Z",
+    seen: false,
     ...overrides,
   };
 }

@@ -103,8 +103,18 @@ jobs:
           TAG: ${{ steps.ref.outputs.tag }}
           VERSION: ${{ steps.ref.outputs.version }}
         run: |
+          BODY=$(gh release view "$TAG" --json body --jq .body)
+          # Re-running a failed release job from the Actions UI keeps
+          # event_name as `release`, so the `if` above does not stop a second
+          # append — the body itself has to say it already has the section.
+          case "$BODY" in
+            *"### Docker"*)
+              echo "Release body already links the image; leaving it alone."
+              exit 0
+              ;;
+          esac
           {
-            gh release view "$TAG" --json body --jq .body
+            printf '%s' "$BODY"
             printf '\n\n---\n\n### Docker\n\n```sh\ndocker run -p 3000:3000 -v prison-data:/data \\\n  -e GITHUB_TOKEN="$(gh auth token)" mfozmen/prison:%s\n```\n\n' "$VERSION"
             printf '[`mfozmen/prison:%s` on Docker Hub](https://hub.docker.com/r/mfozmen/prison/tags?name=%s) — linux/amd64 and linux/arm64.\n' "$VERSION" "$VERSION"
           } > body.md

@@ -890,6 +890,31 @@ describe("SettingsModal — check for updates", () => {
     ).toBeInTheDocument();
   });
 
+  it("drops a previous answer when Settings is reopened", async () => {
+    // The old answer is stale by an unknown amount — an hour later it would
+    // still read "You're on the latest version" without having asked anyone.
+    vi.stubEnv("NEXT_PUBLIC_APP_VERSION", "1.6.0");
+    stubRelease("v1.6.0");
+    const props = {
+      ...filterProps,
+      orgs: [],
+      availableRepos: [],
+      value: emptyValue,
+      onChange: vi.fn(),
+      onClose: vi.fn(),
+    };
+    const { rerender } = render(<SettingsModal {...props} open={true} />);
+    selectSection("About");
+    clickCheck();
+    expect(await screen.findByText("You're on the latest version.")).toBeInTheDocument();
+
+    rerender(<SettingsModal {...props} open={false} />);
+    rerender(<SettingsModal {...props} open={true} />);
+    selectSection("About");
+    expect(screen.queryByText("You're on the latest version.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check for updates" })).toBeInTheDocument();
+  });
+
   it("announces the answer to a screen reader", async () => {
     vi.stubEnv("NEXT_PUBLIC_APP_VERSION", "1.6.0");
     stubRelease("v1.6.0");

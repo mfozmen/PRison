@@ -20,7 +20,7 @@ access. Four lists, oldest first, plus a history section:
   first, so finished work confirms itself. Collapsed by default with a count;
   expands to the latest 15 with **Load more** for the rest.
 
-![The PRison dashboard showing the four PR lists and the recently merged / closed history in dark mode](docs/screenshot.png)
+![The PRison dashboard in dark mode, showing the four PR lists, the header's activity bell carrying three unseen events, and the recently merged / closed history expanded](docs/screenshot.png)
 
 ### Features
 

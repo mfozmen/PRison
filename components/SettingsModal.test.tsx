@@ -917,24 +917,24 @@ describe("SettingsModal — owner defaults cover the personal account", () => {
   it("offers a row for the personal account alongside the orgs", () => {
     // Dashboard passes [login, ...orgs]; the personal account is the head of
     // that list and used to be the one owner with no way to set a default.
-    renderTracked({ owners: ["mehmet", "acme"] });
-    expect(screen.getByRole("textbox", { name: "mehmet check names" })).toBeInTheDocument();
+    renderTracked({ owners: ["octocat", "acme"] });
+    expect(screen.getByRole("textbox", { name: "octocat check names" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "acme check names" })).toBeInTheDocument();
   });
 
   it("stores a personal-account default under that login", () => {
     const onChange = vi.fn();
-    renderTracked({ owners: ["mehmet"], onChange });
-    fireEvent.change(screen.getByRole("textbox", { name: "mehmet check names" }), {
+    renderTracked({ owners: ["octocat"], onChange });
+    fireEvent.change(screen.getByRole("textbox", { name: "octocat check names" }), {
       target: { value: "qa/smoke" },
     });
     // resolveTracked keys on the owner segment of `owner/repo`, so this is the
-    // shape that makes mehmet/anything pick the default up.
-    expect(onChange).toHaveBeenCalledWith({ orgs: { mehmet: ["qa/smoke"] }, repos: {} });
+    // shape that makes octocat/anything pick the default up.
+    expect(onChange).toHaveBeenCalledWith({ orgs: { octocat: ["qa/smoke"] }, repos: {} });
   });
 
   it("calls the section what it now is", () => {
-    renderTracked({ owners: ["mehmet"] });
+    renderTracked({ owners: ["octocat"] });
     expect(screen.getByText("Owner defaults")).toBeInTheDocument();
     expect(screen.queryByText("Organization defaults")).not.toBeInTheDocument();
   });

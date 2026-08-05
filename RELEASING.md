@@ -9,20 +9,24 @@ which in turn builds and pushes the Docker image.
 - You are on `main`, up to date with `origin`, with a clean working tree.
   release-it refuses otherwise (`requireBranch`, `requireCleanWorkingDir`,
   `requireUpstream`).
-- `GITHUB_TOKEN` is exported, so release-it can create the GitHub release.
+- `gh` is authenticated (`gh auth status`). `.release-it.mjs` reads the GitHub
+  token from it, so nothing has to be exported by hand — and a release with no
+  token available stops before it writes anything rather than skipping the
+  GitHub release and leaving the Docker image unbuilt. Setting `GITHUB_TOKEN`
+  yourself still wins if you prefer.
 - The repo secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` exist, or the image
   workflow will fail after the release lands.
 
 ## Cut a release
 
 ```sh
-GITHUB_TOKEN="$(gh auth token)" npx release-it
+npx release-it
 ```
 
 For the **first** release, name the version explicitly:
 
 ```sh
-GITHUB_TOKEN="$(gh auth token)" npx release-it 1.0.0
+npx release-it 1.0.0
 ```
 
 Add `--dry-run` to see every step without touching anything.

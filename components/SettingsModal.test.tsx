@@ -770,6 +770,16 @@ describe("SettingsModal", () => {
       expect(onTestNotification).toHaveBeenCalled();
     });
 
+    it("says where else to look when the notification never appears", () => {
+      renderWithPermission("granted");
+      expect(screen.getByText(/nothing appeared\?/i)).toBeInTheDocument();
+    });
+
+    it("keeps the OS hint out of sight until there is a button it explains", () => {
+      renderWithPermission("denied");
+      expect(screen.queryByText(/nothing appeared\?/i)).not.toBeInTheDocument();
+    });
+
     it("offers no test button until permission is granted", () => {
       renderWithPermission("default");
       expect(

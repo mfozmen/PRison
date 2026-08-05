@@ -2334,6 +2334,24 @@ describe("Dashboard — auto refresh", () => {
     );
   });
 
+  it("leaves the stored snapshot alone on a render where nothing moved", async () => {
+    // The detection effect runs on every commit, age ticks included. Rewriting
+    // a thousand ids to discover they are the thousand ids already there is
+    // work for its own sake.
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.statusSnapshot")).toContain(STUCK_PR.id),
+    );
+
+    const writes = vi.spyOn(Storage.prototype, "setItem");
+    fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
+    expect(
+      writes.mock.calls.filter(([key]) => key === "prison.statusSnapshot"),
+    ).toHaveLength(0);
+    writes.mockRestore();
+  });
+
   it("reports what changed while it was closed, on the first fetch after a mount", async () => {
     // The whole point: nothing polls while the tab is shut, so the review that
     // landed overnight is simply the current state by morning. Diffing the

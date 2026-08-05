@@ -109,9 +109,6 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // absorbed it silently. Armed by hydration when a stored snapshot came back,
   // spent by the first fetch that delivers anything.
   const catchUpRef = useRef(false);
-  // What was last written, so the every-render effect below rewrites storage
-  // only when the snapshot actually moved.
-  const lastSnapshotRef = useRef<string | null>(null);
   // Bumped in the same state batch as a silent poll's results, so the commit
   // where it changes is guaranteed to carry that poll's data — an interleaving
   // commit can't consume the signal the way a ref flag could.
@@ -265,9 +262,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     // Refs, not state: the detection effect reads them, and a restored
     // snapshot must be in place before the first fetch lands or that fetch
     // diffs against nothing and the catch-up has no baseline.
-    const storedSnapshot = localStorage.getItem(SNAPSHOT_KEY);
-    lastSnapshotRef.current = storedSnapshot;
-    seenStatusRef.current = parseSnapshot(storedSnapshot);
+    seenStatusRef.current = parseSnapshot(localStorage.getItem(SNAPSHOT_KEY));
     // Only with a baseline. A first-ever run has none, and letting it report
     // would write the entire board into the feed as news.
     catchUpRef.current = seenStatusRef.current.size > 0;
@@ -524,12 +519,18 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     // an item that flaps out and back still doesn't re-announce itself.
     const merged = new Map([...prev, ...visible]);
     seenStatusRef.current = merged;
-    if (hydrated) {
-      const serialized = serializeSnapshot(merged);
-      if (serialized !== lastSnapshotRef.current) {
-        lastSnapshotRef.current = serialized;
-        localStorage.setItem(SNAPSHOT_KEY, serialized);
-      }
+    // The union differs from what it grew out of exactly when some visible item
+    // is new or has moved — the same test, over the handful of items on screen
+    // rather than over the whole accumulated snapshot. This effect has no
+    // dependency array and so runs on every commit, including the ones that
+    // only ticked an age label; serializing a thousand ids each time to find
+    // out nothing changed is work for its own sake.
+    const moved = [...visible].some(([id, event]) => {
+      const seen = prev.get(id);
+      return !seen || seen.status !== event.status || seen.at !== event.at;
+    });
+    if (hydrated && moved) {
+      localStorage.setItem(SNAPSHOT_KEY, serializeSnapshot(merged));
     }
     // The first fetch after a mount that restored a snapshot reports too: what
     // changed while PRison was closed is exactly what the user came to find

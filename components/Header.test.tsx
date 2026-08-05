@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { Header } from "./Header";
+import { activityEntry } from "@/lib/fixtures";
 
 // The activity feed has its own test file; the Header only has to pass it
 // through, so every case here supplies an empty one.
@@ -143,5 +144,46 @@ describe("Header — app version", () => {
     expect(screen.queryByText(/^v/)).toBeNull();
     expect(screen.queryByText(/undefined/i)).toBeNull();
     vi.unstubAllEnvs();
+  });
+});
+
+// The bell's own behaviour lives in ActivityBell.test.tsx; what is only true
+// here is that the Header mounts it and hands it *these* props — without this
+// block, deleting <ActivityBell /> from Header.tsx leaves the file green.
+describe("Header — activity bell", () => {
+  function renderHeader(props: Partial<React.ComponentProps<typeof Header>> = {}) {
+    return render(
+      <Header
+        orgs={orgs}
+        selectedOrg="acme"
+        onOrgChange={() => {}}
+        login="mehmet"
+        onOpenSettings={() => {}}
+        {...activityProps}
+        {...props}
+      />,
+    );
+  }
+
+  it("renders the bell with the forwarded activity entries", () => {
+    renderHeader({ activity: [activityEntry()] });
+    // The unseen count comes from the entries, so this fails both when the
+    // bell is gone and when `activity` stops reaching it.
+    expect(screen.getByRole("button", { name: "Activity, 1 unseen" })).toBeInTheDocument();
+  });
+
+  it("opening the bell calls the forwarded onOpenActivity", () => {
+    const onOpenActivity = vi.fn();
+    renderHeader({ activity: [activityEntry()], onOpenActivity });
+    fireEvent.click(screen.getByRole("button", { name: "Activity, 1 unseen" }));
+    expect(onOpenActivity).toHaveBeenCalledTimes(1);
+  });
+
+  it("clearing from the bell panel calls the forwarded onClearActivity", () => {
+    const onClearActivity = vi.fn();
+    renderHeader({ activity: [activityEntry()], onClearActivity });
+    fireEvent.click(screen.getByRole("button", { name: "Activity, 1 unseen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
+    expect(onClearActivity).toHaveBeenCalledTimes(1);
   });
 });

@@ -94,6 +94,8 @@ describe("parseActivity", () => {
     // A status from a future version, or a hand-typed one: it would otherwise
     // render a row that names a PR and then says nothing about it.
     ["a status this version doesn't know", { status: "rebasing" }],
+    // `in` would accept this from Object.prototype and hand the row a function.
+    ["a status borrowed from the prototype chain", { status: "constructor" }],
     ["a number where a string belongs", { repo: 7 }],
     ["seen as a string", { seen: "yes" }],
     ["a missing recordedAt", { recordedAt: undefined }],

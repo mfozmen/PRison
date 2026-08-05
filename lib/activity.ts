@@ -51,9 +51,11 @@ function isEntry(value: unknown): value is ActivityEntry {
     typeof e.number === "number" &&
     // Against the known set, not merely "is a string": the feed looks the
     // status up in PHRASES to say what happened, and a status this version
-    // doesn't know would render a row with a blank explanation.
+    // doesn't know would render a row with a blank explanation. hasOwnProperty
+    // rather than `in`, or "constructor" would validate and hand the row a
+    // function to render.
     typeof e.status === "string" &&
-    e.status in PHRASES &&
+    Object.prototype.hasOwnProperty.call(PHRASES, e.status) &&
     typeof e.url === "string" &&
     typeof e.recordedAt === "string" &&
     typeof e.seen === "boolean"

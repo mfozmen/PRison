@@ -10,6 +10,9 @@ import {
   notificationPermission,
   requestNotificationPermission,
   parsePollInterval,
+  serializeSnapshot,
+  parseSnapshot,
+  MAX_SNAPSHOT_ENTRIES,
   POLL_INTERVAL_OPTIONS,
   DEFAULT_POLL_INTERVAL_MS,
   type StatusEvent,
@@ -402,4 +405,66 @@ describe("requestNotificationPermission", () => {
       expect(requestPermission).not.toHaveBeenCalled();
     },
   );
+});
+
+describe("serializeSnapshot / parseSnapshot", () => {
+  const event = {
+    id: "PR_1",
+    repo: "acme/web",
+    number: 7,
+    status: "ready" as const,
+    url: "https://github.com/acme/web/pull/7",
+  };
+
+  it("round-trips a snapshot", () => {
+    const snapshot = new Map([[event.id, event]]);
+    expect(parseSnapshot(serializeSnapshot(snapshot))).toEqual(snapshot);
+  });
+
+  it("keeps the freshness stamp, which is what separates a second reply from the first", () => {
+    const thread = { ...event, status: "comment" as const, at: "2026-06-21T00:00:00Z" };
+    const back = parseSnapshot(serializeSnapshot(new Map([[thread.id, thread]])));
+    expect(back.get(thread.id)?.at).toBe("2026-06-21T00:00:00Z");
+  });
+
+  it("bounds what it writes, so a tab left running for a year can't fill storage", () => {
+    const many = new Map(
+      Array.from({ length: MAX_SNAPSHOT_ENTRIES + 50 }, (_, i) => [
+        `PR_${i}`,
+        { ...event, id: `PR_${i}`, number: i },
+      ]),
+    );
+    const kept = parseSnapshot(serializeSnapshot(many));
+    expect(kept.size).toBe(MAX_SNAPSHOT_ENTRIES);
+    // The newest survive; the oldest fall off.
+    expect(kept.has("PR_0")).toBe(false);
+    expect(kept.has(`PR_${MAX_SNAPSHOT_ENTRIES + 49}`)).toBe(true);
+  });
+
+  it.each([
+    ["no stored value", null],
+    ["an empty string", ""],
+    ["unparseable JSON", "{not json"],
+    ["a non-array", JSON.stringify({ id: "PR_1" })],
+  ])("reads %s as no snapshot", (_label, raw) => {
+    expect(parseSnapshot(raw).size).toBe(0);
+  });
+
+  it.each([
+    ["a missing id", { ...event, id: undefined }],
+    ["a numeric repo", { ...event, repo: 42 }],
+    ["a string number", { ...event, number: "7" }],
+    ["a status this version doesn't know", { ...event, status: "abducted" }],
+    ["a status borrowed from the prototype chain", { ...event, status: "constructor" }],
+    ["a non-string stamp", { ...event, at: 1 }],
+    ["null", null],
+  ])("drops %s rather than diffing against it", (_label, entry) => {
+    expect(parseSnapshot(JSON.stringify([entry])).size).toBe(0);
+  });
+
+  it("keeps the good entries around a bad one", () => {
+    const raw = JSON.stringify([event, { ...event, id: "PR_2", status: "nonsense" }]);
+    const back = parseSnapshot(raw);
+    expect([...back.keys()]).toEqual(["PR_1"]);
+  });
 });

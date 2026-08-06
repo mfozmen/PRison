@@ -221,3 +221,57 @@ export function withBadge(title: string, count: number): string {
 export function withoutBadge(title: string): string {
   return title.replace(BADGE_RE, "");
 }
+
+export const SNAPSHOT_KEY = "prison.statusSnapshot";
+
+/** How many ids the stored snapshot remembers.
+ *
+ * The snapshot accumulates rather than resets, so an item that leaves the
+ * board and comes back doesn't re-announce itself — which means it only ever
+ * grows. Bounded so a tab left running for a year can't fill localStorage;
+ * the oldest ids fall off, and the worst that costs is one repeated event for
+ * something last seen thousands of items ago. */
+export const MAX_SNAPSHOT_ENTRIES = 1000;
+
+export function serializeSnapshot(snapshot: StatusSnapshot): string {
+  return JSON.stringify([...snapshot.values()].slice(-MAX_SNAPSHOT_ENTRIES));
+}
+
+/** Read a stored snapshot back.
+ *
+ * An unreadable value reads as no snapshot, which costs only the catch-up on
+ * one open — a throw here would take the dashboard down instead. Entries are
+ * validated individually against the known statuses: an unknown one would be
+ * diffed against and could emit an event the feed can't put into words.
+ * Failing that check drops the entry, so its item simply reads as new. */
+export function parseSnapshot(raw: string | null): StatusSnapshot {
+  const snapshot: StatusSnapshot = new Map();
+  if (!raw) return snapshot;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return snapshot;
+  }
+  if (!Array.isArray(parsed)) return snapshot;
+  for (const value of parsed.slice(-MAX_SNAPSHOT_ENTRIES)) {
+    if (isStatusEvent(value)) snapshot.set(value.id, value);
+  }
+  return snapshot;
+}
+
+export function isStatusEvent(value: unknown): value is StatusEvent {
+  if (typeof value !== "object" || value === null) return false;
+  const e = value as Record<string, unknown>;
+  return (
+    typeof e.id === "string" &&
+    typeof e.repo === "string" &&
+    typeof e.number === "number" &&
+    typeof e.status === "string" &&
+    // hasOwnProperty rather than `in`: "constructor" is on every object's
+    // prototype chain and would validate as a status nothing can describe.
+    Object.prototype.hasOwnProperty.call(PHRASES, e.status) &&
+    typeof e.url === "string" &&
+    (e.at === undefined || typeof e.at === "string")
+  );
+}

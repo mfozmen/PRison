@@ -2193,7 +2193,7 @@ describe("Dashboard — auto refresh", () => {
 
     stuckList = [STUCK_PR, NEW_STUCK_PR];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
-    expect(await screen.findByText("brand new stuck pr")).toBeInTheDocument();
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     // A desktop notification exists to interrupt, and interrupting someone who
     // is already looking is noise. The feed is a timeline, so it takes the
     // event either way — and the bell is what makes it noticeable on screen.
@@ -2324,6 +2324,187 @@ describe("Dashboard — auto refresh", () => {
     // on every poll. The accumulated history is in the feed.
     expect(document.title).toBe("(2) PRison");
     expect(constructed.at(-1)?.options?.body).toBe("acme/b #7 — checks failing");
+  });
+
+  it("stores the snapshot so a later mount has something to compare against", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.statusSnapshot")).toContain(STUCK_PR.id),
+    );
+  });
+
+  it("leaves the stored snapshot alone on a render where nothing moved", async () => {
+    // The detection effect runs on every commit, age ticks included. Rewriting
+    // a thousand ids to discover they are the thousand ids already there is
+    // work for its own sake.
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.statusSnapshot")).toContain(STUCK_PR.id),
+    );
+
+    const writes = vi.spyOn(Storage.prototype, "setItem");
+    fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
+    expect(
+      writes.mock.calls.filter(([key]) => key === "prison.statusSnapshot"),
+    ).toHaveLength(0);
+    writes.mockRestore();
+  });
+
+  it("reports what changed while it was closed, on the first fetch after a mount", async () => {
+    // The whole point: nothing polls while the tab is shut, so the review that
+    // landed overnight is simply the current state by morning. Diffing the
+    // first fetch against the stored snapshot is what turns it back into news.
+    localStorage.setItem(
+      "prison.statusSnapshot",
+      JSON.stringify([
+        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "pending" },
+      ]),
+    );
+    stuckList = [];
+    readyList = [{ ...READY_PR, id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number }];
+
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("ready pr")).toBeInTheDocument();
+
+    expect(await screen.findByRole("button", { name: /^activity, 1 unseen$/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^activity, 1 unseen$/i }));
+    expect(screen.getByText(/is ready to merge/i)).toBeInTheDocument();
+  });
+
+  it("stays quiet on the first ever run, when there is no snapshot to compare against", async () => {
+    // Every item reads as new against an empty snapshot, so a catch-up here
+    // would write the whole board into the feed as news.
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    expect(document.title).toBe("PRison");
+    expect(screen.getByRole("button", { name: /^activity$/i })).toBeInTheDocument();
+  });
+
+  it("reports the catch-up once, not again on the next render", async () => {
+    localStorage.setItem(
+      "prison.statusSnapshot",
+      JSON.stringify([
+        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "pending" },
+      ]),
+    );
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByRole("button", { name: /^activity, 1 unseen$/i })).toBeInTheDocument();
+
+    // A re-render that carries no fetch — the badge must not climb.
+    fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
+    expect(screen.getByRole("button", { name: /^activity, 1 unseen$/i })).toBeInTheDocument();
+  });
+
+  it("spends the catch-up on the first fetch that landed, even when the board is empty", async () => {
+    // An empty board is an answer, not a missing one — the catch-up has been
+    // paid. Waiting for the first fetch that happens to carry rows instead
+    // leaves the flag armed with no expiry, and the next fetch the user
+    // triggers — an org switch, a Retry — poses as the catch-up and replays
+    // that scope's whole board into the feed as news.
+    localStorage.setItem(
+      "prison.statusSnapshot",
+      JSON.stringify([
+        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "pending" },
+      ]),
+    );
+    stuckList = [];
+
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText(/no prs stuck on checks/i)).toBeInTheDocument();
+
+    // A different scope, whose PR the stored snapshot last saw waiting on
+    // checks and which is now failing — a change the catch-up would report if
+    // it were still armed.
+    stuckList = [STUCK_PR];
+    fireEvent.change(screen.getByRole("combobox", { name: "Filter by organization" }), {
+      target: { value: "acme" },
+    });
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    // The bell only re-renders after the detection effect's own state update
+    // lands, so a "nothing was announced" assertion has to let that settle
+    // first — reading straight after the row appears passes either way.
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    expect(screen.getByRole("button", { name: /^activity$/i })).toBeInTheDocument();
+  });
+
+  it("keeps the catch-up armed when every endpoint rejected, and reports it on Retry", async () => {
+    // A first load where all five endpoints rejected refreshed nothing, so the
+    // catch-up is still owed — landedRef, not a non-empty board, is what spends
+    // it. Retry is the fetch that lands, and it still reports what moved while
+    // PRison was closed.
+    localStorage.setItem(
+      "prison.statusSnapshot",
+      JSON.stringify([
+        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "pending" },
+      ]),
+    );
+    const serve = mutableFetch() as unknown as (url: string) => Promise<unknown>;
+    let allFail = true;
+    global.fetch = vi.fn((url: string) =>
+      allFail ? Promise.resolve({ ok: false, status: 500 }) : serve(url),
+    ) as unknown as typeof fetch;
+
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText(/failed to load stuck prs/i)).toBeInTheDocument();
+    // Nothing landed, so nothing was reported and the flag is still unspent.
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(screen.getByRole("button", { name: /^activity$/i })).toBeInTheDocument();
+
+    allFail = false;
+    fireEvent.click(screen.getAllByRole("button", { name: /^retry$/i })[0]);
+
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    // STUCK_PR was last seen waiting on checks and is now failing — the change
+    // the catch-up exists to surface.
+    expect(
+      await screen.findByRole("button", { name: /^activity, 1 unseen$/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("moves ids that are still on the board to the end of the stored snapshot", async () => {
+    // Re-inserting a key keeps its original slot in a Map, so a plain union
+    // orders the snapshot by first sighting. The stored bound trims the front,
+    // which would drop a PR that has been on the board for months while ids
+    // long gone from it survive — and the next open would call it news.
+    localStorage.setItem(
+      "prison.statusSnapshot",
+      JSON.stringify([
+        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "failing" },
+        { id: "gone-1", repo: "acme/b", number: 999, url: "u", status: "failing" },
+      ]),
+    );
+    stuckList = [STUCK_PR, NEW_STUCK_PR];
+
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem("prison.statusSnapshot") ?? "[]");
+      // "gone-1" is the only id no longer on screen, so it is the only one left
+      // at the front — the end of the list is what is still live.
+      expect(stored.map((e: { id: string }) => e.id)).toEqual([
+        "gone-1",
+        STUCK_PR.id,
+        NEW_STUCK_PR.id,
+      ]);
+    });
+  });
+
+  it("does not notify about the catch-up while the tab is focused", async () => {
+    // Opening PRison and being told what PRison is already showing you.
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    localStorage.setItem(
+      "prison.statusSnapshot",
+      JSON.stringify([
+        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "pending" },
+      ]),
+    );
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByRole("button", { name: /^activity, 1 unseen$/i })).toBeInTheDocument();
+    expect(constructed).toHaveLength(0);
   });
 
   it("re-reads permission when the test notification is sent", async () => {

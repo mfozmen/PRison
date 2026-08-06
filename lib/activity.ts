@@ -6,7 +6,7 @@
 // refuse to show it, the count because it clears the instant the tab regains
 // focus, which is before anyone has read it. This module keeps them instead.
 
-import { PHRASES, type StatusEvent } from "./notify";
+import { isStatusEvent, type StatusEvent } from "./notify";
 
 export type ActivityEntry = StatusEvent & {
   /** When PRison noticed, not when GitHub recorded it. The two differ by up to
@@ -42,24 +42,14 @@ export function appendEvents(
   return [...fresh, ...log].slice(0, MAX_ENTRIES);
 }
 
+// An entry is a StatusEvent that has been recorded, so the shared contract is
+// checked where it is defined — two copies would drift the first time a field
+// or a status is added, and the half that wasn't updated would quietly accept
+// the wrong shape.
 function isEntry(value: unknown): value is ActivityEntry {
-  if (typeof value !== "object" || value === null) return false;
+  if (!isStatusEvent(value)) return false;
   const e = value as Record<string, unknown>;
-  return (
-    typeof e.id === "string" &&
-    typeof e.repo === "string" &&
-    typeof e.number === "number" &&
-    // Against the known set, not merely "is a string": the feed looks the
-    // status up in PHRASES to say what happened, and a status this version
-    // doesn't know would render a row with a blank explanation. hasOwnProperty
-    // rather than `in`, or "constructor" would validate and hand the row a
-    // function to render.
-    typeof e.status === "string" &&
-    Object.prototype.hasOwnProperty.call(PHRASES, e.status) &&
-    typeof e.url === "string" &&
-    typeof e.recordedAt === "string" &&
-    typeof e.seen === "boolean"
-  );
+  return typeof e.recordedAt === "string" && typeof e.seen === "boolean";
 }
 
 /** Read a stored log back.

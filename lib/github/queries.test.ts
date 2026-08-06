@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs, parseReadyPrs, parseRepoSearch, parsePrComments, parseClosedPrs, parseLatestRelease } from "./queries";
+import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs, parseReadyPrs, parseRepoSearch, parsePrComments, parseClosedPrs, parseLatestRelease, parseReviewedPrs } from "./queries";
 
 describe("searchQuery", () => {
   it("scopes author search to the org", () => {
@@ -1530,5 +1530,177 @@ describe("parseLatestRelease", () => {
   ])("reads %s as no release, rather than throwing", (_label, raw) => {
     // The update check is a convenience; it must never take Settings down.
     expect(parseLatestRelease(raw)).toBeUndefined();
+  });
+});
+
+describe("searchQuery — reviewed", () => {
+  it("asks for open PRs the viewer has already reviewed", () => {
+    expect(searchQuery("reviewed")).toBe("is:open is:pr reviewed-by:@me");
+  });
+  it("scopes the reviewed search to the org", () => {
+    expect(searchQuery("reviewed", "org:acme")).toBe("is:open is:pr reviewed-by:@me org:acme");
+  });
+});
+
+describe("parseReviewedPrs", () => {
+  const raw = (over: Record<string, unknown> = {}) => ({
+    search: {
+      nodes: [
+        {
+          id: "PR_1",
+          title: "add retry backoff",
+          url: "https://gh/acme/b/pull/9",
+          number: 9,
+          isDraft: false,
+          repository: { nameWithOwner: "acme/b" },
+          author: { login: "alice" },
+          reviews: { nodes: [{ state: "CHANGES_REQUESTED", submittedAt: "2026-07-01T00:00:00Z" }] },
+          commits: { nodes: [{ commit: { pushedDate: "2026-06-30T00:00:00Z" } }] },
+          ...over,
+        },
+      ],
+    },
+  });
+
+  it("carries the viewer's own verdict and when they gave it", () => {
+    expect(parseReviewedPrs(raw())).toEqual([
+      {
+        id: "PR_1",
+        title: "add retry backoff",
+        url: "https://gh/acme/b/pull/9",
+        number: 9,
+        repo: "acme/b",
+        author: "alice",
+        state: "CHANGES_REQUESTED",
+        reviewedAt: "2026-07-01T00:00:00Z",
+        updatedSince: false,
+        isDraft: false,
+      },
+    ]);
+  });
+
+  it("flags a PR pushed to after the review — the reason to come back", () => {
+    const [pr] = parseReviewedPrs(
+      raw({ commits: { nodes: [{ commit: { pushedDate: "2026-07-02T00:00:00Z" } }] } }),
+    );
+    expect(pr.updatedSince).toBe(true);
+  });
+
+  it("falls back to committedDate when pushedDate is absent", () => {
+    // GitHub omits pushedDate on commits it did not receive over the wire.
+    const [pr] = parseReviewedPrs(
+      raw({ commits: { nodes: [{ commit: { committedDate: "2026-07-03T00:00:00Z" } }] } }),
+    );
+    expect(pr.updatedSince).toBe(true);
+  });
+
+  it.each([
+    ["no commit at all", { commits: { nodes: [] } }],
+    ["no dated commit", { commits: { nodes: [{ commit: {} }] } }],
+  ])("reads %s as no news rather than as newer", (_label, over) => {
+    const [pr] = parseReviewedPrs(raw(over));
+    expect(pr.updatedSince).toBe(false);
+  });
+
+  it("drops a match with no submitted review from the viewer", () => {
+    // Without a review time the row has nothing to say, and it would sort to
+    // the bottom of a list ordered by exactly that field.
+    expect(parseReviewedPrs(raw({ reviews: { nodes: [] } }))).toEqual([]);
+  });
+
+  it("survives a missing author, repository, draft flag and review state", () => {
+    const [pr] = parseReviewedPrs(
+      raw({
+        author: null,
+        repository: null,
+        isDraft: undefined,
+        reviews: { nodes: [{ submittedAt: "2026-07-01T00:00:00Z" }] },
+      }),
+    );
+    expect(pr.author).toBe("unknown");
+    expect(pr.repo).toBe("");
+    expect(pr.isDraft).toBe(false);
+    // A review with no state reads as the weakest one — it says nothing about
+    // the code, which is exactly what "Commented" means.
+    expect(pr.state).toBe("COMMENTED");
+  });
+
+  it("reads a state the UI has no badge for as Commented", () => {
+    // DISMISSED is filtered out by the query today, but the response is untyped
+    // and an unmapped state would render a blank badge.
+    const [pr] = parseReviewedPrs(
+      raw({ reviews: { nodes: [{ state: "DISMISSED", submittedAt: "2026-07-01T00:00:00Z" }] } }),
+    );
+    expect(pr.state).toBe("COMMENTED");
+  });
+
+  it("reads a nodeless response as an empty list", () => {
+    expect(parseReviewedPrs({})).toEqual([]);
+    expect(parseReviewedPrs({ search: { nodes: [null] } })).toEqual([]);
+  });
+});
+
+describe("parsePrComments — threads on a PR the viewer reviewed", () => {
+  const thread = (starter: string, over: Record<string, unknown> = {}) => ({
+    id: "t1",
+    isResolved: false,
+    path: "src/app.ts",
+    starter: { nodes: [{ author: { login: starter } }] },
+    comments: {
+      nodes: [
+        {
+          author: { login: "alice", __typename: "User" },
+          bodyText: "done, took the fixed delay out",
+          createdAt: "2026-07-01T00:00:00Z",
+          url: "https://gh/acme/b/pull/9#discussion_r1",
+        },
+      ],
+    },
+    ...over,
+  });
+
+  const raw = (threads: unknown[]) => ({
+    search: {
+      nodes: [
+        {
+          id: "PR_9",
+          number: 9,
+          url: "https://gh/acme/b/pull/9",
+          repository: { nameWithOwner: "acme/b" },
+          reviewThreads: { nodes: threads },
+        },
+      ],
+    },
+  });
+
+  it("keeps a reply to a thread the viewer raised", () => {
+    // The reported gap: you review someone's PR, they answer your comment, and
+    // nothing on the board ever says so.
+    const kept = parsePrComments(raw([thread("octocat")]), "octocat", true);
+    expect(kept.map((c) => c.id)).toEqual(["t1"]);
+    expect(kept[0].url).toBe("https://gh/acme/b/pull/9#discussion_r1");
+  });
+
+  it("drops a thread someone else raised on that PR", () => {
+    // Every unresolved thread on a PR is waiting on somebody; only the ones the
+    // viewer raised are waiting on the viewer.
+    expect(parsePrComments(raw([thread("bob")]), "octocat", true)).toEqual([]);
+  });
+
+  it("drops a thread the viewer raised once the viewer has replied last", () => {
+    const own = thread("octocat", {
+      comments: { nodes: [{ author: { login: "octocat", __typename: "User" }, bodyText: "thanks", createdAt: "2026-07-02T00:00:00Z", url: "u" }] },
+    });
+    expect(parsePrComments(raw([own]), "octocat", true)).toEqual([]);
+  });
+
+  it("ignores who raised the thread on the viewer's own PRs", () => {
+    // The PR is theirs, so every unanswered thread is theirs to answer.
+    expect(parsePrComments(raw([thread("bob")]), "octocat").map((c) => c.id)).toEqual(["t1"]);
+  });
+
+  it("drops a viewer-raised thread with no starter recorded", () => {
+    const headless = thread("octocat", { starter: { nodes: [] } });
+    expect(parsePrComments(raw([headless]), "octocat", true)).toEqual([]);
   });
 });

@@ -156,4 +156,85 @@ describe("GET /api/pr-comments", () => {
     const res = await GET(req("http://x/api/pr-comments?org=acme"));
     expect(res.headers.get("X-Partial")).toBeNull();
   });
+  it("runs both searches: own PRs and PRs the viewer reviewed", async () => {
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("mfozmen");
+    queryMock.mockResolvedValue({ data: { search: { nodes: [] } }, partial: false });
+    await GET(req("http://x/api/pr-comments?org=acme"));
+    expect(queryMock.mock.calls.map((c) => c[2].q)).toEqual([
+      "is:open is:pr author:@me org:acme",
+      "is:open is:pr reviewed-by:@me org:acme",
+    ]);
+  });
+
+  it("keeps only viewer-raised threads from the reviewed-PR search", async () => {
+    // On someone else's PR every unresolved thread is waiting on somebody;
+    // only the ones the viewer raised are waiting on the viewer.
+    const reviewedRaw = (starter: string) => ({
+      search: {
+        nodes: [
+          {
+            id: "PR_9",
+            number: 9,
+            url: "https://gh/acme/e/pull/9",
+            repository: { nameWithOwner: "acme/e" },
+            reviewThreads: {
+              nodes: [
+                {
+                  id: "t9",
+                  isResolved: false,
+                  path: "internal/dispatch.go",
+                  starter: { nodes: [{ author: { login: starter } }] },
+                  comments: {
+                    nodes: [
+                      {
+                        author: { login: "alice", __typename: "User" },
+                        bodyText: "done",
+                        createdAt: "2026-07-02T00:00:00Z",
+                        url: "https://gh/acme/e/pull/9#discussion_r9",
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("mfozmen");
+    queryMock
+      .mockResolvedValueOnce({ data: { search: { nodes: [] } }, partial: false })
+      .mockResolvedValueOnce({ data: reviewedRaw("mfozmen"), partial: false });
+    const mine = await (await GET(req("http://x/api/pr-comments"))).json();
+    expect(mine.map((c: { id: string }) => c.id)).toEqual(["t9"]);
+
+    queryMock.mockReset();
+    queryMock
+      .mockResolvedValueOnce({ data: { search: { nodes: [] } }, partial: false })
+      .mockResolvedValueOnce({ data: reviewedRaw("bob"), partial: false });
+    const theirs = await (await GET(req("http://x/api/pr-comments"))).json();
+    expect(theirs).toEqual([]);
+  });
+
+  it("sets X-Partial when only the reviewed-PR search was partial", async () => {
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("mfozmen");
+    queryMock
+      .mockResolvedValueOnce({ data: { search: { nodes: [] } }, partial: false })
+      .mockResolvedValueOnce({ data: { search: { nodes: [] } }, partial: true });
+    const res = await GET(req("http://x/api/pr-comments"));
+    expect(res.headers.get("X-Partial")).toBe("1");
+  });
+
+  it("returns a thread once when both searches somehow surface it", async () => {
+    // The thread id is the natural key; a duplicated row would render twice
+    // and double-count.
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("mfozmen");
+    queryMock.mockResolvedValue({ data: COMMENTS_RAW, partial: false });
+    const body = await (await GET(req("http://x/api/pr-comments"))).json();
+    expect(body.filter((c: { id: string }) => c.id === "t1")).toHaveLength(1);
+  });
 });

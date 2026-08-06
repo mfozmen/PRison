@@ -98,14 +98,18 @@ const ORPHAN_COMMENT = {
 };
 
 function okFetch() {
-  // FIVE-WAY: closed-prs → [], pr-comments → [], ready → [READY_PR], stuck → [STUCK_PR], else (review) → [REVIEW_PR]
+  // SIX-WAY: reviewed-prs → [], closed-prs → [], pr-comments → [], ready → [READY_PR],
+  // stuck → [STUCK_PR], else (review-requests) → [REVIEW_PR]. "reviewed" is tested
+  // first because "/api/reviewed-prs" also contains "review".
   return vi.fn((url: string) =>
     Promise.resolve({
       ok: true,
       headers: { get: () => null },
       json: () =>
         Promise.resolve(
-          url.includes("closed")
+          url.includes("reviewed")
+            ? []
+            : url.includes("closed")
             ? []
             : url.includes("pr-comments")
               ? []
@@ -127,7 +131,9 @@ function fetchWithComments(comments: unknown[]) {
       headers: { get: () => null },
       json: () =>
         Promise.resolve(
-          url.includes("closed")
+          url.includes("reviewed")
+            ? []
+            : url.includes("closed")
             ? []
             : url.includes("pr-comments")
               ? comments
@@ -148,7 +154,9 @@ function partialFetch() {
       headers: { get: (h: string) => (url.includes("stuck") && h === "X-Partial" ? "1" : null) },
       json: () =>
         Promise.resolve(
-          url.includes("closed")
+          url.includes("reviewed")
+            ? []
+            : url.includes("closed")
             ? []
             : url.includes("ready") ? [READY_PR] : url.includes("stuck") ? [STUCK_PR] : [REVIEW_PR],
         ),
@@ -180,7 +188,9 @@ function fetchWithClosed(closed: unknown[]) {
       headers: { get: () => null },
       json: () =>
         Promise.resolve(
-          url.includes("closed")
+          url.includes("reviewed")
+            ? []
+            : url.includes("closed")
             ? closed
             : url.includes("stuck")
               ? [STUCK_PR]
@@ -1047,8 +1057,9 @@ describe("Dashboard", () => {
       await waitFor(() => {
         const after = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
           .length;
-        // One refresh = stuck-prs + review-requests + ready-to-merge + pr-comments + closed-prs.
-        expect(after).toBe(before + 5);
+        // One refresh = stuck-prs + review-requests + ready-to-merge + pr-comments
+        // + closed-prs + reviewed-prs.
+        expect(after).toBe(before + 6);
       });
     });
 
@@ -1439,15 +1450,16 @@ describe("Dashboard", () => {
       expect(screen.getByText(/failed to load ready-to-merge prs/i)).toBeInTheDocument();
       expect(screen.getByText(/failed to load comments/i)).toBeInTheDocument();
       expect(screen.getByText(/failed to load closed prs/i)).toBeInTheDocument();
+      expect(screen.getByText(/failed to load reviewed prs/i)).toBeInTheDocument();
 
       const before = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
       const retries = screen.getAllByRole("button", { name: /retry/i });
-      expect(retries).toHaveLength(5);
+      expect(retries).toHaveLength(6);
       for (const retry of retries) fireEvent.click(retry);
       await waitFor(() =>
         expect(
           (global.fetch as ReturnType<typeof vi.fn>).mock.calls,
-        ).toHaveLength(before + 5 * retries.length),
+        ).toHaveLength(before + 6 * retries.length),
       );
     });
 
@@ -1460,7 +1472,7 @@ describe("Dashboard", () => {
       await waitFor(() =>
         expect(
           (global.fetch as ReturnType<typeof vi.fn>).mock.calls,
-        ).toHaveLength(10),
+        ).toHaveLength(12),
       );
     });
   });
@@ -1527,10 +1539,11 @@ describe("Dashboard", () => {
       const refreshButton = screen.getByRole("button", { name: /^refresh$/i });
       await waitFor(() => expect(refreshButton).toBeEnabled());
       fireEvent.click(refreshButton);
-      // 5 fetches on mount + 5 on refresh (stuck + review + ready + comments + closed) = 10 total.
+      // 6 fetches on mount + 6 on refresh (stuck + review + ready + comments + closed
+      // + reviewed) = 12 total.
       // Use waitFor so the assertion retries until all async refresh fetches register.
       await waitFor(() =>
-        expect(global.fetch as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(10),
+        expect(global.fetch as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(12),
       );
     });
 
@@ -1787,6 +1800,168 @@ describe("Dashboard — comments awaiting your reply", () => {
   });
 });
 
+describe("Dashboard — recently reviewed", () => {
+  const REVIEWED_PR = {
+    id: "rv1",
+    title: "add retry backoff",
+    url: "https://github.com/acme/e/pull/9",
+    number: 9,
+    repo: "acme/e",
+    author: "alice",
+    state: "CHANGES_REQUESTED" as const,
+    reviewedAt: "2026-06-20T00:00:00Z",
+    updatedSince: false,
+    isDraft: false,
+  };
+
+  // Serves the reviewed list; stuck carries STUCK_PR so unrelated sections
+  // still render, and the comments list is supplied per test.
+  function fetchWithReviewed(reviewed: unknown[], comments: unknown[] = []) {
+    return vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        headers: { get: () => null },
+        json: () =>
+          Promise.resolve(
+            url.includes("reviewed")
+              ? reviewed
+              : url.includes("pr-comments")
+                ? comments
+                : url.includes("stuck")
+                  ? [STUCK_PR]
+                  : [],
+          ),
+      }),
+    ) as unknown as typeof fetch;
+  }
+
+  it("shows the section collapsed by default with a total count", async () => {
+    global.fetch = fetchWithReviewed([REVIEWED_PR]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("reviewed-count-badge")).toHaveTextContent("1"),
+    );
+    expect(screen.queryByText("add retry backoff")).not.toBeInTheDocument();
+  });
+
+  it("expands to the rows, carrying your own verdict", async () => {
+    global.fetch = fetchWithReviewed([REVIEWED_PR]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("reviewed-count-badge")).toHaveTextContent("1"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /recently reviewed/i }));
+    expect(await screen.findByText("add retry backoff")).toBeInTheDocument();
+    expect(screen.getByText("Changes requested")).toBeInTheDocument();
+  });
+
+  it("persists the reviewed-section open state to localStorage", async () => {
+    global.fetch = fetchWithReviewed([REVIEWED_PR]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("reviewed-count-badge")).toHaveTextContent("1"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /recently reviewed/i }));
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.reviewedOpen")).toBe("true"),
+    );
+  });
+
+  it("hydrates the reviewed section open from localStorage", async () => {
+    localStorage.setItem("prison.reviewedOpen", "true");
+    global.fetch = fetchWithReviewed([REVIEWED_PR]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("add retry backoff")).toBeInTheDocument();
+  });
+
+  it("flags a PR pushed to since your review", async () => {
+    global.fetch = fetchWithReviewed([{ ...REVIEWED_PR, updatedSince: true }]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("reviewed-count-badge")).toHaveTextContent("1"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /recently reviewed/i }));
+    expect(await screen.findByText("Updated since")).toBeInTheDocument();
+  });
+
+  it("keeps a re-requested PR in the review queue instead of the archive", async () => {
+    // GitHub reports a PR you reviewed AND were asked to review again under
+    // both searches. Waiting-on-you wins — no PR in two lists.
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        headers: { get: () => null },
+        json: () =>
+          Promise.resolve(
+            url.includes("reviewed")
+              ? [{ ...REVIEWED_PR, id: REVIEW_PR.id }]
+              : url.includes("review")
+                ? [REVIEW_PR]
+                : [],
+          ),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("review pr")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId("reviewed-count-badge")).toHaveTextContent("0"),
+    );
+  });
+
+  it("drops drafts when Hide drafts is on", async () => {
+    global.fetch = fetchWithReviewed([REVIEWED_PR, { ...REVIEWED_PR, id: "rv2", title: "draft reviewed pr", isDraft: true }]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("reviewed-count-badge")).toHaveTextContent("2"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /hide drafts/i }));
+    await waitFor(() =>
+      expect(screen.getByTestId("reviewed-count-badge")).toHaveTextContent("1"),
+    );
+  });
+
+  it("shows a reply on a PR you reviewed in the comments column", async () => {
+    // The gap this section came from: the comments column only ever showed
+    // threads on your OWN PRs, so an answer to a review comment you left on
+    // someone else's PR never reached the board.
+    const reply = { ...COMMENT, id: "t9", prId: REVIEWED_PR.id, repo: "acme/e", number: 9, preview: "done, took the fixed delay out" };
+    global.fetch = fetchWithReviewed([REVIEWED_PR], [reply]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("done, took the fixed delay out")).toBeInTheDocument();
+  });
+
+  it("shows an error banner and retry when the reviewed fetch fails", async () => {
+    global.fetch = vi.fn((url: string) =>
+      url.includes("reviewed")
+        ? Promise.reject(new Error("network error"))
+        : Promise.resolve({ ok: true, headers: { get: () => null }, json: () => Promise.resolve(url.includes("stuck") ? [STUCK_PR] : []) }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText(/failed to load reviewed PRs/i)).toBeInTheDocument();
+    // Unrelated sections still render.
+    expect(screen.getByText("stuck pr")).toBeInTheDocument();
+  });
+
+  it("reveals a page at a time, then Load more", async () => {
+    const many = Array.from({ length: 20 }, (_, i) => ({
+      ...REVIEWED_PR,
+      id: `rv${i}`,
+      title: `reviewed pr ${i}`,
+      reviewedAt: new Date(Date.UTC(2026, 5, 25) - i * 86_400_000).toISOString(),
+    }));
+    global.fetch = fetchWithReviewed(many);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("reviewed-count-badge")).toHaveTextContent("20"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /recently reviewed/i }));
+    expect(await screen.findByText("reviewed pr 0")).toBeInTheDocument();
+    expect(screen.queryByText("reviewed pr 15")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /load more \(showing 15 of 20\)/i }));
+    expect(await screen.findByText("reviewed pr 15")).toBeInTheDocument();
+  });
+});
+
 describe("Dashboard — auto refresh", () => {
   const NEW_STUCK_PR = { ...STUCK_PR, id: "new-stuck", title: "brand new stuck pr" };
 
@@ -1861,14 +2036,14 @@ describe("Dashboard — auto refresh", () => {
     return (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
   }
 
-  it("polls all five endpoints once per interval when enabled, without the loading banner", async () => {
+  it("polls all six endpoints once per interval when enabled, without the loading banner", async () => {
     localStorage.setItem("prison.autoRefresh", "true");
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    expect(fetchCalls()).toBe(5);
+    expect(fetchCalls()).toBe(6);
 
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
-    expect(fetchCalls()).toBe(10);
+    expect(fetchCalls()).toBe(12);
     expect(screen.queryByText(/loading/i)).not.toBeInTheDocument();
   });
 
@@ -1878,13 +2053,13 @@ describe("Dashboard — auto refresh", () => {
     localStorage.setItem("prison.pollInterval", String(longest));
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    expect(fetchCalls()).toBe(5);
+    expect(fetchCalls()).toBe(6);
 
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
-    expect(fetchCalls()).toBe(5);
+    expect(fetchCalls()).toBe(6);
 
     await act(() => vi.advanceTimersByTimeAsync(longest));
-    expect(fetchCalls()).toBe(10);
+    expect(fetchCalls()).toBe(12);
   });
 
   it("defaults to 30 minutes when nothing is stored", async () => {
@@ -1894,10 +2069,10 @@ describe("Dashboard — auto refresh", () => {
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
 
     await act(() => vi.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS - 1000));
-    expect(fetchCalls()).toBe(5);
+    expect(fetchCalls()).toBe(6);
 
     await act(() => vi.advanceTimersByTimeAsync(1000));
-    expect(fetchCalls()).toBe(10);
+    expect(fetchCalls()).toBe(12);
     await waitFor(() =>
       expect(localStorage.getItem("prison.pollInterval")).toBe(
         String(DEFAULT_POLL_INTERVAL_MS),
@@ -1953,7 +2128,7 @@ describe("Dashboard — auto refresh", () => {
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     expect(await screen.findByText("Updated just now")).toBeInTheDocument();
 
-    // Every one of the five endpoints answers 500, so the poll fetches nothing.
+    // Every one of the six endpoints answers 500, so the poll fetches nothing.
     global.fetch = vi.fn(() =>
       Promise.resolve({ ok: false, status: 500 }),
     ) as unknown as typeof fetch;
@@ -2001,7 +2176,7 @@ describe("Dashboard — auto refresh", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS * 2));
-    expect(fetchCalls()).toBe(5);
+    expect(fetchCalls()).toBe(6);
   });
 
   it("enabling the checkbox persists and requests notification permission when undecided", async () => {
@@ -2237,12 +2412,12 @@ describe("Dashboard — auto refresh", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
-    expect(fetchCalls()).toBe(10);
+    expect(fetchCalls()).toBe(12);
 
     openSettings("Auto refresh");
     fireEvent.click(screen.getByRole("checkbox", { name: /auto refresh/i }));
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS * 2));
-    expect(fetchCalls()).toBe(10);
+    expect(fetchCalls()).toBe(12);
   });
 
   it("starts with an empty feed — the first load is a seed, not news", async () => {
@@ -2431,7 +2606,7 @@ describe("Dashboard — auto refresh", () => {
   });
 
   it("keeps the catch-up armed when every endpoint rejected, and reports it on Retry", async () => {
-    // A first load where all five endpoints rejected refreshed nothing, so the
+    // A first load where all six endpoints rejected refreshed nothing, so the
     // catch-up is still owed — landedRef, not a non-empty board, is what spends
     // it. Retry is the fetch that lands, and it still reports what moved while
     // PRison was closed.
@@ -2626,7 +2801,9 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
         headers: { get: () => null },
         json: () =>
           Promise.resolve(
-            url.includes("closed")
+            url.includes("reviewed")
+              ? []
+              : url.includes("closed")
               ? makeClosed(1)
               : url.includes("pr-comments")
                 ? [COMMENT]

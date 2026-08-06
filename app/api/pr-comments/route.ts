@@ -13,10 +13,24 @@ export async function GET(request: Request) {
   const scoped = resolveScope(request);
   if ("error" in scoped) return new Response(scoped.error, { status: 400 });
   try {
-    const { data, partial } = await ghQuery(token, PR_COMMENTS_QUERY, {
-      q: searchQuery("author", scoped.scope),
-    });
-    return Response.json(parsePrComments(data, login), partial ? { headers: { "X-Partial": "1" } } : undefined);
+    // Two searches, because "waiting on my reply" has two shapes. On the
+    // viewer's own PRs any unanswered thread is theirs; on a PR they reviewed,
+    // only the threads they raised — and those never appeared here before,
+    // which is why a reply to your own review comment went unnoticed.
+    const [own, reviewed] = await Promise.all([
+      ghQuery(token, PR_COMMENTS_QUERY, { q: searchQuery("author", scoped.scope) }),
+      ghQuery(token, PR_COMMENTS_QUERY, { q: searchQuery("reviewed", scoped.scope) }),
+    ]);
+    const comments = [
+      ...parsePrComments(own.data, login),
+      ...parsePrComments(reviewed.data, login, true),
+    ];
+    // A PR can match both searches only if the viewer reviewed their own PR,
+    // which GitHub forbids — but the thread id is the natural key either way,
+    // and a duplicated row would render twice and double-count.
+    const deduped = [...new Map(comments.map((c) => [c.id, c])).values()];
+    const partial = own.partial || reviewed.partial;
+    return Response.json(deduped, partial ? { headers: { "X-Partial": "1" } } : undefined);
   } catch {
     return new Response("Upstream GitHub error", { status: 502 });
   }

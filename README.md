@@ -7,22 +7,29 @@
 
 A read-only GitHub dashboard that shows which pull requests need your attention,
 and for how long — across your personal account and every organization you can
-access. Four lists, oldest first, plus a history section:
+access. Four lists, oldest first, plus two history sections:
 
 - **Ready to merge** — PRs GitHub reports as mergeable now. An out-of-date branch
   still counts, with a **"Needs update"** hint (a bot/manual update handles it) —
   but only once its checks are green; while one is red or still running it
   belongs under *Stuck on checks*, and no PR is ever in both lists.
-- **Comments awaiting your reply** — review threads on your own PRs where the last
-  word isn't yours. Each row opens the comment itself, not the top of the PR.
+- **Comments awaiting your reply** — review threads where the last word isn't
+  yours: every unresolved thread on your own PRs, plus the threads you raised on
+  PRs you reviewed. Each row opens the comment itself, not the top of the PR.
 - **Waiting on your review** — PRs you're blocking others on.
 - **Stuck on checks** — your open PRs with failing/pending checks, or otherwise
   blocked from merging (required checks, review, or conflicts).
+- **Recently reviewed** — open PRs you already reviewed, badged with the verdict
+  you left, and flagged **"Updated since"** when the author has pushed after it.
+  A PR that comes back for another review leaves this list and returns to
+  *Waiting on your review*.
 - **Recently merged / closed** — your own PRs that were merged or closed, newest
-  first, so finished work confirms itself. Collapsed by default with a count;
-  expands to the latest 15 with **Load more** for the rest.
+  first, so finished work confirms itself.
 
-![The PRison dashboard in dark mode, showing the four PR lists, the header's activity bell carrying three unseen events, and the recently merged / closed history expanded](docs/screenshot.png)
+Both history sections sit side by side, collapsed by default with a count, and
+expand to the latest 15 with **Load more** for the rest.
+
+![The PRison dashboard in dark mode, showing the four PR lists, the header's activity bell carrying three unseen events, and the recently reviewed and recently merged / closed histories expanded side by side](docs/screenshot.png)
 
 ### Features
 
@@ -38,8 +45,10 @@ access. Four lists, oldest first, plus a history section:
   org) plus per-repo overrides, with a
   type-to-search repo picker — and PRison shows them as **"⏳ Awaiting: &lt;name&gt;"**
   on a blocked PR until they report.
-- **Recently merged / closed history.** Merged and closed-without-merging PRs,
-  each badged **Merged** or **Closed** with how long ago it ended.
+- **History you can walk back into.** Merged and closed-without-merging PRs, each
+  badged **Merged** or **Closed** with how long ago it ended — and next to them
+  the PRs you reviewed, so a discussion you left open is one click away instead
+  of lost in GitHub's notification list.
 - **Grouping** — flat, by repository, or by check, with a **Hide drafts** toggle
   next to them in the filter bar.
 - **Auto refresh (opt-in).** Turn it on in Settings and pick how often to check

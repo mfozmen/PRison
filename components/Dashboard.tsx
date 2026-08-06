@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo, useTransition } from "react";
-import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr } from "@/lib/types";
+import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr, ReviewedPr } from "@/lib/types";
 import { sortByAgeAsc, sortByAgeDesc, relativeAge } from "@/lib/prioritize";
 import { suggestStuck, suggestReview, suggestReady, suggestComment, needsReview, stuckGroupKeys, reviewDecisionLabel } from "@/lib/suggest";
 import { PrList } from "./PrList";
 import { PrRow } from "./PrRow";
 import { ClosedPrRow } from "./ClosedPrRow";
+import { ReviewedPrRow } from "./ReviewedPrRow";
+import { ArchiveSection } from "./ArchiveSection";
 import { Header } from "./Header";
 import { SettingsModal } from "./SettingsModal";
 import { type TrackedChecks, EMPTY_TRACKED, parseTracked, awaitingChecks } from "@/lib/tracked-checks";
@@ -82,15 +84,21 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [readyPrs, setReadyPrs] = useState<ReadyPr[]>([]);
   const [comments, setComments] = useState<PrComment[]>([]);
   const [closedPrs, setClosedPrs] = useState<ClosedPr[]>([]);
+  const [reviewedPrs, setReviewedPrs] = useState<ReviewedPr[]>([]);
   const [stuckError, setStuckError] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [readyError, setReadyError] = useState<string | null>(null);
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [closedError, setClosedError] = useState<string | null>(null);
+  const [reviewedError, setReviewedError] = useState<string | null>(null);
   // Closed PRs are history, not a work queue, so the section starts collapsed;
   // closedVisible drives the client-side "Load more" (15 at a time).
   const [closedOpen, setClosedOpen] = useState(false);
   const [closedVisible, setClosedVisible] = useState(CLOSED_PAGE_SIZE);
+  // Same shape as the closed history: a look-back list, so it starts collapsed
+  // and reveals a page at a time.
+  const [reviewedOpen, setReviewedOpen] = useState(false);
+  const [reviewedVisible, setReviewedVisible] = useState(CLOSED_PAGE_SIZE);
   const [partial, setPartial] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -135,7 +143,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             ? `?org=${encodeURIComponent(org)}`
             : "";
       const run = async () => {
-        const [stuckResult, reviewResult, readyResult, commentsResult, closedResult] = await Promise.allSettled([
+        const [stuckResult, reviewResult, readyResult, commentsResult, closedResult, reviewedResult] = await Promise.allSettled([
           fetch(`/api/stuck-prs${qs}`).then(async (r) => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const partial = r.headers?.get?.("X-Partial") === "1";
@@ -166,6 +174,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             const items = (await r.json()) as ClosedPr[];
             return { items, partial };
           }),
+          fetch(`/api/reviewed-prs${qs}`).then(async (r) => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const partial = r.headers?.get?.("X-Partial") === "1";
+            const items = (await r.json()) as ReviewedPr[];
+            return { items, partial };
+          }),
         ]);
 
         if (latestOrgRef.current !== org) return;
@@ -180,7 +194,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         // moves when something actually landed. A fetch where every endpoint
         // rejected refreshed nothing, and claiming otherwise would hide the
         // staleness the label exists to show.
-        if ([stuckResult, reviewResult, readyResult, commentsResult, closedResult].some((r) => r.status === "fulfilled")) {
+        if ([stuckResult, reviewResult, readyResult, commentsResult, closedResult, reviewedResult].some((r) => r.status === "fulfilled")) {
           setLastRefreshedAt(new Date().toISOString());
           landedRef.current = true;
         }
@@ -232,16 +246,28 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           );
           setClosedPrs(closedResult.status === "fulfilled" ? closedResult.value.items : []);
         }
+        if (!silent || reviewedResult.status === "fulfilled") {
+          setReviewedError(
+            reviewedResult.status === "rejected"
+              ? "Failed to load reviewed PRs. Please retry."
+              : null,
+          );
+          setReviewedPrs(reviewedResult.status === "fulfilled" ? reviewedResult.value.items : []);
+        }
         // Fresh list for this scope, so collapse the reveal back to the first
         // page — but never on a silent poll, which refreshes in place and must
         // not fold a "Load more" expansion the user is reading.
-        if (!silent) setClosedVisible(CLOSED_PAGE_SIZE);
+        if (!silent) {
+          setClosedVisible(CLOSED_PAGE_SIZE);
+          setReviewedVisible(CLOSED_PAGE_SIZE);
+        }
         const anyPartial =
           (stuckResult.status === "fulfilled" && stuckResult.value.partial) ||
           (reviewResult.status === "fulfilled" && reviewResult.value.partial) ||
           (readyResult.status === "fulfilled" && readyResult.value.partial) ||
           (commentsResult.status === "fulfilled" && commentsResult.value.partial) ||
-          (closedResult.status === "fulfilled" && closedResult.value.partial);
+          (closedResult.status === "fulfilled" && closedResult.value.partial) ||
+          (reviewedResult.status === "fulfilled" && reviewedResult.value.partial);
         setPartial(anyPartial);
       };
       // Silent polls skip the transition so isPending (the "Loading…" banner
@@ -264,6 +290,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     const storedPollInterval = localStorage.getItem("prison.pollInterval");
     const storedTracked = localStorage.getItem("prison.trackedChecks");
     const storedClosedOpen = localStorage.getItem("prison.closedOpen");
+    const storedReviewedOpen = localStorage.getItem("prison.reviewedOpen");
     const storedActivity = localStorage.getItem(ACTIVITY_KEY);
     // Refs, not state: the detection effect reads them, and a restored
     // snapshot must be in place before the first fetch lands or that fetch
@@ -300,6 +327,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       setPollInterval(parsePollInterval(storedPollInterval));
       if (storedClosedOpen === "true") {
         setClosedOpen(true);
+      }
+      if (storedReviewedOpen === "true") {
+        setReviewedOpen(true);
       }
       // "blocker" (old value) falls through → stays "flat" (default)
       setTracked(parseTracked(storedTracked));
@@ -342,6 +372,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     if (!hydrated) return;
     localStorage.setItem("prison.closedOpen", String(closedOpen));
   }, [closedOpen, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.reviewedOpen", String(reviewedOpen));
+  }, [reviewedOpen, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -467,13 +502,29 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     (pr) => !(pr.viaBlocked && isAwaiting(pr.repo, pr.checkNames)),
   );
 
+  // A PR the viewer is being asked to review AGAIN is not history — it is back
+  // in the work queue, and GitHub reports it under both searches. Waiting-on-you
+  // wins, so no PR sits in two lists.
+  const reviewRequestIds = new Set(sortedReviews.map((req) => req.id));
+  const sortedReviewedAll = sortByAgeDesc(
+    reviewedPrs.filter((pr) => !reviewRequestIds.has(pr.id)),
+    (pr) => pr.reviewedAt,
+  );
+  const sortedReviewed = hideDrafts
+    ? sortedReviewedAll.filter((pr) => !pr.isDraft)
+    : sortedReviewedAll;
+
   // Comments are only shown for PRs the dashboard is currently showing, so the
-  // column can never point at a PR that isn't on screen. Derived from the two
-  // author-owned lists AFTER arbitration, which is why it lives here and not in
-  // the route.
+  // column can never point at a PR that isn't on screen. Derived from the lists
+  // AFTER arbitration, which is why it lives here and not in the route. The
+  // reviewed and review-request lists are in here too: a reply to a thread the
+  // viewer raised on someone else's PR is waiting on the viewer just as much as
+  // one on their own PR, and dropping it was why such replies never surfaced.
   const visiblePrIds = new Set([
     ...visibleStuck.map((pr) => pr.id),
     ...visibleReady.map((pr) => pr.id),
+    ...visibleReviews.map((req) => req.id),
+    ...sortedReviewed.map((pr) => pr.id),
   ]);
   const visibleComments = sortByAgeAsc(
     comments.filter(
@@ -1040,51 +1091,54 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             />
           </div>
         </div>
-        {/* Recently merged / closed — history, collapsed by default. Not a PrList:
-            its count badge would show the sliced (revealed) count, but the header
-            shows how many were fetched — the most recent up to CLOSED_PRS_QUERY's
-            first: 50, not necessarily the user's all-time total. */}
-        <div className="flex flex-col gap-4">
-          <button
-            type="button"
-            aria-expanded={closedOpen}
-            onClick={() => setClosedOpen((o) => !o)}
-            className="flex min-h-[44px] w-full items-center gap-2 rounded-md text-left focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+        {/* The two look-back sections share a row: both are archives, both
+            start collapsed, and stacking them would push the board into a
+            column of headers long after the work queues have ended. */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <ArchiveSection
+            title="Recently reviewed"
+            count={sortedReviewed.length}
+            countTestId="reviewed-count-badge"
+            open={reviewedOpen}
+            onToggle={() => setReviewedOpen((o) => !o)}
+            error={reviewedError}
+            onRetry={() => fetchData(selectedOrg)}
           >
-            <svg
-              aria-hidden="true"
-              className={`shrink-0 text-muted transition-transform ${closedOpen ? "rotate-90" : ""}`}
-              width="12"
-              height="12"
-              viewBox="0 0 12 12"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path d="M4 2.5 8 6l-4 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
-              Recently merged / closed
-            </h2>
-            <span
-              data-testid="closed-count-badge"
-              className="rounded-full bg-border px-2 py-0.5 font-mono text-xs tabular-nums text-foreground ring-1 ring-inset ring-border"
-            >
-              {sortedClosed.length}
-            </span>
-          </button>
-          {closedError && (
-            <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-              <span>{closedError}</span>
-              <button
-                onClick={() => fetchData(selectedOrg)}
-                className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-          {closedOpen &&
-            (sortedClosed.length === 0 ? (
+            {sortedReviewed.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">
+                No PRs you have reviewed are still open
+              </p>
+            ) : (
+              <>
+                <ul className="flex flex-col gap-2">
+                  {sortedReviewed.slice(0, reviewedVisible).map((pr) => (
+                    <li key={pr.id}>
+                      <ReviewedPrRow pr={pr} now={new Date()} />
+                    </li>
+                  ))}
+                </ul>
+                {sortedReviewed.length > reviewedVisible && (
+                  <button
+                    type="button"
+                    onClick={() => setReviewedVisible((v) => v + CLOSED_PAGE_SIZE)}
+                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-95 dark:hover:brightness-110 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                  >
+                    Load more (showing {reviewedVisible} of {sortedReviewed.length})
+                  </button>
+                )}
+              </>
+            )}
+          </ArchiveSection>
+          <ArchiveSection
+            title="Recently merged / closed"
+            count={sortedClosed.length}
+            countTestId="closed-count-badge"
+            open={closedOpen}
+            onToggle={() => setClosedOpen((o) => !o)}
+            error={closedError}
+            onRetry={() => fetchData(selectedOrg)}
+          >
+            {sortedClosed.length === 0 ? (
               <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">
                 No closed PRs
               </p>
@@ -1107,7 +1161,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   </button>
                 )}
               </>
-            ))}
+            )}
+          </ArchiveSection>
         </div>
       </main>
     </div>

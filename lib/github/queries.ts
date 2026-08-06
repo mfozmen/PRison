@@ -14,11 +14,14 @@ export function searchQuery(kind: "author" | "review" | "ready" | "closed" | "re
   // (including any required review), and some repos don't require review.
   // "reviewed" is the other side of "review": PRs the viewer has already
   // submitted a review on, which review-requested:@me no longer returns.
+  // -author:@me on "reviewed": GitHub accepts a COMMENTED review on your own PR
+  // (inline self-annotations submit as one), and reviewed-by:@me returns it. Your
+  // own PR is already in the work queues, so it is not history to look back at.
   const who =
     kind === "review"
       ? "review-requested:@me"
       : kind === "reviewed"
-        ? "reviewed-by:@me"
+        ? "reviewed-by:@me -author:@me"
         : "author:@me";
   // "closed" fetches the user's finished PRs (merged is a subset of closed).
   const state = kind === "closed" ? "is:closed" : "is:open";
@@ -368,7 +371,7 @@ export const REVIEWED_PRS_QUERY = `
   query($q: String!, $login: String!) {
     search(query: $q, type: ISSUE, first: 50) {
       nodes { ... on PullRequest {
-        id title url number isDraft updatedAt
+        id title url number isDraft
         repository { nameWithOwner }
         author { login }
         reviews(last: 1, author: $login, states: [APPROVED, CHANGES_REQUESTED, COMMENTED]) {

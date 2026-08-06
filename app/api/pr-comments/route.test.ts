@@ -50,6 +50,24 @@ const COMMENTS_RAW = {
   },
 };
 
+// Marks every thread as opened by the viewer, which is what the reviewed-PR
+// search keeps.
+function startedByViewer(raw: typeof COMMENTS_RAW) {
+  return {
+    search: {
+      nodes: raw.search.nodes.map((pr) => ({
+        ...pr,
+        reviewThreads: {
+          nodes: pr.reviewThreads.nodes.map((t) => ({
+            ...t,
+            starter: { nodes: [{ author: { login: "mfozmen" } }] },
+          })),
+        },
+      })),
+    },
+  };
+}
+
 beforeEach(() => {
   readTokenMock.mockReset();
   readLoginMock.mockReset();
@@ -163,7 +181,7 @@ describe("GET /api/pr-comments", () => {
     await GET(req("http://x/api/pr-comments?org=acme"));
     expect(queryMock.mock.calls.map((c) => c[2].q)).toEqual([
       "is:open is:pr author:@me org:acme",
-      "is:open is:pr reviewed-by:@me org:acme",
+      "is:open is:pr reviewed-by:@me -author:@me org:acme",
     ]);
   });
 
@@ -225,6 +243,35 @@ describe("GET /api/pr-comments", () => {
       .mockResolvedValueOnce({ data: { search: { nodes: [] } }, partial: false })
       .mockResolvedValueOnce({ data: { search: { nodes: [] } }, partial: true });
     const res = await GET(req("http://x/api/pr-comments"));
+    expect(res.headers.get("X-Partial")).toBe("1");
+  });
+
+  it("still serves your own PRs' threads when the reviewed search fails", async () => {
+    // Before the reviewed search existed this list depended on one query; a
+    // blip on the new one must not take the old one down with it.
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("mfozmen");
+    queryMock
+      .mockResolvedValueOnce({ data: COMMENTS_RAW, partial: false })
+      .mockRejectedValueOnce(new Error("network error"));
+    const res = await GET(req("http://x/api/pr-comments"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toHaveLength(1);
+    // A leg that never answered is missing data — which is what X-Partial says.
+    expect(res.headers.get("X-Partial")).toBe("1");
+  });
+
+  it("still serves the reviewed threads when the own-PR search fails", async () => {
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("mfozmen");
+    queryMock
+      .mockRejectedValueOnce(new Error("network error"))
+      // The reviewed leg keeps only threads the viewer raised, so this one is
+      // theirs.
+      .mockResolvedValueOnce({ data: startedByViewer(COMMENTS_RAW), partial: false });
+    const res = await GET(req("http://x/api/pr-comments"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toHaveLength(1);
     expect(res.headers.get("X-Partial")).toBe("1");
   });
 

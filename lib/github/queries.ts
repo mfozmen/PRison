@@ -154,6 +154,21 @@ function isReadyViaBlocked(node: any): boolean {
   return failingChecks === 0 && pendingChecks === 0;
 }
 
+/** Out of date, and nothing else holding it up.
+ *
+ * mergeStateStatus is a single value with a priority order, and BEHIND outranks
+ * UNSTABLE: a PR whose branch is behind reports BEHIND even while a check is red
+ * or still running. Reading BEHIND on its own as "mergeable once updated" put
+ * those PRs in the ready list while the check rollup put the same PRs in the
+ * stuck list, so one PR sat in both at once. Only the ones with nothing failing
+ * and nothing running are merely out of date. */
+function isBehindAndGreen(node: any): boolean {
+  if (node.mergeStateStatus !== "BEHIND") return false;
+  const ctxs = node.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes ?? [];
+  const { failingChecks, pendingChecks } = computeCheckRollup(ctxs);
+  return failingChecks === 0 && pendingChecks === 0;
+}
+
 export function parseStuckPrs(raw: any): StuckPr[] {
   return (raw?.search?.nodes ?? [])
     .filter((n: any) => n?.id)
@@ -358,7 +373,7 @@ export function parseReadyPrs(raw: any): ReadyPr[] {
   // check or review, and is routed to the ready bucket with needsUpdate:true.
   return (raw?.search?.nodes ?? [])
     .filter((n: any) => n?.id)
-    .filter((n: any) => n.mergeStateStatus === "CLEAN" || n.mergeStateStatus === "BEHIND" || isReadyViaBlocked(n))
+    .filter((n: any) => n.mergeStateStatus === "CLEAN" || isBehindAndGreen(n) || isReadyViaBlocked(n))
     .filter((n: any) => !n.isDraft)
     .map((n: any) => {
       const commit = n.commits?.nodes?.[0]?.commit ?? {};

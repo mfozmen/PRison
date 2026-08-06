@@ -1019,6 +1019,55 @@ describe("parseReadyPrs", () => {
     expect(result[0].needsUpdate).toBe(true);
   });
 
+  // mergeStateStatus is one value with a priority order, and BEHIND outranks
+  // UNSTABLE: an out-of-date PR reports BEHIND even while a check is red or
+  // still running. Reading BEHIND on its own as "mergeable once updated" put
+  // those in ready while the rollup also put them in stuck — the same PR in
+  // both lists at once.
+  const behindWithChecks = (checkState: string) => ({
+    mergeStateStatus: "BEHIND",
+    commits: { nodes: [{ commit: {
+      pushedDate: "2026-06-25T00:00:00Z",
+      committedDate: "2026-06-24T00:00:00Z",
+      statusCheckRollup: { contexts: { nodes: [{ name: "ci", status: checkState }] } },
+    } }] },
+  });
+
+  it.each([
+    ["a check still running", "IN_PROGRESS"],
+    ["a queued check", "QUEUED"],
+  ])("excludes a BEHIND PR with %s — it is stuck, not ready", (_label, state) => {
+    const result = parseReadyPrs({ search: { nodes: [makePr(behindWithChecks(state))] } });
+    expect(result).toHaveLength(0);
+  });
+
+  it("excludes a BEHIND PR with a failing check", () => {
+    const pr = makePr({
+      mergeStateStatus: "BEHIND",
+      commits: { nodes: [{ commit: {
+        pushedDate: "2026-06-25T00:00:00Z",
+        committedDate: "2026-06-24T00:00:00Z",
+        statusCheckRollup: { contexts: { nodes: [{ name: "ci", conclusion: "FAILURE" }] } },
+      } }] },
+    });
+    expect(parseReadyPrs({ search: { nodes: [pr] } })).toHaveLength(0);
+  });
+
+  it("keeps a BEHIND PR whose checks are all green", () => {
+    const result = parseReadyPrs({ search: { nodes: [makePr(behindWithChecks("SUCCESS"))] } });
+    expect(result).toHaveLength(1);
+    expect(result[0].needsUpdate).toBe(true);
+  });
+
+  it("puts a BEHIND PR with a pending check in exactly one list", () => {
+    // The bug as it was seen: one PR, both lists, at the same time.
+    const raw = { search: { nodes: [makePr(behindWithChecks("IN_PROGRESS"))] } };
+    const inReady = parseReadyPrs(raw).map((pr) => pr.id);
+    const inStuck = parseStuckPrs(raw).map((pr) => pr.id);
+    expect(inReady.filter((id) => inStuck.includes(id))).toEqual([]);
+    expect(inStuck).toEqual(["pr1"]);
+  });
+
   it("BLOCKED + no rollupState + APPROVED → excluded from ready (rollupState must be SUCCESS)", () => {
     // Without statusCheckRollup.state === "SUCCESS", a BLOCKED PR does not qualify
     // as ready-via-blocked even when approved. This covers the absent-rollup case.

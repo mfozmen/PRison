@@ -85,6 +85,7 @@ export function prComment(overrides: Partial<PrComment> = {}): PrComment {
     preview: "Could you split this into two functions?",
     commentedAt: "2026-06-23T00:00:00Z",
     viewerReacted: false,
+    viewerStarted: false,
     ...overrides,
   };
 }

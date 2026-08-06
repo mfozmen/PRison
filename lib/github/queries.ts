@@ -318,6 +318,10 @@ export function parsePrComments(
           preview: previewOf(last.bodyText ?? ""),
           commentedAt: last.createdAt ?? "",
           viewerReacted: (last.reactionGroups ?? []).some((g: any) => g?.viewerHasReacted === true),
+          // Only the viewer-started pass can produce these, and the Dashboard
+          // reads it to know the thread stands on its own — it is waiting on the
+          // viewer whether or not that PR is on the board.
+          viewerStarted: viewerStartedOnly,
         } as PrComment)),
     );
 }

@@ -1408,6 +1408,7 @@ describe("parsePrComments", () => {
       preview: "please fix",
       commentedAt: "2026-07-01T00:00:00Z",
       viewerReacted: false,
+      viewerStarted: false,
     });
   });
 
@@ -1493,6 +1494,7 @@ describe("parsePrComments", () => {
       preview: "",
       commentedAt: "",
       viewerReacted: false,
+      viewerStarted: false,
     });
   });
 
@@ -1679,6 +1681,8 @@ describe("parsePrComments — threads on a PR the viewer reviewed", () => {
     const kept = parsePrComments(raw([thread("octocat")]), "octocat", true);
     expect(kept.map((c) => c.id)).toEqual(["t1"]);
     expect(kept[0].url).toBe("https://gh/acme/b/pull/9#discussion_r1");
+    // Marked so the Dashboard keeps it whether or not that PR is on the board.
+    expect(kept[0].viewerStarted).toBe(true);
   });
 
   it("drops a thread someone else raised on that PR", () => {

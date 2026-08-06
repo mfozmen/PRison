@@ -1924,8 +1924,26 @@ describe("Dashboard — recently reviewed", () => {
     // The gap this section came from: the comments column only ever showed
     // threads on your OWN PRs, so an answer to a review comment you left on
     // someone else's PR never reached the board.
-    const reply = { ...COMMENT, id: "t9", prId: REVIEWED_PR.id, repo: "acme/e", number: 9, preview: "done, took the fixed delay out" };
+    // viewerStarted is what the reviewed leg of /api/pr-comments returns.
+    const reply = { ...COMMENT, id: "t9", prId: REVIEWED_PR.id, repo: "acme/e", number: 9, preview: "done, took the fixed delay out", viewerStarted: true };
     global.fetch = fetchWithReviewed([REVIEWED_PR], [reply]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("done, took the fixed delay out")).toBeInTheDocument();
+  });
+
+  it("keeps that reply when the reviewed list itself fails to load", async () => {
+    // The thread is waiting on the viewer whether or not the section that would
+    // have listed its PR came back.
+    const reply = { ...COMMENT, id: "t9", prId: REVIEWED_PR.id, repo: "acme/e", number: 9, preview: "done, took the fixed delay out", viewerStarted: true };
+    global.fetch = vi.fn((url: string) =>
+      url.includes("reviewed")
+        ? Promise.reject(new Error("network error"))
+        : Promise.resolve({
+            ok: true,
+            headers: { get: () => null },
+            json: () => Promise.resolve(url.includes("pr-comments") ? [reply] : []),
+          }),
+    ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("done, took the fixed delay out")).toBeInTheDocument();
   });

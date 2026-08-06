@@ -514,22 +514,23 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     ? sortedReviewedAll.filter((pr) => !pr.isDraft)
     : sortedReviewedAll;
 
-  // Comments are only shown for PRs the dashboard is currently showing, so the
-  // column can never point at a PR that isn't on screen. Derived from the lists
-  // AFTER arbitration, which is why it lives here and not in the route. The
-  // reviewed and review-request lists are in here too: a reply to a thread the
-  // viewer raised on someone else's PR is waiting on the viewer just as much as
-  // one on their own PR, and dropping it was why such replies never surfaced.
+  // Comments on the viewer's own PRs are only shown for PRs the dashboard is
+  // currently showing, so the column can never point at a PR that isn't on
+  // screen. Derived from the lists AFTER arbitration, which is why it lives
+  // here and not in the route.
   const visiblePrIds = new Set([
     ...visibleStuck.map((pr) => pr.id),
     ...visibleReady.map((pr) => pr.id),
     ...visibleReviews.map((req) => req.id),
-    ...sortedReviewed.map((pr) => pr.id),
   ]);
   const visibleComments = sortByAgeAsc(
     comments.filter(
       (c) =>
-        visiblePrIds.has(c.prId) &&
+        // A thread the viewer raised on someone else's PR needs no list to
+        // justify it — it is waiting on them either way, and tying it to the
+        // reviewed list would have hidden it whenever that list failed or
+        // filtered the PR out.
+        (c.viewerStarted || visiblePrIds.has(c.prId)) &&
         (showBots || !c.isBot) &&
         !(hideReacted && c.viewerReacted),
     ),

@@ -57,6 +57,7 @@ export type PrComment = {
   preview: string;     // whitespace-normalized bodyText, at most PREVIEW_MAX chars, ellipsized when cut
   commentedAt: string; // ISO — when the ball landed in the viewer's court; drives the age badge
   viewerReacted: boolean; // viewer has an emoji reaction on the last comment; the client can treat that as an acknowledgement and hide the thread
+  viewerStarted: boolean; // the viewer opened the thread — true only for threads found on PRs they reviewed, where that is the whole reason the thread is theirs to answer
 };
 
 // One of the viewer's own closed PRs (author:@me is:closed) — merged or closed

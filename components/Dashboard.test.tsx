@@ -2193,7 +2193,7 @@ describe("Dashboard — auto refresh", () => {
 
     stuckList = [STUCK_PR, NEW_STUCK_PR];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
-    expect(await screen.findByText("brand new stuck pr")).toBeInTheDocument();
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     // A desktop notification exists to interrupt, and interrupting someone who
     // is already looking is noise. The feed is a timeline, so it takes the
     // event either way — and the bell is what makes it noticeable on screen.
@@ -2395,6 +2395,68 @@ describe("Dashboard — auto refresh", () => {
     // A re-render that carries no fetch — the badge must not climb.
     fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
     expect(screen.getByRole("button", { name: /^activity, 1 unseen$/i })).toBeInTheDocument();
+  });
+
+  it("spends the catch-up on the first fetch that landed, even when the board is empty", async () => {
+    // An empty board is an answer, not a missing one — the catch-up has been
+    // paid. Waiting for the first fetch that happens to carry rows instead
+    // leaves the flag armed with no expiry, and the next fetch the user
+    // triggers — an org switch, a Retry — poses as the catch-up and replays
+    // that scope's whole board into the feed as news.
+    localStorage.setItem(
+      "prison.statusSnapshot",
+      JSON.stringify([
+        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "pending" },
+      ]),
+    );
+    stuckList = [];
+
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText(/no prs stuck on checks/i)).toBeInTheDocument();
+
+    // A different scope, whose PR the stored snapshot last saw waiting on
+    // checks and which is now failing — a change the catch-up would report if
+    // it were still armed.
+    stuckList = [STUCK_PR];
+    fireEvent.change(screen.getByRole("combobox", { name: "Filter by organization" }), {
+      target: { value: "acme" },
+    });
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    // The bell only re-renders after the detection effect's own state update
+    // lands, so a "nothing was announced" assertion has to let that settle
+    // first — reading straight after the row appears passes either way.
+    await act(() => vi.advanceTimersByTimeAsync(0));
+
+    expect(screen.getByRole("button", { name: /^activity$/i })).toBeInTheDocument();
+  });
+
+  it("moves ids that are still on the board to the end of the stored snapshot", async () => {
+    // Re-inserting a key keeps its original slot in a Map, so a plain union
+    // orders the snapshot by first sighting. The stored bound trims the front,
+    // which would drop a PR that has been on the board for months while ids
+    // long gone from it survive — and the next open would call it news.
+    localStorage.setItem(
+      "prison.statusSnapshot",
+      JSON.stringify([
+        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "failing" },
+        { id: "gone-1", repo: "acme/b", number: 999, url: "u", status: "failing" },
+      ]),
+    );
+    stuckList = [STUCK_PR, NEW_STUCK_PR];
+
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem("prison.statusSnapshot") ?? "[]");
+      // "gone-1" is the only id no longer on screen, so it is the only one left
+      // at the front — the end of the list is what is still live.
+      expect(stored.map((e: { id: string }) => e.id)).toEqual([
+        "gone-1",
+        STUCK_PR.id,
+        NEW_STUCK_PR.id,
+      ]);
+    });
   });
 
   it("does not notify about the catch-up while the tab is focused", async () => {

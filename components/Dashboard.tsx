@@ -107,8 +107,13 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // report what a live poll happened to watch happen: a review that arrived
   // overnight was already the current state by morning, and the first fetch
   // absorbed it silently. Armed by hydration when a stored snapshot came back,
-  // spent by the first fetch that delivers anything.
+  // spent by the first fetch that lands.
   const catchUpRef = useRef(false);
+  // Set once any endpoint has answered, alongside the staleness stamp. A ref
+  // rather than state: it is written in the same synchronous block as the data
+  // setters, so the commit that carries the results already sees it, and it
+  // must not cause a render of its own.
+  const landedRef = useRef(false);
   // Bumped in the same state batch as a silent poll's results, so the commit
   // where it changes is guaranteed to carry that poll's data — an interleaving
   // commit can't consume the signal the way a ref flag could.
@@ -177,6 +182,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         // staleness the label exists to show.
         if ([stuckResult, reviewResult, readyResult, commentsResult, closedResult].some((r) => r.status === "fulfilled")) {
           setLastRefreshedAt(new Date().toISOString());
+          landedRef.current = true;
         }
 
         // A silent poll runs unattended, so a rejected endpoint must not
@@ -517,7 +523,18 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     // on record would then swallow the *next* failure too, because it would
     // match what we last saw. The union keeps ids that have left the board, so
     // an item that flaps out and back still doesn't re-announce itself.
-    const merged = new Map([...prev, ...visible]);
+    const merged = new Map(prev);
+    // Re-inserting an existing key keeps its ORIGINAL slot in a Map, so a plain
+    // union orders the snapshot by when an id was FIRST seen. Past the stored
+    // bound that evicts the wrong end: a PR that has sat on the board since
+    // before the oldest thousand ids is dropped while ids long gone from it
+    // survive, and the next open reports that still-visible PR as news. Deleting
+    // first moves everything currently on screen to the end, so what falls off
+    // is what really is stale.
+    for (const [id, event] of visible) {
+      merged.delete(id);
+      merged.set(id, event);
+    }
     seenStatusRef.current = merged;
     // The union differs from what it grew out of exactly when some visible item
     // is new or has moved — the same test, over the handful of items on screen
@@ -534,11 +551,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     }
     // The first fetch after a mount that restored a snapshot reports too: what
     // changed while PRison was closed is exactly what the user came to find
-    // out. Spent on the first commit that carries data, so the empty renders
-    // before it don't consume it. A desktop notification still needs an
-    // unfocused tab, so opening the app doesn't notify about what it is
-    // already showing.
-    const catchUp = catchUpRef.current && visible.size > 0;
+    // out. Spent on the first fetch that LANDED — not the first one that
+    // happened to bring visible rows: a first load where every endpoint
+    // rejected leaves it armed, so Retry still reports what moved, while a
+    // board that is legitimately empty spends it and a later org switch can
+    // never be mistaken for the catch-up and replay everything into the feed.
+    // A desktop notification still needs an unfocused tab, so opening the app
+    // doesn't notify about what it is already showing.
+    const catchUp = catchUpRef.current && landedRef.current;
     if (catchUp) catchUpRef.current = false;
     if (pollGen !== lastPollGenRef.current || catchUp) {
       lastPollGenRef.current = pollGen;

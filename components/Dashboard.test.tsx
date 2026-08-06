@@ -2430,6 +2430,40 @@ describe("Dashboard — auto refresh", () => {
     expect(screen.getByRole("button", { name: /^activity$/i })).toBeInTheDocument();
   });
 
+  it("keeps the catch-up armed when every endpoint rejected, and reports it on Retry", async () => {
+    // A first load where all five endpoints rejected refreshed nothing, so the
+    // catch-up is still owed — landedRef, not a non-empty board, is what spends
+    // it. Retry is the fetch that lands, and it still reports what moved while
+    // PRison was closed.
+    localStorage.setItem(
+      "prison.statusSnapshot",
+      JSON.stringify([
+        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "pending" },
+      ]),
+    );
+    const serve = mutableFetch() as unknown as (url: string) => Promise<unknown>;
+    let allFail = true;
+    global.fetch = vi.fn((url: string) =>
+      allFail ? Promise.resolve({ ok: false, status: 500 }) : serve(url),
+    ) as unknown as typeof fetch;
+
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText(/failed to load stuck prs/i)).toBeInTheDocument();
+    // Nothing landed, so nothing was reported and the flag is still unspent.
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(screen.getByRole("button", { name: /^activity$/i })).toBeInTheDocument();
+
+    allFail = false;
+    fireEvent.click(screen.getAllByRole("button", { name: /^retry$/i })[0]);
+
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    // STUCK_PR was last seen waiting on checks and is now failing — the change
+    // the catch-up exists to surface.
+    expect(
+      await screen.findByRole("button", { name: /^activity, 1 unseen$/i }),
+    ).toBeInTheDocument();
+  });
+
   it("moves ids that are still on the board to the end of the stored snapshot", async () => {
     // Re-inserting a key keeps its original slot in a Map, so a plain union
     // orders the snapshot by first sighting. The stored bound trims the front,

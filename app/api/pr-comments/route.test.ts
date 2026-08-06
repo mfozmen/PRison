@@ -244,6 +244,10 @@ describe("GET /api/pr-comments", () => {
       .mockResolvedValueOnce({ data: { search: { nodes: [] } }, partial: true });
     const res = await GET(req("http://x/api/pr-comments"));
     expect(res.headers.get("X-Partial")).toBe("1");
+    // GitHub degrading the data it did return can be the steady state for an
+    // account; the list is complete for what the token can see, so the client
+    // must keep taking it.
+    expect(res.headers.get("X-Incomplete")).toBeNull();
   });
 
   it("still serves your own PRs' threads when the reviewed search fails", async () => {
@@ -259,6 +263,10 @@ describe("GET /api/pr-comments", () => {
     expect(await res.json()).toHaveLength(1);
     // A leg that never answered is missing data — which is what X-Partial says.
     expect(res.headers.get("X-Partial")).toBe("1");
+    // And X-Incomplete says the stronger thing: this list is a truncated view
+    // of one that exists, so a silent poll must not overwrite the screen with
+    // it.
+    expect(res.headers.get("X-Incomplete")).toBe("1");
   });
 
   it("still serves the reviewed threads when the own-PR search fails", async () => {
@@ -273,6 +281,7 @@ describe("GET /api/pr-comments", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toHaveLength(1);
     expect(res.headers.get("X-Partial")).toBe("1");
+    expect(res.headers.get("X-Incomplete")).toBe("1");
   });
 
   it("returns a thread once when both searches somehow surface it", async () => {

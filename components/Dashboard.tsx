@@ -165,8 +165,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           fetch(`/api/pr-comments${qs}`).then(async (r) => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const partial = r.headers?.get?.("X-Partial") === "1";
+            // This route runs two searches and answers 200 when only one of
+            // them came back — a truncated list, which the silent-poll guard
+            // below has to treat like an outright failure.
+            const incomplete = r.headers?.get?.("X-Incomplete") === "1";
             const items = (await r.json()) as PrComment[];
-            return { items, partial };
+            return { items, partial, incomplete };
           }),
           fetch(`/api/closed-prs${qs}`).then(async (r) => {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -230,7 +234,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           );
           setReadyPrs(readyResult.status === "fulfilled" ? readyResult.value.items : []);
         }
-        if (!silent || commentsResult.status === "fulfilled") {
+        // A 200 that dropped a whole search is a failure wearing a success's
+        // clothes: replacing the list with it would wipe every own-PR thread
+        // off the screen, and the poll after it would then announce them all
+        // over again as new.
+        if (
+          !silent ||
+          (commentsResult.status === "fulfilled" && !commentsResult.value.incomplete)
+        ) {
           setCommentsError(
             commentsResult.status === "rejected"
               ? "Failed to load comments. Please retry."
@@ -521,6 +532,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const visiblePrIds = new Set([
     ...visibleStuck.map((pr) => pr.id),
     ...visibleReady.map((pr) => pr.id),
+    // Defensive. GitHub refuses to request a review from a PR's own author, so
+    // nothing the route can emit matches this today — the own leg only carries
+    // threads on author:@me PRs, and the reviewed leg's threads carry
+    // viewerStarted. It stays because the rule here is "the PR is on screen",
+    // and this list is on screen.
     ...visibleReviews.map((req) => req.id),
   ]);
   const visibleComments = sortByAgeAsc(

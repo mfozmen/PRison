@@ -2847,11 +2847,21 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
   // Every list serves one item so a failed poll has something to preserve;
   // `failPath` makes exactly one endpoint answer 500 from the next poll on.
   let failPath: string | null;
+  // /api/pr-comments runs two searches and answers 200 with X-Incomplete when
+  // only one of them came back — a truncated list, not a failed fetch.
+  let commentsIncomplete: boolean;
 
   function pollFetch() {
     return vi.fn((url: string) => {
       if (failPath && url.includes(failPath)) {
         return Promise.resolve({ ok: false, status: 500 });
+      }
+      if (commentsIncomplete && url.includes("pr-comments")) {
+        return Promise.resolve({
+          ok: true,
+          headers: { get: (h: string) => (h === "X-Partial" || h === "X-Incomplete" ? "1" : null) },
+          json: () => Promise.resolve([]),
+        });
       }
       return Promise.resolve({
         ok: true,
@@ -2903,6 +2913,7 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
 
   beforeEach(() => {
     failPath = null;
+    commentsIncomplete = false;
     localStorage.setItem("prison.autoRefresh", "true");
     localStorage.setItem("prison.pollInterval", String(POLL_MS));
     localStorage.setItem("prison.closedOpen", "true");
@@ -2942,5 +2953,33 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
     failPath = null;
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(screen.getByText(item)).toBeInTheDocument();
+  });
+
+  it("keeps the comments on screen when a silent poll comes back missing a search", async () => {
+    // A 200 that dropped one of the two searches is a failure wearing a
+    // success's clothes. Replacing the list with it would wipe the threads,
+    // and the next poll would then announce them all over again as new.
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("please fix the null check")).toBeInTheDocument();
+
+    commentsIncomplete = true;
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    expect(screen.getByText("please fix the null check")).toBeInTheDocument();
+  });
+
+  it("still takes a truncated list on a refresh the viewer asked for", async () => {
+    // Asked-for is the opposite case: someone is looking, the banner explains
+    // the gap, and freezing the list would hide it.
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("please fix the null check")).toBeInTheDocument();
+
+    const refreshButton = screen.getByRole("button", { name: /^refresh$/i });
+    await waitFor(() => expect(refreshButton).toBeEnabled());
+
+    commentsIncomplete = true;
+    fireEvent.click(refreshButton);
+    await waitFor(() =>
+      expect(screen.queryByText("please fix the null check")).not.toBeInTheDocument(),
+    );
   });
 });

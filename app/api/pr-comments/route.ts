@@ -39,11 +39,19 @@ export async function GET(request: Request) {
   // back once — but the thread id is the natural key either way, and a
   // duplicated row would render twice and double-count.
   const deduped = [...new Map(comments.map((c) => [c.id, c])).values()];
-  // A leg that never answered is missing data — exactly what X-Partial says.
+  // Two different kinds of missing, and the client acts on them differently.
+  // X-Incomplete means a whole search never answered, so this list is a
+  // truncated view of one that exists — a silent poll must not overwrite what
+  // is on screen with it. X-Partial is GitHub degrading the data it did
+  // return (an org the token cannot fully see), which can be the steady state
+  // for an account and must not freeze the list forever.
+  const incomplete = own.status === "rejected" || reviewed.status === "rejected";
   const partial =
-    own.status === "rejected" ||
-    reviewed.status === "rejected" ||
-    own.value.partial ||
-    reviewed.value.partial;
-  return Response.json(deduped, partial ? { headers: { "X-Partial": "1" } } : undefined);
+    incomplete ||
+    (own.status === "fulfilled" && own.value.partial) ||
+    (reviewed.status === "fulfilled" && reviewed.value.partial);
+  if (!partial) return Response.json(deduped);
+  const headers: Record<string, string> = { "X-Partial": "1" };
+  if (incomplete) headers["X-Incomplete"] = "1";
+  return Response.json(deduped, { headers });
 }

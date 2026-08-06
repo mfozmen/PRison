@@ -47,10 +47,10 @@ export interface DashboardProps {
 // narrows the view.
 const ALL = "";
 
-// Client-side page size for the closed-PR list: initial rows shown and the
-// "Load more" increment. The whole list is fetched up front (see CLOSED_PRS_QUERY,
-// first: 50), so this only governs how much is revealed at once.
-const CLOSED_PAGE_SIZE = 15;
+// Client-side page size for both history sections: initial rows shown and the
+// "Load more" increment. Each list is fetched up front (search first: 50), so
+// this only governs how much is revealed at once.
+const ARCHIVE_PAGE_SIZE = 15;
 
 export function Dashboard({ orgs, login }: DashboardProps) {
   const [selectedOrg, setSelectedOrg] = useState<string>(ALL);
@@ -94,11 +94,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // Closed PRs are history, not a work queue, so the section starts collapsed;
   // closedVisible drives the client-side "Load more" (15 at a time).
   const [closedOpen, setClosedOpen] = useState(false);
-  const [closedVisible, setClosedVisible] = useState(CLOSED_PAGE_SIZE);
+  const [closedVisible, setClosedVisible] = useState(ARCHIVE_PAGE_SIZE);
   // Same shape as the closed history: a look-back list, so it starts collapsed
   // and reveals a page at a time.
   const [reviewedOpen, setReviewedOpen] = useState(false);
-  const [reviewedVisible, setReviewedVisible] = useState(CLOSED_PAGE_SIZE);
+  const [reviewedVisible, setReviewedVisible] = useState(ARCHIVE_PAGE_SIZE);
   const [partial, setPartial] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -258,8 +258,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         // page — but never on a silent poll, which refreshes in place and must
         // not fold a "Load more" expansion the user is reading.
         if (!silent) {
-          setClosedVisible(CLOSED_PAGE_SIZE);
-          setReviewedVisible(CLOSED_PAGE_SIZE);
+          setClosedVisible(ARCHIVE_PAGE_SIZE);
+          setReviewedVisible(ARCHIVE_PAGE_SIZE);
         }
         const anyPartial =
           (stuckResult.status === "fulfilled" && stuckResult.value.partial) ||
@@ -1120,7 +1120,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 {sortedReviewed.length > reviewedVisible && (
                   <button
                     type="button"
-                    onClick={() => setReviewedVisible((v) => v + CLOSED_PAGE_SIZE)}
+                    onClick={() => setReviewedVisible((v) => v + ARCHIVE_PAGE_SIZE)}
                     className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-95 dark:hover:brightness-110 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
                   >
                     Load more (showing {reviewedVisible} of {sortedReviewed.length})
@@ -1154,7 +1154,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 {sortedClosed.length > closedVisible && (
                   <button
                     type="button"
-                    onClick={() => setClosedVisible((v) => v + CLOSED_PAGE_SIZE)}
+                    onClick={() => setClosedVisible((v) => v + ARCHIVE_PAGE_SIZE)}
                     className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-95 dark:hover:brightness-110 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
                   >
                     Load more (showing {closedVisible} of {sortedClosed.length})

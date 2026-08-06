@@ -1535,10 +1535,10 @@ describe("parseLatestRelease", () => {
 
 describe("searchQuery — reviewed", () => {
   it("asks for open PRs the viewer has already reviewed", () => {
-    expect(searchQuery("reviewed")).toBe("is:open is:pr reviewed-by:@me -author:@me");
+    expect(searchQuery("reviewed")).toBe("is:open is:pr reviewed-by:@me -author:@me sort:updated-desc");
   });
   it("scopes the reviewed search to the org", () => {
-    expect(searchQuery("reviewed", "org:acme")).toBe("is:open is:pr reviewed-by:@me -author:@me org:acme");
+    expect(searchQuery("reviewed", "org:acme")).toBe("is:open is:pr reviewed-by:@me -author:@me org:acme sort:updated-desc");
   });
 });
 

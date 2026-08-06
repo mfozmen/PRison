@@ -75,7 +75,7 @@ describe("GET /api/reviewed-prs", () => {
     expect(body[0].state).toBe("CHANGES_REQUESTED");
     expect(body[0].updatedSince).toBe(true);
     expect(queryMock.mock.calls[0][2]).toEqual({
-      q: "is:open is:pr reviewed-by:@me -author:@me org:acme",
+      q: "is:open is:pr reviewed-by:@me -author:@me org:acme sort:updated-desc",
       login: "octocat",
     });
   });
@@ -86,7 +86,7 @@ describe("GET /api/reviewed-prs", () => {
     queryMock.mockResolvedValue({ data: REVIEWED_RAW, partial: false });
     const res = await GET(req("http://x/api/reviewed-prs"));
     expect(res.status).toBe(200);
-    expect(queryMock.mock.calls[0][2].q).toBe("is:open is:pr reviewed-by:@me -author:@me");
+    expect(queryMock.mock.calls[0][2].q).toBe("is:open is:pr reviewed-by:@me -author:@me sort:updated-desc");
   });
 
   it("scopes to a personal account (?user=octocat)", async () => {
@@ -95,7 +95,7 @@ describe("GET /api/reviewed-prs", () => {
     queryMock.mockResolvedValue({ data: REVIEWED_RAW, partial: false });
     const res = await GET(req("http://x/api/reviewed-prs?user=octocat"));
     expect(res.status).toBe(200);
-    expect(queryMock.mock.calls[0][2].q).toBe("is:open is:pr reviewed-by:@me -author:@me user:octocat");
+    expect(queryMock.mock.calls[0][2].q).toBe("is:open is:pr reviewed-by:@me -author:@me user:octocat sort:updated-desc");
   });
 
   it("returns 400 when user contains invalid characters", async () => {

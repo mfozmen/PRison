@@ -181,7 +181,7 @@ describe("GET /api/pr-comments", () => {
     await GET(req("http://x/api/pr-comments?org=acme"));
     expect(queryMock.mock.calls.map((c) => c[2].q)).toEqual([
       "is:open is:pr author:@me org:acme",
-      "is:open is:pr reviewed-by:@me -author:@me org:acme",
+      "is:open is:pr reviewed-by:@me -author:@me org:acme sort:updated-desc",
     ]);
   });
 

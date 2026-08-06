@@ -28,7 +28,12 @@ export function searchQuery(kind: "author" | "review" | "ready" | "closed" | "re
   // GitHub search has no merge-order sort; sort:updated-desc just biases the
   // fixed 50-row window toward recent activity. parseClosedPrs' consumer
   // re-sorts by endedAt client-side for true newest-close-first order.
-  const sort = kind === "closed" ? " sort:updated-desc" : "";
+  //
+  // "reviewed" needs it for a different reason: unlike the other open-PR
+  // searches it is not bounded by the viewer's own PR count, so a heavy
+  // reviewer overflows 50 rows and the default relevance order would hand back
+  // an arbitrary subset — dropping exactly the recent threads this exists for.
+  const sort = kind === "closed" || kind === "reviewed" ? " sort:updated-desc" : "";
   return `${state} is:pr ${who}${scopePart}${sort}`;
 }
 

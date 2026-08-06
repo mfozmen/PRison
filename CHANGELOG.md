@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.7.1](https://github.com/mfozmen/PRison/compare/v1.7.0...v1.7.1) (2026-08-06)
+
+### Bug Fixes
+
+* keep an out-of-date PR out of Ready while its checks are running ([#16](https://github.com/mfozmen/PRison/issues/16)) ([9cdf2f0](https://github.com/mfozmen/PRison/commit/9cdf2f0d2c64deee882988b2acdf156a15816217))
+
 ## [1.7.0](https://github.com/mfozmen/PRison/compare/v1.6.0...v1.7.0) (2026-08-05)
 
 ### Features

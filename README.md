@@ -9,8 +9,10 @@ A read-only GitHub dashboard that shows which pull requests need your attention,
 and for how long — across your personal account and every organization you can
 access. Four lists, oldest first, plus a history section:
 
-- **Ready to merge** — PRs GitHub reports as mergeable now. Out-of-date branches
-  still count and get a **"Needs update"** hint (a bot/manual update handles them).
+- **Ready to merge** — PRs GitHub reports as mergeable now. An out-of-date branch
+  still counts, with a **"Needs update"** hint (a bot/manual update handles it) —
+  but only once its checks are green; while one is red or still running it
+  belongs under *Stuck on checks*, and no PR is ever in both lists.
 - **Comments awaiting your reply** — review threads on your own PRs where the last
   word isn't yours. Each row opens the comment itself, not the top of the PR.
 - **Waiting on your review** — PRs you're blocking others on.

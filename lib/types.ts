@@ -85,7 +85,10 @@ export type ReviewedPr = {
   number: number;
   repo: string;
   author: string;
-  state: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED";  // the viewer's own latest submitted review
+  // The viewer's own latest submitted review. DISMISSED is not a verdict — the
+  // author cleared it — but it is still the last thing the viewer said, and
+  // saying so beats badging the opinion underneath it.
+  state: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED" | "DISMISSED";
   reviewedAt: string;    // ISO — when the viewer last reviewed; drives sort + the age
   updatedSince: boolean; // a commit landed after that review — the author answered with code
   isDraft: boolean;

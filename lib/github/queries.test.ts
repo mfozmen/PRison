@@ -1372,6 +1372,13 @@ describe("parseRepoSearch", () => {
 });
 
 describe("parsePrComments", () => {
+  it("reads a non-array nodes field as an empty list", () => {
+    // This route has no try/catch — the throw a ?? [] default would let through
+    // escapes as a 500 and takes the other search's results with it.
+    expect(parsePrComments({ search: { nodes: {} } }, "mfozmen")).toEqual([]);
+    expect(parsePrComments({}, "mfozmen")).toEqual([]);
+  });
+
   const thread = (over: Record<string, unknown> = {}, comment: Record<string, unknown> | null = {}) => ({
     id: "t1",
     isResolved: false,
@@ -1628,17 +1635,29 @@ describe("parseReviewedPrs", () => {
   });
 
   it("reads a state the UI has no badge for as Commented", () => {
-    // DISMISSED is filtered out by the query today, but the response is untyped
-    // and an unmapped state would render a blank badge.
+    // PENDING never reaches a submitted review, but the response is untyped and
+    // an unmapped state would render a blank badge.
+    const [pr] = parseReviewedPrs(
+      raw({ reviews: { nodes: [{ state: "PENDING", submittedAt: "2026-07-01T00:00:00Z" }] } }),
+    );
+    expect(pr.state).toBe("COMMENTED");
+  });
+
+  it("keeps a dismissed review as its own verdict", () => {
+    // The author cleared it, so it is not an opinion any more — but it is still
+    // the last thing the viewer said, and falling through to an older review
+    // would badge a verdict that has been superseded twice over.
     const [pr] = parseReviewedPrs(
       raw({ reviews: { nodes: [{ state: "DISMISSED", submittedAt: "2026-07-01T00:00:00Z" }] } }),
     );
-    expect(pr.state).toBe("COMMENTED");
+    expect(pr.state).toBe("DISMISSED");
   });
 
   it("reads a nodeless response as an empty list", () => {
     expect(parseReviewedPrs({})).toEqual([]);
     expect(parseReviewedPrs({ search: { nodes: [null] } })).toEqual([]);
+    // Not an array: ?? [] would let it through and the next .filter would throw.
+    expect(parseReviewedPrs({ search: { nodes: {} } })).toEqual([]);
   });
 });
 

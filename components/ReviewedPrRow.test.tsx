@@ -37,6 +37,7 @@ describe("ReviewedPrRow", () => {
     ["APPROVED", "Approved"],
     ["CHANGES_REQUESTED", "Changes requested"],
     ["COMMENTED", "Commented"],
+    ["DISMISSED", "Dismissed"],
   ] as const)("badges a %s review as %s", (state, label) => {
     render(<ReviewedPrRow pr={{ ...approved, state }} now={now} />);
     expect(screen.getByText(label)).toBeInTheDocument();

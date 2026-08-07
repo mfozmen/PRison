@@ -2981,5 +2981,8 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
     await waitFor(() =>
       expect(screen.queryByText("please fix the null check")).not.toBeInTheDocument(),
     );
+    // And it says so, rather than rendering "No comments awaiting your reply" —
+    // a confident claim built on half a list.
+    expect(screen.getByText(/some comment threads couldn't be loaded/i)).toBeInTheDocument();
   });
 });

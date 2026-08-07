@@ -245,7 +245,13 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           setCommentsError(
             commentsResult.status === "rejected"
               ? "Failed to load comments. Please retry."
-              : null,
+              : // Reached only when the viewer asked for this refresh (a silent
+                // poll skips the whole branch on an incomplete answer). Saying
+                // nothing here would render "No comments awaiting your reply" —
+                // a confident claim built on half a list.
+                commentsResult.value.incomplete
+                ? "Some comment threads couldn't be loaded. Please retry."
+                : null,
           );
           setComments(commentsResult.status === "fulfilled" ? commentsResult.value.items : []);
         }

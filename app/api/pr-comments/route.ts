@@ -21,9 +21,17 @@ export async function GET(request: Request) {
   // one query, and a blip on the new one must not take the old one down with
   // it. It also makes the try/catch every sibling route needs unnecessary —
   // neither leg can reject past this point.
+  // withStarter is what the query costs: only the reviewed leg reads who opened
+  // a thread, and this is the heaviest query in the app.
   const [own, reviewed] = await Promise.allSettled([
-    ghQuery(token, PR_COMMENTS_QUERY, { q: searchQuery("author", scoped.scope) }),
-    ghQuery(token, PR_COMMENTS_QUERY, { q: searchQuery("reviewed", scoped.scope) }),
+    ghQuery(token, PR_COMMENTS_QUERY, {
+      q: searchQuery("author", scoped.scope),
+      withStarter: false,
+    }),
+    ghQuery(token, PR_COMMENTS_QUERY, {
+      q: searchQuery("reviewed", scoped.scope),
+      withStarter: true,
+    }),
   ]);
   // Both down is an upstream outage, not partial data.
   if (own.status === "rejected" && reviewed.status === "rejected") {

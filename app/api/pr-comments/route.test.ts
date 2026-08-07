@@ -50,6 +50,24 @@ const COMMENTS_RAW = {
   },
 };
 
+// Marks every thread as opened by the viewer, which is what the reviewed-PR
+// search keeps.
+function startedByViewer(raw: typeof COMMENTS_RAW) {
+  return {
+    search: {
+      nodes: raw.search.nodes.map((pr) => ({
+        ...pr,
+        reviewThreads: {
+          nodes: pr.reviewThreads.nodes.map((t) => ({
+            ...t,
+            starter: { nodes: [{ author: { login: "mfozmen" } }] },
+          })),
+        },
+      })),
+    },
+  };
+}
+
 beforeEach(() => {
   readTokenMock.mockReset();
   readLoginMock.mockReset();
@@ -155,5 +173,124 @@ describe("GET /api/pr-comments", () => {
     queryMock.mockResolvedValue({ data: COMMENTS_RAW, partial: false });
     const res = await GET(req("http://x/api/pr-comments?org=acme"));
     expect(res.headers.get("X-Partial")).toBeNull();
+  });
+  it("runs both searches: own PRs and PRs the viewer reviewed", async () => {
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("mfozmen");
+    queryMock.mockResolvedValue({ data: { search: { nodes: [] } }, partial: false });
+    await GET(req("http://x/api/pr-comments?org=acme"));
+    expect(queryMock.mock.calls.map((c) => c[2].q)).toEqual([
+      "is:open is:pr author:@me org:acme",
+      "is:open is:pr reviewed-by:@me -author:@me org:acme sort:updated-desc",
+    ]);
+  });
+
+  it("keeps only viewer-raised threads from the reviewed-PR search", async () => {
+    // On someone else's PR every unresolved thread is waiting on somebody;
+    // only the ones the viewer raised are waiting on the viewer.
+    const reviewedRaw = (starter: string) => ({
+      search: {
+        nodes: [
+          {
+            id: "PR_9",
+            number: 9,
+            url: "https://gh/acme/e/pull/9",
+            repository: { nameWithOwner: "acme/e" },
+            reviewThreads: {
+              nodes: [
+                {
+                  id: "t9",
+                  isResolved: false,
+                  path: "internal/dispatch.go",
+                  starter: { nodes: [{ author: { login: starter } }] },
+                  comments: {
+                    nodes: [
+                      {
+                        author: { login: "alice", __typename: "User" },
+                        bodyText: "done",
+                        createdAt: "2026-07-02T00:00:00Z",
+                        url: "https://gh/acme/e/pull/9#discussion_r9",
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("mfozmen");
+    queryMock
+      .mockResolvedValueOnce({ data: { search: { nodes: [] } }, partial: false })
+      .mockResolvedValueOnce({ data: reviewedRaw("mfozmen"), partial: false });
+    const mine = await (await GET(req("http://x/api/pr-comments"))).json();
+    expect(mine.map((c: { id: string }) => c.id)).toEqual(["t9"]);
+
+    queryMock.mockReset();
+    queryMock
+      .mockResolvedValueOnce({ data: { search: { nodes: [] } }, partial: false })
+      .mockResolvedValueOnce({ data: reviewedRaw("bob"), partial: false });
+    const theirs = await (await GET(req("http://x/api/pr-comments"))).json();
+    expect(theirs).toEqual([]);
+  });
+
+  it("sets X-Partial when only the reviewed-PR search was partial", async () => {
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("mfozmen");
+    queryMock
+      .mockResolvedValueOnce({ data: { search: { nodes: [] } }, partial: false })
+      .mockResolvedValueOnce({ data: { search: { nodes: [] } }, partial: true });
+    const res = await GET(req("http://x/api/pr-comments"));
+    expect(res.headers.get("X-Partial")).toBe("1");
+    // GitHub degrading the data it did return can be the steady state for an
+    // account; the list is complete for what the token can see, so the client
+    // must keep taking it.
+    expect(res.headers.get("X-Incomplete")).toBeNull();
+  });
+
+  it("still serves your own PRs' threads when the reviewed search fails", async () => {
+    // Before the reviewed search existed this list depended on one query; a
+    // blip on the new one must not take the old one down with it.
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("mfozmen");
+    queryMock
+      .mockResolvedValueOnce({ data: COMMENTS_RAW, partial: false })
+      .mockRejectedValueOnce(new Error("network error"));
+    const res = await GET(req("http://x/api/pr-comments"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toHaveLength(1);
+    // A leg that never answered is missing data — which is what X-Partial says.
+    expect(res.headers.get("X-Partial")).toBe("1");
+    // And X-Incomplete says the stronger thing: this list is a truncated view
+    // of one that exists, so a silent poll must not overwrite the screen with
+    // it.
+    expect(res.headers.get("X-Incomplete")).toBe("1");
+  });
+
+  it("still serves the reviewed threads when the own-PR search fails", async () => {
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("mfozmen");
+    queryMock
+      .mockRejectedValueOnce(new Error("network error"))
+      // The reviewed leg keeps only threads the viewer raised, so this one is
+      // theirs.
+      .mockResolvedValueOnce({ data: startedByViewer(COMMENTS_RAW), partial: false });
+    const res = await GET(req("http://x/api/pr-comments"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toHaveLength(1);
+    expect(res.headers.get("X-Partial")).toBe("1");
+    expect(res.headers.get("X-Incomplete")).toBe("1");
+  });
+
+  it("returns a thread once when both searches somehow surface it", async () => {
+    // The thread id is the natural key; a duplicated row would render twice
+    // and double-count.
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("mfozmen");
+    queryMock.mockResolvedValue({ data: COMMENTS_RAW, partial: false });
+    const body = await (await GET(req("http://x/api/pr-comments"))).json();
+    expect(body.filter((c: { id: string }) => c.id === "t1")).toHaveLength(1);
   });
 });

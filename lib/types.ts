@@ -57,6 +57,7 @@ export type PrComment = {
   preview: string;     // whitespace-normalized bodyText, at most PREVIEW_MAX chars, ellipsized when cut
   commentedAt: string; // ISO — when the ball landed in the viewer's court; drives the age badge
   viewerReacted: boolean; // viewer has an emoji reaction on the last comment; the client can treat that as an acknowledgement and hide the thread
+  viewerStarted: boolean; // the viewer opened the thread — true only for threads found on PRs they reviewed, where that is the whole reason the thread is theirs to answer
 };
 
 // One of the viewer's own closed PRs (author:@me is:closed) — merged or closed
@@ -70,6 +71,24 @@ export type ClosedPr = {
   repo: string;
   merged: boolean;   // true = merged, false = closed without merging
   endedAt: string;   // ISO — mergedAt ?? closedAt; drives sort + "merged/closed Xd ago"
+};
+
+// Someone else's open PR the viewer has already reviewed (is:open reviewed-by:@me).
+// "Waiting on your review" drops a PR the moment you submit a review, but that is
+// where the interesting part starts — did they answer the changes you asked for?
+// Powers the "Recently reviewed" history section, newest review first.
+// See parseReviewedPrs.
+export type ReviewedPr = {
+  id: string;
+  title: string;
+  url: string;
+  number: number;
+  repo: string;
+  author: string;
+  state: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED";  // the viewer's own latest submitted review
+  reviewedAt: string;    // ISO — when the viewer last reviewed; drives sort + the age
+  updatedSince: boolean; // a commit landed after that review — the author answered with code
+  isDraft: boolean;
 };
 
 export type AgeBucket = "fresh" | "warning" | "urgent";

@@ -5,9 +5,10 @@
 
 import type { StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr } from "./types";
 
-/** Selectable auto-refresh intervals. Each poll costs 5 API calls, so the
- * shortest option is 5 minutes — enough to notice a blocked PR without
- * burning rate limit on a tab left open all day. */
+/** Selectable auto-refresh intervals. Each poll costs 6 endpoint calls (the
+ * comments one runs two searches), so the shortest option is 5 minutes —
+ * enough to notice a blocked PR without burning rate limit on a tab left open
+ * all day. */
 export const POLL_INTERVAL_OPTIONS = [
   { ms: 5 * 60_000, label: "Every 5 minutes" },
   { ms: 15 * 60_000, label: "Every 15 minutes" },

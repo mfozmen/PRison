@@ -1,24 +1,39 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Raw GraphQL responses are intentionally untyped at the boundary; parsers
 // convert them to domain types as the first step.
-import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr } from "@/lib/types";
+import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr, ReviewedPr } from "@/lib/types";
 
 // scope is optional: when omitted, the search spans every repo the token can
 // see (the user's personal account plus all accessible organizations).
 // Callers pass a ready-made qualifier string such as "org:acme" or "user:mfozmen".
-export function searchQuery(kind: "author" | "review" | "ready" | "closed", scope?: string): string {
+export function searchQuery(kind: "author" | "review" | "ready" | "closed" | "reviewed", scope?: string): string {
   const scopePart = scope ? ` ${scope}` : "";
   // "ready" fetches all of the user's open PRs; parseReadyPrs then keeps the
   // ones GitHub reports as mergeable now (mergeStateStatus CLEAN, not draft).
   // We do NOT filter on review:approved here — a CLEAN PR is already mergeable
   // (including any required review), and some repos don't require review.
-  const who = kind === "review" ? "review-requested:@me" : "author:@me";
+  // "reviewed" is the other side of "review": PRs the viewer has already
+  // submitted a review on, which review-requested:@me no longer returns.
+  // -author:@me on "reviewed": GitHub accepts a COMMENTED review on your own PR
+  // (inline self-annotations submit as one), and reviewed-by:@me returns it. Your
+  // own PR is already in the work queues, so it is not history to look back at.
+  const who =
+    kind === "review"
+      ? "review-requested:@me"
+      : kind === "reviewed"
+        ? "reviewed-by:@me -author:@me"
+        : "author:@me";
   // "closed" fetches the user's finished PRs (merged is a subset of closed).
   const state = kind === "closed" ? "is:closed" : "is:open";
   // GitHub search has no merge-order sort; sort:updated-desc just biases the
   // fixed 50-row window toward recent activity. parseClosedPrs' consumer
   // re-sorts by endedAt client-side for true newest-close-first order.
-  const sort = kind === "closed" ? " sort:updated-desc" : "";
+  //
+  // "reviewed" needs it for a different reason: unlike the other open-PR
+  // searches it is not bounded by the viewer's own PR count, so a heavy
+  // reviewer overflows 50 rows and the default relevance order would hand back
+  // an arbitrary subset — dropping exactly the recent threads this exists for.
+  const sort = kind === "closed" || kind === "reviewed" ? " sort:updated-desc" : "";
   return `${state} is:pr ${who}${scopePart}${sort}`;
 }
 
@@ -230,6 +245,10 @@ export const PR_COMMENTS_QUERY = `
         id number url repository { nameWithOwner }
         reviewThreads(first: 50) { nodes {
           id isResolved path
+          # Who opened the thread. On the viewer's own PRs every unresolved
+          # thread is theirs to answer, but on someone else's PR only the
+          # threads the viewer started are — see parsePrComments.
+          starter: comments(first: 1) { nodes { author { login } } }
           comments(last: 1) { nodes {
             author { login __typename }
             bodyText createdAt url
@@ -264,14 +283,28 @@ function previewOf(bodyText: string): string {
  * A viewer emoji reaction on the last comment (viewerReacted) is surfaced the same
  * way: reacting is how the viewer acknowledges a comment without replying, and the
  * Dashboard hides acknowledged threads behind a toggle.
+ *
+ * viewerStartedOnly narrows this to threads the viewer opened, which is what the
+ * same question means on someone ELSE's PR: every unresolved thread there is
+ * waiting on somebody, but only the ones the viewer raised are waiting on the
+ * viewer. On the viewer's own PRs it stays off — the PR is theirs, so every
+ * unanswered thread is theirs to answer.
  */
-export function parsePrComments(raw: any, viewerLogin: string): PrComment[] {
+export function parsePrComments(
+  raw: any,
+  viewerLogin: string,
+  viewerStartedOnly = false,
+): PrComment[] {
   return (raw?.search?.nodes ?? [])
     .filter((pr: any) => pr?.id)
     .flatMap((pr: any) =>
       (pr.reviewThreads?.nodes ?? [])
         .filter((t: any) => t?.isResolved === false)
         .map((thread: any) => ({ thread, last: thread.comments?.nodes?.[0] }))
+        .filter(({ thread }: any) =>
+          !viewerStartedOnly ||
+          thread.starter?.nodes?.[0]?.author?.login === viewerLogin,
+        )
         .filter(({ last }: any) => last?.author?.login && last.author.login !== viewerLogin)
         .map(({ thread, last }: any) => ({
           id: thread.id,
@@ -285,6 +318,10 @@ export function parsePrComments(raw: any, viewerLogin: string): PrComment[] {
           preview: previewOf(last.bodyText ?? ""),
           commentedAt: last.createdAt ?? "",
           viewerReacted: (last.reactionGroups ?? []).some((g: any) => g?.viewerHasReacted === true),
+          // Only the viewer-started pass can produce these, and the Dashboard
+          // reads it to know the thread stands on its own — it is waiting on the
+          // viewer whether or not that PR is on the board.
+          viewerStarted: viewerStartedOnly,
         } as PrComment)),
     );
 }
@@ -335,6 +372,72 @@ export function parseClosedPrs(raw: any): ClosedPr[] {
       merged: !!n.merged,
       endedAt: n.mergedAt ?? n.closedAt ?? "",
     } as ClosedPr));
+}
+
+// $login rather than @me: reviews(author:) takes a literal login, and it is the
+// same viewer the session already resolved for parsePrComments.
+export const REVIEWED_PRS_QUERY = `
+  query($q: String!, $login: String!) {
+    search(query: $q, type: ISSUE, first: 50) {
+      nodes { ... on PullRequest {
+        id title url number isDraft
+        repository { nameWithOwner }
+        author { login }
+        reviews(last: 1, author: $login, states: [APPROVED, CHANGES_REQUESTED, COMMENTED]) {
+          nodes { state submittedAt }
+        }
+        commits(last: 1) { nodes { commit { pushedDate committedDate } } }
+      } }
+    }
+  }`;
+
+// The verdicts a submitted review can carry. Checked rather than trusted: the
+// GraphQL response is untyped at this boundary, and a state the UI has no badge
+// for would render blank.
+const REVIEW_STATES = new Set(["APPROVED", "CHANGES_REQUESTED", "COMMENTED"]);
+
+/**
+ * Open PRs the viewer has already reviewed — the ones "Waiting on your review"
+ * dropped the moment the review was submitted.
+ *
+ * A PR the viewer is being asked to review AGAIN is not history: GitHub reports
+ * it under review-requested:@me as well, and the Dashboard keeps it there so no
+ * PR sits in two lists.
+ *
+ * PENDING reviews are excluded by the query's states filter — an unsubmitted
+ * draft review is not a review anyone else can see.
+ */
+export function parseReviewedPrs(raw: any): ReviewedPr[] {
+  return (raw?.search?.nodes ?? [])
+    .filter((n: any) => n?.id)
+    .map((n: any) => {
+      const review = n.reviews?.nodes?.[0] ?? {};
+      const commit = n.commits?.nodes?.[0]?.commit ?? {};
+      const pushedAt = commit.pushedDate ?? commit.committedDate ?? "";
+      const reviewedAt = review.submittedAt ?? "";
+      return {
+        id: n.id,
+        title: n.title,
+        url: n.url,
+        number: n.number,
+        repo: n.repository?.nameWithOwner ?? "",
+        author: n.author?.login ?? "unknown",
+        // Anything unrecognised reads as the weakest verdict — it says nothing
+        // about the code, which is what "Commented" means.
+        state: REVIEW_STATES.has(review.state) ? review.state : "COMMENTED",
+        reviewedAt,
+        // A push after the review is the reason to come back — the author
+        // answered with code. Parsed rather than string-compared: the
+        // timestamps come from two different fields, and only one of them
+        // being absent should read as "no news", not as "newer".
+        updatedSince:
+          !!pushedAt && !!reviewedAt && Date.parse(pushedAt) > Date.parse(reviewedAt),
+        isDraft: n.isDraft ?? false,
+      } as ReviewedPr;
+    })
+    // No submitted review from the viewer means search matched on something we
+    // can't date — without a review time the row has nothing to say.
+    .filter((pr: ReviewedPr) => pr.reviewedAt !== "");
 }
 
 export const REPO_SEARCH_QUERY = `

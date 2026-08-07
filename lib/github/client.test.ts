@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GraphqlResponseError } from "@octokit/graphql";
 
 const { graphqlMock } = vi.hoisted(() => ({ graphqlMock: vi.fn() }));
@@ -10,6 +10,14 @@ vi.mock("@octokit/graphql", async (orig) => {
 });
 
 import { ghQuery } from "./client";
+
+// The retry path asserts call counts, which only mean anything from zero.
+// Braces, not a concise body: mockReset returns the mock, and a beforeEach that
+// returns a function hands Vitest a teardown callback — it would then CALL the
+// mock after each test and reject into nobody's hands.
+beforeEach(() => {
+  graphqlMock.mockReset();
+});
 
 describe("ghQuery", () => {
   it("returns the data on success", async () => {
@@ -29,5 +37,240 @@ describe("ghQuery", () => {
   it("rethrows non-GraphQL errors (network, auth)", async () => {
     graphqlMock.mockRejectedValue(new Error("network down"));
     await expect(ghQuery("t", "query")).rejects.toThrow("network down");
+  });
+});
+
+describe("ghQuery — the secondary rate limit", () => {
+  // A refresh fires six of these at once; GitHub answers a burst account-wide,
+  // so every list on the board fails together and the page looks broken.
+  // Retry-After by default, because that is the only shape that earns a retry.
+  const secondary = (over: Record<string, unknown> = {}) =>
+    Object.assign(new Error("You have exceeded a secondary rate limit"), {
+      status: 403,
+      response: { headers: { "retry-after": "1" } },
+      ...over,
+    });
+
+  // Fake timers for the whole block, installed and removed in pairs: the waits
+  // here are seconds long, and a useRealTimers() left at the end of a test body
+  // never runs when an assertion above it fails — leaking fake timers into
+  // every test after it.
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // Past the longest wait plus the jitter on top of it.
+  const settle = (ms: number) => vi.advanceTimersByTimeAsync(ms + 2_000);
+
+  it("waits and retries once, so the burst reads as a hiccup", async () => {
+    graphqlMock
+      .mockRejectedValueOnce(secondary())
+      .mockResolvedValueOnce({ viewer: { login: "me" } });
+    const p = ghQuery("t", "query");
+    await settle(1_000);
+    await expect(p).resolves.toEqual({ data: { viewer: { login: "me" } }, partial: false });
+    expect(graphqlMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("waits as long as Retry-After asks", async () => {
+    graphqlMock
+      .mockRejectedValueOnce(secondary({ response: { headers: { "retry-after": "2" } } }))
+      .mockResolvedValueOnce({ ok: true });
+    const p = ghQuery("t", "query");
+    await settle(2_000);
+    await expect(p).resolves.toEqual({ data: { ok: true }, partial: false });
+  });
+
+  it("steps aside when GitHub asks for longer than a refresh should take", async () => {
+    // Coming back early can extend the block, so a long Retry-After is a reason
+    // not to retry at all. The banner and its Retry button say the rest.
+    graphqlMock.mockRejectedValue(secondary({ response: { headers: { "retry-after": "60" } } }));
+    await expect(ghQuery("t", "query")).rejects.toThrow("secondary rate limit");
+    expect(graphqlMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("steps aside when GitHub does not say how long the block runs", async () => {
+    // A short guess re-fires the burst that tripped the limit; a safe one holds
+    // the dashboard open for a minute. Neither is better than the banner.
+    graphqlMock.mockRejectedValue(secondary({ response: { headers: {} } }));
+    await expect(ghQuery("t", "query")).rejects.toThrow("secondary rate limit");
+    expect(graphqlMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the ceiling room for the jitter rather than letting it decide", async () => {
+    // 5s is the ceiling exactly, so a wait plus its jitter no longer fits. The
+    // header decides on its own — otherwise a coin flip would be the difference
+    // between a list coming back and a list showing an error banner, and six
+    // lists would each flip it separately.
+    graphqlMock.mockRejectedValue(secondary({ response: { headers: { "retry-after": "5" } } }));
+    await expect(ghQuery("t", "query")).rejects.toThrow("secondary rate limit");
+    expect(graphqlMock).toHaveBeenCalledTimes(1);
+
+    // 3s does fit, jitter and all, so it retries every time.
+    graphqlMock.mockReset();
+    graphqlMock
+      .mockRejectedValueOnce(secondary({ response: { headers: { "retry-after": "3" } } }))
+      .mockResolvedValueOnce({ ok: true });
+    const p = ghQuery("t", "query");
+    await settle(3_000);
+    await expect(p).resolves.toEqual({ data: { ok: true }, partial: false });
+  });
+
+  it("spreads the retries out instead of waking all six together", async () => {
+    // A fixed wait would re-fire the very burst that tripped the limit.
+    const waits: number[] = [];
+    const realSetTimeout = globalThis.setTimeout;
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void, ms?: number) => {
+      waits.push(ms ?? 0);
+      return realSetTimeout(fn, 0);
+    }) as typeof setTimeout);
+    for (let i = 0; i < 8; i++) {
+      graphqlMock.mockRejectedValueOnce(secondary()).mockResolvedValueOnce({ ok: true });
+      await ghQuery("t", "query");
+    }
+    vi.mocked(globalThis.setTimeout).mockRestore();
+    expect(new Set(waits).size).toBeGreaterThan(1);
+    expect(Math.min(...waits)).toBeGreaterThanOrEqual(1_000);
+    expect(Math.max(...waits)).toBeLessThan(3_000);
+  });
+
+  it("gives up after the one retry rather than hammering GitHub", async () => {
+    graphqlMock.mockRejectedValue(secondary());
+    // The assertion is attached before the clock moves: the call rejects while
+    // the timers advance, and a handler added a tick later is an unhandled
+    // rejection — which fails the run on an otherwise green suite.
+    const settled = expect(ghQuery("t", "query")).rejects.toThrow("secondary rate limit");
+    await settle(1_000);
+    await settled;
+    expect(graphqlMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps partial data the retry came back with", async () => {
+    const partialErr = new GraphqlResponseError({} as any, {} as any, {
+      data: { search: { nodes: [] } },
+      errors: [{ message: "`acme` forbids access" }],
+    } as any);
+    graphqlMock.mockRejectedValueOnce(secondary()).mockRejectedValueOnce(partialErr);
+    const p = ghQuery("t", "query");
+    await settle(1_000);
+    await expect(p).resolves.toEqual({ data: { search: { nodes: [] } }, partial: true });
+  });
+
+  it("does not retry a plain 403 — a permission failure fails identically", async () => {
+    graphqlMock.mockRejectedValue(Object.assign(new Error("Resource not accessible"), { status: 403 }));
+    await expect(ghQuery("t", "query")).rejects.toThrow("Resource not accessible");
+    expect(graphqlMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a permission 403 that happens to carry Retry-After", async () => {
+    // The header sizes the wait; it is not what decides there should be one.
+    graphqlMock.mockRejectedValue(Object.assign(new Error("Resource not accessible"), {
+      status: 403,
+      response: { headers: { "retry-after": "1" } },
+    }));
+    await expect(ghQuery("t", "query")).rejects.toThrow("Resource not accessible");
+    expect(graphqlMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a 403 that says nothing at all", async () => {
+    graphqlMock.mockRejectedValue({ status: 403 });
+    await expect(ghQuery("t", "query")).rejects.toBeTruthy();
+    expect(graphqlMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries a 429 the same way — GitHub uses both codes for this", async () => {
+    graphqlMock
+      .mockRejectedValueOnce(Object.assign(new Error("Too many requests"), {
+        status: 429,
+        response: { headers: { "retry-after": "1" } },
+      }))
+      .mockResolvedValueOnce({ ok: true });
+    const p = ghQuery("t", "query");
+    await settle(1_000);
+    await expect(p).resolves.toEqual({ data: { ok: true }, partial: false });
+  });
+
+  it("does not retry the hourly point budget — it resets on the hour, not in a second", async () => {
+    const err = new GraphqlResponseError({} as any, {} as any, {
+      data: null,
+      errors: [{ type: "RATE_LIMITED", message: "API rate limit exceeded" }],
+    } as any);
+    graphqlMock.mockRejectedValue(err);
+    await expect(ghQuery("t", "query")).rejects.toBeTruthy();
+    expect(graphqlMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats an unparseable Retry-After as GitHub not having said", async () => {
+    graphqlMock.mockRejectedValue(secondary({ response: { headers: { "retry-after": "soon" } } }));
+    await expect(ghQuery("t", "query")).rejects.toThrow("secondary rate limit");
+    expect(graphqlMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("ghQuery — what it leaves behind on a failure", () => {
+  // Every route turns the throw into a bare 502, so this line is the only
+  // record of why. "It works when I hit Retry" is undiagnosable without it.
+  it("logs the GraphQL error types and messages, not the wrapper's", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const err = new GraphqlResponseError({} as any, {} as any, {
+      data: null,
+      errors: [{ type: "RATE_LIMITED", message: "API rate limit exceeded" }],
+    } as any);
+    graphqlMock.mockRejectedValue(err);
+    await expect(ghQuery("t", "query")).rejects.toBeTruthy();
+    expect(spy.mock.calls[0][0]).toContain("RATE_LIMITED: API rate limit exceeded");
+    spy.mockRestore();
+  });
+
+  it("survives an errors entry with neither a type nor a message", async () => {
+    // The logger runs on the failure path; a throw in here would swallow the
+    // upstream error and replace it with a TypeError.
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const err = new GraphqlResponseError({} as any, {} as any, {
+      data: null,
+      errors: [{}],
+    } as any);
+    graphqlMock.mockRejectedValue(err);
+    await expect(ghQuery("t", "query")).rejects.toBeTruthy();
+    expect(spy.mock.calls[0][0]).toContain("?: ");
+    spy.mockRestore();
+  });
+
+  it("falls back to the error's own message when there is no errors array", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    graphqlMock.mockRejectedValue(new Error("network down"));
+    await expect(ghQuery("t", "query")).rejects.toThrow("network down");
+    expect(spy.mock.calls[0][0]).toContain("network down");
+    spy.mockRestore();
+  });
+
+  it("still writes a line when what was thrown carries nothing at all", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    graphqlMock.mockRejectedValue({});
+    await expect(ghQuery("t", "query")).rejects.toBeTruthy();
+    expect(spy.mock.calls[0][0]).toContain("status=? name=? no detail");
+
+    // `throw null` is legal, and a logger that dies on it would replace the
+    // upstream failure with a TypeError from inside the error path.
+    graphqlMock.mockRejectedValue(null);
+    await expect(ghQuery("t", "query")).rejects.toBeNull();
+    expect(spy.mock.calls[1][0]).toContain("status=? name=? no detail");
+    spy.mockRestore();
+  });
+
+  it("never writes the request the error carries, which holds the token", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const err = Object.assign(new Error("HttpError"), {
+      status: 403,
+      request: { headers: { authorization: "token ghp_secret" } },
+    });
+    graphqlMock.mockRejectedValue(err);
+    await expect(ghQuery("t", "query")).rejects.toBeTruthy();
+    expect(spy.mock.calls[0][0]).toContain("status=403");
+    expect(spy.mock.calls[0][0]).not.toContain("ghp_secret");
+    spy.mockRestore();
   });
 });

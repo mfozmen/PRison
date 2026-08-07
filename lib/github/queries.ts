@@ -6,23 +6,32 @@ import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr, Reviewe
 // scope is optional: when omitted, the search spans every repo the token can
 // see (the user's personal account plus all accessible organizations).
 // Callers pass a ready-made qualifier string such as "org:acme" or "user:mfozmen".
-export function searchQuery(kind: "author" | "review" | "ready" | "closed" | "reviewed", scope?: string): string {
+export type SearchKind = "author" | "review" | "ready" | "closed" | "reviewed";
+
+// Whose PRs each list is about.
+//
+// "ready" fetches all of the user's open PRs; parseReadyPrs then keeps the ones
+// GitHub reports as mergeable now (mergeStateStatus CLEAN, not draft). We do NOT
+// filter on review:approved here — a CLEAN PR is already mergeable (including
+// any required review), and some repos don't require review.
+//
+// "reviewed" is the other side of "review": PRs the viewer has already submitted
+// a review on, which review-requested:@me no longer returns. It excludes
+// -author:@me because GitHub accepts a COMMENTED review on your own PR (inline
+// self-annotations submit as one) and reviewed-by:@me returns it — and your own
+// PR is already in the work queues, so it is not history to look back at.
+const OWN_PRS = "author:@me";
+const WHO: Record<SearchKind, string> = {
+  author: OWN_PRS,
+  ready: OWN_PRS,
+  closed: OWN_PRS,
+  review: "review-requested:@me",
+  reviewed: "reviewed-by:@me -author:@me",
+};
+
+export function searchQuery(kind: SearchKind, scope?: string): string {
   const scopePart = scope ? ` ${scope}` : "";
-  // "ready" fetches all of the user's open PRs; parseReadyPrs then keeps the
-  // ones GitHub reports as mergeable now (mergeStateStatus CLEAN, not draft).
-  // We do NOT filter on review:approved here — a CLEAN PR is already mergeable
-  // (including any required review), and some repos don't require review.
-  // "reviewed" is the other side of "review": PRs the viewer has already
-  // submitted a review on, which review-requested:@me no longer returns.
-  // -author:@me on "reviewed": GitHub accepts a COMMENTED review on your own PR
-  // (inline self-annotations submit as one), and reviewed-by:@me returns it. Your
-  // own PR is already in the work queues, so it is not history to look back at.
-  const who =
-    kind === "review"
-      ? "review-requested:@me"
-      : kind === "reviewed"
-        ? "reviewed-by:@me -author:@me"
-        : "author:@me";
+  const who = WHO[kind];
   // "closed" fetches the user's finished PRs (merged is a subset of closed).
   const state = kind === "closed" ? "is:closed" : "is:open";
   // GitHub search has no merge-order sort; sort:updated-desc just biases the
@@ -185,7 +194,7 @@ function isBehindAndGreen(node: any): boolean {
 }
 
 export function parseStuckPrs(raw: any): StuckPr[] {
-  return (raw?.search?.nodes ?? [])
+  return searchNodes(raw)
     .filter((n: any) => n?.id)
     .map((n: any) => {
       const commit = n.commits?.nodes?.[0]?.commit ?? {};
@@ -218,7 +227,7 @@ export function parseStuckPrs(raw: any): StuckPr[] {
 }
 
 export function parseReviewRequests(raw: any, viewerLogin: string): ReviewRequest[] {
-  return (raw?.search?.nodes ?? [])
+  return searchNodes(raw)
     .filter((n: any) => n?.id)
     .map((n: any) => {
       // Use the LATEST review request for the viewer, not the first — a
@@ -239,7 +248,7 @@ export function parseReviewRequests(raw: any, viewerLogin: string): ReviewReques
 }
 
 export const PR_COMMENTS_QUERY = `
-  query($q: String!) {
+  query($q: String!, $withStarter: Boolean!) {
     search(query: $q, type: ISSUE, first: 50) {
       nodes { ... on PullRequest {
         id number url repository { nameWithOwner }
@@ -247,8 +256,10 @@ export const PR_COMMENTS_QUERY = `
           id isResolved path
           # Who opened the thread. On the viewer's own PRs every unresolved
           # thread is theirs to answer, but on someone else's PR only the
-          # threads the viewer started are — see parsePrComments.
-          starter: comments(first: 1) { nodes { author { login } } }
+          # threads the viewer started are — see parsePrComments. This is the
+          # heaviest query in the app and it now runs twice per refresh, so the
+          # own-PR leg, which never reads this, does not pay for it.
+          starter: comments(first: 1) @include(if: $withStarter) { nodes { author { login } } }
           comments(last: 1) { nodes {
             author { login __typename }
             bodyText createdAt url
@@ -258,6 +269,16 @@ export const PR_COMMENTS_QUERY = `
       } }
     }
   }`;
+
+// The shape every search parser starts from. Array-checked rather than
+// ?? []-defaulted: nodes arriving as anything but an array would make the very
+// next .filter throw, and /api/pr-comments has no try/catch to turn that into
+// the documented 502 — it would escape as a 500 and take the other search's
+// results down with it.
+function searchNodes(raw: any): any[] {
+  const nodes = raw?.search?.nodes;
+  return Array.isArray(nodes) ? nodes : [];
+}
 
 // Long enough to convey what the comment asks for, short enough that a row stays
 // a scannable inbox line. The card also clamps to two lines (see PrRow).
@@ -295,7 +316,7 @@ export function parsePrComments(
   viewerLogin: string,
   viewerStartedOnly = false,
 ): PrComment[] {
-  return (raw?.search?.nodes ?? [])
+  return searchNodes(raw)
     .filter((pr: any) => pr?.id)
     .flatMap((pr: any) =>
       (pr.reviewThreads?.nodes ?? [])
@@ -361,7 +382,7 @@ export const CLOSED_PRS_QUERY = `
   }`;
 
 export function parseClosedPrs(raw: any): ClosedPr[] {
-  return (raw?.search?.nodes ?? [])
+  return searchNodes(raw)
     .filter((n: any) => n?.id)
     .map((n: any) => ({
       id: n.id,
@@ -383,7 +404,11 @@ export const REVIEWED_PRS_QUERY = `
         id title url number isDraft
         repository { nameWithOwner }
         author { login }
-        reviews(last: 1, author: $login, states: [APPROVED, CHANGES_REQUESTED, COMMENTED]) {
+        # DISMISSED belongs here even though it is not a verdict: without it a
+        # dismissed review falls through to an older one, so the row badges a
+        # stale opinion — or the PR vanishes from the list while reviewed-by:@me
+        # still matches it.
+        reviews(last: 1, author: $login, states: [APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED]) {
           nodes { state submittedAt }
         }
         commits(last: 1) { nodes { commit { pushedDate committedDate } } }
@@ -394,7 +419,7 @@ export const REVIEWED_PRS_QUERY = `
 // The verdicts a submitted review can carry. Checked rather than trusted: the
 // GraphQL response is untyped at this boundary, and a state the UI has no badge
 // for would render blank.
-const REVIEW_STATES = new Set(["APPROVED", "CHANGES_REQUESTED", "COMMENTED"]);
+const REVIEW_STATES = new Set(["APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED"]);
 
 /**
  * Open PRs the viewer has already reviewed — the ones "Waiting on your review"
@@ -408,7 +433,7 @@ const REVIEW_STATES = new Set(["APPROVED", "CHANGES_REQUESTED", "COMMENTED"]);
  * draft review is not a review anyone else can see.
  */
 export function parseReviewedPrs(raw: any): ReviewedPr[] {
-  return (raw?.search?.nodes ?? [])
+  return searchNodes(raw)
     .filter((n: any) => n?.id)
     .map((n: any) => {
       const review = n.reviews?.nodes?.[0] ?? {};
@@ -452,7 +477,7 @@ export const REPO_SEARCH_QUERY = `
   }`;
 
 export function parseRepoSearch(raw: any): string[] {
-  const nodes: any[] = raw?.search?.nodes ?? [];
+  const nodes: any[] = searchNodes(raw);
   const seen = new Set<string>();
   const results: string[] = [];
   for (const node of nodes) {
@@ -474,7 +499,7 @@ export function parseReadyPrs(raw: any): ReadyPr[] {
   // Additionally, a BLOCKED PR with rollupState SUCCESS and reviewDecision APPROVED
   // is blocked only by out-of-date/push-auth (bot-handled merge), not by a missing
   // check or review, and is routed to the ready bucket with needsUpdate:true.
-  return (raw?.search?.nodes ?? [])
+  return searchNodes(raw)
     .filter((n: any) => n?.id)
     .filter((n: any) => n.mergeStateStatus === "CLEAN" || isBehindAndGreen(n) || isReadyViaBlocked(n))
     .filter((n: any) => !n.isDraft)

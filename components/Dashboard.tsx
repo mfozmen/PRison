@@ -245,7 +245,13 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           setCommentsError(
             commentsResult.status === "rejected"
               ? "Failed to load comments. Please retry."
-              : null,
+              : // Reached only when the viewer asked for this refresh (a silent
+                // poll skips the whole branch on an incomplete answer). Saying
+                // nothing here would render "No comments awaiting your reply" —
+                // a confident claim built on half a list.
+                commentsResult.value.incomplete
+                ? "Some comment threads couldn't be loaded. Please retry."
+                : null,
           );
           setComments(commentsResult.status === "fulfilled" ? commentsResult.value.items : []);
         }
@@ -276,7 +282,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           (stuckResult.status === "fulfilled" && stuckResult.value.partial) ||
           (reviewResult.status === "fulfilled" && reviewResult.value.partial) ||
           (readyResult.status === "fulfilled" && readyResult.value.partial) ||
-          (commentsResult.status === "fulfilled" && commentsResult.value.partial) ||
+          // An incomplete answer sets X-Partial too. When the viewer asked for
+          // this refresh the comments section says so itself, and counting it
+          // here as well would put two banners and two Retry buttons on one
+          // failure — but a silent poll leaves that section silent on purpose,
+          // so there the global banner is the only signal left.
+          (commentsResult.status === "fulfilled" &&
+            commentsResult.value.partial &&
+            !(commentsResult.value.incomplete && !silent)) ||
           (closedResult.status === "fulfilled" && closedResult.value.partial) ||
           (reviewedResult.status === "fulfilled" && reviewedResult.value.partial);
         setPartial(anyPartial);

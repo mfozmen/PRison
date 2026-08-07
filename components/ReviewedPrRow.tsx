@@ -10,6 +10,8 @@ const VERDICT: Record<ReviewedPr["state"], { label: string; className: string }>
   APPROVED: { label: "Approved", className: "bg-success/15 text-success ring-success/30" },
   CHANGES_REQUESTED: { label: "Changes requested", className: "bg-danger/15 text-danger ring-danger/30" },
   COMMENTED: { label: "Commented", className: "bg-border text-muted ring-border" },
+  // Struck through because the verdict no longer stands: the author cleared it.
+  DISMISSED: { label: "Dismissed", className: "bg-border text-muted line-through ring-border" },
 };
 
 // A PR the viewer has already reviewed: history like ClosedPrRow, not a work

@@ -2965,6 +2965,9 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
     commentsIncomplete = true;
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(screen.getByText("please fix the null check")).toBeInTheDocument();
+    // The section stays silent here on purpose, so the global banner is the
+    // only thing left to say the list is older than the rest of the page.
+    expect(screen.getByText(/some data couldn't be loaded/i)).toBeInTheDocument();
   });
 
   it("still takes a truncated list on a refresh the viewer asked for", async () => {
@@ -2981,5 +2984,11 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
     await waitFor(() =>
       expect(screen.queryByText("please fix the null check")).not.toBeInTheDocument(),
     );
+    // And it says so, rather than rendering "No comments awaiting your reply" —
+    // a confident claim built on half a list.
+    expect(screen.getByText(/some comment threads couldn't be loaded/i)).toBeInTheDocument();
+    // Once, not twice: the section's own message replaces the global banner
+    // rather than sitting under it with a second Retry button.
+    expect(screen.queryByText(/some data couldn't be loaded/i)).not.toBeInTheDocument();
   });
 });

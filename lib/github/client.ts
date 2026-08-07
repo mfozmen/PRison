@@ -17,32 +17,36 @@ export async function ghQuery<T>(
   query: string,
   vars?: Record<string, unknown>,
 ): Promise<{ data: T; partial: boolean }> {
+  // One definition of "ran it", so the retry can never drift from the first
+  // attempt on what counts as partial data.
+  const runOnce = async (): Promise<{ data: T; partial: boolean }> => {
+    try {
+      return { data: (await ghClient(token)(query, vars)) as T, partial: false };
+    } catch (e) {
+      if (e instanceof GraphqlResponseError && e.data) return { data: e.data as T, partial: true };
+      throw e;
+    }
+  };
   try {
-    const data = (await ghClient(token)(query, vars)) as T;
-    return { data, partial: false };
+    return await runOnce();
   } catch (e) {
-    if (e instanceof GraphqlResponseError && e.data) return { data: e.data as T, partial: true };
     // A dashboard refresh fires six of these at once and GitHub answers a burst
     // with a secondary rate limit — which is account-wide, so every list on the
     // board fails together and the page looks broken. It clears in about a
     // second, which is why hitting Retry has always "fixed" it. Waiting once is
     // that same Retry, without the human.
     const wait = secondaryLimitWaitMs(e);
-    if (wait !== null) {
-      await new Promise((r) => setTimeout(r, wait));
-      try {
-        const data = (await ghClient(token)(query, vars)) as T;
-        return { data, partial: false };
-      } catch (retryError) {
-        if (retryError instanceof GraphqlResponseError && retryError.data) {
-          return { data: retryError.data as T, partial: true };
-        }
-        logUpstreamError(retryError);
-        throw retryError;
-      }
+    if (wait === null) {
+      logUpstreamError(e);
+      throw e;
     }
-    logUpstreamError(e);
-    throw e;
+    await new Promise((r) => setTimeout(r, wait));
+    try {
+      return await runOnce();
+    } catch (retryError) {
+      logUpstreamError(retryError);
+      throw retryError;
+    }
   }
 }
 
@@ -53,7 +57,7 @@ export async function ghQuery<T>(
 // that one resets on the hour, so an immediate retry only spends the quota it
 // is out of.
 const MAX_WAIT_MS = 5_000;
-const JITTER_MS = 500;
+const JITTER_MS = 2_000;
 function secondaryLimitWaitMs(e: unknown): number | null {
   const err = (e ?? {}) as {
     status?: number;
@@ -61,6 +65,13 @@ function secondaryLimitWaitMs(e: unknown): number | null {
     response?: { headers?: Record<string, string> };
   };
   if (err.status !== 403 && err.status !== 429) return null;
+  // A 403 is far more often a permission problem than a rate limit, and
+  // retrying that is just a second way to fail — so GitHub has to name the
+  // limit before we wait for it, Retry-After header or not. A 429 only ever
+  // means rate.
+  if (err.status === 403 && !/secondary rate limit|abuse detection/i.test(err.message ?? "")) {
+    return null;
+  }
   const retryAfter = Number(err.response?.headers?.["retry-after"]);
   if (Number.isFinite(retryAfter) && retryAfter > 0) {
     // Coming back before GitHub said we may can extend the block, so a wait
@@ -69,15 +80,14 @@ function secondaryLimitWaitMs(e: unknown): number | null {
     // honest answer there.
     return retryAfter * 1000 > MAX_WAIT_MS ? null : withJitter(retryAfter * 1000);
   }
-  // Without the header GitHub still names it in the body. A 403 that is a
-  // permission problem must not be retried — it would fail identically.
-  if (!/secondary rate limit|abuse detection/i.test(err.message ?? "")) return null;
   return withJitter(1_000);
 }
 
 // The six queries a refresh makes are rejected together by an account-wide
 // limit, so a fixed wait would wake them together too — re-firing the very
-// burst that tripped it, at twice the size.
+// burst that tripped it, at twice the size. The spread has to be wide enough
+// that they actually arrive apart, which is why it is comparable to the wait
+// itself rather than a rounding error on top of it.
 function withJitter(ms: number): number {
   return ms + Math.floor(Math.random() * JITTER_MS);
 }

@@ -61,7 +61,7 @@ describe("ghQuery — the secondary rate limit", () => {
   });
 
   // Past the longest wait plus the jitter on top of it.
-  const settle = (ms: number) => vi.advanceTimersByTimeAsync(ms + 500);
+  const settle = (ms: number) => vi.advanceTimersByTimeAsync(ms + 2_000);
 
   it("waits and retries once, so the burst reads as a hiccup", async () => {
     graphqlMock
@@ -105,14 +105,17 @@ describe("ghQuery — the secondary rate limit", () => {
     vi.mocked(globalThis.setTimeout).mockRestore();
     expect(new Set(waits).size).toBeGreaterThan(1);
     expect(Math.min(...waits)).toBeGreaterThanOrEqual(1_000);
-    expect(Math.max(...waits)).toBeLessThan(1_500);
+    expect(Math.max(...waits)).toBeLessThan(3_000);
   });
 
   it("gives up after the one retry rather than hammering GitHub", async () => {
     graphqlMock.mockRejectedValue(secondary());
-    const p = ghQuery("t", "query");
+    // The assertion is attached before the clock moves: the call rejects while
+    // the timers advance, and a handler added a tick later is an unhandled
+    // rejection — which fails the run on an otherwise green suite.
+    const settled = expect(ghQuery("t", "query")).rejects.toThrow("secondary rate limit");
     await settle(1_000);
-    await expect(p).rejects.toThrow("secondary rate limit");
+    await settled;
     expect(graphqlMock).toHaveBeenCalledTimes(2);
   });
 
@@ -129,6 +132,16 @@ describe("ghQuery — the secondary rate limit", () => {
 
   it("does not retry a plain 403 — a permission failure fails identically", async () => {
     graphqlMock.mockRejectedValue(Object.assign(new Error("Resource not accessible"), { status: 403 }));
+    await expect(ghQuery("t", "query")).rejects.toThrow("Resource not accessible");
+    expect(graphqlMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a permission 403 that happens to carry Retry-After", async () => {
+    // The header sizes the wait; it is not what decides there should be one.
+    graphqlMock.mockRejectedValue(Object.assign(new Error("Resource not accessible"), {
+      status: 403,
+      response: { headers: { "retry-after": "1" } },
+    }));
     await expect(ghQuery("t", "query")).rejects.toThrow("Resource not accessible");
     expect(graphqlMock).toHaveBeenCalledTimes(1);
   });

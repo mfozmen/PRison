@@ -282,7 +282,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           (stuckResult.status === "fulfilled" && stuckResult.value.partial) ||
           (reviewResult.status === "fulfilled" && reviewResult.value.partial) ||
           (readyResult.status === "fulfilled" && readyResult.value.partial) ||
-          (commentsResult.status === "fulfilled" && commentsResult.value.partial) ||
+          // An incomplete answer sets X-Partial too, but the comments section
+          // already carries its own message for it — counting it here as well
+          // would put two banners and two Retry buttons on one failure.
+          (commentsResult.status === "fulfilled" &&
+            commentsResult.value.partial &&
+            !commentsResult.value.incomplete) ||
           (closedResult.status === "fulfilled" && closedResult.value.partial) ||
           (reviewedResult.status === "fulfilled" && reviewedResult.value.partial);
         setPartial(anyPartial);

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.9.0](https://github.com/mfozmen/PRison/compare/v1.8.0...v1.9.0) (2026-08-07)
+
+### Bug Fixes
+
+* survive GitHub's secondary rate limit, and say why when a query fails ([#19](https://github.com/mfozmen/PRison/issues/19)) ([d2d7752](https://github.com/mfozmen/PRison/commit/d2d7752fc595ff55652ed70b1f41ad637dabcebd))
+
 ## [1.8.0](https://github.com/mfozmen/PRison/compare/v1.7.1...v1.8.0) (2026-08-07)
 
 ### Features

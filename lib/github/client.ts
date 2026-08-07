@@ -80,9 +80,12 @@ function secondaryLimitWaitMs(e: unknown): number | null {
   // take, since coming back before GitHub said we may can extend the block.
   const retryAfter = Number(err.response?.headers?.["retry-after"]);
   if (!Number.isFinite(retryAfter) || retryAfter <= 0) return null;
-  // Capped after the jitter, not before, or the ceiling is a suggestion.
-  const wait = withJitter(retryAfter * 1000);
-  return wait > MAX_WAIT_MS ? null : wait;
+  // The header alone decides whether there is a retry; the jitter only decides
+  // when. The budget leaves room for the jitter on top, so the ceiling holds
+  // without a coin flip ever being the difference between a list coming back
+  // and a list showing an error banner.
+  if (retryAfter * 1000 + JITTER_MS > MAX_WAIT_MS) return null;
+  return withJitter(retryAfter * 1000);
 }
 
 // The six queries a refresh makes are rejected together by an account-wide

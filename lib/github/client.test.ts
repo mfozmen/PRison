@@ -100,14 +100,23 @@ describe("ghQuery — the secondary rate limit", () => {
     expect(graphqlMock).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the cap honest by applying it after the jitter", async () => {
-    // 5s is exactly the ceiling, so any jitter on top of it puts the wait over
-    // — checking the cap first would let the ceiling be a suggestion.
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+  it("leaves the ceiling room for the jitter rather than letting it decide", async () => {
+    // 5s is the ceiling exactly, so a wait plus its jitter no longer fits. The
+    // header decides on its own — otherwise a coin flip would be the difference
+    // between a list coming back and a list showing an error banner, and six
+    // lists would each flip it separately.
     graphqlMock.mockRejectedValue(secondary({ response: { headers: { "retry-after": "5" } } }));
     await expect(ghQuery("t", "query")).rejects.toThrow("secondary rate limit");
     expect(graphqlMock).toHaveBeenCalledTimes(1);
-    vi.mocked(Math.random).mockRestore();
+
+    // 3s does fit, jitter and all, so it retries every time.
+    graphqlMock.mockReset();
+    graphqlMock
+      .mockRejectedValueOnce(secondary({ response: { headers: { "retry-after": "3" } } }))
+      .mockResolvedValueOnce({ ok: true });
+    const p = ghQuery("t", "query");
+    await settle(3_000);
+    await expect(p).resolves.toEqual({ data: { ok: true }, partial: false });
   });
 
   it("spreads the retries out instead of waking all six together", async () => {

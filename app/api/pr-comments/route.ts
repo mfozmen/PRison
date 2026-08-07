@@ -21,16 +21,19 @@ export async function GET(request: Request) {
   // one query, and a blip on the new one must not take the old one down with
   // it. It also makes the try/catch every sibling route needs unnecessary —
   // neither leg can reject past this point.
-  // withStarter is what the query costs: only the reviewed leg reads who opened
-  // a thread, and this is the heaviest query in the app.
+  // Who opened a thread is what the query costs, and this is the heaviest query
+  // in the app — so only the leg that filters on it asks for it. Held once for
+  // both the fetch and the parse below: two booleans that disagreed would drop
+  // every thread and report an empty list rather than an error.
+  const STARTER = { own: false, reviewed: true } as const;
   const [own, reviewed] = await Promise.allSettled([
     ghQuery(token, PR_COMMENTS_QUERY, {
       q: searchQuery("author", scoped.scope),
-      withStarter: false,
+      withStarter: STARTER.own,
     }),
     ghQuery(token, PR_COMMENTS_QUERY, {
       q: searchQuery("reviewed", scoped.scope),
-      withStarter: true,
+      withStarter: STARTER.reviewed,
     }),
   ]);
   // Both down is an upstream outage, not partial data.
@@ -38,9 +41,11 @@ export async function GET(request: Request) {
     return new Response("Upstream GitHub error", { status: 502 });
   }
   const comments = [
-    ...(own.status === "fulfilled" ? parsePrComments(own.value.data, login) : []),
+    ...(own.status === "fulfilled"
+      ? parsePrComments(own.value.data, login, STARTER.own)
+      : []),
     ...(reviewed.status === "fulfilled"
-      ? parsePrComments(reviewed.value.data, login, true)
+      ? parsePrComments(reviewed.value.data, login, STARTER.reviewed)
       : []),
   ];
   // The reviewed search excludes the viewer's own PRs, so a thread can only come

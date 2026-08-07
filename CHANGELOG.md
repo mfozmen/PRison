@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/mfozmen/PRison/compare/v1.7.1...v1.8.0) (2026-08-07)
+
+### Features
+
+* Recently reviewed, and the replies that never reached the board ([#18](https://github.com/mfozmen/PRison/issues/18)) ([6eec6f2](https://github.com/mfozmen/PRison/commit/6eec6f237dc750f6e26733d17fb36a3aa0e4634d))
+* report what changed while PRison was closed ([#17](https://github.com/mfozmen/PRison/issues/17)) ([2ee712c](https://github.com/mfozmen/PRison/commit/2ee712cf96313e4a11e17d763e020636cea335e7))
+
 ## [1.7.1](https://github.com/mfozmen/PRison/compare/v1.7.0...v1.7.1) (2026-08-06)
 
 ### Bug Fixes

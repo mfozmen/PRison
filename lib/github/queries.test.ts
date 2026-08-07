@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs, parseReadyPrs, parseRepoSearch, parsePrComments, parseClosedPrs, parseLatestRelease, parseReviewedPrs, PR_COMMENTS_QUERY, REVIEWED_PRS_QUERY } from "./queries";
+import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs, parseReadyPrs, parseRepoSearch, parsePrComments, parseClosedPrs, parseLatestRelease, parseReviewedPrs, PR_COMMENTS_QUERY, REVIEWED_PRS_QUERY, STUCK_PRS_QUERY, READY_PRS_QUERY } from "./queries";
 
 describe("searchQuery", () => {
   it("scopes author search to the org", () => {
@@ -478,6 +478,99 @@ describe("parseStuckPrs", () => {
     expect(prs[0].pending).toContain("ci/test");
     expect(prs[0].pendingChecks).toBe(1);
     expect(prs[0].failingChecks).toBe(0);
+  });
+
+  // A re-run leaves the failed attempt in the rollup next to the green one.
+  // Same name AND same workflow is what makes them the same check.
+  const rerun = (
+    runs: { conclusion?: string; status?: string; completedAt?: string; workflow?: string }[],
+  ) => ({
+    search: { nodes: [
+      { id: "60", title: "re-run", url: "u60", number: 60,
+        repository: { nameWithOwner: "acme/x" },
+        commits: { nodes: [{ commit: {
+          pushedDate: "2026-06-25T00:00:00Z",
+          statusCheckRollup: { contexts: { nodes: runs.map((r) => ({
+            name: "build",
+            conclusion: r.conclusion,
+            status: r.status,
+            completedAt: r.completedAt,
+            checkSuite: r.workflow ? { workflowRun: { workflow: { name: r.workflow } } } : undefined,
+          })) } },
+        } }] } },
+    ] },
+  });
+
+  it("re-run to green clears the check instead of staying red forever", () => {
+    const prs = parseStuckPrs(rerun([
+      { conclusion: "FAILURE", completedAt: "2026-06-25T12:01:29Z", workflow: "CI" },
+      { conclusion: "SUCCESS", completedAt: "2026-06-25T12:01:33Z", workflow: "CI" },
+    ]));
+    // Nothing failing and nothing pending, so the PR leaves the stuck list —
+    // which is the half of this bug that kept it out of Ready to merge.
+    expect(prs).toHaveLength(0);
+  });
+
+  it("survives two failed attempts sharing one completedAt", () => {
+    // The shape this bug was reported from: a workflow triggered twice, both
+    // attempts failing in the same second, then a re-run four seconds later.
+    const prs = parseStuckPrs(rerun([
+      { conclusion: "FAILURE", completedAt: "2026-06-25T12:01:29Z", workflow: "CI" },
+      { conclusion: "FAILURE", completedAt: "2026-06-25T12:01:29Z", workflow: "CI" },
+      { conclusion: "SUCCESS", completedAt: "2026-06-25T12:01:33Z", workflow: "CI" },
+    ]));
+    expect(prs).toHaveLength(0);
+  });
+
+  it("a re-run that goes red reports the failure", () => {
+    const prs = parseStuckPrs(rerun([
+      { conclusion: "SUCCESS", completedAt: "2026-06-25T12:01:29Z", workflow: "CI" },
+      { conclusion: "FAILURE", completedAt: "2026-06-25T12:01:33Z", workflow: "CI" },
+    ]));
+    expect(prs[0].failing).toContain("build");
+  });
+
+  it("an older failed attempt listed after the green one still loses", () => {
+    // Rollup order is not chronological order; completedAt decides.
+    const prs = parseStuckPrs(rerun([
+      { conclusion: "SUCCESS", completedAt: "2026-06-25T12:01:33Z", workflow: "CI" },
+      { conclusion: "FAILURE", completedAt: "2026-06-25T12:01:29Z", workflow: "CI" },
+    ]));
+    expect(prs).toHaveLength(0);
+  });
+
+  it("two workflows sharing a name are not re-runs — the failure still wins", () => {
+    // Both are required; collapsing them to the newest would hide a red check.
+    const prs = parseStuckPrs(rerun([
+      { conclusion: "FAILURE", completedAt: "2026-06-25T12:01:29Z", workflow: "CI" },
+      { conclusion: "SUCCESS", completedAt: "2026-06-25T12:01:33Z", workflow: "Release" },
+    ]));
+    expect(prs[0].failing).toContain("build");
+  });
+
+  it("a run still in flight outranks a finished one, listed either way", () => {
+    // No completedAt means it is the current attempt.
+    const after = parseStuckPrs(rerun([
+      { conclusion: "SUCCESS", completedAt: "2026-06-25T12:01:29Z", workflow: "CI" },
+      { status: "IN_PROGRESS", workflow: "CI" },
+    ]));
+    expect(after[0].pending).toContain("build");
+
+    const before = parseStuckPrs(rerun([
+      { status: "IN_PROGRESS", workflow: "CI" },
+      { conclusion: "SUCCESS", completedAt: "2026-06-25T12:01:29Z", workflow: "CI" },
+    ]));
+    expect(before[0].pending).toContain("build");
+  });
+
+  it("keeps worst-wins when the runs report no workflow to group them by", () => {
+    // A status context, or a check from an app that reports no workflow: we
+    // cannot prove these are the same check, so nothing is discarded.
+    const prs = parseStuckPrs(rerun([
+      { conclusion: "FAILURE", completedAt: "2026-06-25T12:01:29Z" },
+      { conclusion: "SUCCESS", completedAt: "2026-06-25T12:01:33Z" },
+    ]));
+    expect(prs[0].failing).toContain("build");
   });
 
   it("dedup: counts match the deduped arrays for all-named fixture", () => {
@@ -1735,6 +1828,18 @@ describe("REVIEWED_PRS_QUERY", () => {
     expect(REVIEWED_PRS_QUERY).toContain(
       "states: [APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED]",
     );
+  });
+});
+
+describe("the check rollup both PR queries share", () => {
+  it("asks for what tells a re-run from a second check of the same name", () => {
+    // Without these two, groupStatus silently falls back to worst-wins and a
+    // re-run to green goes red again — with every test still passing, because
+    // the fixtures supply the fields the query would have stopped requesting.
+    for (const query of [STUCK_PRS_QUERY, READY_PRS_QUERY]) {
+      expect(query).toContain("completedAt");
+      expect(query).toContain("checkSuite { workflowRun { workflow { name } } }");
+    }
   });
 });
 

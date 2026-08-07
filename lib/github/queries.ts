@@ -127,8 +127,14 @@ function reRunKey(c: any, index: number): string {
 // flight, and sorting it below a finished older one would report a result
 // GitHub has already superseded.
 function newestRun(runs: any[]): any {
-  return runs.reduce((newest: any, r: any) =>
-    !r.completedAt || (newest.completedAt && r.completedAt > newest.completedAt) ? r : newest,
+  return runs.reduce(
+    (newest: any, r: any) =>
+      !r.completedAt || (newest.completedAt && r.completedAt > newest.completedAt) ? r : newest,
+    // Seeded rather than letting reduce take the first element implicitly: that
+    // form throws on an empty array. Buckets are never empty by construction,
+    // but the throw would be a TypeError from inside a parser, and there is no
+    // reading of a rollup where that is the useful failure.
+    runs[0],
   );
 }
 

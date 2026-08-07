@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { graphql, GraphqlResponseError } from "@octokit/graphql";
 
 export function ghClient(token: string) {
@@ -94,7 +95,10 @@ function secondaryLimitWaitMs(e: unknown): number | null {
 // that they actually arrive apart, which is why it is comparable to the wait
 // itself rather than a rounding error on top of it.
 function withJitter(ms: number): number {
-  return ms + Math.floor(Math.random() * JITTER_MS);
+  // randomInt over Math.random because this runs server-side and Math.random is
+  // flagged wherever it appears; nothing here needs unpredictability, the two
+  // are interchangeable for spreading out a wait.
+  return ms + randomInt(JITTER_MS);
 }
 
 // Every route turns this throw into a bare 502, so without a line here the

@@ -22,30 +22,55 @@ on:
 permissions:
   contents: write
 
+env:
+  IMAGE: mfozmen/prison
+
 jobs:
-  publish:
+  # The tag is derived once and handed to the other jobs. metadata-action's
+  # `type=semver` reads github.ref, which is a branch on a manual run and would
+  # yield no tags at all. The tag reaches the shell as an env var, never as
+  # `${{ }}` inside the script, so it cannot be interpolated into the command line.
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.ref.outputs.tag }}
+      version: ${{ steps.ref.outputs.version }}
     steps:
       - id: ref
-        # metadata-action's `type=semver` reads github.ref, which is a branch on a
-        # manual run and would yield no tags at all. Derive the version once, here.
-        # The tag reaches the shell as an env var, never as `${{ }}` inside the
-        # script, so it cannot be interpolated into the command line.
         env:
           TAG: ${{ inputs.tag || github.event.release.tag_name }}
         run: |
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
+  # One job per architecture, each on a runner of that architecture. arm64 used
+  # to be emulated with QEMU on the amd64 runner, and `npm ci` under that
+  # emulation hung indefinitely — twice in a row on v1.9.1, with no output for
+  # half an hour, after taking 100 seconds a release earlier. Native runners are
+  # free for public repositories and remove the emulation entirely.
+  #
+  # Each job pushes an untagged manifest by digest; `publish` below joins them
+  # under the real tags. No job pushes a tag, so a half-built image never
+  # appears on Docker Hub.
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
       # Third-party actions are pinned to an immutable commit SHA, not a mutable
       # major tag: this job holds a token that can publish a public image under
       # our name, so a retagged upstream release must not become our build step.
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
-          ref: ${{ steps.ref.outputs.tag }}
+          ref: ${{ needs.prepare.outputs.tag }}
 
-      # linux/arm64 is built under emulation on the amd64 runner.
-      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       # The token reaches Docker only through this action, never a build arg:
@@ -55,10 +80,56 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          # Keep the Docker Hub tag page readable; attestations add unnamed entries.
+          provenance: false
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          # Scoped per platform: one shared scope would have the two jobs
+          # overwrite each other's cache on every run.
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+
+      # The digest is the only thing `publish` needs, and an empty file named
+      # after it is the cheapest way to carry one per job through an artifact.
+      - env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          # Slashes are not allowed in artifact names.
+          name: digest-${{ strategy.job-index }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - id: meta
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
-          images: mfozmen/prison
+          images: ${{ env.IMAGE }}
           # `latest` moves only forward. A real, non-prerelease release moves it;
           # a manual run does not, because it may be rebuilding an OLD tag and
           # would silently hand `docker run mfozmen/prison` an older image. When a
@@ -73,20 +144,21 @@ jobs:
           #   * reading `github.event.inputs.latest`: that context stringifies, and
           #     the non-empty string "false" is truthy. `inputs` keeps the boolean.
           tags: |
-            type=raw,value=${{ steps.ref.outputs.version }}
+            type=raw,value=${{ needs.prepare.outputs.version }}
             type=raw,value=latest,enable=${{ (github.event_name == 'release' && github.event.release.prerelease == false) || (github.event_name == 'workflow_dispatch' && inputs.latest) }}
 
-      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # Keep the Docker Hub tag page readable; attestations add unnamed entries.
-          provenance: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # One multi-arch manifest per tag, pointing at the per-architecture images
+      # the build jobs already pushed. This is the step that makes the tags exist.
+      - env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        working-directory: /tmp/digests
+        run: |
+          args=""
+          while IFS= read -r tag; do
+            [ -n "$tag" ] && args="$args -t $tag"
+          done <<< "$TAGS"
+          # shellcheck disable=SC2046,SC2086 — both words must split into args.
+          docker buildx imagetools create $args $(printf "${IMAGE}@sha256:%s " *)
 
       # GitHub attaches "Source code (zip)" to every release, but the artifact
       # people actually install is the image — and it does not exist until the
@@ -100,8 +172,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           # gh runs outside the checkout (below), so name the repo explicitly.
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ steps.ref.outputs.tag }}
-          VERSION: ${{ steps.ref.outputs.version }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           BODY=$(gh release view "$TAG" --json body --jq .body)
           # Re-running a failed release job from the Actions UI keeps

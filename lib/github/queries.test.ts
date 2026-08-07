@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs, parseReadyPrs, parseRepoSearch, parsePrComments, parseClosedPrs, parseLatestRelease, parseReviewedPrs } from "./queries";
+import { searchQuery, parseStuckPrs, parseReviewRequests, parseOrgs, parseReadyPrs, parseRepoSearch, parsePrComments, parseClosedPrs, parseLatestRelease, parseReviewedPrs, PR_COMMENTS_QUERY, REVIEWED_PRS_QUERY } from "./queries";
 
 describe("searchQuery", () => {
   it("scopes author search to the org", () => {
@@ -1725,5 +1725,26 @@ describe("parsePrComments — threads on a PR the viewer reviewed", () => {
   it("drops a viewer-raised thread with no starter recorded", () => {
     const headless = thread("octocat", { starter: { nodes: [] } });
     expect(parsePrComments(raw([headless]), "octocat", true)).toEqual([]);
+  });
+});
+
+describe("REVIEWED_PRS_QUERY", () => {
+  it("asks GitHub for dismissed reviews", () => {
+    // parseReviewedPrs knows what to do with a DISMISSED review, but that
+    // branch is unreachable in production unless the query requests the state.
+    expect(REVIEWED_PRS_QUERY).toContain(
+      "states: [APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED]",
+    );
+  });
+});
+
+describe("PR_COMMENTS_QUERY — conditional starter field", () => {
+  it("declares $withStarter as a required Boolean", () => {
+    expect(PR_COMMENTS_QUERY).toContain("$withStarter: Boolean!");
+  });
+  it("gates the starter comments field on $withStarter", () => {
+    expect(PR_COMMENTS_QUERY).toContain(
+      "starter: comments(first: 1) @include(if: $withStarter)",
+    );
   });
 });

@@ -46,13 +46,14 @@ export async function ghQuery<T>(
   }
 }
 
-// How long to wait before the single retry, or null when this failure is not a
-// secondary rate limit and retrying would just be a second way to fail.
+// How long to wait before the single retry, or null when retrying would just be
+// a second way to fail.
 //
 // Deliberately NOT the hourly point budget (a RATE_LIMITED GraphQL error):
 // that one resets on the hour, so an immediate retry only spends the quota it
 // is out of.
 const MAX_WAIT_MS = 5_000;
+const JITTER_MS = 500;
 function secondaryLimitWaitMs(e: unknown): number | null {
   const err = (e ?? {}) as {
     status?: number;
@@ -60,14 +61,25 @@ function secondaryLimitWaitMs(e: unknown): number | null {
     response?: { headers?: Record<string, string> };
   };
   if (err.status !== 403 && err.status !== 429) return null;
-  const headers = err.response?.headers ?? {};
-  const retryAfter = Number(headers["retry-after"]);
+  const retryAfter = Number(err.response?.headers?.["retry-after"]);
   if (Number.isFinite(retryAfter) && retryAfter > 0) {
-    return Math.min(retryAfter * 1000, MAX_WAIT_MS);
+    // Coming back before GitHub said we may can extend the block, so a wait
+    // longer than a refresh should take is a reason not to retry at all —
+    // never a reason to retry early. The banner and its Retry button are the
+    // honest answer there.
+    return retryAfter * 1000 > MAX_WAIT_MS ? null : withJitter(retryAfter * 1000);
   }
   // Without the header GitHub still names it in the body. A 403 that is a
   // permission problem must not be retried — it would fail identically.
-  return /secondary rate limit|abuse detection/i.test(err.message ?? "") ? 1_000 : null;
+  if (!/secondary rate limit|abuse detection/i.test(err.message ?? "")) return null;
+  return withJitter(1_000);
+}
+
+// The six queries a refresh makes are rejected together by an account-wide
+// limit, so a fixed wait would wake them together too — re-firing the very
+// burst that tripped it, at twice the size.
+function withJitter(ms: number): number {
+  return ms + Math.floor(Math.random() * JITTER_MS);
 }
 
 // Every route turns this throw into a bare 502, so without a line here the
@@ -86,7 +98,11 @@ function logUpstreamError(e: unknown): void {
   // GraphQL errors carry the answer (RATE_LIMITED, a timeout, a bad variable)
   // in the array, not in the top-level message — which only ever says "Request
   // failed due to following response errors:".
-  const detail = (err.errors ?? [])
+  // Array-checked, not ??-defaulted: this runs on the failure path, and a .map
+  // that throws here would replace the upstream error with a TypeError from
+  // inside its own handler.
+  const errors = Array.isArray(err.errors) ? err.errors : [];
+  const detail = errors
     .map((x) => `${x?.type ?? "?"}: ${String(x?.message ?? "").slice(0, 160)}`)
     .join(" | ");
   console.error(

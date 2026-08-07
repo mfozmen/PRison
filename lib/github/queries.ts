@@ -194,7 +194,7 @@ function isBehindAndGreen(node: any): boolean {
 }
 
 export function parseStuckPrs(raw: any): StuckPr[] {
-  return (raw?.search?.nodes ?? [])
+  return searchNodes(raw)
     .filter((n: any) => n?.id)
     .map((n: any) => {
       const commit = n.commits?.nodes?.[0]?.commit ?? {};
@@ -227,7 +227,7 @@ export function parseStuckPrs(raw: any): StuckPr[] {
 }
 
 export function parseReviewRequests(raw: any, viewerLogin: string): ReviewRequest[] {
-  return (raw?.search?.nodes ?? [])
+  return searchNodes(raw)
     .filter((n: any) => n?.id)
     .map((n: any) => {
       // Use the LATEST review request for the viewer, not the first — a
@@ -382,7 +382,7 @@ export const CLOSED_PRS_QUERY = `
   }`;
 
 export function parseClosedPrs(raw: any): ClosedPr[] {
-  return (raw?.search?.nodes ?? [])
+  return searchNodes(raw)
     .filter((n: any) => n?.id)
     .map((n: any) => ({
       id: n.id,
@@ -477,7 +477,7 @@ export const REPO_SEARCH_QUERY = `
   }`;
 
 export function parseRepoSearch(raw: any): string[] {
-  const nodes: any[] = raw?.search?.nodes ?? [];
+  const nodes: any[] = searchNodes(raw);
   const seen = new Set<string>();
   const results: string[] = [];
   for (const node of nodes) {
@@ -499,7 +499,7 @@ export function parseReadyPrs(raw: any): ReadyPr[] {
   // Additionally, a BLOCKED PR with rollupState SUCCESS and reviewDecision APPROVED
   // is blocked only by out-of-date/push-auth (bot-handled merge), not by a missing
   // check or review, and is routed to the ready bucket with needsUpdate:true.
-  return (raw?.search?.nodes ?? [])
+  return searchNodes(raw)
     .filter((n: any) => n?.id)
     .filter((n: any) => n.mergeStateStatus === "CLEAN" || isBehindAndGreen(n) || isReadyViaBlocked(n))
     .filter((n: any) => !n.isDraft)

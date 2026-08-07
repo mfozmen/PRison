@@ -282,12 +282,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           (stuckResult.status === "fulfilled" && stuckResult.value.partial) ||
           (reviewResult.status === "fulfilled" && reviewResult.value.partial) ||
           (readyResult.status === "fulfilled" && readyResult.value.partial) ||
-          // An incomplete answer sets X-Partial too, but the comments section
-          // already carries its own message for it — counting it here as well
-          // would put two banners and two Retry buttons on one failure.
+          // An incomplete answer sets X-Partial too. When the viewer asked for
+          // this refresh the comments section says so itself, and counting it
+          // here as well would put two banners and two Retry buttons on one
+          // failure — but a silent poll leaves that section silent on purpose,
+          // so there the global banner is the only signal left.
           (commentsResult.status === "fulfilled" &&
             commentsResult.value.partial &&
-            !commentsResult.value.incomplete) ||
+            !(commentsResult.value.incomplete && !silent)) ||
           (closedResult.status === "fulfilled" && closedResult.value.partial) ||
           (reviewedResult.status === "fulfilled" && reviewedResult.value.partial);
         setPartial(anyPartial);

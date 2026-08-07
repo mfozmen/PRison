@@ -72,15 +72,17 @@ function secondaryLimitWaitMs(e: unknown): number | null {
   if (err.status === 403 && !/secondary rate limit|abuse detection/i.test(err.message ?? "")) {
     return null;
   }
+  // Only GitHub knows how long the block runs, so without Retry-After we do not
+  // guess: a short guess re-fires the very burst that tripped the limit, and a
+  // guess long enough to be safe (GitHub says a minute) holds the whole
+  // dashboard open waiting for it. The banner and its Retry button are the
+  // honest answer there — as they are for a wait longer than a refresh should
+  // take, since coming back before GitHub said we may can extend the block.
   const retryAfter = Number(err.response?.headers?.["retry-after"]);
-  if (Number.isFinite(retryAfter) && retryAfter > 0) {
-    // Coming back before GitHub said we may can extend the block, so a wait
-    // longer than a refresh should take is a reason not to retry at all —
-    // never a reason to retry early. The banner and its Retry button are the
-    // honest answer there.
-    return retryAfter * 1000 > MAX_WAIT_MS ? null : withJitter(retryAfter * 1000);
-  }
-  return withJitter(1_000);
+  if (!Number.isFinite(retryAfter) || retryAfter <= 0) return null;
+  // Capped after the jitter, not before, or the ceiling is a suggestion.
+  const wait = withJitter(retryAfter * 1000);
+  return wait > MAX_WAIT_MS ? null : wait;
 }
 
 // The six queries a refresh makes are rejected together by an account-wide

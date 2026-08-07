@@ -87,11 +87,12 @@ expand to the latest 15 with **Load more** for the rest.
   less — with a Retry button, like every failed list.
 - **Rides out GitHub's rate limiting.** A refresh asks GitHub six things at once,
   and a burst can trip its secondary rate limit — which applies to your whole
-  account, so every list fails together and the page looks broken. That usually
-  clears in about a second, so PRison waits out GitHub's own `Retry-After` and
-  asks once more instead of making you press Retry yourself. When GitHub asks for
-  longer than a refresh should take, PRison steps aside and shows the banner —
-  coming back early only extends the block.
+  account, so every list fails together and the page looks broken. When GitHub
+  says how long the block runs and it's short, PRison waits that out and asks
+  once more instead of making you press Retry yourself. When GitHub asks for
+  longer than a refresh should take — or doesn't say at all — PRison steps aside
+  and shows the banner rather than guessing, since coming back early only
+  extends the block.
 - **Light / dark theme**, responsive two-column layout, minute-level ages,
   color-coded lists, and a Refresh button.
 - **Personal account + per-org filter** in the top-right switcher.

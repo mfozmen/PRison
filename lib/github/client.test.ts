@@ -43,9 +43,11 @@ describe("ghQuery", () => {
 describe("ghQuery — the secondary rate limit", () => {
   // A refresh fires six of these at once; GitHub answers a burst account-wide,
   // so every list on the board fails together and the page looks broken.
+  // Retry-After by default, because that is the only shape that earns a retry.
   const secondary = (over: Record<string, unknown> = {}) =>
     Object.assign(new Error("You have exceeded a secondary rate limit"), {
       status: 403,
+      response: { headers: { "retry-after": "1" } },
       ...over,
     });
 
@@ -88,6 +90,24 @@ describe("ghQuery — the secondary rate limit", () => {
     graphqlMock.mockRejectedValue(secondary({ response: { headers: { "retry-after": "60" } } }));
     await expect(ghQuery("t", "query")).rejects.toThrow("secondary rate limit");
     expect(graphqlMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("steps aside when GitHub does not say how long the block runs", async () => {
+    // A short guess re-fires the burst that tripped the limit; a safe one holds
+    // the dashboard open for a minute. Neither is better than the banner.
+    graphqlMock.mockRejectedValue(secondary({ response: { headers: {} } }));
+    await expect(ghQuery("t", "query")).rejects.toThrow("secondary rate limit");
+    expect(graphqlMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the cap honest by applying it after the jitter", async () => {
+    // 5s is exactly the ceiling, so any jitter on top of it puts the wait over
+    // — checking the cap first would let the ceiling be a suggestion.
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    graphqlMock.mockRejectedValue(secondary({ response: { headers: { "retry-after": "5" } } }));
+    await expect(ghQuery("t", "query")).rejects.toThrow("secondary rate limit");
+    expect(graphqlMock).toHaveBeenCalledTimes(1);
+    vi.mocked(Math.random).mockRestore();
   });
 
   it("spreads the retries out instead of waking all six together", async () => {
@@ -174,13 +194,10 @@ describe("ghQuery — the secondary rate limit", () => {
     expect(graphqlMock).toHaveBeenCalledTimes(1);
   });
 
-  it("ignores an unparseable Retry-After and falls back to the body", async () => {
-    graphqlMock
-      .mockRejectedValueOnce(secondary({ response: { headers: { "retry-after": "soon" } } }))
-      .mockResolvedValueOnce({ ok: true });
-    const p = ghQuery("t", "query");
-    await settle(1_000);
-    await expect(p).resolves.toEqual({ data: { ok: true }, partial: false });
+  it("treats an unparseable Retry-After as GitHub not having said", async () => {
+    graphqlMock.mockRejectedValue(secondary({ response: { headers: { "retry-after": "soon" } } }));
+    await expect(ghQuery("t", "query")).rejects.toThrow("secondary rate limit");
+    expect(graphqlMock).toHaveBeenCalledTimes(1);
   });
 });
 

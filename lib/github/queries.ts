@@ -51,6 +51,18 @@ export const VIEWER_QUERY = `query { viewer { login } }`;
 export const ORGS_QUERY = `
   query { viewer { organizations(first: 100) { nodes { login avatarUrl } } } }`;
 
+// Shared by both queries that read checks, because they have to agree on these
+// fields and two copies is how they stop agreeing. completedAt and the workflow
+// name are what tell a re-run apart from a second check that shares a name —
+// see groupStatus. Neither is a connection, so they cost no query points.
+const CHECK_ROLLUP = `statusCheckRollup { state contexts(first: 100) { nodes {
+            ... on CheckRun {
+              name status conclusion completedAt
+              checkSuite { workflowRun { workflow { name } } }
+            }
+            ... on StatusContext { context state }
+          } } }`;
+
 export const STUCK_PRS_QUERY = `
   query($q: String!) {
     search(query: $q, type: ISSUE, first: 50) {
@@ -59,10 +71,7 @@ export const STUCK_PRS_QUERY = `
         repository { nameWithOwner }
         commits(last: 1) { nodes { commit {
           pushedDate committedDate
-          statusCheckRollup { state contexts(first: 100) { nodes {
-            ... on CheckRun { name status conclusion }
-            ... on StatusContext { context state }
-          } } }
+          ${CHECK_ROLLUP}
         } } }
       } }
     }
@@ -100,11 +109,41 @@ function checkName(c: any): string | undefined {
   return c.name === undefined ? c.context || undefined : c.name || undefined;
 }
 
+// Re-runs of one check share a name AND a workflow, and only the newest of them
+// still describes reality — a check that failed and was re-run to green stayed
+// red here forever, which also held the PR out of Ready to merge.
+//
+// Runs that only share a name are a different thing: two workflows can each
+// publish "build", both required, and collapsing them to the newest would hide
+// a real failure. So the key is the workflow, and anything we cannot prove came
+// from one — a status context, a check from an app that reports no workflow —
+// keeps its own bucket and the old worst-wins rule.
+function reRunKey(c: any, index: number): string {
+  const workflow = c.checkSuite?.workflowRun?.workflow?.name;
+  return workflow ? `workflow:${workflow}` : `solo:${index}`;
+}
+
+// Still running outranks finished: a run with no completedAt is the attempt in
+// flight, and sorting it below a finished older one would report a result
+// GitHub has already superseded.
+function newestRun(runs: any[]): any {
+  return runs.reduce((newest: any, r: any) =>
+    !r.completedAt || (newest.completedAt && r.completedAt > newest.completedAt) ? r : newest,
+  );
+}
+
 // Effective status of a named group, by precedence:
-// failing (any FAILURE/ERROR/TIMED_OUT) > pending (any PENDING/…) > ok.
+// failing (any FAILURE/ERROR/TIMED_OUT) > pending (any PENDING/…) > ok —
+// applied across workflows, after each workflow is reduced to its latest run.
 function groupStatus(runs: any[]): "failing" | "pending" | "ok" {
-  if (runs.some((r: any) => classify(r) === "failing")) return "failing";
-  if (runs.some((r: any) => classify(r) === "pending")) return "pending";
+  const buckets = new Map<string, any[]>();
+  runs.forEach((r: any, i: number) => {
+    const key = reRunKey(r, i);
+    buckets.set(key, [...(buckets.get(key) ?? []), r]);
+  });
+  const current = Array.from(buckets.values(), newestRun);
+  if (current.some((r: any) => classify(r) === "failing")) return "failing";
+  if (current.some((r: any) => classify(r) === "pending")) return "pending";
   return "ok";
 }
 
@@ -362,10 +401,7 @@ export const READY_PRS_QUERY = `
         repository { nameWithOwner }
         commits(last: 1) { nodes { commit {
           pushedDate committedDate
-          statusCheckRollup { state contexts(first: 100) { nodes {
-            ... on CheckRun { name status conclusion }
-            ... on StatusContext { context state }
-          } } }
+          ${CHECK_ROLLUP}
         } } }
       } }
     }

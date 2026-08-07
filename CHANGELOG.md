@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.9.1](https://github.com/mfozmen/PRison/compare/v1.9.0...v1.9.1) (2026-08-07)
+
+### Bug Fixes
+
+* a check that was re-run to green no longer stays red ([#25](https://github.com/mfozmen/PRison/issues/25)) ([308e443](https://github.com/mfozmen/PRison/commit/308e4432bbdfdece0afd8d42e56a23cfe731895d))
+
 ## [1.9.0](https://github.com/mfozmen/PRison/compare/v1.8.0...v1.9.0) (2026-08-07)
 
 ### Bug Fixes

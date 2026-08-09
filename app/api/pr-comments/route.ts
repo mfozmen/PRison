@@ -26,14 +26,20 @@ export async function GET(request: Request) {
   // both the fetch and the parse below: two booleans that disagreed would drop
   // every thread and report an empty list rather than an error.
   const STARTER = { own: false, reviewed: true } as const;
+  // Review bodies are the mirror image: they only make sense on the viewer's own
+  // PRs, where an unanswered one is theirs to answer. Not the inverse of STARTER
+  // by coincidence — asked as its own flag so a later leg can set them freely.
+  const REVIEWS = { own: true, reviewed: false } as const;
   const [own, reviewed] = await Promise.allSettled([
     ghQuery(token, PR_COMMENTS_QUERY, {
       q: searchQuery("author", scoped.scope),
       withStarter: STARTER.own,
+      withReviews: REVIEWS.own,
     }),
     ghQuery(token, PR_COMMENTS_QUERY, {
       q: searchQuery("reviewed", scoped.scope),
       withStarter: STARTER.reviewed,
+      withReviews: REVIEWS.reviewed,
     }),
   ]);
   // Both down is an upstream outage, not partial data.

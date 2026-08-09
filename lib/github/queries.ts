@@ -293,10 +293,36 @@ export function parseReviewRequests(raw: any, viewerLogin: string): ReviewReques
 }
 
 export const PR_COMMENTS_QUERY = `
-  query($q: String!, $withStarter: Boolean!) {
+  query($q: String!, $withStarter: Boolean!, $withReviews: Boolean!) {
     search(query: $q, type: ISSUE, first: 50) {
       nodes { ... on PullRequest {
         id number url repository { nameWithOwner }
+        # The body of a submitted review — the second of GitHub's three comment
+        # surfaces, and the one that made this issue: a question typed into the
+        # review box lives here, not in reviewThreads, so a PR with no inline
+        # thread at all could carry an unanswered question invisibly.
+        #
+        # Own-PR leg only. On someone else's PR a review body is either the
+        # viewer's own (waiting on the author) or another reviewer's (waiting on
+        # nobody in particular) — neither is the viewer's to answer, and this is
+        # the heaviest query in the app, so the reviewed leg does not pay for it.
+        reviews(last: 20) @include(if: $withReviews) { nodes {
+          id url bodyText submittedAt
+          author { login __typename }
+          reactionGroups { viewerHasReacted }
+        } }
+        # Not rows — the answer signal. A review body has no replies, so
+        # "answered" has to be read off the PR: the viewer saying anything in the
+        # conversation after the review was submitted. See parsePrComments.
+        #
+        # A window, so on a PR that stays chatty long after the viewer answered,
+        # their answer can fall out of it and the row comes back. That is the
+        # forgiving failure this heuristic already accepts — a handled row costs
+        # a glance, where the other direction hides an unanswered question — so
+        # it stays a window rather than growing the heaviest query in the app.
+        comments(last: 20) @include(if: $withReviews) { nodes {
+          author { login } createdAt
+        } }
         reviewThreads(first: 50) { nodes {
           id isResolved path
           # Who opened the thread. On the viewer's own PRs every unresolved
@@ -363,33 +389,89 @@ export function parsePrComments(
 ): PrComment[] {
   return searchNodes(raw)
     .filter((pr: any) => pr?.id)
-    .flatMap((pr: any) =>
-      (pr.reviewThreads?.nodes ?? [])
-        .filter((t: any) => t?.isResolved === false)
-        .map((thread: any) => ({ thread, last: thread.comments?.nodes?.[0] }))
-        .filter(({ thread }: any) =>
-          !viewerStartedOnly ||
-          thread.starter?.nodes?.[0]?.author?.login === viewerLogin,
-        )
-        .filter(({ last }: any) => last?.author?.login && last.author.login !== viewerLogin)
-        .map(({ thread, last }: any) => ({
-          id: thread.id,
-          prId: pr.id,
-          url: last.url ?? pr.url,
-          repo: pr.repository?.nameWithOwner ?? "",
-          number: pr.number,
-          author: last.author.login,
-          isBot: last.author.__typename === "Bot",
-          path: thread.path ?? "",
-          preview: previewOf(last.bodyText ?? ""),
-          commentedAt: last.createdAt ?? "",
-          viewerReacted: (last.reactionGroups ?? []).some((g: any) => g?.viewerHasReacted === true),
-          // Only the viewer-started pass can produce these, and the Dashboard
-          // reads it to know the thread stands on its own — it is waiting on the
-          // viewer whether or not that PR is on the board.
-          viewerStarted: viewerStartedOnly,
-        } as PrComment)),
-    );
+    .flatMap((pr: any) => [...reviewBodiesOf(pr, viewerLogin), ...threadsOf(pr, viewerLogin, viewerStartedOnly)]);
+}
+
+/**
+ * Review bodies still waiting on the viewer.
+ *
+ * An inline thread says whose turn it is structurally — it has replies, and a
+ * resolve bit. A review body has neither: the author answers in a conversation
+ * comment or another review, with nothing linking the two. So the turn is read
+ * off the PR instead — the review is waiting while the viewer has said nothing
+ * in the conversation since it was submitted.
+ *
+ * That is a heuristic, and it is deliberately the forgiving one: a viewer who
+ * answered somewhere it cannot see (a thread reply, a commit message) sees a row
+ * that is already handled, which costs a glance. The other direction would hide
+ * an unanswered question, which is the bug this exists to fix.
+ *
+ * Reacting is the manual escape hatch, exactly as it is for threads: the emoji
+ * is how the viewer acknowledges without replying, and the Dashboard hides
+ * reacted rows behind a toggle.
+ */
+function reviewBodiesOf(pr: any, viewerLogin: string): PrComment[] {
+  const reviews = pr.reviews?.nodes;
+  // Absent rather than empty on the reviewed leg, which does not request them.
+  if (!Array.isArray(reviews)) return [];
+  // "" sorts before every ISO timestamp, so a viewer who has not spoken on this
+  // PR leaves every review body pending without a second code path.
+  const viewerSpokeAt = (pr.comments?.nodes ?? [])
+    .filter((c: any) => c?.author?.login === viewerLogin)
+    .reduce((latest: string, c: any) => (c.createdAt > latest ? c.createdAt : latest), "");
+  return reviews
+    .filter((r: any) => r?.id && r.submittedAt > viewerSpokeAt)
+    .filter((r: any) => r.author?.login && r.author.login !== viewerLogin)
+    // An APPROVED review with no text is the common case and says nothing that
+    // can be replied to. Trimmed, because whitespace is not a question either.
+    .filter((r: any) => (r.bodyText ?? "").trim() !== "")
+    .map((r: any) => ({
+      id: r.id,
+      prId: pr.id,
+      url: r.url ?? pr.url,
+      repo: pr.repository?.nameWithOwner ?? "",
+      number: pr.number,
+      author: r.author.login,
+      isBot: r.author.__typename === "Bot",
+      // A review body hangs on the PR, not on a file.
+      path: "",
+      source: "review",
+      preview: previewOf(r.bodyText),
+      // Never absent past the filter above: an undefined submittedAt does not
+      // compare greater than "", so a review without one is already gone.
+      commentedAt: r.submittedAt,
+      viewerReacted: (r.reactionGroups ?? []).some((g: any) => g?.viewerHasReacted === true),
+      viewerStarted: false,
+    } as PrComment));
+}
+
+function threadsOf(pr: any, viewerLogin: string, viewerStartedOnly: boolean): PrComment[] {
+  return (pr.reviewThreads?.nodes ?? [])
+    .filter((t: any) => t?.isResolved === false)
+    .map((thread: any) => ({ thread, last: thread.comments?.nodes?.[0] }))
+    .filter(({ thread }: any) =>
+      !viewerStartedOnly ||
+      thread.starter?.nodes?.[0]?.author?.login === viewerLogin,
+    )
+    .filter(({ last }: any) => last?.author?.login && last.author.login !== viewerLogin)
+    .map(({ thread, last }: any) => ({
+      id: thread.id,
+      prId: pr.id,
+      url: last.url ?? pr.url,
+      repo: pr.repository?.nameWithOwner ?? "",
+      number: pr.number,
+      author: last.author.login,
+      isBot: last.author.__typename === "Bot",
+      path: thread.path ?? "",
+      source: "thread",
+      preview: previewOf(last.bodyText ?? ""),
+      commentedAt: last.createdAt ?? "",
+      viewerReacted: (last.reactionGroups ?? []).some((g: any) => g?.viewerHasReacted === true),
+      // Only the viewer-started pass can produce these, and the Dashboard
+      // reads it to know the thread stands on its own — it is waiting on the
+      // viewer whether or not that PR is on the board.
+      viewerStarted: viewerStartedOnly,
+    } as PrComment));
 }
 
 export function parseOrgs(raw: any): Org[] {

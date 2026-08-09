@@ -66,9 +66,21 @@ const COMMENT = {
   author: "alice",
   isBot: false,
   path: "src/app.ts",
+  source: "thread",
   preview: "please fix the null check",
   commentedAt: "2026-06-19T00:00:00Z",
   viewerReacted: false,
+};
+
+// The other comment surface: a question typed into the review box, which hangs
+// on the PR rather than on a file.
+const REVIEW_COMMENT = {
+  ...COMMENT,
+  id: "rv1",
+  url: "https://github.com/acme/b/pull/2#pullrequestreview-1",
+  path: "",
+  source: "review",
+  preview: "does this handle the empty case?",
 };
 
 // A comment the viewer acknowledged with an emoji reaction (on STUCK_PR).
@@ -1730,6 +1742,22 @@ describe("Dashboard — comments awaiting your reply", () => {
     expect(
       await screen.findByText("can you take another look at this branch"),
     ).toBeInTheDocument();
+  });
+
+  it("says a review-body comment is one, since it carries no file to show instead", async () => {
+    global.fetch = fetchWithComments([REVIEW_COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("does this handle the empty case?")).toBeInTheDocument();
+    expect(screen.getByText("Review comment")).toBeInTheDocument();
+    expect(screen.queryByText("src/app.ts")).not.toBeInTheDocument();
+  });
+
+  it("labels only the review body when both surfaces are on the board", async () => {
+    global.fetch = fetchWithComments([COMMENT, REVIEW_COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("please fix the null check")).toBeInTheDocument();
+    expect(screen.getByText("src/app.ts")).toBeInTheDocument();
+    expect(screen.getAllByText("Review comment")).toHaveLength(1);
   });
 
   it("hides bot comments by default and reveals them when 'Show bot comments' is checked", async () => {

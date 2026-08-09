@@ -57,20 +57,43 @@ jobs:
           # the inline-comment tool, plus gh for reading the diff and leaving a
           # top-level summary. Without these the agent analyzes but has no
           # permitted tool to publish (silent no-op).
+          #
+          # Read/Grep/Glob are also granted, read-only against the checkout
+          # that's already on disk (no write, no network). Without them, a
+          # review that needs anything beyond the raw hunks — e.g. whether a
+          # changed function has other callers, or what the surrounding file
+          # looks like — has no permitted way to look, and each attempt burns
+          # a denied-tool turn instead. On PR #26 the run hit
+          # error_max_turns after 41 turns with 22 permission denials and
+          # never posted anything; the allowlist's shape (diff/comment tools
+          # only, nothing for reading the repo) is consistent with that, but
+          # the per-turn tool-call stream isn't in the run log, so which
+          # calls were denied is NOT confirmed. This grant is the fix to
+          # verify or rule out that theory on the next run.
           claude_args: |
             --max-turns 40
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob"
           prompt: |
             You are reviewing this pull request as an ADVISORY reviewer for the
             PRison project. Do NOT approve or block the PR — leave the verdict to
             the human and to the deterministic CI gate.
 
-            How to publish your review:
-            - Use `mcp__github_inline_comment__create_inline_comment` to leave
-              inline comments on the specific changed lines for concrete findings.
-            - Use `gh pr comment` to leave ONE concise top-level summary. ALWAYS
-              post this summary, even if you find nothing notable (say so
-              briefly), so the run leaves a visible result.
+            How to publish your review, IN THIS ORDER:
+            1. Fetch the diff once with `gh pr diff` (don't re-fetch it). Read
+               whatever surrounding repo context you need with Read/Grep/Glob.
+            2. As soon as you know your findings, use `gh pr comment` to post
+               ONE concise top-level summary. ALWAYS post this summary, even
+               if you find nothing notable (say so briefly).
+            3. Only after the summary is posted, use
+               `mcp__github_inline_comment__create_inline_comment` for inline
+               comments on the specific changed lines, for the most important
+               findings only.
+
+            Post the summary BEFORE the inline comments, not after: a run
+            that runs out of turns partway through inline commenting still
+            leaves the summary on the PR. Posting it last (as this workflow
+            used to do) means a run that dies before the end leaves nothing
+            at all.
 
             Review the diff for:
             - Bugs, security issues, and performance problems.
@@ -81,8 +104,6 @@ jobs:
 
             Group findings by severity (Critical / Warning / Suggestion), be
             concise and specific, and always cite the file and line. Do not
-            nitpick style the linter already enforces.
-
-            Spend turns economically: fetch the diff once with `gh pr diff` and
-            don't re-fetch; leave inline comments only for the most important
-            issues; post the single summary comment last so it always lands.
+            nitpick style the linter already enforces. Spend turns
+            economically — you have a limited budget and the summary must go
+            out well before it runs dry.

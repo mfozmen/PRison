@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.10.0](https://github.com/mfozmen/PRison/compare/v1.9.1...v1.10.0) (2026-08-09)
+
+### Features
+
+* filter the board by draft state in three ways, not two ([#31](https://github.com/mfozmen/PRison/issues/31)) ([7d44083](https://github.com/mfozmen/PRison/commit/7d44083ad45c27d7fc7beffa298e1b484e863b84)), closes [#29](https://github.com/mfozmen/PRison/issues/29)
+* surface questions left in a review body, not just inline threads ([#32](https://github.com/mfozmen/PRison/issues/32)) ([52d3f7a](https://github.com/mfozmen/PRison/commit/52d3f7ac04e17146b0bf1d4713fe55ed96f96165))
+
+### Bug Fixes
+
+* log the Retry-After GitHub actually sends on an upstream failure ([#36](https://github.com/mfozmen/PRison/issues/36)) ([5a336a2](https://github.com/mfozmen/PRison/commit/5a336a20eab126936903c315602f8bd99d164ff5)), closes [#20](https://github.com/mfozmen/PRison/issues/20)
+* send three GraphQL queries at a time instead of seven at once ([#30](https://github.com/mfozmen/PRison/issues/30)) ([7966d6e](https://github.com/mfozmen/PRison/commit/7966d6e697787db97f5bd3521700f2da505cef94)), closes [#24](https://github.com/mfozmen/PRison/issues/24)
+
 ## [1.9.1](https://github.com/mfozmen/PRison/compare/v1.9.0...v1.9.1) (2026-08-07)
 
 ### Bug Fixes

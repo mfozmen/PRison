@@ -30,7 +30,7 @@ access. Four lists, oldest first, plus two history sections:
 Both history sections sit side by side, collapsed by default with a count, and
 expand to the latest 15 with **Load more** for the rest.
 
-![The PRison dashboard in dark mode, showing the four PR lists, the header's activity bell carrying three unseen events, and the recently reviewed and recently merged / closed histories expanded side by side](docs/screenshot.png)
+![The PRison dashboard in dark mode, showing the filter bar's grouping and draft filters above the four PR lists — ready to merge, comments awaiting your reply, PRs waiting on your review, and PRs stuck on checks — with the recently reviewed and recently merged / closed histories collapsed at the bottom](docs/screenshot.png)
 
 ### Features
 

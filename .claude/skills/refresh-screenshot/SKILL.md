@@ -1,25 +1,31 @@
 ---
 name: refresh-screenshot
-description: Regenerate docs/screenshot.png from synthetic data. Use when the dashboard UI changed and the README screenshot no longer shows it — a new filter, a new section, a restyled card. Drives the local dev server and Chrome; never captures real GitHub data.
+description: Regenerate docs/screenshot.png from synthetic data. Use when the dashboard UI changed and the README screenshot no longer shows it — a new filter, a new section, a restyled card. Drives headless Chrome from a script; never captures real GitHub data.
 ---
 
 # Refreshing docs/screenshot.png
 
-The README screenshot goes stale every time the dashboard gains a control. This
-is how to redo it without putting a single real repository, organization, or
-person into a public repo.
+The README screenshot goes stale every time the dashboard gains a control. Two
+files do the whole job:
+
+- `scripts/screenshot/demo-board.mjs` — the synthetic board, one array per list.
+- `scripts/screenshot/capture.mjs` — headless Chrome over the DevTools Protocol.
 
 ## The rule this exists for
 
-PRison is public. Anything visible in `docs/screenshot.png` is published. The
-board in the screenshot must therefore come from `scripts/screenshot/demo-board.mjs`,
-which is built from the same allowlisted names (`acme`, `globex`, `initech`,
-`widgets-inc`, `alice`, `bob`, `carol`, `dave`, `octocat`) that
-`lib/generic-fixtures.ts` enforces everywhere else in the repo.
+PRison is public. Anything visible in `docs/screenshot.png` is published, so the
+board must come from `demo-board.mjs`, which is built from the same allowlisted
+names (`acme`, `globex`, `initech`, `widgets-inc`, `alice`, `bob`, `carol`,
+`dave`, `octocat`) that `lib/generic-fixtures.ts` enforces everywhere else.
 
 **Never screenshot a signed-in board showing real data**, not even to "check the
 layout" — a real PR title in a discarded screenshot is still a real PR title
 that reached the disk of a public checkout.
+
+The capture script is built so that cannot happen by accident: it mints its own
+session cookie carrying a **deliberately invalid token**, so the shell renders
+and the org query returns nothing, and it patches `window.fetch` before the
+first paint so no list ever reaches GitHub.
 
 ## Steps
 
@@ -29,63 +35,36 @@ that reached the disk of a public checkout.
 npm run dev
 ```
 
-Leave it running in the background. It listens on `http://localhost:3000` unless
-that port is taken — read the actual URL out of its output.
+`docs/screenshot.png` is not reachable from a production build without a real
+token, which is the thing this must not use. Note the port it actually picked:
+if the Docker container is on `:3000` — and it holds **real** data — `next dev`
+falls back to `:3001` and you must point the capture at that one.
 
-Note this is separate from the Docker container that may also be on `:3000`. If
-the container is running, either stop it or let `next dev` pick another port and
-use that one.
-
-### 2. Open it in Chrome and sign in
-
-Use the Chrome tools (`tabs_create_mcp`, then `navigate`). Sign in normally —
-the dev server needs a working token to render the page shell at all.
-
-The signed-in shell shows your own login in the header and your organizations in
-the org `<select>`. That select is **closed** and reads "All organizations" in
-its default state, so the real names sit in unopened `<option>` elements and
-never reach the image. Leave it closed. Your login does appear; that is fine
-when it is an allowlisted name, and if it is not, sign in with an account whose
-name is.
-
-### 3. Replace the board with the synthetic one
+### 2. Capture
 
 ```bash
-node scripts/screenshot/demo-board.mjs
+node scripts/screenshot/capture.mjs                        # localhost:3000
+PRISON_URL=http://localhost:3001 node scripts/screenshot/capture.mjs
 ```
 
-That prints a self-contained snippet. Run it in the page with `javascript_tool`.
-It patches `window.fetch` so every `/api/*` list answers from the demo board and
-leaves every other request alone. It returns the list of routes it patched —
-check that string before continuing; an empty or partial list means the snippet
-did not take.
+It writes `docs/screenshot.png` directly, at 1280 CSS px and 2x, dark theme,
+full page. Nothing to click, no browser to drive. Chrome runs headless on a
+throwaway profile, so your own browser is untouched; set `CHROME_PATH` if Chrome
+is not at the default macOS location.
 
-Then click **Refresh** in the filter bar. All six lists refetch and land on the
-synthetic board. Confirm by eye that the titles are the demo ones
-(`Retry the payment webhook instead of dropping it`, …) before capturing.
+Give it a minute. Chrome's first headless start on a managed machine can take
+well over the usual couple of seconds.
 
-The demo board's ages are relative to when you ran the command, so the badges
-read `2h` / `3d` rather than a frozen date.
+If it fails with "the dashboard did not render", the dev server is not up at the
+URL you passed. If it fails on `AUTH_SECRET`, run `npm run dev` once so
+`.env.local` gets written.
 
-### 4. Set up the shot
-
-- **Dark mode** — the existing screenshot is dark; use the sun/moon toggle.
-- **Window size** — wide enough that the two-column layout is in its desktop
-  form, around 1600×1000. `resize_window` does this.
-- Make sure the control the screenshot exists to show is **visible and in a
-  state that demonstrates it**. If the change is a new filter, leave it on its
-  default rather than an exotic setting, unless the exotic one is the point.
-- Scroll so the filter bar and the four work-queue lists are all in frame.
-
-### 5. Capture and replace
-
-Screenshot with the Chrome tools, then write the image to `docs/screenshot.png`,
-replacing the old one. Keep the filename — the README links to it by path.
-
-### 6. Check before committing
+### 3. Check before committing
 
 - Open the PNG and **read every string in it**. Any repository, org, person, or
-  PR title that is not from the demo board is a leak; go back to step 3.
+  PR title that is not from the demo board is a leak.
+- Make sure the control the screenshot exists to show is visible and in a state
+  that demonstrates it — default state unless the exotic one is the point.
 - If the composition changed enough that the README's alt text no longer
   describes it, update the alt text too.
 - `npx vitest run lib/generic-fixtures.test.ts` — the guard scans committed
@@ -97,10 +76,24 @@ replacing the old one. Keep the filename — the README links to it by path.
 Edit `scripts/screenshot/demo-board.mjs`. It is plain data in the shapes
 `lib/types.ts` defines, one array per list, and the only rules are:
 
-- Names come from the allowlist above. If you need a new one, add it to the
-  allowlist in `lib/generic-fixtures.ts` first, and pick something that is
-  obviously fictional.
+- Names come from the allowlist above — **both halves** of `org/repo`, which is
+  the one that trips people up. If you need a new one, add it to the allowlist
+  in `lib/generic-fixtures.ts` first, and pick something obviously fictional.
 - Keep at least one draft in the lists that can hold one, so the draft filter
   has something to act on.
 - Keep the mix that makes the board legible: something failing, something
   pending, something approved and waiting, something merged.
+
+Ages are written as `ago(hours)` and resolve at run time, so the badges read
+`2h` / `3d` instead of freezing at the date the file was written.
+
+## Changing the shot itself
+
+`capture.mjs` is a small CDP client — `send(method, params)` returns the result.
+The knobs worth knowing:
+
+- `WIDTH` / `SCALE` at the top.
+- The `Page.addScriptToEvaluateOnNewDocument` source seeds `localStorage`
+  (theme, draft filter), installs the fetch patch, and hides the `nextjs-portal`
+  dev overlay. Anything that must be true before the first paint goes there.
+- The 3 s settle before capture covers React's commit and the age badges.

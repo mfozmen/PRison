@@ -174,9 +174,13 @@ function logUpstreamError(e: unknown): void {
   // turns the next real occurrence into an answer instead of another guess.
   // "absent" is kept distinct from the header's own value so a 403 with no
   // header doesn't read the same as one GitHub simply didn't explain.
-  const retryAfter = err.response?.headers?.["retry-after"];
+  // Bounded like every other upstream string on this line. A Retry-After is a
+  // few characters of seconds or an HTTP date; anything longer is not something
+  // to paste into a log whole, whatever sent it.
+  const header = err.response?.headers?.["retry-after"];
+  const retryAfter = header === undefined ? "absent" : String(header).slice(0, 32);
   console.error(
-    `[github] upstream query failed: status=${err.status ?? "?"} name=${err.name ?? "?"} retry-after=${retryAfter ?? "absent"} ` +
+    `[github] upstream query failed: status=${err.status ?? "?"} name=${err.name ?? "?"} retry-after=${retryAfter} ` +
       (detail || String(err.message ?? "no detail").slice(0, 200)),
   );
 }

@@ -405,4 +405,20 @@ describe("ghQuery — what it leaves behind on a failure", () => {
     expect(spy.mock.calls[0][0]).not.toContain("undefined");
     spy.mockRestore();
   });
+
+  it("bounds the header rather than pasting whatever arrived into the log", async () => {
+    // Every other upstream string on this line is truncated; this one carries
+    // seconds or an HTTP date, so a long one is not worth logging whole.
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    graphqlMock.mockRejectedValue(
+      Object.assign(new Error("blocked"), {
+        status: 403,
+        response: { headers: { "retry-after": "9".repeat(500) } },
+      }),
+    );
+    await expect(ghQuery("t", "query")).rejects.toBeTruthy();
+    expect(spy.mock.calls[0][0]).toContain(`retry-after=${"9".repeat(32)} `);
+    expect(spy.mock.calls[0][0]).not.toContain("9".repeat(33));
+    spy.mockRestore();
+  });
 });

@@ -9,7 +9,7 @@
 
 ### Bug Fixes
 
-* log the Retry-After GitHub actually sends on an upstream failure ([#36](https://github.com/mfozmen/PRison/issues/36)) ([5a336a2](https://github.com/mfozmen/PRison/commit/5a336a20eab126936903c315602f8bd99d164ff5)), closes [#20](https://github.com/mfozmen/PRison/issues/20)
+* log the Retry-After GitHub actually sends on an upstream failure ([#36](https://github.com/mfozmen/PRison/issues/36)) ([5a336a2](https://github.com/mfozmen/PRison/commit/5a336a20eab126936903c315602f8bd99d164ff5)), refs [#20](https://github.com/mfozmen/PRison/issues/20) — which stays open until a real 403 is captured
 * send three GraphQL queries at a time instead of seven at once ([#30](https://github.com/mfozmen/PRison/issues/30)) ([7966d6e](https://github.com/mfozmen/PRison/commit/7966d6e697787db97f5bd3521700f2da505cef94)), closes [#24](https://github.com/mfozmen/PRison/issues/24)
 
 ## [1.9.1](https://github.com/mfozmen/PRison/compare/v1.9.0...v1.9.1) (2026-08-07)

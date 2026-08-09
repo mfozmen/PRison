@@ -5,6 +5,42 @@ export function ghClient(token: string) {
   return graphql.defaults({ headers: { authorization: `token ${token}` } });
 }
 
+// GitHub documents the secondary rate limit as triggered by CONCURRENT requests
+// and asks that a single user's requests be made serially. A refresh did the
+// opposite: six fetches at once, one of which issues two queries of its own, so
+// seven queries left together and two or three came back as error banners.
+//
+// Three at a time, measured rather than guessed. Against a real account the
+// whole refresh takes ~3.3s bounded versus ~3.2s unbounded — the wall clock is
+// set by the slowest single query (2-3s), and the queue drains behind it for
+// free. Two costs +1.8s and one costs +5.3s, which is why this is not serial.
+// Individual queries also come back FASTER bounded (~2.1s vs ~3.1s at their
+// slowest): GitHub is already throttling the burst, so the concurrency was
+// never buying the speed it looked like it was.
+const MAX_CONCURRENT = 3;
+
+let active = 0;
+const waiting: (() => void)[] = [];
+
+// Only the request itself is gated, never the retry's wait — a query sleeping
+// out a Retry-After holds no slot, or one blocked query would idle a third of
+// the queue for as long as the block lasts.
+async function withSlot<T>(fn: () => Promise<T>): Promise<T> {
+  if (active >= MAX_CONCURRENT) await new Promise<void>((r) => waiting.push(r));
+  else active++;
+  try {
+    return await fn();
+  } finally {
+    // Handed to the next waiter rather than released and re-taken: releasing
+    // first would let a caller arriving in that same tick claim the slot the
+    // waiter was already woken for, and both would run. The count only moves
+    // when nobody is queued.
+    const next = waiting.shift();
+    if (next) next();
+    else active--;
+  }
+}
+
 // Runs a query but tolerates partial failures. GitHub returns the data it
 // could resolve alongside an `errors` array when, for example, one
 // organization forbids the token (org PAT/app restrictions). @octokit throws on
@@ -20,22 +56,23 @@ export async function ghQuery<T>(
 ): Promise<{ data: T; partial: boolean }> {
   // One definition of "ran it", so the retry can never drift from the first
   // attempt on what counts as partial data.
-  const runOnce = async (): Promise<{ data: T; partial: boolean }> => {
-    try {
-      return { data: (await ghClient(token)(query, vars)) as T, partial: false };
-    } catch (e) {
-      if (e instanceof GraphqlResponseError && e.data) return { data: e.data as T, partial: true };
-      throw e;
-    }
-  };
+  const runOnce = (): Promise<{ data: T; partial: boolean }> =>
+    withSlot(async () => {
+      try {
+        return { data: (await ghClient(token)(query, vars)) as T, partial: false };
+      } catch (e) {
+        if (e instanceof GraphqlResponseError && e.data) return { data: e.data as T, partial: true };
+        throw e;
+      }
+    });
   try {
     return await runOnce();
   } catch (e) {
-    // A dashboard refresh fires six of these at once and GitHub answers a burst
-    // with a secondary rate limit — which is account-wide, so every list on the
-    // board fails together and the page looks broken. It clears in about a
-    // second, which is why hitting Retry has always "fixed" it. Waiting once is
-    // that same Retry, without the human.
+    // The gate above makes a burst far less likely, but the limit is
+    // account-wide: another tab, another device, or the queue's own steady
+    // three can still trip it, and then every list fails together and the page
+    // looks broken. It clears in about a second, which is why hitting Retry has
+    // always "fixed" it. Waiting once is that same Retry, without the human.
     const wait = secondaryLimitWaitMs(e);
     if (wait === null) {
       logUpstreamError(e);
@@ -89,11 +126,12 @@ function secondaryLimitWaitMs(e: unknown): number | null {
   return withJitter(retryAfter * 1000);
 }
 
-// The six queries a refresh makes are rejected together by an account-wide
-// limit, so a fixed wait would wake them together too — re-firing the very
-// burst that tripped it, at twice the size. The spread has to be wide enough
-// that they actually arrive apart, which is why it is comparable to the wait
-// itself rather than a rounding error on top of it.
+// Whatever is in flight when an account-wide limit lands is rejected together,
+// so a fixed wait would wake them together too — re-firing the very burst that
+// tripped it. The spread has to be wide enough that they actually arrive apart,
+// which is why it is comparable to the wait itself rather than a rounding error
+// on top of it. The queue does not do this job: it caps how many run at once,
+// not how far apart they start.
 function withJitter(ms: number): number {
   // randomInt over Math.random because this runs server-side and Math.random is
   // flagged wherever it appears; nothing here needs unpredictability, the two

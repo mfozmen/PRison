@@ -563,15 +563,26 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // currently showing, so the column can never point at a PR that isn't on
   // screen. Derived from the lists AFTER arbitration, which is why it lives
   // here and not in the route.
+  //
+  // Two lists, not three: "Waiting on your review" cannot contribute. A comment
+  // reaching the check below came from one of /api/pr-comments' two legs, and
+  // neither can land on a PR in that list — the own leg searches author:@me,
+  // which review-requested:@me excludes because GitHub will not request a review
+  // from a PR's own author, and every row the reviewed leg emits carries
+  // viewerStarted, which short-circuits the check before it gets here.
+  //
+  // And it would still be redundant if that first half ever turned out to have a
+  // hole: a comment from the own leg is on an author:@me PR, and the two lists
+  // below search author:@me too, so the review list has nothing of its own to
+  // contribute either way.
+  //
+  // It used to be included defensively, with a test that fabricated the payload
+  // to cover it. Both are gone: defence against an input the route cannot emit
+  // is a claim nobody can check, and a test that manufactures the input to prove
+  // the claim only checks itself.
   const visiblePrIds = new Set([
     ...visibleStuck.map((pr) => pr.id),
     ...visibleReady.map((pr) => pr.id),
-    // Defensive. GitHub refuses to request a review from a PR's own author, so
-    // nothing the route can emit matches this today — the own leg only carries
-    // threads on author:@me PRs, and the reviewed leg's threads carry
-    // viewerStarted. It stays because the rule here is "the PR is on screen",
-    // and this list is on screen.
-    ...visibleReviews.map((req) => req.id),
   ]);
   const visibleComments = sortByAgeAsc(
     comments.filter(

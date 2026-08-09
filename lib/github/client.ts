@@ -156,6 +156,7 @@ function logUpstreamError(e: unknown): void {
     name?: string;
     message?: string;
     errors?: { type?: string; message?: string }[];
+    response?: { headers?: Record<string, string> };
   };
   // GraphQL errors carry the answer (RATE_LIMITED, a timeout, a bad variable)
   // in the array, not in the top-level message — which only ever says "Request
@@ -167,8 +168,15 @@ function logUpstreamError(e: unknown): void {
   const detail = errors
     .map((x) => `${x?.type ?? "?"}: ${String(x?.message ?? "").slice(0, 160)}`)
     .join(" | ");
+  // secondaryLimitWaitMs only ever acts on a Retry-After that fits the 5s
+  // budget, so what GitHub actually sends on a real block is still unknown —
+  // logging it here on every failure, not only the retried path, is what
+  // turns the next real occurrence into an answer instead of another guess.
+  // "absent" is kept distinct from the header's own value so a 403 with no
+  // header doesn't read the same as one GitHub simply didn't explain.
+  const retryAfter = err.response?.headers?.["retry-after"];
   console.error(
-    `[github] upstream query failed: status=${err.status ?? "?"} name=${err.name ?? "?"} ` +
+    `[github] upstream query failed: status=${err.status ?? "?"} name=${err.name ?? "?"} retry-after=${retryAfter ?? "absent"} ` +
       (detail || String(err.message ?? "no detail").slice(0, 200)),
   );
 }

@@ -356,13 +356,13 @@ describe("ghQuery — what it leaves behind on a failure", () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     graphqlMock.mockRejectedValue({});
     await expect(ghQuery("t", "query")).rejects.toBeTruthy();
-    expect(spy.mock.calls[0][0]).toContain("status=? name=? no detail");
+    expect(spy.mock.calls[0][0]).toContain("status=? name=? retry-after=absent no detail");
 
     // `throw null` is legal, and a logger that dies on it would replace the
     // upstream failure with a TypeError from inside the error path.
     graphqlMock.mockRejectedValue(null);
     await expect(ghQuery("t", "query")).rejects.toBeNull();
-    expect(spy.mock.calls[1][0]).toContain("status=? name=? no detail");
+    expect(spy.mock.calls[1][0]).toContain("status=? name=? retry-after=absent no detail");
     spy.mockRestore();
   });
 
@@ -371,11 +371,38 @@ describe("ghQuery — what it leaves behind on a failure", () => {
     const err = Object.assign(new Error("HttpError"), {
       status: 403,
       request: { headers: { authorization: "token ghp_secret" } },
+      response: { headers: { "retry-after": "60" } },
     });
     graphqlMock.mockRejectedValue(err);
     await expect(ghQuery("t", "query")).rejects.toBeTruthy();
     expect(spy.mock.calls[0][0]).toContain("status=403");
     expect(spy.mock.calls[0][0]).not.toContain("ghp_secret");
+    spy.mockRestore();
+  });
+
+  // The issue this line exists for: whether a real secondary-rate-limit 403
+  // ever carries a Retry-After the 5s budget accepts is still unknown, and
+  // this is the only record of what GitHub actually sent. It has to survive
+  // in the log line whether or not the retry path ever looked at it.
+  it("logs the Retry-After value a failure carries, even one the retry budget declined", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    graphqlMock.mockRejectedValue(
+      Object.assign(new Error("You have exceeded a secondary rate limit"), {
+        status: 403,
+        response: { headers: { "retry-after": "60" } },
+      }),
+    );
+    await expect(ghQuery("t", "query")).rejects.toBeTruthy();
+    expect(spy.mock.calls[0][0]).toContain("retry-after=60");
+    spy.mockRestore();
+  });
+
+  it("says the header was absent instead of printing undefined", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    graphqlMock.mockRejectedValue(Object.assign(new Error("network down"), { status: 500 }));
+    await expect(ghQuery("t", "query")).rejects.toBeTruthy();
+    expect(spy.mock.calls[0][0]).toContain("retry-after=absent");
+    expect(spy.mock.calls[0][0]).not.toContain("undefined");
     spy.mockRestore();
   });
 });

@@ -42,18 +42,24 @@ export type ReadyPr = {
   viaBlocked: boolean;    // true when qualified via isReadyViaBlocked (BLOCKED+APPROVED, no failing/pending check)
 };
 
-// An inline review-thread comment on one of the viewer's own PRs that is still
-// waiting on a reply: the thread is unresolved AND its last comment is not the
-// viewer's. See parsePrComments.
+// A review comment on one of the viewer's own PRs that is still waiting on a
+// reply. Two surfaces reach this type, and they decide "waiting" differently —
+// an inline thread is unresolved with a last comment that is not the viewer's;
+// a review body has neither replies nor a resolve bit, so it waits until the
+// viewer says something on the PR after it. See parsePrComments.
 export type PrComment = {
-  id: string;          // review-thread id
+  id: string;          // review-thread id, or review id for a review body
+  // Which surface it came from. The row shows it, because the two are answered
+  // in different places and a body with no file badge otherwise reads as a
+  // thread whose path failed to load.
+  source: "thread" | "review";
   prId: string;        // PR node id — the Dashboard shows only comments on PRs visible in the stuck/ready lists
   url: string;         // direct anchor to the comment, e.g. .../pull/42#discussion_r1
   repo: string;
   number: number;
   author: string;
   isBot: boolean;      // author.__typename === "Bot"; bots dominate the raw feed, so the client hides them by default
-  path: string;        // file the thread hangs on
+  path: string;        // file the thread hangs on; "" for a review body, which hangs on the PR
   preview: string;     // whitespace-normalized bodyText, at most PREVIEW_MAX chars, ellipsized when cut
   commentedAt: string; // ISO — when the ball landed in the viewer's court; drives the age badge
   viewerReacted: boolean; // viewer has an emoji reaction on the last comment; the client can treat that as an acknowledgement and hide the thread

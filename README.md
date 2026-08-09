@@ -13,9 +13,10 @@ access. Four lists, oldest first, plus two history sections:
   still counts, with a **"Needs update"** hint (a bot/manual update handles it) —
   but only once its checks are green; while one is red or still running it
   belongs under *Stuck on checks*, and no PR is ever in both lists.
-- **Comments awaiting your reply** — review threads where the last word isn't
-  yours: every unresolved thread on your own PRs, plus the threads you raised on
-  PRs you reviewed. Each row opens the comment itself, not the top of the PR.
+- **Comments awaiting your reply** — review comments where the last word isn't
+  yours: every unresolved inline thread on your own PRs, the threads you raised
+  on PRs you reviewed, and questions left in the body of a review rather than on
+  a line of the diff. Each row opens the comment itself, not the top of the PR.
 - **Waiting on your review** — PRs you're blocking others on.
 - **Stuck on checks** — your open PRs with failing/pending checks, or otherwise
   blocked from merging (required checks, review, or conflicts).
@@ -34,12 +35,15 @@ expand to the latest 15 with **Load more** for the rest.
 
 ### Features
 
-- **Unanswered review comments.** A thread is waiting on you when it is unresolved
-  *and* its most recent comment isn't yours — replying adds a comment, so your own
-  last word means the ball is back in the reviewer's court. The age counts from
-  that comment, so you can see what you've been sitting on for four days. Bots
-  write most review threads, so they're hidden behind a **Show bot comments**
-  toggle.
+- **Unanswered review comments.** An inline thread is waiting on you when it is
+  unresolved *and* its most recent comment isn't yours — replying adds a comment,
+  so your own last word means the ball is back in the reviewer's court. A review
+  *body* has neither replies nor a resolve bit, so it waits until you say
+  something on the PR after it; a reaction dismisses one, the same emoji that
+  dismisses a thread. Rows say which surface they came from, because the two are
+  answered in different places. The age counts from the comment, so you can see
+  what you've been sitting on for four days. Bots write most review comments, so
+  they're hidden behind a **Show bot comments** toggle.
 - **Tracked checks → Awaiting.** GitHub's API hides "expected" required checks
   (e.g. a manually-triggered `qa/smoke` or automation) from non-admins. Name the
   checks you care about — a default per owner (your personal account and every

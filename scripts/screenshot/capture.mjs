@@ -54,7 +54,8 @@ function connect(wsUrl) {
     const slot = pending.get(msg.id);
     if (!slot) return;
     pending.delete(msg.id);
-    msg.error ? slot.reject(new Error(msg.error.message)) : slot.resolve(msg.result);
+    if (msg.error) slot.reject(new Error(msg.error.message));
+    else slot.resolve(msg.result);
   });
   const ready = new Promise((resolve, reject) => {
     ws.addEventListener("open", resolve, { once: true });

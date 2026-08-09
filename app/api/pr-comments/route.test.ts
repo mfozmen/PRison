@@ -195,6 +195,17 @@ describe("GET /api/pr-comments", () => {
     expect(queryMock.mock.calls.map((c) => c[2].withStarter)).toEqual([false, true]);
   });
 
+  it("asks for review bodies only on the own-PR leg", async () => {
+    // A review body on someone else's PR is either the viewer's own or another
+    // reviewer's — neither is the viewer's to answer, so the reviewed leg does
+    // not pay for the two extra connections.
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("mfozmen");
+    queryMock.mockResolvedValue({ data: { search: { nodes: [] } }, partial: false });
+    await GET(req("http://x/api/pr-comments"));
+    expect(queryMock.mock.calls.map((c) => c[2].withReviews)).toEqual([true, false]);
+  });
+
   it("keeps only viewer-raised threads from the reviewed-PR search", async () => {
     // On someone else's PR every unresolved thread is waiting on somebody;
     // only the ones the viewer raised are waiting on the viewer.

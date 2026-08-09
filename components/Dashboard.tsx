@@ -927,6 +927,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                       </svg>
                       {c.author}
                     </span>
+                    {/* A review body has no file, so without this it would read
+                        as an inline thread whose path failed to load — and the
+                        two are answered in different places. */}
+                    {c.source === "review" && (
+                      <span className="inline-flex items-center rounded bg-surface px-1.5 py-0.5 text-xs font-medium text-muted ring-1 ring-inset ring-border">
+                        Review comment
+                      </span>
+                    )}
                     {c.path && (
                       <span className="inline-flex items-center gap-1 rounded bg-surface px-1.5 py-0.5 font-mono text-xs text-muted ring-1 ring-inset ring-border">
                         <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">

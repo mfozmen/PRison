@@ -1505,6 +1505,7 @@ describe("parsePrComments", () => {
       author: "alice",
       isBot: false,
       path: "src/app.ts",
+      source: "thread",
       preview: "please fix",
       commentedAt: "2026-07-01T00:00:00Z",
       viewerReacted: false,
@@ -1591,6 +1592,7 @@ describe("parsePrComments", () => {
       author: "alice",
       isBot: false,
       path: "",
+      source: "thread",
       preview: "",
       commentedAt: "",
       viewerReacted: false,
@@ -1617,6 +1619,168 @@ describe("parsePrComments", () => {
   it("leaves viewerReacted false when reactionGroups is absent", () => {
     const [c] = parsePrComments(raw([thread()]), "mfozmen");
     expect(c.viewerReacted).toBe(false);
+  });
+
+  describe("review bodies", () => {
+    const review = (over: Record<string, unknown> = {}) => ({
+      id: "rv1",
+      url: "https://gh/acme/b/pull/2#pullrequestreview-1",
+      bodyText: "Does this handle the empty case?",
+      submittedAt: "2026-07-02T00:00:00Z",
+      author: { login: "alice", __typename: "User" },
+      ...over,
+    });
+
+    // The PR from issue #28: no inline thread exists at all, and the question
+    // was typed into the review box alongside an approval.
+    const withReviews = (
+      reviews: unknown[],
+      conversation: unknown[] = [],
+      threads: unknown[] = [],
+    ) => {
+      const r = raw(threads);
+      Object.assign(r.search.nodes[0], {
+        reviews: { nodes: reviews },
+        comments: { nodes: conversation },
+      });
+      return r;
+    };
+
+    it("surfaces a question left in a review body on a PR with no inline threads", () => {
+      expect(parsePrComments(withReviews([review()]), "mfozmen")).toEqual([
+        {
+          id: "rv1",
+          prId: "PR_1",
+          url: "https://gh/acme/b/pull/2#pullrequestreview-1",
+          repo: "acme/b",
+          number: 2,
+          author: "alice",
+          isBot: false,
+          path: "",
+          source: "review",
+          preview: "Does this handle the empty case?",
+          commentedAt: "2026-07-02T00:00:00Z",
+          viewerReacted: false,
+          viewerStarted: false,
+        },
+      ]);
+    });
+
+    it("drops an approval that carries no text", () => {
+      expect(parsePrComments(withReviews([review({ bodyText: "" })]), "mfozmen")).toEqual([]);
+      expect(parsePrComments(withReviews([review({ bodyText: "  \n " })]), "mfozmen")).toEqual([]);
+      expect(parsePrComments(withReviews([review({ bodyText: undefined })]), "mfozmen")).toEqual([]);
+    });
+
+    it("drops the viewer's own review body — it waits on the author, not on them", () => {
+      const mine = review({ author: { login: "mfozmen", __typename: "User" } });
+      expect(parsePrComments(withReviews([mine]), "mfozmen")).toEqual([]);
+    });
+
+    it("drops a review with no id or no author", () => {
+      expect(parsePrComments(withReviews([review({ id: undefined })]), "mfozmen")).toEqual([]);
+      expect(parsePrComments(withReviews([review({ author: null })]), "mfozmen")).toEqual([]);
+    });
+
+    it("treats a conversation comment from the viewer after the review as the answer", () => {
+      const answered = withReviews(
+        [review()],
+        [{ author: { login: "mfozmen" }, createdAt: "2026-07-03T00:00:00Z" }],
+      );
+      expect(parsePrComments(answered, "mfozmen")).toEqual([]);
+    });
+
+    it("keeps waiting when the viewer only spoke before the review", () => {
+      const stale = withReviews(
+        [review()],
+        [{ author: { login: "mfozmen" }, createdAt: "2026-07-01T00:00:00Z" }],
+      );
+      expect(parsePrComments(stale, "mfozmen")).toHaveLength(1);
+    });
+
+    it("reads the viewer's latest word, not whichever comment came last in the list", () => {
+      const conversation = [
+        { author: { login: "mfozmen" }, createdAt: "2026-07-03T00:00:00Z" },
+        { author: { login: "mfozmen" }, createdAt: "2026-07-01T00:00:00Z" },
+      ];
+      expect(parsePrComments(withReviews([review()], conversation), "mfozmen")).toEqual([]);
+    });
+
+    it("does not let someone else's later comment answer for the viewer", () => {
+      const others = [{ author: { login: "alice" }, createdAt: "2026-07-09T00:00:00Z" }];
+      expect(parsePrComments(withReviews([review()], others), "mfozmen")).toHaveLength(1);
+    });
+
+    it("marks a bot's review body so the existing toggle can hide it", () => {
+      const bot = review({ author: { login: "github-actions", __typename: "Bot" } });
+      const [c] = parsePrComments(withReviews([bot]), "mfozmen");
+      expect(c.isBot).toBe(true);
+    });
+
+    it("carries a viewer reaction, which is how a review body gets dismissed", () => {
+      const reacted = review({ reactionGroups: [{ viewerHasReacted: true }] });
+      const [c] = parsePrComments(withReviews([reacted]), "mfozmen");
+      expect(c.viewerReacted).toBe(true);
+    });
+
+    it("falls back to the PR url when the review carries none", () => {
+      const [c] = parsePrComments(withReviews([review({ url: undefined })]), "mfozmen");
+      expect(c.url).toBe("https://gh/acme/b/pull/2");
+      expect(c.commentedAt).toBe("2026-07-02T00:00:00Z");
+    });
+
+    it("fills in what a sparse PR node leaves out", () => {
+      // The conversation connection can come back absent while reviews do not,
+      // and a review carries no reactionGroups until someone reacts.
+      const sparse = {
+        search: {
+          nodes: [
+            {
+              id: "PR_1",
+              number: 2,
+              url: "https://gh/acme/b/pull/2",
+              reviews: { nodes: [null, review()] },
+            },
+          ],
+        },
+      };
+      expect(parsePrComments(sparse, "mfozmen")).toEqual([
+        {
+          id: "rv1",
+          prId: "PR_1",
+          url: "https://gh/acme/b/pull/2#pullrequestreview-1",
+          repo: "",
+          number: 2,
+          author: "alice",
+          isBot: false,
+          path: "",
+          source: "review",
+          preview: "Does this handle the empty case?",
+          commentedAt: "2026-07-02T00:00:00Z",
+          viewerReacted: false,
+          viewerStarted: false,
+        },
+      ]);
+    });
+
+    it("ignores a null entry in the conversation", () => {
+      const withNull = withReviews([review()], [null]);
+      expect(parsePrComments(withNull, "mfozmen")).toHaveLength(1);
+    });
+
+    it("returns nothing for the reviewed leg, which never asks for reviews", () => {
+      // The @include(if:) leaves the field absent rather than empty, and an
+      // absent field must not be read as "no reviews on this PR" by accident.
+      expect(parsePrComments(raw([]), "mfozmen", true)).toEqual([]);
+    });
+
+    it("lists both surfaces when a PR has each", () => {
+      const both = withReviews([review()], [], [thread()]);
+      expect(parsePrComments(both, "mfozmen").map((c) => [c.source, c.id])).toEqual([
+        ["review", "rv1"],
+        ["thread", "t1"],
+      ]);
+    });
   });
 });
 

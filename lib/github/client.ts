@@ -19,6 +19,11 @@ export function ghClient(token: string) {
 // never buying the speed it looked like it was.
 const MAX_CONCURRENT = 3;
 
+// Per process, not per token — so on an instance several people signed into,
+// unrelated accounts would share one queue while the limit they are avoiding is
+// per-account. Left that way on purpose: PRison is a dashboard you run for
+// yourself, and keying the gate by token would hand anyone who signs in their
+// own three slots, which is the wrong direction for a shared box anyway.
 let active = 0;
 const waiting: (() => void)[] = [];
 

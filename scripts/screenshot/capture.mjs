@@ -16,10 +16,15 @@
 // lists never reach GitHub either: the board is patched in before the first
 // paint. See .claude/skills/refresh-screenshot.
 
-import { execFileSync, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+// Imported straight from the TypeScript, which Node strips itself — the session
+// cookie has to decrypt, so it is minted with the app's own encryptToken rather
+// than a copy of it, one AES change away from silently producing a cookie that
+// reads as "signed out".
+import { encryptToken } from "../../lib/token-cookie.ts";
 import { pageSnippet } from "./demo-board.mjs";
 
 const ROOT = new URL("../..", import.meta.url).pathname;
@@ -31,19 +36,6 @@ const CHROME = process.env.CHROME_PATH
 // Matches the committed screenshot: 1280 CSS px wide at 2x.
 const WIDTH = 1280;
 const SCALE = 2;
-
-// The session cookie has to decrypt, so it is minted with the app's own
-// encryptToken rather than a copy of it — one AES change away from silently
-// producing a cookie that reads as "signed out".
-function loadEncryptToken() {
-  const bundle = join(tmpdir(), `prison-token-cookie-${process.pid}.mjs`);
-  execFileSync(join(ROOT, "node_modules", ".bin", "esbuild"), [
-    join(ROOT, "lib", "token-cookie.ts"),
-    "--bundle", "--format=esm", "--platform=node", `--outfile=${bundle}`,
-    "--log-level=error",
-  ]);
-  return import(bundle).then((m) => ({ encryptToken: m.encryptToken, bundle }));
-}
 
 function authSecret() {
   const env = readFileSync(join(ROOT, ".env.local"), "utf8");
@@ -94,7 +86,6 @@ async function until(fn, what, tries = 60) {
   throw new Error(`timed out waiting for ${what}`);
 }
 
-const { encryptToken, bundle } = await loadEncryptToken();
 const profile = mkdtempSync(join(tmpdir(), "prison-shot-"));
 const port = 9330 + (process.pid % 500);
 
@@ -173,5 +164,4 @@ try {
   cdp?.close();
   chrome.kill();
   rmSync(profile, { recursive: true, force: true });
-  rmSync(bundle, { force: true });
 }

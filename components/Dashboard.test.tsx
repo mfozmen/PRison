@@ -747,8 +747,10 @@ describe("Dashboard", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("hides draft items from both lists when hide-drafts is checked", async () => {
-    global.fetch = vi.fn((url: string) =>
+  // The three states share a board that has one draft and one non-draft in each
+  // of the two filtered lists.
+  const draftsAndNot = () =>
+    vi.fn((url: string) =>
       Promise.resolve({
         ok: true,
         json: () =>
@@ -762,16 +764,26 @@ describe("Dashboard", () => {
       }),
     ) as unknown as typeof fetch;
 
+  const draftButton = (name: RegExp) => screen.getByRole("button", { name });
+
+  it("shows drafts and non-drafts together by default", async () => {
+    global.fetch = draftsAndNot();
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    // Both drafts visible initially
     expect(await screen.findByText("draft stuck pr")).toBeInTheDocument();
     expect(screen.getByText("draft review pr")).toBeInTheDocument();
+    expect(screen.getByText("stuck pr")).toBeInTheDocument();
+    expect(screen.getByText("review pr")).toBeInTheDocument();
+    expect(draftButton(/^all$/i)).toHaveAttribute("aria-pressed", "true");
+  });
 
-    // Hide drafts is a filter-bar toggle, not a Settings checkbox.
-    const toggle = screen.getByRole("button", { name: /hide drafts/i });
-    expect(toggle).toHaveAttribute("aria-pressed", "false");
-    fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-pressed", "true");
+  it("drops drafts from both lists on No drafts", async () => {
+    global.fetch = draftsAndNot();
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("draft stuck pr")).toBeInTheDocument();
+
+    fireEvent.click(draftButton(/no drafts/i));
+    expect(draftButton(/no drafts/i)).toHaveAttribute("aria-pressed", "true");
+    expect(draftButton(/^all$/i)).toHaveAttribute("aria-pressed", "false");
 
     await waitFor(() =>
       expect(screen.queryByText("draft stuck pr")).not.toBeInTheDocument(),
@@ -781,40 +793,82 @@ describe("Dashboard", () => {
     expect(screen.getByText("review pr")).toBeInTheDocument();
   });
 
-  it("persists hideDrafts toggle to localStorage", async () => {
+  it("keeps only drafts on Only drafts", async () => {
+    global.fetch = draftsAndNot();
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /hide drafts/i }));
+
+    fireEvent.click(draftButton(/only drafts/i));
+    expect(draftButton(/only drafts/i)).toHaveAttribute("aria-pressed", "true");
+
     await waitFor(() =>
-      expect(localStorage.getItem("prison.hideDrafts")).toBe("true"),
+      expect(screen.queryByText("stuck pr")).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByText("review pr")).not.toBeInTheDocument();
+    expect(screen.getByText("draft stuck pr")).toBeInTheDocument();
+    expect(screen.getByText("draft review pr")).toBeInTheDocument();
+  });
+
+  it("says why Ready to merge is empty under Only drafts", async () => {
+    // parseReadyPrs drops drafts server-side, so that section can only ever be
+    // empty in this mode — correctly, but an unexplained blank reads as a bug.
+    global.fetch = draftsAndNot();
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("Nothing ready to merge")).toBeInTheDocument();
+
+    fireEvent.click(draftButton(/only drafts/i));
+    await waitFor(() =>
+      expect(screen.getByText("Drafts are never ready to merge")).toBeInTheDocument(),
     );
   });
 
-  it("restores the pressed state of the hide-drafts toggle on mount", async () => {
+  it("persists the draft filter to localStorage", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    fireEvent.click(draftButton(/only drafts/i));
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.draftFilter")).toBe("only"),
+    );
+  });
+
+  it("restores the draft filter on mount", async () => {
+    localStorage.setItem("prison.draftFilter", "only");
+    global.fetch = draftsAndNot();
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    // The non-draft is gone from the start — the filter applies before the
+    // first paint the user sees, not after a flash of everything.
+    expect(await screen.findByText("draft stuck pr")).toBeInTheDocument();
+    expect(screen.queryByText("stuck pr")).not.toBeInTheDocument();
+    expect(draftButton(/only drafts/i)).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("ignores a draft filter localStorage does not recognise", async () => {
+    localStorage.setItem("prison.draftFilter", "sometimes");
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    expect(draftButton(/^all$/i)).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("carries the old hide-drafts setting over to No drafts", async () => {
+    // The two-state key is what everyone upgrading has; dropping it would
+    // silently turn their drafts back on.
     localStorage.setItem("prison.hideDrafts", "true");
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /hide drafts/i })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(draftButton(/no drafts/i)).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("hydrates hideDrafts from localStorage", async () => {
+  it("prefers the new draft filter key over the old one", async () => {
     localStorage.setItem("prison.hideDrafts", "true");
-    global.fetch = vi.fn((url: string) =>
-      Promise.resolve({
-        ok: true,
-        json: () =>
-          Promise.resolve(
-            url.includes("ready")
-              ? []
-              : url.includes("stuck")
-                ? [STUCK_PR, DRAFT_STUCK_PR]
-                : [REVIEW_PR, DRAFT_REVIEW_PR],
-          ),
-      }),
-    ) as unknown as typeof fetch;
+    localStorage.setItem("prison.draftFilter", "all");
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    expect(draftButton(/^all$/i)).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("applies the migrated setting to the lists, not just the buttons", async () => {
+    localStorage.setItem("prison.hideDrafts", "true");
+    global.fetch = draftsAndNot();
 
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
@@ -1947,16 +2001,22 @@ describe("Dashboard — recently reviewed", () => {
     );
   });
 
-  it("drops drafts when Hide drafts is on", async () => {
+  it("follows the draft filter in both directions", async () => {
     global.fetch = fetchWithReviewed([REVIEWED_PR, { ...REVIEWED_PR, id: "rv2", title: "draft reviewed pr", isDraft: true }]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
     await waitFor(() =>
       expect(screen.getByTestId("reviewed-count-badge")).toHaveTextContent("2"),
     );
-    fireEvent.click(screen.getByRole("button", { name: /hide drafts/i }));
+    fireEvent.click(screen.getByRole("button", { name: /no drafts/i }));
     await waitFor(() =>
       expect(screen.getByTestId("reviewed-count-badge")).toHaveTextContent("1"),
     );
+    // Also 1, but the other one — the count alone cannot tell the two states
+    // apart, so expand and name it.
+    fireEvent.click(screen.getByRole("button", { name: /only drafts/i }));
+    fireEvent.click(screen.getByRole("button", { name: /recently reviewed/i }));
+    expect(await screen.findByText("draft reviewed pr")).toBeInTheDocument();
+    expect(screen.queryByText("reviewed pr")).not.toBeInTheDocument();
   });
 
   it("shows a reply on a PR you reviewed in the comments column", async () => {

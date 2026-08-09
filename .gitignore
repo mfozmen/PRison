@@ -48,6 +48,7 @@ next-env.d.ts
 .claude/skills/*
 !.claude/skills/ui-ux-pro-max/
 !.claude/skills/create-readme/
+!.claude/skills/refresh-screenshot/
 
 # Python bytecode (vendored design skill)
 __pycache__/

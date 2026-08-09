@@ -15,8 +15,20 @@ import { ghQuery } from "./client";
 // Braces, not a concise body: mockReset returns the mock, and a beforeEach that
 // returns a function hands Vitest a teardown callback — it would then CALL the
 // mock after each test and reject into nobody's hands.
+let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   graphqlMock.mockReset();
+  // Every failure-path test below exercises the real logUpstreamError call,
+  // which is correct in production but turns a green run into a wall of
+  // "upstream query failed" stderr lines. Silence it here; the "what it
+  // leaves behind on a failure" tests install their own spy on top of this
+  // one to assert on what got logged, then restore back down to this spy —
+  // so keep our own reference instead of re-deriving it from console.error,
+  // which by then points at whatever the inner spy restored it to.
+  consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+});
+afterEach(() => {
+  consoleErrorSpy.mockRestore();
 });
 
 describe("ghQuery", () => {

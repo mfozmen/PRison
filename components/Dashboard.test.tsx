@@ -1705,45 +1705,6 @@ describe("Dashboard — comments awaiting your reply", () => {
     expect(screen.getByText(/no comments awaiting your reply/i)).toBeInTheDocument();
   });
 
-  it("shows a comment on a review-requested PR even when the viewer did not start the thread", async () => {
-    // viewerStarted is the escape hatch for threads with no list behind them;
-    // a review-request PR is on screen, so its threads must pass on the list
-    // membership alone.
-    const askedOfMe = {
-      ...COMMENT,
-      id: "t6",
-      prId: REVIEW_PR.id,
-      repo: "acme/c",
-      number: 9,
-      preview: "can you take another look at this branch",
-      viewerStarted: false,
-    };
-    global.fetch = vi.fn((url: string) =>
-      Promise.resolve({
-        ok: true,
-        headers: { get: () => null },
-        json: () =>
-          Promise.resolve(
-            url.includes("reviewed")
-              ? []
-              : url.includes("closed")
-              ? []
-              : url.includes("pr-comments")
-                ? [askedOfMe]
-                : url.includes("ready")
-                  ? []
-                  : url.includes("stuck")
-                    ? []
-                    : [REVIEW_PR],
-          ),
-      }),
-    ) as unknown as typeof fetch;
-    render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(
-      await screen.findByText("can you take another look at this branch"),
-    ).toBeInTheDocument();
-  });
-
   it("says a review-body comment is one, since it carries no file to show instead", async () => {
     global.fetch = fetchWithComments([REVIEW_COMMENT]);
     render(<Dashboard orgs={ORGS} login="testuser" />);

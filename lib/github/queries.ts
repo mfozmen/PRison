@@ -314,6 +314,12 @@ export const PR_COMMENTS_QUERY = `
         # Not rows — the answer signal. A review body has no replies, so
         # "answered" has to be read off the PR: the viewer saying anything in the
         # conversation after the review was submitted. See parsePrComments.
+        #
+        # A window, so on a PR that stays chatty long after the viewer answered,
+        # their answer can fall out of it and the row comes back. That is the
+        # forgiving failure this heuristic already accepts — a handled row costs
+        # a glance, where the other direction hides an unanswered question — so
+        # it stays a window rather than growing the heaviest query in the app.
         comments(last: 20) @include(if: $withReviews) { nodes {
           author { login } createdAt
         } }

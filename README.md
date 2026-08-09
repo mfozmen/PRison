@@ -50,8 +50,9 @@ expand to the latest 15 with **Load more** for the rest.
   badged **Merged** or **Closed** with how long ago it ended — and next to them
   the PRs you reviewed, so a discussion you left open is one click away instead
   of lost in GitHub's notification list.
-- **Grouping** — flat, by repository, or by check, with a **Hide drafts** toggle
-  next to them in the filter bar.
+- **Grouping** — flat, by repository, or by check, with a **draft filter** next
+  to it in the filter bar: **All**, **Only drafts** to see just what you have in
+  progress, or **No drafts** to get them out of the way.
 - **Auto refresh (opt-in).** Turn it on in Settings and pick how often to check
   — every 5, 15, or 30 minutes, or hourly (30 minutes by default). PRison then
   tells you what *moved*, not just what's new: a PR that became ready to merge,
@@ -180,9 +181,9 @@ the release when there's a newer one); the
 **sun/moon** toggles the theme; **Sign Out** clears the
 stored token. Click a **PR title** (or a suggested-action link) to jump to
 GitHub — a comment row lands on that exact thread. In the filter bar: **Flat / By
-repo / By check** to group, **Hide drafts** to drop draft PRs from the lists, and
-**Refresh** to re-fetch without reloading — next to it, **Updated Xm ago** tells
-you how fresh the data is.
+repo / By check** to group, **All / Only drafts / No drafts** to filter by draft
+state, and **Refresh** to re-fetch without reloading — next to it, **Updated Xm
+ago** tells you how fresh the data is.
 
 ## Documentation
 

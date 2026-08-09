@@ -52,10 +52,20 @@ const ALL = "";
 // this only governs how much is revealed at once.
 const ARCHIVE_PAGE_SIZE = 15;
 
+// Every label names the resulting set rather than an action, because one of
+// three buttons cannot rely on you inferring its current state the way a lone
+// "Hide drafts" toggle could.
+type DraftFilter = "all" | "only" | "none";
+const DRAFT_FILTERS: { value: DraftFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "only", label: "Only drafts" },
+  { value: "none", label: "No drafts" },
+];
+
 export function Dashboard({ orgs, login }: DashboardProps) {
   const [selectedOrg, setSelectedOrg] = useState<string>(ALL);
   const [hydrated, setHydrated] = useState(false);
-  const [hideDrafts, setHideDrafts] = useState(false);
+  const [draftFilter, setDraftFilter] = useState<DraftFilter>("all");
   // Bots author the large majority of unanswered review threads, so they are
   // hidden by default; the filter is client-side to keep the toggle instant.
   const [showBots, setShowBots] = useState(false);
@@ -306,6 +316,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // hydration mismatch on the controlled filter.
   useEffect(() => {
     const stored = localStorage.getItem("prison.org");
+    const storedDraftFilter = localStorage.getItem("prison.draftFilter");
+    // The old two-state key. Read as a fallback so anyone who had drafts hidden
+    // keeps them hidden across the upgrade; never written again.
     const storedHideDrafts = localStorage.getItem("prison.hideDrafts");
     const storedShowBots = localStorage.getItem("prison.showBots");
     const storedHideReacted = localStorage.getItem("prison.hideReacted");
@@ -333,8 +346,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       ) {
         setSelectedOrg(stored);
       }
-      if (storedHideDrafts === "true") {
-        setHideDrafts(true);
+      if (DRAFT_FILTERS.some((f) => f.value === storedDraftFilter)) {
+        setDraftFilter(storedDraftFilter as DraftFilter);
+      } else if (storedHideDrafts === "true") {
+        setDraftFilter("none");
       }
       if (storedShowBots === "true") {
         setShowBots(true);
@@ -369,8 +384,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem("prison.hideDrafts", String(hideDrafts));
-  }, [hideDrafts, hydrated]);
+    localStorage.setItem("prison.draftFilter", draftFilter);
+  }, [draftFilter, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -513,14 +528,22 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const isAwaiting = (repo: string, checkNames: string[]) =>
     awaitingChecks(repo, checkNames, tracked).length > 0;
 
-  const sortedStuckAll = hideDrafts ? sortedStuck.filter((pr) => !pr.isDraft) : sortedStuck;
+  // One home for the rule, because three lists apply it and three copies is how
+  // they stop agreeing.
+  const matchesDraft = (isDraft: boolean) =>
+    draftFilter === "all" || (draftFilter === "only") === isDraft;
+
+  const sortedStuckAll = sortedStuck.filter((pr) => matchesDraft(pr.isDraft));
   // A BLOCKED+approved+green PR with no awaiting tracked checks is already in the ready
   // list; exclude it from stuck so it doesn't appear in both lists.
   const visibleStuck = sortedStuckAll.filter(
     (pr) => !(pr.readyViaBlocked && !isAwaiting(pr.repo, pr.checkNames)),
   );
-  const visibleReviews = hideDrafts ? sortedReviews.filter((req) => !req.isDraft) : sortedReviews;
-  // Drafts are already excluded server-side (parseReadyPrs drops drafts); hideDrafts is a no-op here.
+  const visibleReviews = sortedReviews.filter((req) => matchesDraft(req.isDraft));
+  // Drafts are already excluded server-side (parseReadyPrs drops drafts), so
+  // "No drafts" is a no-op here and "Only drafts" can only ever come up empty —
+  // correctly, since a draft cannot be merged. The empty message says so rather
+  // than leaving a permanently blank section looking broken.
   // A BLOCKED+approved+green PR with awaiting tracked checks belongs in stuck, not here.
   const visibleReady = sortedReady.filter(
     (pr) => !(pr.viaBlocked && isAwaiting(pr.repo, pr.checkNames)),
@@ -534,9 +557,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     reviewedPrs.filter((pr) => !reviewRequestIds.has(pr.id)),
     (pr) => pr.reviewedAt,
   );
-  const sortedReviewed = hideDrafts
-    ? sortedReviewedAll.filter((pr) => !pr.isDraft)
-    : sortedReviewedAll;
+  const sortedReviewed = sortedReviewedAll.filter((pr) => matchesDraft(pr.isDraft));
 
   // Comments on the viewer's own PRs are only shown for PRs the dashboard is
   // currently showing, so the column can never point at a PR that isn't on
@@ -751,21 +772,30 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               By check
             </button>
           </div>
-          {/* Drafts get toggled constantly — often enough that burying it in
+          {/* Drafts get filtered constantly — often enough that burying this in
               Settings cost two clicks every time. It lives here, in the same
-              visual language as the group-by buttons. */}
-          <button
-            type="button"
-            aria-pressed={hideDrafts}
-            onClick={() => setHideDrafts((v) => !v)}
-            className={`min-h-[44px] cursor-pointer rounded-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
-              hideDrafts
-                ? "bg-accent text-background"
-                : "bg-surface text-foreground"
-            }`}
-          >
-            Hide drafts
-          </button>
+              visual language as the group-by buttons, and as three buttons
+              rather than a cycling one so every state is a single click and a
+              screen reader can read the whole set at once. */}
+          <div role="group" aria-label="Drafts" className="flex rounded-md">
+            {DRAFT_FILTERS.map(({ value, label }, i) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={draftFilter === value}
+                onClick={() => setDraftFilter(value)}
+                className={`min-h-[44px] cursor-pointer px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
+                  i === 0 ? "rounded-l-md" : ""
+                } ${i === DRAFT_FILTERS.length - 1 ? "rounded-r-md" : ""} ${
+                  draftFilter === value
+                    ? "bg-accent text-background"
+                    : "bg-surface text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           {/* Deliberately not a live region: the label re-renders every minute
               as it ages, and announcing "Updated 4m ago" on a loop would talk
               over everything else for as long as the tab is open. */}
@@ -825,7 +855,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           <PrList
             title="Ready to merge"
             items={visibleReady}
-            emptyMessage="Nothing ready to merge"
+            emptyMessage={
+              draftFilter === "only"
+                ? "Drafts are never ready to merge"
+                : "Nothing ready to merge"
+            }
             keyExtractor={(pr) => pr.id}
             countAccent="success"
             renderRow={(pr) => (

@@ -40,6 +40,92 @@ describe("ghQuery", () => {
   });
 });
 
+describe("ghQuery — the concurrency gate", () => {
+  // A deferred query: resolve/reject it by hand so a test can hold slots open
+  // and observe how many made it through.
+  function gate() {
+    let release!: (v: unknown) => void;
+    let fail!: (e: unknown) => void;
+    const promise = new Promise((res, rej) => {
+      release = res;
+      fail = rej;
+    });
+    return { promise, release, fail };
+  }
+
+  it("never lets more than three queries reach GitHub at once", async () => {
+    const gates = Array.from({ length: 7 }, gate);
+    let started = 0;
+    graphqlMock.mockImplementation(() => gates[started++].promise);
+
+    // Seven at once is exactly what a refresh sends: six fetches, one of which
+    // issues two queries of its own.
+    const all = Promise.all(Array.from({ length: 7 }, () => ghQuery("t", "query")));
+    await vi.waitFor(() => expect(started).toBe(3));
+
+    // The other four are queued, not merely slow — nothing more starts until
+    // one of the three finishes.
+    await Promise.resolve();
+    expect(started).toBe(3);
+
+    gates[0].release({ ok: 1 });
+    await vi.waitFor(() => expect(started).toBe(4));
+
+    gates.slice(1).forEach((g) => g.release({ ok: 1 }));
+    expect(await all).toHaveLength(7);
+    expect(started).toBe(7);
+  });
+
+  it("hands the slot to the next waiter instead of releasing it into a race", async () => {
+    // Release-then-reacquire would let a query arriving in the same tick take
+    // the slot a waiter was already woken for, and both would run — four in
+    // flight against a cap of three.
+    const gates = Array.from({ length: 5 }, gate);
+    let started = 0;
+    graphqlMock.mockImplementation(() => gates[started++].promise);
+
+    const first = Array.from({ length: 4 }, () => ghQuery("t", "query"));
+    await vi.waitFor(() => expect(started).toBe(3));
+
+    // The fourth is queued; a fifth arrives at the moment a slot frees.
+    gates[0].release({ ok: 1 });
+    const late = ghQuery("t", "query");
+    await vi.waitFor(() => expect(started).toBe(4));
+    await Promise.resolve();
+    expect(started).toBe(4);
+
+    gates.slice(1).forEach((g) => g.release({ ok: 1 }));
+    await Promise.all([...first, late]);
+  });
+
+  it("frees the slot when a query throws", async () => {
+    // A leaked slot is a dashboard that gets slower every refresh until it
+    // stops making requests at all.
+    graphqlMock.mockRejectedValue(new Error("network down"));
+    for (let i = 0; i < 5; i++) {
+      await expect(ghQuery("t", "query")).rejects.toThrow("network down");
+    }
+    graphqlMock.mockResolvedValue({ ok: true });
+    expect(await ghQuery("t", "query")).toEqual({ data: { ok: true }, partial: false });
+  });
+
+  it("frees the slot when GitHub answers with partial data", async () => {
+    // The partial path returns through a catch, which is the branch a naive
+    // release-on-success would miss.
+    const partialErr = new GraphqlResponseError({} as any, {} as any, {
+      data: { search: { nodes: [] } },
+      errors: [{ message: "`acme` forbids access" }],
+    } as any);
+    graphqlMock.mockRejectedValue(partialErr);
+    for (let i = 0; i < 5; i++) {
+      expect((await ghQuery("t", "query")).partial).toBe(true);
+    }
+    graphqlMock.mockReset();
+    graphqlMock.mockResolvedValue({ ok: true });
+    expect(await ghQuery("t", "query")).toEqual({ data: { ok: true }, partial: false });
+  });
+});
+
 describe("ghQuery — the secondary rate limit", () => {
   // A refresh fires six of these at once; GitHub answers a burst account-wide,
   // so every list on the board fails together and the page looks broken.
@@ -146,6 +232,25 @@ describe("ghQuery — the secondary rate limit", () => {
     await settle(1_000);
     await settled;
     expect(graphqlMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not hold a slot while it waits out a Retry-After", async () => {
+    // The gate is three wide. If the wait happened inside it, three queries
+    // sleeping out a one-second block would stop the dashboard dead for that
+    // second — turning a limit that hit some of the board into one that hits
+    // all of it.
+    graphqlMock.mockRejectedValue(secondary());
+    const three = Array.from({ length: 3 }, () =>
+      expect(ghQuery("t", "query")).rejects.toThrow("secondary rate limit"),
+    );
+    await vi.waitFor(() => expect(graphqlMock).toHaveBeenCalledTimes(3));
+
+    // All three are now asleep, holding nothing.
+    const fourth = expect(ghQuery("t", "query")).rejects.toThrow("secondary rate limit");
+    await vi.waitFor(() => expect(graphqlMock).toHaveBeenCalledTimes(4));
+
+    await settle(1_000);
+    await Promise.all([...three, fourth]);
   });
 
   it("keeps partial data the retry came back with", async () => {

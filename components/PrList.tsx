@@ -30,6 +30,17 @@ export function PrList<T>({
   groupHref,
   countAccent,
 }: PrListProps<T>) {
+  // Collapsed rather than expanded, so a group that stops existing — the
+  // grouping mode changed, its last PR merged — leaves nothing behind that
+  // could hide a group of the same name later. Every group opens by default.
+  //
+  // Component state, not localStorage: this is a "not right now" gesture, and a
+  // repo you folded away last Tuesday should not still be folded away when you
+  // open the board wondering why it looks empty. It survives refreshes, which
+  // is the span that matters, because a poll re-renders rather than remounts.
+  const [collapsed, setCollapsed] = React.useState<Set<string>>(() => new Set());
+  const listId = React.useId();
+
   // Build ordered groups when groupBy or groupKeys is provided. groupKeys takes
   // precedence and supports one-to-many placement (an item may appear in
   // multiple groups). Each entry retains the item's original index so default
@@ -90,26 +101,62 @@ export function PrList<T>({
         </p>
       ) : (groupBy || groupKeys) ? (
         <div className="flex flex-col">
-          {groups.map(({ key, entries }) => {
+          {groups.map(({ key, entries }, groupIndex) => {
             const href = groupHref?.(key);
+            const open = !collapsed.has(key);
+            const panelId = `${listId}-group-${groupIndex}`;
             return (
               <div key={key}>
                 <div
                   className="mt-4 mb-1 flex items-center gap-2"
                   data-testid="group-header"
                 >
-                  {href ? (
+                  {/* The name and the count sit inside the toggle so the target
+                      is the width of the header rather than a 12px chevron. The
+                      GitHub link cannot: an anchor inside a button is invalid,
+                      and it has its own job, so it follows as its own control. */}
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    aria-controls={panelId}
+                    onClick={() =>
+                      setCollapsed((prev) => {
+                        const next = new Set(prev);
+                        if (!next.delete(key)) next.add(key);
+                        return next;
+                      })
+                    }
+                    className="flex min-h-[32px] cursor-pointer items-center gap-2 rounded-md text-left transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      className={`shrink-0 text-muted transition-transform ${open ? "rotate-90" : ""}`}
+                      width="12"
+                      height="12"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path d="M4 2.5 8 6l-4 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span className="text-muted text-xs font-medium uppercase tracking-wide">
+                      {key}
+                    </span>
+                    <span className="rounded-full bg-border px-2 py-0.5 font-mono text-xs tabular-nums text-foreground ring-1 ring-inset ring-border">
+                      {entries.length}
+                    </span>
+                  </button>
+                  {href && (
                     <a
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={`Open ${key} on GitHub`}
-                      className="text-muted text-xs font-medium uppercase tracking-wide hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
+                      className="shrink-0 text-muted hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
                     >
-                      {key}
                       <svg
                         aria-hidden="true"
-                        className="inline-block ml-1 -mt-0.5 shrink-0"
+                        className="block shrink-0"
                         width="12"
                         height="12"
                         viewBox="0 0 12 12"
@@ -125,20 +172,19 @@ export function PrList<T>({
                         />
                       </svg>
                     </a>
-                  ) : (
-                    <span className="text-muted text-xs font-medium uppercase tracking-wide">
-                      {key}
-                    </span>
                   )}
-                  <span className="rounded-full bg-border px-2 py-0.5 font-mono text-xs tabular-nums text-foreground ring-1 ring-inset ring-border">
-                    {entries.length}
-                  </span>
                 </div>
-                <ul className="flex flex-col gap-2">
-                  {entries.map(({ item, index }) => (
-                    <li key={keyExtractor(item, index)}>{renderRow(item)}</li>
-                  ))}
-                </ul>
+                {/* Unmounted rather than hidden: a collapsed group's rows are
+                    not "on screen but invisible", and leaving them in the tree
+                    would keep them reachable by find-in-page and by every count
+                    that walks the DOM. */}
+                {open && (
+                  <ul id={panelId} className="flex flex-col gap-2">
+                    {entries.map(({ item, index }) => (
+                      <li key={keyExtractor(item, index)}>{renderRow(item)}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             );
           })}

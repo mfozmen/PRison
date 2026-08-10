@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.11.0](https://github.com/mfozmen/PRison/compare/v1.10.0...v1.11.0) (2026-08-10)
+
+### Features
+
+* fold a group away by its header when grouping by repo or check ([#37](https://github.com/mfozmen/PRison/issues/37)) ([a5bef41](https://github.com/mfozmen/PRison/commit/a5bef41514f1033f864c13c98ee11ee7cd8f82f6))
+
 ## [1.10.0](https://github.com/mfozmen/PRison/compare/v1.9.1...v1.10.0) (2026-08-09)
 
 ### Features

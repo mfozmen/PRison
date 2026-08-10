@@ -1,0 +1,6 @@
+# Shell scripts stay LF whatever the checkout platform. Docker runs them inside
+# a Linux image, and a CRLF shebang makes exec fail with the memorable lie
+# "no such file or directory" — the file is right there, but `/bin/sh\r` is not.
+# Windows checkouts with core.autocrlf=true hit this on `docker compose build`.
+*.sh text eol=lf
+docker-entrypoint.sh text eol=lf

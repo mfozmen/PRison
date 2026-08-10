@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { PrList } from "./PrList";
 
 describe("PrList", () => {
@@ -494,5 +494,135 @@ describe("PrList group subheader count badge", () => {
     expect(countSpan).toHaveClass("text-foreground");
     expect(countSpan).not.toHaveClass("bg-surface");
     expect(countSpan).not.toHaveClass("text-muted");
+  });
+});
+
+describe("PrList — collapsing a group", () => {
+  const items = [
+    { name: "one", repo: "acme/alpha" },
+    { name: "two", repo: "acme/alpha" },
+    { name: "three", repo: "acme/beta" },
+  ];
+
+  const renderGrouped = (extra: Record<string, unknown> = {}) =>
+    render(
+      <PrList
+        title="All PRs"
+        items={items}
+        emptyMessage="No PRs."
+        renderRow={(item) => <div data-testid="row">{item.name}</div>}
+        groupBy={(item) => item.repo}
+        {...extra}
+      />,
+    );
+
+  const toggle = (key: string) =>
+    screen.getAllByRole("button").find((b) => b.textContent?.includes(key))!;
+
+  it("opens every group by default, so grouping alone hides nothing", () => {
+    renderGrouped();
+    expect(screen.getAllByTestId("row")).toHaveLength(3);
+    expect(toggle("acme/alpha")).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("hides a group's rows when its header is clicked, and brings them back", () => {
+    renderGrouped();
+    fireEvent.click(toggle("acme/alpha"));
+    expect(screen.getAllByTestId("row")).toHaveLength(1);
+    expect(screen.getByTestId("row")).toHaveTextContent("three");
+    expect(toggle("acme/alpha")).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(toggle("acme/alpha"));
+    expect(screen.getAllByTestId("row")).toHaveLength(3);
+  });
+
+  it("collapses only the group that was clicked", () => {
+    renderGrouped();
+    fireEvent.click(toggle("acme/alpha"));
+    expect(toggle("acme/beta")).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("three")).toBeInTheDocument();
+  });
+
+  it("keeps the name and the count visible while collapsed — that is the point", () => {
+    renderGrouped();
+    fireEvent.click(toggle("acme/alpha"));
+    const button = toggle("acme/alpha");
+    expect(button).toHaveTextContent("acme/alpha");
+    expect(within(button).getByText("2")).toBeInTheDocument();
+  });
+
+  it("points the toggle at the list it controls", () => {
+    renderGrouped();
+    const panelId = toggle("acme/alpha").getAttribute("aria-controls");
+    expect(panelId).toBeTruthy();
+    expect(document.getElementById(panelId!)?.tagName).toBe("UL");
+  });
+
+  it("leaves the GitHub link outside the toggle, so collapsing is not a click away from a new tab", () => {
+    renderGrouped({ groupHref: (key: string) => `https://github.com/${key}` });
+    const link = screen.getByRole("link", { name: /open acme\/alpha on github/i });
+    expect(link).toHaveAttribute("href", "https://github.com/acme/alpha");
+    // An anchor inside a button is invalid HTML and would swallow the toggle.
+    expect(toggle("acme/alpha").contains(link)).toBe(false);
+  });
+
+  it("still collapses when there is no link to sit beside", () => {
+    renderGrouped();
+    expect(screen.queryByRole("link")).toBeNull();
+    fireEvent.click(toggle("acme/alpha"));
+    expect(screen.getAllByTestId("row")).toHaveLength(1);
+  });
+
+  const listOf = (data: { name: string; repo: string }[]) => (
+    <PrList
+      title="All PRs"
+      items={data}
+      emptyMessage="No PRs."
+      renderRow={(item) => <div data-testid="row">{item.name}</div>}
+      groupBy={(item) => item.repo}
+    />
+  );
+
+  it("forgets a fold once its group stops existing, so the group does not come back folded", () => {
+    // The trap: fold acme/alpha away, its last PR clears, a new one lands
+    // tomorrow — and the group returns already folded, hiding work nobody
+    // chose to hide.
+    const { rerender } = render(listOf(items));
+    fireEvent.click(toggle("acme/alpha"));
+    expect(screen.getAllByTestId("row")).toHaveLength(1);
+
+    rerender(listOf([{ name: "three", repo: "acme/beta" }]));
+    expect(screen.queryAllByRole("button")).toHaveLength(1);
+
+    rerender(listOf(items));
+    expect(screen.getAllByTestId("row")).toHaveLength(3);
+    expect(toggle("acme/alpha")).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("keeps a fold while its group is still there, across a re-render", () => {
+    const { rerender } = render(listOf(items));
+    fireEvent.click(toggle("acme/alpha"));
+    rerender(listOf([...items, { name: "four", repo: "acme/beta" }]));
+    expect(toggle("acme/alpha")).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("drops the other mode's folds when the grouping changes under it", () => {
+    // Repo keys and check keys share one Set. They cannot collide today, but
+    // the pruning is what makes that true rather than a coincidence.
+    const { rerender } = render(listOf(items));
+    fireEvent.click(toggle("acme/alpha"));
+    rerender(
+      <PrList
+        title="All PRs"
+        items={items}
+        emptyMessage="No PRs."
+        renderRow={(item) => <div data-testid="row">{item.name}</div>}
+        groupBy={() => "build"}
+      />,
+    );
+    expect(toggle("build")).toHaveAttribute("aria-expanded", "true");
+
+    rerender(listOf(items));
+    expect(toggle("acme/alpha")).toHaveAttribute("aria-expanded", "true");
   });
 });

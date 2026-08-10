@@ -26,7 +26,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  document.documentElement.classList.remove("dark");
+  delete document.documentElement.dataset.theme;
+  delete document.documentElement.dataset.mode;
   localStorage.clear();
 });
 
@@ -73,54 +74,76 @@ describe("Header", () => {
   });
 });
 
-describe("Header theme toggle", () => {
-  it("shows moon icon (light mode) and aria-label 'Switch to dark theme' when dark class is absent", () => {
-    render(<Header orgs={[]} selectedOrg="" onOrgChange={() => {}} login="testuser" onOpenSettings={() => {}} {...activityProps} />);
-    const toggle = screen.getByRole("button", { name: "Switch to dark theme" });
-    expect(toggle).toBeInTheDocument();
+// The button flips the ground, not the family: which family you are on decides
+// what the two grounds are *called*, and Settings is the only place that
+// changes it.
+describe("Header ground toggle", () => {
+  function renderHeader() {
+    return render(<Header orgs={[]} selectedOrg="" onOrgChange={() => {}} login="testuser" onOpenSettings={() => {}} {...activityProps} />);
+  }
+
+  it("offers the dark ground and shows the moon when no ground is stamped", () => {
+    renderHeader();
+    const toggle = screen.getByRole("button", { name: "Switch to Default Dark" });
     // Moon SVG has a path element with d starting with "M14"
     const svg = toggle.querySelector("svg");
-    expect(svg).not.toBeNull();
     expect(svg?.querySelector("path[d^='M14']")).not.toBeNull();
   });
 
-  it("clicking toggle adds dark class to documentElement and sets localStorage to dark", () => {
-    render(<Header orgs={[]} selectedOrg="" onOrgChange={() => {}} login="testuser" onOpenSettings={() => {}} {...activityProps} />);
-    const toggle = screen.getByRole("button", { name: "Switch to dark theme" });
-    fireEvent.click(toggle);
-    expect(document.documentElement.classList.contains("dark")).toBe(true);
-    expect(localStorage.getItem("prison.theme")).toBe("dark");
+  it("clicking stamps the dark ground and stores it", () => {
+    renderHeader();
+    fireEvent.click(screen.getByRole("button", { name: "Switch to Default Dark" }));
+    expect(document.documentElement.dataset.mode).toBe("dark");
+    expect(localStorage.getItem("prison.mode")).toBe("dark");
   });
 
-  it("clicking toggle removes dark class and sets localStorage to light when dark mode is active", () => {
-    document.documentElement.classList.add("dark");
-    render(<Header orgs={[]} selectedOrg="" onOrgChange={() => {}} login="testuser" onOpenSettings={() => {}} {...activityProps} />);
-    const toggle = screen.getByRole("button", { name: "Switch to light theme" });
-    fireEvent.click(toggle);
-    expect(document.documentElement.classList.contains("dark")).toBe(false);
-    expect(localStorage.getItem("prison.theme")).toBe("light");
+  it("clicking again goes back to the light ground", () => {
+    document.documentElement.dataset.mode = "dark";
+    renderHeader();
+    fireEvent.click(screen.getByRole("button", { name: "Switch to Default Light" }));
+    expect(document.documentElement.dataset.mode).toBe("light");
+    expect(localStorage.getItem("prison.mode")).toBe("light");
   });
 
-  // Server render can't see documentElement, so the SSR snapshot is always
-  // light mode — even when the client would hydrate into dark.
-  it("server-renders in light mode regardless of the client theme", () => {
-    document.documentElement.classList.add("dark");
+  it("shows the sun once the dark ground is active", () => {
+    document.documentElement.dataset.mode = "dark";
+    renderHeader();
+    const toggle = screen.getByRole("button", { name: "Switch to Default Light" });
+    expect(toggle.querySelector("svg circle")).not.toBeNull();
+  });
+
+  // The whole point of naming both axes: on Aurora the grounds are Dawn and
+  // Night, and the button has to say so.
+  it("names the destination in the current family's own words", () => {
+    document.documentElement.dataset.theme = "aurora";
+    document.documentElement.dataset.mode = "dark";
+    renderHeader();
+    expect(screen.getByRole("button", { name: "Switch to Aurora Dawn" })).toBeInTheDocument();
+  });
+
+  it("names İznik's grounds too", () => {
+    document.documentElement.dataset.theme = "iznik";
+    renderHeader();
+    expect(screen.getByRole("button", { name: "Switch to İznik Cobalt" })).toBeInTheDocument();
+  });
+
+  it("leaves the family alone when the ground is flipped", () => {
+    document.documentElement.dataset.theme = "cyanotype";
+    renderHeader();
+    fireEvent.click(screen.getByRole("button", { name: "Switch to Cyanotype Print" }));
+    expect(document.documentElement.dataset.theme).toBe("cyanotype");
+    expect(localStorage.getItem("prison.theme")).toBeNull();
+  });
+
+  // Server render can't see documentElement, so the SSR snapshot is always the
+  // default family in its light ground — even when the client hydrates darker.
+  it("server-renders the default family's light ground regardless of the client", () => {
+    document.documentElement.dataset.theme = "aurora";
+    document.documentElement.dataset.mode = "dark";
     const html = renderToString(
       <Header orgs={[]} selectedOrg="" onOrgChange={() => {}} login="testuser" onOpenSettings={() => {}} {...activityProps} />,
     );
-    expect(html).toContain("Switch to dark theme");
-  });
-
-  it("initializes in dark state (sun icon) when dark class is present on documentElement at mount", () => {
-    document.documentElement.classList.add("dark");
-    localStorage.setItem("prison.theme", "dark");
-    render(<Header orgs={[]} selectedOrg="" onOrgChange={() => {}} login="testuser" onOpenSettings={() => {}} {...activityProps} />);
-    const toggle = screen.getByRole("button", { name: "Switch to light theme" });
-    expect(toggle).toBeInTheDocument();
-    // Sun SVG has a circle element
-    const svg = toggle.querySelector("svg");
-    expect(svg).not.toBeNull();
-    expect(svg?.querySelector("circle")).not.toBeNull();
+    expect(html).toContain("Switch to Default Dark");
   });
 });
 

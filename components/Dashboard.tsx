@@ -822,7 +822,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             type="button"
             onClick={() => fetchData(selectedOrg)}
             disabled={isPending}
-            className={`flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-95 dark:hover:brightness-110 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${lastRefreshedAt ? "" : "ml-auto"}`}
+            className={`flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${lastRefreshedAt ? "" : "ml-auto"}`}
           >
             <svg
               aria-hidden="true"
@@ -1204,7 +1204,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   <button
                     type="button"
                     onClick={() => setReviewedVisible((v) => v + ARCHIVE_PAGE_SIZE)}
-                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-95 dark:hover:brightness-110 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
                   >
                     Load more (showing {reviewedVisible} of {sortedReviewed.length})
                   </button>
@@ -1238,7 +1238,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   <button
                     type="button"
                     onClick={() => setClosedVisible((v) => v + ARCHIVE_PAGE_SIZE)}
-                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-95 dark:hover:brightness-110 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
                   >
                     Load more (showing {closedVisible} of {sortedClosed.length})
                   </button>

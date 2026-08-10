@@ -63,7 +63,7 @@ export function ActivityBell({ entries, onOpen, onClear }: ActivityBellProps) {
         aria-expanded={open}
         aria-controls={panelId}
         onClick={toggle}
-        className="relative cursor-pointer rounded-md border border-border bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors hover:brightness-95 dark:hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="relative cursor-pointer rounded-md border border-border bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M8 1.5a4 4 0 0 0-4 4v2.6L2.8 10.6a.5.5 0 0 0 .45.72h9.5a.5.5 0 0 0 .45-.72L12 8.1V5.5a4 4 0 0 0-4-4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>

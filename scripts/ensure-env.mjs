@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { randomBytes } from "node:crypto";
+import { fileURLToPath } from "node:url";
 
-const envFile = new URL("../.env.local", import.meta.url).pathname;
+// fileURLToPath, not .pathname: on Windows the latter yields "/C:/…", which
+// resolves against the drive root and makes every write fail with ENOENT.
+const envFile = fileURLToPath(new URL("../.env.local", import.meta.url));
 
 let existing = "";
 if (existsSync(envFile)) {

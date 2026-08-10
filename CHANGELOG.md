@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.12.0](https://github.com/mfozmen/PRison/compare/v1.11.0...v1.12.0) (2026-08-10)
+
+### Features
+
+* preview each theme's own colours and typeface in Settings ([568935d](https://github.com/mfozmen/PRison/commit/568935d3d0cbe72ee687a6cd9f62e6015c947497))
+* theme families with their own colours and typefaces ([6559574](https://github.com/mfozmen/PRison/commit/65595742e0c9bd4c15a33f1cae878fdcf503d0e4))
+
+### Bug Fixes
+
+* keep shell scripts LF so the Docker image builds on Windows ([69da30e](https://github.com/mfozmen/PRison/commit/69da30e678ee651c8d25c4ecb5ed178d86d268d1))
+* make the fixture guard run on Windows ([9c7e0af](https://github.com/mfozmen/PRison/commit/9c7e0af29a925d13c300b783f6c619e54e5838c5))
+* resolve script paths with fileURLToPath so builds work on Windows ([bb5a72a](https://github.com/mfozmen/PRison/commit/bb5a72afb0ddf9f4b16b656a75ea5d49d1f82e73))
+
 ## [1.11.0](https://github.com/mfozmen/PRison/compare/v1.10.0...v1.11.0) (2026-08-10)
 
 ### Features

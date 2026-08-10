@@ -395,7 +395,11 @@ export function walk(dir: string, out: string[] = []): string[] {
 export function scanRepo(root: string = ROOT): string[] {
   const offenders: string[] = [];
   for (const file of walk(root)) {
-    const rel = relative(root, file);
+    // relative() speaks the platform separator, but the exemption sets and the
+    // reported paths are POSIX. Normalise once here: on Windows the raw form is
+    // "lib\generic-fixtures.test.ts", which matches no exemption, so the guard
+    // reported its own adversarial test as a leak.
+    const rel = relative(root, file).replaceAll("\\", "/");
     for (const bad of scanSource(readFileSync(file, "utf8"))) {
       const isTicket = bad.startsWith("ticket:");
       if (isTicket && TICKET_SCAN_EXEMPT.has(rel)) continue;

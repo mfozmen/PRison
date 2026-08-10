@@ -223,6 +223,24 @@ describe("palette contrast", () => {
     ["bg", "accent"],
   ];
 
+  // The Settings swatches are nested elements stamped with data-theme/data-mode,
+  // so they only pick up a typeface if a rule matches on the family *alone*.
+  // Without one, a swatch inherits the font of whatever family the page is on
+  // and previews the wrong typeface — which looks plausible and is wrong.
+  it("gives every family a mode-independent typeface rule", () => {
+    for (const { id } of THEMES) {
+      // String.raw: in a plain template literal `\[` collapses to `[` and `\s`
+      // to `s`, which silently turns this into a character class that matches
+      // nothing useful.
+      const block = new RegExp(
+        String.raw`\[data-theme="${id}"\]\s*\{([^}]*)\}`,
+      ).exec(css);
+      expect(block, `no family-level block for ${id}`).not.toBeNull();
+      expect(block![1], `${id} sets no --fsans`).toContain("--fsans");
+      expect(block![1], `${id} sets no --fmono`).toContain("--fmono");
+    }
+  });
+
   it("defines a complete palette for all eight family/ground pairs", () => {
     const found = Object.keys(palettes()).sort();
     expect(found).toEqual(

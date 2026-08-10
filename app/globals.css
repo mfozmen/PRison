@@ -18,8 +18,16 @@
  * itself would be circular. :root is the default family in its light mode and
  * doubles as the fallback if either attribute is ever missing. --hover-brightness
  * is what the hover states filter by: dimming on a light ground, lifting on a
- * dark one. --- */
-:root {
+ * dark one.
+ *
+ * The attribute selector is spelled out alongside :root so that these values
+ * also apply to a *nested* element carrying the pair — which is how the theme
+ * previews in Settings work: a small box stamped with data-theme/data-mode
+ * resolves that palette's variables inside itself, so a preview is the palette
+ * rather than a hand-copied picture of it. Without this, a preview of `default`
+ * would inherit whatever family the page is currently on. --- */
+:root,
+[data-theme="default"][data-mode="light"] {
   color-scheme: light;
   --bg: #eef2f7;
   --surface: #fafbfe;
@@ -31,6 +39,15 @@
   --warning: #b45309;
   --success: #16a34a;
   --hover-brightness: 0.95;
+  --fsans: var(--font-fira-sans), ui-sans-serif, system-ui, sans-serif;
+  --fmono: var(--font-fira-code), ui-monospace, monospace;
+}
+
+/* Family-level, like the three below it: :root already sets these, but a
+ * *nested* default swatch in Settings needs a rule that matches on the family
+ * alone — otherwise it inherits the typeface of whatever family the page is on
+ * and previews Fira as IBM Plex. */
+[data-theme="default"] {
   --fsans: var(--font-fira-sans), ui-sans-serif, system-ui, sans-serif;
   --fmono: var(--font-fira-code), ui-monospace, monospace;
 }

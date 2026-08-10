@@ -572,4 +572,57 @@ describe("PrList — collapsing a group", () => {
     fireEvent.click(toggle("acme/alpha"));
     expect(screen.getAllByTestId("row")).toHaveLength(1);
   });
+
+  const listOf = (data: { name: string; repo: string }[]) => (
+    <PrList
+      title="All PRs"
+      items={data}
+      emptyMessage="No PRs."
+      renderRow={(item) => <div data-testid="row">{item.name}</div>}
+      groupBy={(item) => item.repo}
+    />
+  );
+
+  it("forgets a fold once its group stops existing, so the group does not come back folded", () => {
+    // The trap: fold acme/alpha away, its last PR clears, a new one lands
+    // tomorrow — and the group returns already folded, hiding work nobody
+    // chose to hide.
+    const { rerender } = render(listOf(items));
+    fireEvent.click(toggle("acme/alpha"));
+    expect(screen.getAllByTestId("row")).toHaveLength(1);
+
+    rerender(listOf([{ name: "three", repo: "acme/beta" }]));
+    expect(screen.queryAllByRole("button")).toHaveLength(1);
+
+    rerender(listOf(items));
+    expect(screen.getAllByTestId("row")).toHaveLength(3);
+    expect(toggle("acme/alpha")).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("keeps a fold while its group is still there, across a re-render", () => {
+    const { rerender } = render(listOf(items));
+    fireEvent.click(toggle("acme/alpha"));
+    rerender(listOf([...items, { name: "four", repo: "acme/beta" }]));
+    expect(toggle("acme/alpha")).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("drops the other mode's folds when the grouping changes under it", () => {
+    // Repo keys and check keys share one Set. They cannot collide today, but
+    // the pruning is what makes that true rather than a coincidence.
+    const { rerender } = render(listOf(items));
+    fireEvent.click(toggle("acme/alpha"));
+    rerender(
+      <PrList
+        title="All PRs"
+        items={items}
+        emptyMessage="No PRs."
+        renderRow={(item) => <div data-testid="row">{item.name}</div>}
+        groupBy={() => "build"}
+      />,
+    );
+    expect(toggle("build")).toHaveAttribute("aria-expanded", "true");
+
+    rerender(listOf(items));
+    expect(toggle("acme/alpha")).toHaveAttribute("aria-expanded", "true");
+  });
 });

@@ -20,6 +20,7 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 // Imported straight from the TypeScript, which Node strips itself — the session
 // cookie has to decrypt, so it is minted with the app's own encryptToken rather
 // than a copy of it, one AES change away from silently producing a cookie that
@@ -27,7 +28,9 @@ import { join } from "node:path";
 import { encryptToken } from "../../lib/token-cookie.ts";
 import { pageSnippet } from "./demo-board.mjs";
 
-const ROOT = new URL("../..", import.meta.url).pathname;
+// fileURLToPath, not .pathname: on Windows the latter yields "/C:/…", which
+// resolves against the drive root instead of the repo.
+const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const APP = process.env.PRISON_URL ?? "http://localhost:3000";
 const OUT = join(ROOT, "docs", "screenshot.png");
 const CHROME = process.env.CHROME_PATH

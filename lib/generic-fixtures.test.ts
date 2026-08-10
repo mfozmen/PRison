@@ -268,7 +268,13 @@ describe("walk", () => {
     writeFileSync(join(root, "node_modules", "buried.ts"), "");
     writeFileSync(join(root, "keep.ts"), ""); // scannable extension
     writeFileSync(join(root, "notes.txt"), ""); // non-scannable extension
-    symlinkSync(join(root, "keep.ts"), join(root, "link.ts")); // followed would double-count
+    try {
+      symlinkSync(join(root, "keep.ts"), join(root, "link.ts")); // followed would double-count
+    } catch {
+      // Windows refuses symlink creation without elevation or Developer Mode.
+      // The expectation below is the same either way — walk skips symlinks, so
+      // link.ts never appears — only the symlink leg goes uncovered there.
+    }
     expect(walk(root).map((f) => f.slice(root.length + 1))).toEqual(["keep.ts"]);
   });
 });

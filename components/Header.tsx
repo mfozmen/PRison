@@ -6,27 +6,20 @@ import { OrgSwitcher } from "./OrgSwitcher";
 import { ActivityBell } from "./ActivityBell";
 import { releaseUrl, appVersion } from "@/lib/project";
 import type { ActivityEntry } from "@/lib/activity";
+import {
+  applyMode,
+  getMode,
+  getServerMode,
+  getServerTheme,
+  getTheme,
+  modeLabel,
+  subscribeToTheme,
+  themeLabel,
+} from "@/lib/theme";
 
 async function signOut() {
   await fetch("/api/token", { method: "DELETE" });
   window.location.reload();
-}
-
-function subscribeToTheme(callback: () => void): () => void {
-  const observer = new MutationObserver(callback);
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["class"],
-  });
-  return () => observer.disconnect();
-}
-
-function getThemeSnapshot(): boolean {
-  return document.documentElement.classList.contains("dark");
-}
-
-function getServerThemeSnapshot(): boolean {
-  return false;
 }
 
 export interface HeaderProps {
@@ -54,21 +47,13 @@ export function Header({
   // next.config.ts inlines it from package.json; absent in a bare `next dev`.
   const version = appVersion();
 
-  const isDark = useSyncExternalStore(
-    subscribeToTheme,
-    getThemeSnapshot,
-    getServerThemeSnapshot,
-  );
-
-  function toggleTheme() {
-    if (isDark) {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("prison.theme", "light");
-    } else {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("prison.theme", "dark");
-    }
-  }
+  // The button flips the ground the current family sits on; the family itself
+  // is chosen in Settings. Both come off <html>, so one subscription covers
+  // changes made from either place.
+  const mode = useSyncExternalStore(subscribeToTheme, getMode, getServerMode);
+  const theme = useSyncExternalStore(subscribeToTheme, getTheme, getServerTheme);
+  const isDark = mode === "dark";
+  const nextMode = isDark ? "light" : "dark";
 
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/80 px-6 py-3 backdrop-blur">
@@ -95,7 +80,7 @@ export function Header({
           type="button"
           aria-label="Settings"
           onClick={onOpenSettings}
-          className="cursor-pointer rounded-md border border-border bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors hover:brightness-95 dark:hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="cursor-pointer rounded-md border border-border bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M4 6h10M18 6h2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
@@ -108,9 +93,9 @@ export function Header({
         </button>
         <button
           type="button"
-          aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
-          onClick={toggleTheme}
-          className="cursor-pointer rounded-md border border-border bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors hover:brightness-95 dark:hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          aria-label={`Switch to ${themeLabel(theme)} ${modeLabel(theme, nextMode)}`}
+          onClick={() => applyMode(nextMode)}
+          className="cursor-pointer rounded-md border border-border bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           {isDark ? (
             <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
@@ -130,7 +115,7 @@ export function Header({
         )}
         <button
           onClick={() => signOut()}
-          className="cursor-pointer rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:brightness-95 dark:hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="cursor-pointer rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           Sign Out
         </button>

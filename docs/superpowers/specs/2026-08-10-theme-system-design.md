@@ -1,7 +1,7 @@
 # Theme system — design
 
 **Date:** 2026-08-10
-**Status:** approved, not yet implemented
+**Status:** implemented
 
 ## Goal
 
@@ -54,8 +54,8 @@ declared.
 | Source | Role | `dawn` | `night` |
 | --- | --- | --- | --- |
 | 427.8 nm — N₂⁺ band | accent | `#3D4FCB` | `#8A9BFF` |
-| 557.7 nm — O I green line | success | `#12855A` | `#5FDE9B` |
-| 589.0 nm — Na D, sodium layer | warning | `#96690C` | `#F2C64B` |
+| 557.7 nm — O I green line | success | `#117C54` | `#5FDE9B` |
+| 589.0 nm — Na D, sodium layer | warning | `#8F640B` | `#F2C64B` |
 | 630.0 nm — O I red line | danger | `#C4341F` | `#FF6B5E` |
 
 | Token | `dawn` | `night` |
@@ -80,9 +80,9 @@ Each identity colour is a metal oxide the İznik workshops actually used.
 | Source | Role | `glaze` | `cobalt` |
 | --- | --- | --- | --- |
 | cobalt oxide | accent | `#1E4C99` | `#7FA8E8` |
-| copper oxide (turquoise) | success | `#237E7B` | `#4FC4BF` |
-| Kütahya ochre — *borrowed* | warning | `#A9752A` | `#D9A64B` |
-| Armenian bole (iron oxide red) | danger | `#B03A26` | `#E8705A` |
+| copper oxide (turquoise) | success | `#227A77` | `#4FC4BF` |
+| Kütahya ochre — *borrowed* | warning | `#926524` | `#D9A64B` |
+| Armenian bole (iron oxide red) | danger | `#B03A26` | `#EA7B67` |
 
 | Token | `glaze` | `cobalt` |
 | --- | --- | --- |
@@ -108,16 +108,16 @@ paper. Both modes are real outputs — the print and its negative.
 | Source | Role | `negative` | `print` |
 | --- | --- | --- | --- |
 | Prussian blue | accent | `#14567F` | `#7FB3D5` |
-| *borrowed* | success | `#2F7D57` | `#6FBF8B` |
-| *borrowed* | warning | `#96661C` | `#D9A441` |
-| *borrowed* | danger | `#A8402F` | `#D96C63` |
+| *borrowed* | success | `#2B714F` | `#6FBF8B` |
+| *borrowed* | warning | `#875C19` | `#D9A441` |
+| *borrowed* | danger | `#A8402F` | `#E3938C` |
 
 | Token | `negative` | `print` |
 | --- | --- | --- |
 | bg | `#E8E3D3` | `#0E2E47` |
 | surface | `#F4F1E6` | `#14405E` |
 | fg | `#003153` | `#DCE9F2` |
-| muted | `#4A6B84` | `#87A9C2` |
+| muted | `#486881` | `#8BACC4` |
 | brd | `#CFC7B2` | `#1E5378` |
 
 **Stated plainly:** three of the four identity colours are not derived from the source.
@@ -161,10 +161,13 @@ Two keys, two attributes:
 | `prison.theme` | `default` \| `aurora` \| `iznik` \| `cyanotype` | `<html data-theme>` |
 | `prison.mode` | `light` \| `dark` (absent = follow OS) | `<html data-mode>` |
 
-`prison.theme` today holds `"light"` or `"dark"`. Those two values are migrated on read to
-`{theme: "default", mode: <the old value>}` and rewritten into the new pair. Everything else,
-including an absent key, resolves to `default` + OS preference. Nobody's theme changes
-across the upgrade.
+`prison.theme` today holds `"light"` or `"dark"` — a mode, not a family. Those two values
+are resolved on read to `{theme: "default", mode: <the old value>}`. Nothing is written
+back: the first deliberate change the user makes rewrites both keys anyway, so a migration
+pass would only be a second way to get to the same place. A stored `prison.mode` wins over
+the legacy value, since it is the newer, deliberate choice. Everything else, including an
+absent key or an unrecognised family, resolves to `default` plus the OS preference. Nobody's
+theme changes across the upgrade.
 
 The blocking script in `app/layout.tsx` keeps doing what it does today — read storage,
 resolve `mode` against `matchMedia` when unset, stamp both attributes before first paint.
@@ -205,9 +208,14 @@ is both correct today and correct for eight palettes.
   names the destination mode of the current family.
 - `SettingsModal.test.tsx` — the Appearance select changes the family and leaves the mode
   alone.
-- Contrast: every palette's fg-on-bg, fg-on-surface, muted-on-surface and each status
-  colour on its surface is measured against WCAG AA and corrected before merge. Cyanotype's
-  borrowed colours are the ones most likely to need moving.
+- Contrast: `lib/theme.test.ts` parses the shipped stylesheet and measures all
+  thirteen text pairs in every palette against WCAG AA, so a later nudge to a colour
+  cannot quietly make text unreadable. Ten values moved to pass it — the tables above
+  carry the measured values, not the first draft.
+- `default/light` is exempt from that check. It predates this work and misses AA on
+  seven pairs, including `accent` on `bg` at 2.93:1. Correcting it would change the
+  colours of every existing install, which this feature explicitly does not do, so it
+  is left alone and tracked separately.
 - `scripts/screenshot/capture.mjs` sets `prison.theme = "dark"`; it goes through the same
   migration path, so it keeps working, and is re-run to confirm.
 

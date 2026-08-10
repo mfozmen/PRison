@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import type { TrackedChecks } from "@/lib/tracked-checks";
 import { RepoCombobox } from "./RepoCombobox";
 import { POLL_INTERVAL_OPTIONS } from "@/lib/notify";
@@ -11,6 +17,17 @@ import {
   isNewerVersion,
   releaseUrl,
 } from "@/lib/project";
+import {
+  THEMES,
+  applyTheme,
+  getMode,
+  getServerMode,
+  getServerTheme,
+  getTheme,
+  modeLabel,
+  subscribeToTheme,
+  type ThemeId,
+} from "@/lib/theme";
 
 export interface SettingsModalProps {
   availableRepos: string[];
@@ -36,10 +53,14 @@ export interface SettingsModalProps {
   onTestNotification: () => void;
 }
 
+// Comments stays first: it is the section the modal opens on, and the one most
+// often wanted. Appearance sits with About at the end, where the settings stop
+// being about what the dashboard shows and start being about how it looks.
 const SECTIONS = [
   { id: "comments", label: "Comments" },
   { id: "auto-refresh", label: "Auto refresh" },
   { id: "tracked-checks", label: "Tracked checks" },
+  { id: "appearance", label: "Appearance" },
   { id: "about", label: "About" },
 ] as const;
 
@@ -107,7 +128,7 @@ function SettingButton({
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-[44px] cursor-pointer rounded-md border border-border bg-surface px-3 text-sm font-medium text-foreground transition-colors hover:brightness-95 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none dark:hover:brightness-110 ${className}`}
+      className={`min-h-[44px] cursor-pointer rounded-md border border-border bg-surface px-3 text-sm font-medium text-foreground transition-colors hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${className}`}
     >
       {children}
     </button>
@@ -183,6 +204,11 @@ export function SettingsModal({
       setUpdate({ status: "error" });
     }
   }
+  // The family is set here, the ground in the header. Both live on <html>, so
+  // this stays in step with the header button without either owning the state.
+  const theme = useSyncExternalStore(subscribeToTheme, getTheme, getServerTheme);
+  const mode = useSyncExternalStore(subscribeToTheme, getMode, getServerMode);
+
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const tabRefs = useRef<Partial<Record<SectionId, HTMLButtonElement | null>>>({});
 
@@ -381,6 +407,44 @@ export function SettingsModal({
             tabIndex={0}
             className="min-w-0 flex-1 overflow-y-auto px-6 pt-4 pb-6 sm:pt-0"
           >
+            {section === "appearance" && (
+              <div>
+                <p className="mb-3 text-sm text-muted">
+                  Each theme brings its own colours and typefaces.
+                </p>
+                <label className="flex items-center gap-2 text-sm text-muted">
+                  <span>Theme</span>
+                  <select
+                    value={theme}
+                    onChange={(e) => applyTheme(e.target.value as ThemeId)}
+                    aria-label="Theme"
+                    className="min-h-[36px] rounded-md border border-border bg-surface px-2 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                  >
+                    {THEMES.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {/* Naming both grounds here is what makes the header button's
+                    label legible: it says "Switch to Aurora Night", and this is
+                    where you find out that Night is one of Aurora's two. */}
+                <p className="mt-2 text-xs text-muted">
+                  Two grounds:{" "}
+                  <strong className="font-medium text-foreground">
+                    {modeLabel(theme, "light")}
+                  </strong>{" "}
+                  and{" "}
+                  <strong className="font-medium text-foreground">
+                    {modeLabel(theme, "dark")}
+                  </strong>
+                  . You&apos;re on {modeLabel(theme, mode)} — the button in the
+                  header switches between them.
+                </p>
+              </div>
+            )}
+
             {section === "comments" && (
               <div className="space-y-2">
                 <p className="mb-3 text-sm text-muted">

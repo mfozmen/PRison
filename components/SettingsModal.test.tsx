@@ -533,6 +533,7 @@ describe("SettingsModal", () => {
         "Comments",
         "Auto refresh",
         "Tracked checks",
+        "Appearance",
         "About",
       ]);
       expect(tabs[0]).toHaveAttribute("aria-selected", "true");
@@ -942,5 +943,74 @@ describe("SettingsModal — owner defaults cover the personal account", () => {
   it("shows no defaults section when there are no owners at all", () => {
     renderTracked({ owners: [] });
     expect(screen.queryByText("Owner defaults")).not.toBeInTheDocument();
+  });
+});
+
+// The family lives here; the ground lives on the header button. This section is
+// the only place the family can be changed, and the only place both grounds are
+// named — which is what makes the header button's label readable.
+describe("SettingsModal — appearance", () => {
+  function renderAppearance() {
+    const result = render(
+      <SettingsModal
+        {...filterProps}
+        owners={owners}
+        availableRepos={[]}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Appearance");
+    return result;
+  }
+
+  afterEach(() => {
+    delete document.documentElement.dataset.theme;
+    delete document.documentElement.dataset.mode;
+    localStorage.clear();
+  });
+
+  it("lists every family", () => {
+    renderAppearance();
+    const select = screen.getByRole("combobox", { name: "Theme" });
+    expect(
+      Array.from((select as HTMLSelectElement).options).map((o) => o.value),
+    ).toEqual(["default", "aurora", "iznik", "cyanotype"]);
+  });
+
+  it("stamps the chosen family on <html> and stores it", () => {
+    renderAppearance();
+    fireEvent.change(screen.getByRole("combobox", { name: "Theme" }), {
+      target: { value: "aurora" },
+    });
+    expect(document.documentElement.dataset.theme).toBe("aurora");
+    expect(localStorage.getItem("prison.theme")).toBe("aurora");
+  });
+
+  it("shows the family already in effect", () => {
+    document.documentElement.dataset.theme = "iznik";
+    renderAppearance();
+    expect(screen.getByRole("combobox", { name: "Theme" })).toHaveValue("iznik");
+  });
+
+  it("names both of the current family's grounds", () => {
+    document.documentElement.dataset.theme = "aurora";
+    document.documentElement.dataset.mode = "dark";
+    renderAppearance();
+    expect(screen.getByText("Dawn")).toBeInTheDocument();
+    expect(screen.getByText("Night")).toBeInTheDocument();
+    expect(screen.getByText(/You're on Night/)).toBeInTheDocument();
+  });
+
+  it("leaves the ground alone when the family changes", () => {
+    document.documentElement.dataset.mode = "dark";
+    renderAppearance();
+    fireEvent.change(screen.getByRole("combobox", { name: "Theme" }), {
+      target: { value: "cyanotype" },
+    });
+    expect(document.documentElement.dataset.mode).toBe("dark");
+    expect(localStorage.getItem("prison.mode")).toBeNull();
   });
 });

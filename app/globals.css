@@ -1,51 +1,181 @@
 @import "tailwindcss";
 
 /*
- * PRison design system — "Data-Dense Dashboard" with light/dark theme support.
- * Fonts (Fira Sans / Fira Code) are loaded with next/font in app/layout.tsx
- * and exposed as --font-fira-sans / --font-fira-code.
+ * PRison design system — "Data-Dense Dashboard".
+ *
+ * Theming has two axes, both stamped on <html> by THEME_INIT_SCRIPT before the
+ * first paint: data-theme names the family (its accent, its three status
+ * colours, its typefaces) and data-mode names the ground (light or dark).
+ * A family keeps the same hues in both modes; only their lightness moves, so
+ * that switching mode reads as the light changing rather than the theme.
+ *
+ * Every family's fonts are loaded with next/font in app/layout.tsx and exposed
+ * as --font-*; only the default family is preloaded.
  */
 
-/* Font tokens (build-time, not runtime-switchable) */
-@theme {
-  --font-sans: var(--font-fira-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-fira-code), ui-monospace, monospace;
-}
-
-/* Theme-switching raw values — light theme (default).
- * These use a separate namespace (--bg, --danger, ...) from the Tailwind
- * color utilities below. The @theme inline block maps --color-* to these, so
- * referencing --color-danger: var(--color-danger) would be circular — that is
- * why the raw values live under distinct names. */
+/* --- Runtime values. These use a separate namespace (--bg, --danger, --fsans)
+ * from the Tailwind theme keys below, because mapping --color-danger onto
+ * itself would be circular. :root is the default family in its light mode and
+ * doubles as the fallback if either attribute is ever missing. --hover-brightness
+ * is what the hover states filter by: dimming on a light ground, lifting on a
+ * dark one. --- */
 :root {
   color-scheme: light;
-  --bg: #EEF2F7;
-  --surface: #FAFBFE;
-  --fg: #0F172A;
+  --bg: #eef2f7;
+  --surface: #fafbfe;
+  --fg: #0f172a;
   --muted: #475569;
-  --brd: #DCE3EC;
-  --accent: #16A34A;
-  --danger: #DC2626;
-  --warning: #B45309;
-  --success: #16A34A;
+  --brd: #dce3ec;
+  --accent: #16a34a;
+  --danger: #dc2626;
+  --warning: #b45309;
+  --success: #16a34a;
+  --hover-brightness: 0.95;
+  --fsans: var(--font-fira-sans), ui-sans-serif, system-ui, sans-serif;
+  --fmono: var(--font-fira-code), ui-monospace, monospace;
 }
 
-/* Theme-switching raw values — dark theme */
-html.dark {
+[data-theme="default"][data-mode="dark"] {
   color-scheme: dark;
-  --bg: #0F172A;
-  --surface: #1E293B;
-  --fg: #F1F5F9;
-  --muted: #94A3B8;
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --fg: #f1f5f9;
+  --muted: #94a3b8;
   --brd: #334155;
-  --accent: #22C55E;
-  --danger: #F87171;
-  --warning: #FBBF24;
-  --success: #4ADE80;
+  --accent: #22c55e;
+  --danger: #f87171;
+  --warning: #fbbf24;
+  --success: #4ade80;
+  --hover-brightness: 1.1;
 }
 
-/* Map Tailwind color utilities (bg-background, text-danger, ...) to the
- * theme-switching vars so utilities re-resolve when html.dark toggles. */
+/* --- Aurora. Each identity colour is an atmospheric emission line converted
+ * from its wavelength to sRGB, then moved for legibility: the spectral colours
+ * fall outside the sRGB gamut, so the hue is kept and the lightness adjusted.
+ *   427.8 nm  N2+ band            accent
+ *   557.7 nm  O I green line      success
+ *   589.0 nm  Na D, sodium layer  warning
+ *   630.0 nm  O I red line        danger
+ * An aurora is a night phenomenon, so the light mode does not invent a daytime
+ * one — it keeps the four wavelengths and trades the midnight sky for a dawn
+ * sky. Same physics, different hour. --- */
+[data-theme="aurora"] {
+  --fsans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --fmono: var(--font-plex-mono), ui-monospace, monospace;
+}
+
+[data-theme="aurora"][data-mode="light"] {
+  color-scheme: light;
+  --bg: #edf0f8;
+  --surface: #fafbff;
+  --fg: #131a2b;
+  --muted: #5a6683;
+  --brd: #d8deec;
+  --accent: #3d4fcb;
+  --danger: #c4341f;
+  --warning: #8f640b;
+  --success: #117c54;
+  --hover-brightness: 0.95;
+}
+
+[data-theme="aurora"][data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #0a0f1a;
+  --surface: #141b2d;
+  --fg: #e4ecf8;
+  --muted: #8fa2c0;
+  --brd: #253352;
+  --accent: #8a9bff;
+  --danger: #ff6b5e;
+  --warning: #f2c64b;
+  --success: #5fde9b;
+  --hover-brightness: 1.1;
+}
+
+/* --- İznik. Each identity colour is a metal oxide the 16th century workshops
+ * actually fired: cobalt for the accent, copper turquoise for success, iron-rich
+ * Armenian bole for danger. Both grounds are real products of the same
+ * workshops — the white quartz-glaze tile, and the cobalt-ground panel where
+ * the pattern stays white and the ground turns blue.
+ * Known gap: the İznik palette has no yellow, so warning is borrowed from
+ * Kütahya ochre — the next stop in the same tradition, but not İznik. --- */
+[data-theme="iznik"] {
+  --fsans: var(--font-alegreya-sans), ui-sans-serif, system-ui, sans-serif;
+  --fmono: var(--font-inconsolata), ui-monospace, monospace;
+}
+
+[data-theme="iznik"][data-mode="light"] {
+  color-scheme: light;
+  --bg: #f7f3ea;
+  --surface: #fffdf6;
+  --fg: #1d1a16;
+  --muted: #6b6355;
+  --brd: #e2d9c6;
+  --accent: #1e4c99;
+  --danger: #b03a26;
+  --warning: #926524;
+  --success: #227a77;
+  --hover-brightness: 0.95;
+}
+
+[data-theme="iznik"][data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #12244a;
+  --surface: #1a3160;
+  --fg: #f2ede1;
+  --muted: #9baece;
+  --brd: #294479;
+  --accent: #7fa8e8;
+  --danger: #ea7b67;
+  --warning: #d9a64b;
+  --success: #4fc4bf;
+  --hover-brightness: 1.1;
+}
+
+/* --- Cyanotype. One reaction: iron salt on paper turns Prussian blue in
+ * sunlight, unexposed areas stay paper. Both grounds are real outputs — the
+ * print and its negative.
+ * Stated plainly: only the accent comes from the source. The palette is two
+ * colours, and this dashboard has to answer "failing / waiting / ready" at a
+ * glance, so the three status colours are borrowed from outside it. The "every
+ * colour is a measurement" claim that holds for the other families does not
+ * hold here. --- */
+[data-theme="cyanotype"] {
+  --fsans: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
+  --fmono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+[data-theme="cyanotype"][data-mode="light"] {
+  color-scheme: light;
+  --bg: #e8e3d3;
+  --surface: #f4f1e6;
+  --fg: #003153;
+  --muted: #486881;
+  --brd: #cfc7b2;
+  --accent: #14567f;
+  --danger: #a8402f;
+  --warning: #875c19;
+  --success: #2b714f;
+  --hover-brightness: 0.95;
+}
+
+[data-theme="cyanotype"][data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #0e2e47;
+  --surface: #14405e;
+  --fg: #dce9f2;
+  --muted: #8bacc4;
+  --brd: #1e5378;
+  --accent: #7fb3d5;
+  --danger: #e3938c;
+  --warning: #d9a441;
+  --success: #6fbf8b;
+  --hover-brightness: 1.1;
+}
+
+/* Map the Tailwind theme keys onto the runtime values, so utilities like
+ * bg-background, text-danger and font-mono re-resolve the moment data-theme or
+ * data-mode changes on <html>. */
 @theme inline {
   --color-background: var(--bg);
   --color-surface: var(--surface);
@@ -56,6 +186,8 @@ html.dark {
   --color-danger: var(--danger);
   --color-warning: var(--warning);
   --color-success: var(--success);
+  --font-sans: var(--fsans);
+  --font-mono: var(--fmono);
 }
 
 html,
@@ -65,7 +197,7 @@ body {
 
 body {
   color: var(--fg);
-  font-family: var(--font-sans);
+  font-family: var(--fsans);
 }
 
 @media (prefers-reduced-motion: reduce) {

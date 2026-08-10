@@ -972,44 +972,61 @@ describe("SettingsModal — appearance", () => {
     localStorage.clear();
   });
 
-  it("lists every family", () => {
+  it("offers every family", () => {
     renderAppearance();
-    const select = screen.getByRole("combobox", { name: "Theme" });
     expect(
-      Array.from((select as HTMLSelectElement).options).map((o) => o.value),
+      screen.getAllByRole("radio").map((r) => (r as HTMLInputElement).value),
     ).toEqual(["default", "aurora", "iznik", "cyanotype"]);
   });
 
   it("stamps the chosen family on <html> and stores it", () => {
     renderAppearance();
-    fireEvent.change(screen.getByRole("combobox", { name: "Theme" }), {
-      target: { value: "aurora" },
-    });
+    fireEvent.click(screen.getByRole("radio", { name: /Aurora/ }));
     expect(document.documentElement.dataset.theme).toBe("aurora");
     expect(localStorage.getItem("prison.theme")).toBe("aurora");
   });
 
-  it("shows the family already in effect", () => {
+  it("marks the family already in effect", () => {
     document.documentElement.dataset.theme = "iznik";
     renderAppearance();
-    expect(screen.getByRole("combobox", { name: "Theme" })).toHaveValue("iznik");
+    expect(screen.getByRole("radio", { name: /İznik/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /Aurora/ })).not.toBeChecked();
   });
 
-  it("names both of the current family's grounds", () => {
+  it("names both grounds of every family, not just the current one", () => {
     document.documentElement.dataset.theme = "aurora";
     document.documentElement.dataset.mode = "dark";
     renderAppearance();
-    expect(screen.getByText("Dawn")).toBeInTheDocument();
-    expect(screen.getByText("Night")).toBeInTheDocument();
-    expect(screen.getByText(/You're on Night/)).toBeInTheDocument();
+    expect(screen.getByText(/Dawn · Night/)).toBeInTheDocument();
+    expect(screen.getByText(/Glaze · Cobalt/)).toBeInTheDocument();
+    expect(screen.getByText(/Negative · Print/)).toBeInTheDocument();
+    expect(screen.getByText(/on Night/)).toBeInTheDocument();
+  });
+
+  // The swatch is stamped with the pair so globals.css resolves that palette
+  // inside it. If these attributes go missing the preview silently shows the
+  // page's current colours for every row, which looks fine and is wrong.
+  it("renders each swatch under its own family and the current ground", () => {
+    document.documentElement.dataset.mode = "dark";
+    const { container } = renderAppearance();
+    const swatches = container.querySelectorAll("[aria-hidden='true'][data-theme]");
+    expect(
+      Array.from(swatches).map((s) => [
+        s.getAttribute("data-theme"),
+        s.getAttribute("data-mode"),
+      ]),
+    ).toEqual([
+      ["default", "dark"],
+      ["aurora", "dark"],
+      ["iznik", "dark"],
+      ["cyanotype", "dark"],
+    ]);
   });
 
   it("leaves the ground alone when the family changes", () => {
     document.documentElement.dataset.mode = "dark";
     renderAppearance();
-    fireEvent.change(screen.getByRole("combobox", { name: "Theme" }), {
-      target: { value: "cyanotype" },
-    });
+    fireEvent.click(screen.getByRole("radio", { name: /Cyanotype/ }));
     expect(document.documentElement.dataset.mode).toBe("dark");
     expect(localStorage.getItem("prison.mode")).toBeNull();
   });

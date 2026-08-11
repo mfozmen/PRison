@@ -212,6 +212,13 @@ body {
   background: var(--bg);
 }
 
+/* The in-page jump links (summary tiles, archives) travel rather than teleport,
+   so it stays obvious which way the page moved. This is the whole of the
+   animation — no scroll handler exists to opt out of. */
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   color: var(--fg);
   font-family: var(--fsans);
@@ -223,5 +230,9 @@ body {
   *::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+  }
+
+  html {
+    scroll-behavior: auto;
   }
 }

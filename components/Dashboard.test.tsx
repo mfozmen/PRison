@@ -843,7 +843,9 @@ describe("Dashboard", () => {
     expect(await screen.findByText("draft stuck pr")).toBeInTheDocument();
 
     const tile = (label: string) =>
-      screen.getByText(label).parentElement as HTMLElement;
+      screen
+        .getByText(label)
+        .closest("[data-testid='summary-tile']") as HTMLElement;
     expect(tile("Stuck on checks")).toHaveTextContent("2");
     expect(tile("Waiting on you")).toHaveTextContent("2");
 
@@ -3057,5 +3059,35 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
     // Once, not twice: the section's own message replaces the global banner
     // rather than sitting under it with a second Retry button.
     expect(screen.queryByText(/some data couldn't be loaded/i)).not.toBeInTheDocument();
+  });
+});
+
+// The tiles and the archives link are the whole of #45's answer to a board that
+// no longer fits on a screen. They are plain anchors, so nothing but a matching
+// id makes them work — and an id lives in a different file from every href that
+// names it.
+describe("Dashboard — jumping to a section", () => {
+  beforeEach(() => {
+    global.fetch = okFetch();
+  });
+
+  it("gives every in-page link a target that exists", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("Ready to merge")).toBeInTheDocument();
+
+    const hashLinks = Array.from(
+      document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]'),
+    );
+    // Guard against the list going quietly empty and the loop below passing on
+    // nothing: three tiles plus the archives link.
+    expect(hashLinks).toHaveLength(4);
+    for (const link of hashLinks) {
+      const id = link.getAttribute("href")!.slice(1);
+      const target = document.getElementById(id);
+      expect(target, `no element with id "${id}"`).not.toBeNull();
+      // -1 rather than absent: an anchor is only half a jump if the caret stays
+      // at the top of the page, and only a focusable target moves it.
+      expect(target).toHaveAttribute("tabindex", "-1");
+    }
   });
 });

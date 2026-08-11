@@ -11,6 +11,8 @@ export interface PrListProps<T> {
   groupKeys?: (item: T) => string[];
   groupHref?: (key: string) => string | undefined;
   countAccent?: "success" | "warning" | "danger";
+  /** Anchor target for the jump links above. */
+  id?: string;
 }
 
 const countAccentClasses: Record<"success" | "warning" | "danger", string> = {
@@ -30,6 +32,7 @@ export function PrList<T>({
   groupKeys,
   groupHref,
   countAccent,
+  id,
 }: PrListProps<T>) {
   // Open, and component state only — never localStorage.
   //
@@ -85,7 +88,11 @@ export function PrList<T>({
     }, [items, groupBy, groupKeys]);
 
   return (
-    <section className="flex flex-col gap-3">
+    // tabIndex makes the section a focus target, which is what turns a jump
+    // link into a real one: the browser moves the caret here too, so the next
+    // Tab continues inside the section instead of back at the top of the page.
+    // scroll-mt keeps the header off the very edge of the viewport.
+    <section id={id} tabIndex={-1} className="flex scroll-mt-4 flex-col gap-3 focus:outline-none">
       <DisclosureHeader
         open={open}
         onToggle={() => setOpen((v) => !v)}

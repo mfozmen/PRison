@@ -725,3 +725,22 @@ describe("PrList — collapsing the section", () => {
     expect(screen.getAllByTestId("stuck-row")).toHaveLength(3);
   });
 });
+
+// The section is the landing site for the summary tiles. tabIndex is what makes
+// it one: without it the viewport moves and the caret does not.
+describe("PrList — as a jump target", () => {
+  it("gives the section the id it was handed, and focus with it", () => {
+    const { container } = render(
+      <PrList
+        title="Ready to merge"
+        items={[]}
+        emptyMessage="none"
+        renderRow={() => null}
+        id="ready"
+      />,
+    );
+    const section = container.querySelector("section")!;
+    expect(section).toHaveAttribute("id", "ready");
+    expect(section).toHaveAttribute("tabindex", "-1");
+  });
+});

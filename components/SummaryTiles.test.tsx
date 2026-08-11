@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { SummaryTiles, oldestOf } from "./SummaryTiles";
 
 const NOW = new Date("2026-08-11T12:00:00Z");
+// The linked tiles wrap their label in an anchor, so walk up to the tile
+// itself rather than assuming the label's parent is it.
 const tile = (label: string) =>
-  screen.getByText(label).parentElement as HTMLElement;
+  screen.getByText(label).closest("[data-testid='summary-tile']") as HTMLElement;
 
 describe("oldestOf", () => {
   it("returns the earliest of the timestamps", () => {
@@ -88,5 +90,37 @@ describe("SummaryTiles", () => {
   it("has no tile for ready to merge", () => {
     render(<SummaryTiles {...props} />);
     expect(screen.queryByText(/ready to merge/i)).not.toBeInTheDocument();
+  });
+
+  // The count is the reason you want to go there, so the tile is also the way.
+  it.each([
+    ["Waiting on you", "#waiting-on-your-review"],
+    ["Awaiting your reply", "#comments-awaiting-reply"],
+    ["Stuck on checks", "#stuck-on-checks"],
+  ])("links %s to its section", (label, href) => {
+    render(<SummaryTiles {...props} />);
+    expect(screen.getByRole("link", { name: label })).toHaveAttribute(
+      "href",
+      href,
+    );
+  });
+
+  // It describes whichever queue is worst, so where it would land depends on
+  // the data — a link nobody can predict is worse than no link.
+  it("leaves the longest-wait tile inert", () => {
+    render(<SummaryTiles {...props} />);
+    expect(
+      within(tile("Longest wait")).queryByRole("link"),
+    ).not.toBeInTheDocument();
+  });
+
+  // The two histories sit at the foot of the board and have no tile of their
+  // own; one anchor at the row they share reaches both.
+  it("offers one link to the archives", () => {
+    render(<SummaryTiles {...props} />);
+    expect(screen.getByRole("link", { name: /archives/i })).toHaveAttribute(
+      "href",
+      "#archives",
+    );
   });
 });

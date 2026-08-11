@@ -612,7 +612,7 @@ describe("Dashboard", () => {
     expect(screen.queryByText("Review required")).not.toBeInTheDocument();
   });
 
-  it("DIRTY + review-required PR shows the conflicts note, not a review chip (conflicts win)", async () => {
+  it("DIRTY + review-required PR shows the conflict chip alongside the review chip", async () => {
     const DIRTY_REVIEW_PR = {
       ...STUCK_PR,
       id: "dirty-review",
@@ -636,8 +636,10 @@ describe("Dashboard", () => {
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("Has merge conflicts — resolve them on GitHub.")).toBeInTheDocument();
-    expect(screen.queryByText("Review required")).not.toBeInTheDocument();
+    // Both are true and both are actionable; the old note replaced the review
+    // chip outright, which hid one blocker to show the other.
+    expect(await screen.findByText("Merge conflict")).toBeInTheDocument();
+    expect(screen.getByText("Review required")).toBeInTheDocument();
   });
 
   it("blocked PR with visible check names shows chips and not the note", async () => {
@@ -702,7 +704,40 @@ describe("Dashboard", () => {
     ).toBeInTheDocument();
   });
 
-  it("DIRTY PR shows the merge-conflicts note", async () => {
+  // The case that made this a bug report: a conflicted PR with one red check
+  // showed the check and said nothing about the conflict, because the note was
+  // the else-branch of "has no check names".
+  it("shows the conflict beside the failing check, not instead of it", async () => {
+    const DIRTY_AND_FAILING_PR = {
+      ...STUCK_PR,
+      id: "dirty-and-failing",
+      title: "dirty and failing pr",
+      failingChecks: 1,
+      pendingChecks: 0,
+      failing: ["env_check"],
+      pending: [],
+      checkNames: ["env_check"],
+      blocked: true,
+      mergeState: "DIRTY",
+    };
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            url.includes("ready") ? [] : url.includes("stuck") ? [DIRTY_AND_FAILING_PR] : [REVIEW_PR],
+          ),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("Merge conflict")).toBeInTheDocument();
+    expect(screen.getByText("env_check")).toBeInTheDocument();
+    // And the call to action names the blocker that cannot clear itself.
+    expect(screen.getByText("Resolve conflicts")).toBeInTheDocument();
+    expect(screen.queryByText("Re-run failed checks")).not.toBeInTheDocument();
+  });
+
+  it("DIRTY PR shows the merge-conflict chip", async () => {
     const DIRTY_PR = {
       ...STUCK_PR,
       id: "dirty",
@@ -723,7 +758,7 @@ describe("Dashboard", () => {
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("Has merge conflicts — resolve them on GitHub.")).toBeInTheDocument();
+    expect(await screen.findByText("Merge conflict")).toBeInTheDocument();
     expect(
       screen.queryByText("Out of date with the base branch — update it to merge."),
     ).not.toBeInTheDocument();

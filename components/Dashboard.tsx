@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useTransition } from "react";
 import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr, ReviewedPr } from "@/lib/types";
 import { sortByAgeAsc, sortByAgeDesc, relativeAge } from "@/lib/prioritize";
-import { suggestStuck, suggestReview, suggestReady, suggestComment, needsReview, stuckGroupKeys, reviewDecisionLabel } from "@/lib/suggest";
+import { suggestStuck, suggestReview, suggestReady, suggestComment, needsReview, stuckGroupKeys, reviewDecisionLabel, MERGE_CONFLICT_LABEL } from "@/lib/suggest";
 import { PrList } from "./PrList";
 import { SummaryTiles } from "./SummaryTiles";
 import { PrRow } from "./PrRow";
@@ -1130,12 +1130,30 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     {text}
                   </span>
                 );
+                // Conflicts used to be an either/or with the check chips — a
+                // muted sentence shown only when the PR had no check names at
+                // all. One red check was enough to hide the fact that the branch
+                // will not merge, which is the harder blocker of the two: a
+                // check can go green on its own, a conflict cannot. So it is a
+                // chip like the others, first in the row, in danger's colours.
+                const conflicted = pr.mergeState === "DIRTY";
+                const conflictChip = conflicted ? (
+                  <span
+                    key="conflict"
+                    className="inline-flex items-center gap-1 rounded bg-danger/10 px-1.5 py-0.5 text-xs font-medium text-danger ring-1 ring-inset ring-danger/30"
+                  >
+                    <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M3.5 2.5v7M8.5 2.5v7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                      <path d="M2 4.5 4 6.5m0-2L2 6.5M7 4.5l2 2m0-2-2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                    </svg>
+                    {MERGE_CONFLICT_LABEL}
+                  </span>
+                ) : null;
                 let detail: React.ReactNode;
-                if (!hasNames && pr.mergeState === "DIRTY") {
-                  detail = noteSpan("Has merge conflicts — resolve them on GitHub.");
-                } else if (hasNames || hasAwaiting || reviewNeeded) {
+                if (conflicted || hasNames || hasAwaiting || reviewNeeded) {
                   detail = (
                     <div className="flex flex-wrap gap-1 items-center">
+                      {conflictChip}
                       {showFailingNames.map((name, i) => (
                         <span
                           key={`fail-${i}-${name}`}

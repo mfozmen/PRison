@@ -28,8 +28,12 @@ access. Four lists, oldest first, plus two history sections:
 - **Recently merged / closed** — your own PRs that were merged or closed, newest
   first, so finished work confirms itself.
 
-Both history sections sit side by side, collapsed by default with a count, and
-expand to the latest 15 with **Load more** for the rest.
+The lower half of the board is two columns paired by subject: other people's PRs
+on the left — the ones waiting on your review, then the ones you have already
+reviewed — and your own on the right, blocked above finished. Each history sits
+under the queue it is the history of, and the columns grow independently, so
+expanding one never moves the other. Both histories start collapsed with a count
+and expand to the latest 15, with **Load more** for the rest.
 
 ![The PRison dashboard in dark mode. At the top, the filter bar's grouping and draft filters; below it a row of four summary tiles (waiting on you, awaiting your reply, stuck on checks, longest wait); then the four PR lists — ready to merge, comments awaiting your reply, PRs waiting on your review, and PRs stuck on checks — with the recently reviewed and recently merged / closed histories collapsed at the bottom](docs/screenshot.png)
 

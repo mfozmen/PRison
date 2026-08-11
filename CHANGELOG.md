@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.14.0](https://github.com/mfozmen/PRison/compare/v1.13.0...v1.14.0) (2026-08-11)
+
+### Features
+
+* give each summary tile its own oldest wait ([#56](https://github.com/mfozmen/PRison/issues/56)) ([fe78162](https://github.com/mfozmen/PRison/commit/fe7816249d9187cae1b24eadc50603f10357af46)), closes [#45](https://github.com/mfozmen/PRison/issues/45) [#54](https://github.com/mfozmen/PRison/issues/54)
+* index every section instead of special-casing the archives ([#59](https://github.com/mfozmen/PRison/issues/59)) ([4d71cbb](https://github.com/mfozmen/PRison/commit/4d71cbb91e1074788fd3e89021ba484d3a40f6ce)), closes [#52](https://github.com/mfozmen/PRison/issues/52)
+* pair the columns by subject instead of stacking rows ([#60](https://github.com/mfozmen/PRison/issues/60)) ([61dfea4](https://github.com/mfozmen/PRison/commit/61dfea4af8d9229a258ed22390aeae0911a7f986)), closes [#53](https://github.com/mfozmen/PRison/issues/53)
+
+### Bug Fixes
+
+* stop a failing check hiding a merge conflict ([#58](https://github.com/mfozmen/PRison/issues/58)) ([06e0834](https://github.com/mfozmen/PRison/commit/06e0834db749fc4210d5fa6181d89e8dc1f43e3b)), closes [#57](https://github.com/mfozmen/PRison/issues/57)
+* stop the fixture guard reading its own changelog as a leak ([#55](https://github.com/mfozmen/PRison/issues/55)) ([01bdf64](https://github.com/mfozmen/PRison/commit/01bdf642bbbfb878d4a0b14ca2b172c1af91bfc9)), closes [#44](https://github.com/mfozmen/PRison/issues/44)
+
 ## [1.13.0](https://github.com/mfozmen/PRison/compare/v1.12.0...v1.13.0) (2026-08-11)
 
 ### Features

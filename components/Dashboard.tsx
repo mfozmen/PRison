@@ -923,6 +923,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           )}
           <PrList
             title="Comments awaiting your reply"
+            id="comments-awaiting-reply"
             items={visibleComments}
             emptyMessage="No comments awaiting your reply 🎉"
             keyExtractor={(c) => c.id}
@@ -992,6 +993,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             )}
             <PrList
               title="PRs waiting on your review"
+              id="waiting-on-your-review"
               items={visibleReviews}
               emptyMessage="No PRs waiting on your review 🎉"
               keyExtractor={(req) => req.id}
@@ -1061,6 +1063,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             )}
             <PrList
               title="PRs stuck on checks"
+              id="stuck-on-checks"
               items={visibleStuck}
               emptyMessage="No PRs stuck on checks 🎉"
               keyExtractor={(pr) => pr.id}
@@ -1192,7 +1195,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         {/* The two look-back sections share a row: both are archives, both
             start collapsed, and stacking them would push the board into a
             column of headers long after the work queues have ended. */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <div id="archives" tabIndex={-1} className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start scroll-mt-4 focus:outline-none">
           <ArchiveSection
             title="Recently reviewed"
             count={sortedReviewed.length}

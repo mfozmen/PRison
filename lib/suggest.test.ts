@@ -55,6 +55,13 @@ describe("suggestStuck", () => {
       href: "https://github.com/acme/b/pull/2/files",
     });
   });
+  it("DIRTY takes priority over a failing check → 'Resolve conflicts'", () => {
+    // A re-run cannot merge a conflicted PR, and resolving the conflict means a
+    // push, which re-runs the checks anyway.
+    const target = pr({ blocked: true, mergeState: "DIRTY", failingChecks: 1, failing: ["ci"] });
+    expect(suggestStuck(target)).toEqual({ text: "Resolve conflicts", href: target.url });
+  });
+
   it("DIRTY takes priority over a review gate → 'Resolve conflicts' (matches the Dashboard's conflicts note)", () => {
     // A PR can be DIRTY and REVIEW_REQUIRED at once. The Dashboard renders the
     // merge-conflict note (DIRTY wins), so the suggestion must agree — conflicts
@@ -111,6 +118,18 @@ describe("stuckGroupKeys", () => {
       "qa/smoke",
       "Automation Result",
       "Review required",
+    ]);
+  });
+  // "Other" is for blockers the board cannot name, and it can name this one.
+  it("DIRTY with nothing else against it → 'Merge conflict' (not Other)", () => {
+    expect(stuckGroupKeys(s({ mergeState: "DIRTY" }), EMPTY_TRACKED)).toEqual([
+      "Merge conflict",
+    ]);
+  });
+  it("groups a conflicted PR under its checks and the conflict both", () => {
+    expect(stuckGroupKeys(s({ mergeState: "DIRTY", failing: ["build"] }), EMPTY_TRACKED)).toEqual([
+      "build",
+      "Merge conflict",
     ]);
   });
   it("falls back to 'Other' when nothing is groupable", () => {

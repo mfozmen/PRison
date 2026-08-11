@@ -16,13 +16,19 @@ export function reviewDecisionLabel(reviewDecision: string): string {
   return reviewDecision === "CHANGES_REQUESTED" ? "Changes requested" : "Review required";
 }
 
+// The card chip and the By-check group key must read the same, for the same
+// reason reviewDecisionLabel exists: two copies is how they stop agreeing.
+export const MERGE_CONFLICT_LABEL = "Merge conflict";
+
 export function suggestStuck(pr: StuckPr): Suggestion {
   const href = `${pr.url}/checks`;
+  // Conflicts outrank every check. A red check may clear itself on a re-run and
+  // a conflict never does, so "Re-run failed checks" on a conflicted PR points
+  // at the one thing that cannot merge it — and resolving the conflict means a
+  // push, which re-runs those checks anyway.
+  if (pr.mergeState === "DIRTY") return { text: "Resolve conflicts", href: pr.url };
   if (pr.failingChecks > 0) return { text: "Re-run failed checks", href };
   if (pr.pendingChecks > 0) return { text: "Investigate pending CI", href };
-  // Merge conflicts block the merge regardless of review state, and the
-  // Dashboard's detail note prioritizes DIRTY too — keep the CTA in step.
-  if (pr.mergeState === "DIRTY") return { text: "Resolve conflicts", href: pr.url };
   // Checks are green and mergeable — the blocker is a review gate.
   if (pr.reviewDecision === "REVIEW_REQUIRED") return { text: "Request code owner review", href: pr.url };
   if (pr.reviewDecision === "CHANGES_REQUESTED") return { text: "Address review feedback", href: `${pr.url}/files` };
@@ -43,6 +49,10 @@ export function stuckGroupKeys(pr: StuckPr, tracked: TrackedChecks): string[] {
   if (needsReview(pr.reviewDecision)) {
     keys.push(reviewDecisionLabel(pr.reviewDecision));
   }
+  // Without this a conflicted PR with nothing else against it lands in "Other",
+  // which is the bucket for blockers the board cannot name — and it can name
+  // this one.
+  if (pr.mergeState === "DIRTY") keys.push(MERGE_CONFLICT_LABEL);
   const unique = Array.from(new Set(keys));
   return unique.length > 0 ? unique : ["Other"];
 }

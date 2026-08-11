@@ -998,313 +998,322 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             )}
           />
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Review list is LEFT/TOP column */}
-          <div className="flex flex-col gap-4">
-            {reviewError && (
-              <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-                <span>{reviewError}</span>
-                <button
-                  onClick={() => fetchData(selectedOrg)}
-                  className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
-                >
-                  Retry
-                </button>
-              </div>
-            )}
-            <PrList
-              title="PRs waiting on your review"
-              id="waiting-on-your-review"
-              items={visibleReviews}
-              emptyMessage="No PRs waiting on your review 🎉"
-              keyExtractor={(req) => req.id}
-              groupBy={groupBy === "repo" ? (req) => req.repo : undefined}
-              groupHref={
-                groupBy === "repo"
-                  ? (repo) => `https://github.com/${repo}`
-                  : undefined
-              }
-              countAccent="warning"
-              renderRow={(req) => (
-                <PrRow
-                  title={req.title}
-                  repo={req.repo}
-                  number={req.number}
-                  url={req.url}
-                  since={req.requestedAt}
-                  now={new Date()}
-                  draft={req.isDraft}
-                  accent="warning"
-                  detail={
-                    <span className="flex items-center gap-1 text-warning">
-                      <svg
-                        aria-hidden="true"
-                        className="shrink-0"
-                        width="12"
-                        height="12"
-                        viewBox="0 0 12 12"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <circle cx="5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.5" />
-                        <path
-                          d="M1 10c0-2.21 1.79-4 4-4s4 1.79 4 4"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                        />
-                        <path
-                          d="M9 6l2 2-2 2"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                      <span>Blocking @{req.author}</span>
-                    </span>
-                  }
-                  suggestion={suggestReview(req)}
-                />
+        {/* Two columns, paired by subject rather than stacked as rows: other
+            people's PRs on the left (the ones you owe a review, then the ones
+            you have already reviewed), your own on the right (blocked, then
+            finished). It is the split the queries already make —
+            review-requested/reviewed-by against author — so each history sits
+            directly under the queue it is the history of.
+
+            It is also why they are columns and not a second grid row: a row is
+            as tall as its tallest cell, so expanding one list used to push the
+            unrelated section on the other side down with it.  */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {/* Other people's PRs: the review queue, then what you reviewed. */}
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-4">
+              {reviewError && (
+                <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+                  <span>{reviewError}</span>
+                  <button
+                    onClick={() => fetchData(selectedOrg)}
+                    className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+                  >
+                    Retry
+                  </button>
+                </div>
               )}
-            />
+              <PrList
+                title="PRs waiting on your review"
+                id="waiting-on-your-review"
+                items={visibleReviews}
+                emptyMessage="No PRs waiting on your review 🎉"
+                keyExtractor={(req) => req.id}
+                groupBy={groupBy === "repo" ? (req) => req.repo : undefined}
+                groupHref={
+                  groupBy === "repo"
+                    ? (repo) => `https://github.com/${repo}`
+                    : undefined
+                }
+                countAccent="warning"
+                renderRow={(req) => (
+                  <PrRow
+                    title={req.title}
+                    repo={req.repo}
+                    number={req.number}
+                    url={req.url}
+                    since={req.requestedAt}
+                    now={new Date()}
+                    draft={req.isDraft}
+                    accent="warning"
+                    detail={
+                      <span className="flex items-center gap-1 text-warning">
+                        <svg
+                          aria-hidden="true"
+                          className="shrink-0"
+                          width="12"
+                          height="12"
+                          viewBox="0 0 12 12"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <circle cx="5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.5" />
+                          <path
+                            d="M1 10c0-2.21 1.79-4 4-4s4 1.79 4 4"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                          />
+                          <path
+                            d="M9 6l2 2-2 2"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        <span>Blocking @{req.author}</span>
+                      </span>
+                    }
+                    suggestion={suggestReview(req)}
+                  />
+                )}
+              />
+            </div>
+            <ArchiveSection
+              title="Recently reviewed"
+              id="recently-reviewed"
+              count={sortedReviewed.length}
+              countTestId="reviewed-count-badge"
+              open={reviewedOpen}
+              onToggle={() => setReviewedOpen((o) => !o)}
+              error={reviewedError}
+              onRetry={() => fetchData(selectedOrg)}
+            >
+              {sortedReviewed.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">
+                  No PRs you have reviewed are still open
+                </p>
+              ) : (
+                <>
+                  <ul className="flex flex-col gap-2">
+                    {sortedReviewed.slice(0, reviewedVisible).map((pr) => (
+                      <li key={pr.id}>
+                        <ReviewedPrRow pr={pr} now={new Date()} />
+                      </li>
+                    ))}
+                  </ul>
+                  {sortedReviewed.length > reviewedVisible && (
+                    <button
+                      type="button"
+                      onClick={() => setReviewedVisible((v) => v + ARCHIVE_PAGE_SIZE)}
+                      className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                    >
+                      Load more (showing {reviewedVisible} of {sortedReviewed.length})
+                    </button>
+                  )}
+                </>
+              )}
+            </ArchiveSection>
           </div>
-          {/* Stuck list is RIGHT/BOTTOM column */}
-          <div className="flex flex-col gap-4">
-            {stuckError && (
-              <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-                <span>{stuckError}</span>
-                <button
-                  onClick={() => fetchData(selectedOrg)}
-                  className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
-                >
-                  Retry
-                </button>
-              </div>
-            )}
-            <PrList
-              title="PRs stuck on checks"
-              id="stuck-on-checks"
-              items={visibleStuck}
-              emptyMessage="No PRs stuck on checks 🎉"
-              keyExtractor={(pr) => pr.id}
-              countAccent="danger"
-              groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
-              groupKeys={
-                groupBy === "check"
-                  ? (pr) => stuckGroupKeys(pr, tracked)
-                  : undefined
-              }
-              groupHref={
-                groupBy === "repo"
-                  ? (repo) => `https://github.com/${repo}`
-                  : undefined
-              }
-              renderRow={(pr) => {
-                const hasNames = pr.failing.length > 0 || pr.pending.length > 0;
-                const totalNames = pr.failing.length + pr.pending.length;
-                // Only truncate when there are more than 4 names total; otherwise
-                // show every name. The "+N more" count is derived from what is
-                // actually rendered so lopsided check lists never hide a chip
-                // without an indicator.
-                const truncate = totalNames > 4;
-                const showFailingNames = truncate ? pr.failing.slice(0, 2) : pr.failing;
-                const showPendingNames = truncate ? pr.pending.slice(0, 2) : pr.pending;
-                const overflow = totalNames - (showFailingNames.length + showPendingNames.length);
-                const awaiting = awaitingChecks(pr.repo, pr.checkNames, tracked);
-                const hasAwaiting = awaiting.length > 0;
-                // A green PR can still be BLOCKED waiting on a code-owner review;
-                // surface that instead of mislabeling it as pending CI. Colour it
-                // with the repo's status vocabulary: CHANGES_REQUESTED is a negative
-                // signal (danger/red), REVIEW_REQUIRED is merely waiting (warning/amber).
-                const reviewNeeded = needsReview(pr.reviewDecision);
-                const changesRequested = pr.reviewDecision === "CHANGES_REQUESTED";
-                const reviewChip = reviewNeeded ? (
-                  <span
-                    key="review"
-                    className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
-                      changesRequested
-                        ? "bg-danger/10 text-danger ring-danger/30"
-                        : "bg-warning/10 text-warning ring-warning/30"
-                    }`}
+          {/* Your own PRs: what is blocked, then what is finished. */}
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-4">
+              {stuckError && (
+                <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+                  <span>{stuckError}</span>
+                  <button
+                    onClick={() => fetchData(selectedOrg)}
+                    className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
                   >
-                    <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.3" />
-                      <path d="M1 10c0-2.21 1.79-4 4-4s4 1.79 4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                    Retry
+                  </button>
+                </div>
+              )}
+              <PrList
+                title="PRs stuck on checks"
+                id="stuck-on-checks"
+                items={visibleStuck}
+                emptyMessage="No PRs stuck on checks 🎉"
+                keyExtractor={(pr) => pr.id}
+                countAccent="danger"
+                groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
+                groupKeys={
+                  groupBy === "check"
+                    ? (pr) => stuckGroupKeys(pr, tracked)
+                    : undefined
+                }
+                groupHref={
+                  groupBy === "repo"
+                    ? (repo) => `https://github.com/${repo}`
+                    : undefined
+                }
+                renderRow={(pr) => {
+                  const hasNames = pr.failing.length > 0 || pr.pending.length > 0;
+                  const totalNames = pr.failing.length + pr.pending.length;
+                  // Only truncate when there are more than 4 names total; otherwise
+                  // show every name. The "+N more" count is derived from what is
+                  // actually rendered so lopsided check lists never hide a chip
+                  // without an indicator.
+                  const truncate = totalNames > 4;
+                  const showFailingNames = truncate ? pr.failing.slice(0, 2) : pr.failing;
+                  const showPendingNames = truncate ? pr.pending.slice(0, 2) : pr.pending;
+                  const overflow = totalNames - (showFailingNames.length + showPendingNames.length);
+                  const awaiting = awaitingChecks(pr.repo, pr.checkNames, tracked);
+                  const hasAwaiting = awaiting.length > 0;
+                  // A green PR can still be BLOCKED waiting on a code-owner review;
+                  // surface that instead of mislabeling it as pending CI. Colour it
+                  // with the repo's status vocabulary: CHANGES_REQUESTED is a negative
+                  // signal (danger/red), REVIEW_REQUIRED is merely waiting (warning/amber).
+                  const reviewNeeded = needsReview(pr.reviewDecision);
+                  const changesRequested = pr.reviewDecision === "CHANGES_REQUESTED";
+                  const reviewChip = reviewNeeded ? (
+                    <span
+                      key="review"
+                      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
+                        changesRequested
+                          ? "bg-danger/10 text-danger ring-danger/30"
+                          : "bg-warning/10 text-warning ring-warning/30"
+                      }`}
+                    >
+                      <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.3" />
+                        <path d="M1 10c0-2.21 1.79-4 4-4s4 1.79 4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                      </svg>
+                      {reviewDecisionLabel(pr.reviewDecision)}
+                    </span>
+                  ) : null;
+                  const noteIcon = (
+                    <svg aria-hidden="true" className="shrink-0" width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3"/>
+                      <path d="M7 6v4M7 4.5v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
                     </svg>
-                    {reviewDecisionLabel(pr.reviewDecision)}
-                  </span>
-                ) : null;
-                const noteIcon = (
-                  <svg aria-hidden="true" className="shrink-0" width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3"/>
-                    <path d="M7 6v4M7 4.5v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                  </svg>
-                );
-                const noteSpan = (text: string) => (
-                  <span className="flex items-center gap-1.5 text-muted text-sm">
-                    {noteIcon}
-                    {text}
-                  </span>
-                );
-                // Conflicts used to be an either/or with the check chips — a
-                // muted sentence shown only when the PR had no check names at
-                // all. One red check was enough to hide the fact that the branch
-                // will not merge, which is the harder blocker of the two: a
-                // check can go green on its own, a conflict cannot. So it is a
-                // chip like the others, first in the row, in danger's colours.
-                const conflicted = pr.mergeState === "DIRTY";
-                const conflictChip = conflicted ? (
-                  <span
-                    key="conflict"
-                    className="inline-flex items-center gap-1 rounded bg-danger/10 px-1.5 py-0.5 text-xs font-medium text-danger ring-1 ring-inset ring-danger/30"
-                  >
-                    <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M3.5 2.5v7M8.5 2.5v7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                      <path d="M2 4.5 4 6.5m0-2L2 6.5M7 4.5l2 2m0-2-2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                    </svg>
-                    {MERGE_CONFLICT_LABEL}
-                  </span>
-                ) : null;
-                let detail: React.ReactNode;
-                if (conflicted || hasNames || hasAwaiting || reviewNeeded) {
-                  detail = (
-                    <div className="flex flex-wrap gap-1 items-center">
-                      {conflictChip}
-                      {showFailingNames.map((name, i) => (
-                        <span
-                          key={`fail-${i}-${name}`}
-                          className="bg-danger/10 text-danger ring-1 ring-inset ring-danger/30 rounded px-1.5 py-0.5 text-xs font-medium"
-                        >
-                          {name}
-                        </span>
-                      ))}
-                      {showPendingNames.map((name, i) => (
-                        <span
-                          key={`pend-${i}-${name}`}
-                          className="bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium"
-                        >
-                          {name}
-                        </span>
-                      ))}
-                      {overflow > 0 && (
-                        <span className="text-xs text-muted">+{overflow} more</span>
-                      )}
-                      {hasAwaiting &&
-                        awaiting.map((name) => (
+                  );
+                  const noteSpan = (text: string) => (
+                    <span className="flex items-center gap-1.5 text-muted text-sm">
+                      {noteIcon}
+                      {text}
+                    </span>
+                  );
+                  // Conflicts used to be an either/or with the check chips — a
+                  // muted sentence shown only when the PR had no check names at
+                  // all. One red check was enough to hide the fact that the branch
+                  // will not merge, which is the harder blocker of the two: a
+                  // check can go green on its own, a conflict cannot. So it is a
+                  // chip like the others, first in the row, in danger's colours.
+                  const conflicted = pr.mergeState === "DIRTY";
+                  const conflictChip = conflicted ? (
+                    <span
+                      key="conflict"
+                      className="inline-flex items-center gap-1 rounded bg-danger/10 px-1.5 py-0.5 text-xs font-medium text-danger ring-1 ring-inset ring-danger/30"
+                    >
+                      <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3.5 2.5v7M8.5 2.5v7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                        <path d="M2 4.5 4 6.5m0-2L2 6.5M7 4.5l2 2m0-2-2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                      </svg>
+                      {MERGE_CONFLICT_LABEL}
+                    </span>
+                  ) : null;
+                  let detail: React.ReactNode;
+                  if (conflicted || hasNames || hasAwaiting || reviewNeeded) {
+                    detail = (
+                      <div className="flex flex-wrap gap-1 items-center">
+                        {conflictChip}
+                        {showFailingNames.map((name, i) => (
                           <span
-                            key={`await-${name}`}
-                            aria-label={`Awaiting: ${name}`}
-                            title={`Awaiting: ${name}`}
-                            className="inline-flex items-center gap-1 rounded border border-dashed border-muted/60 px-1.5 py-0.5 text-xs font-medium text-muted"
+                            key={`fail-${i}-${name}`}
+                            className="bg-danger/10 text-danger ring-1 ring-inset ring-danger/30 rounded px-1.5 py-0.5 text-xs font-medium"
                           >
-                            <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3" />
-                              <path d="M6 3.5v2.75l1.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
                             {name}
                           </span>
                         ))}
-                      {reviewChip}
-                    </div>
+                        {showPendingNames.map((name, i) => (
+                          <span
+                            key={`pend-${i}-${name}`}
+                            className="bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium"
+                          >
+                            {name}
+                          </span>
+                        ))}
+                        {overflow > 0 && (
+                          <span className="text-xs text-muted">+{overflow} more</span>
+                        )}
+                        {hasAwaiting &&
+                          awaiting.map((name) => (
+                            <span
+                              key={`await-${name}`}
+                              aria-label={`Awaiting: ${name}`}
+                              title={`Awaiting: ${name}`}
+                              className="inline-flex items-center gap-1 rounded border border-dashed border-muted/60 px-1.5 py-0.5 text-xs font-medium text-muted"
+                            >
+                              <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3" />
+                                <path d="M6 3.5v2.75l1.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                              {name}
+                            </span>
+                          ))}
+                        {reviewChip}
+                      </div>
+                    );
+                  } else if (pr.blocked) {
+                    detail = noteSpan("Some required checks run on GitHub and aren't shown here.");
+                  } else {
+                    detail = `${pr.failingChecks} failing · ${pr.pendingChecks} pending`;
+                  }
+                  return (
+                    <PrRow
+                      title={pr.title}
+                      repo={pr.repo}
+                      number={pr.number}
+                      url={pr.url}
+                      since={pr.stuckSince}
+                      now={new Date()}
+                      draft={pr.isDraft}
+                      accent="danger"
+                      detail={detail}
+                      suggestion={suggestStuck(pr)}
+                    />
                   );
-                } else if (pr.blocked) {
-                  detail = noteSpan("Some required checks run on GitHub and aren't shown here.");
-                } else {
-                  detail = `${pr.failingChecks} failing · ${pr.pendingChecks} pending`;
-                }
-                return (
-                  <PrRow
-                    title={pr.title}
-                    repo={pr.repo}
-                    number={pr.number}
-                    url={pr.url}
-                    since={pr.stuckSince}
-                    now={new Date()}
-                    draft={pr.isDraft}
-                    accent="danger"
-                    detail={detail}
-                    suggestion={suggestStuck(pr)}
-                  />
-                );
-              }}
-            />
+                }}
+              />
+            </div>
+            <ArchiveSection
+              title="Recently merged / closed"
+              id="recently-closed"
+              count={sortedClosed.length}
+              countTestId="closed-count-badge"
+              open={closedOpen}
+              onToggle={() => setClosedOpen((o) => !o)}
+              error={closedError}
+              onRetry={() => fetchData(selectedOrg)}
+            >
+              {sortedClosed.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">
+                  No closed PRs
+                </p>
+              ) : (
+                <>
+                  <ul className="flex flex-col gap-2">
+                    {sortedClosed.slice(0, closedVisible).map((pr) => (
+                      <li key={pr.id}>
+                        <ClosedPrRow pr={pr} now={new Date()} />
+                      </li>
+                    ))}
+                  </ul>
+                  {sortedClosed.length > closedVisible && (
+                    <button
+                      type="button"
+                      onClick={() => setClosedVisible((v) => v + ARCHIVE_PAGE_SIZE)}
+                      className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                    >
+                      Load more (showing {closedVisible} of {sortedClosed.length})
+                    </button>
+                  )}
+                </>
+              )}
+            </ArchiveSection>
           </div>
-        </div>
-        {/* The two look-back sections share a row: both are archives, both
-            start collapsed, and stacking them would push the board into a
-            column of headers long after the work queues have ended. */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          <ArchiveSection
-            title="Recently reviewed"
-            id="recently-reviewed"
-            count={sortedReviewed.length}
-            countTestId="reviewed-count-badge"
-            open={reviewedOpen}
-            onToggle={() => setReviewedOpen((o) => !o)}
-            error={reviewedError}
-            onRetry={() => fetchData(selectedOrg)}
-          >
-            {sortedReviewed.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">
-                No PRs you have reviewed are still open
-              </p>
-            ) : (
-              <>
-                <ul className="flex flex-col gap-2">
-                  {sortedReviewed.slice(0, reviewedVisible).map((pr) => (
-                    <li key={pr.id}>
-                      <ReviewedPrRow pr={pr} now={new Date()} />
-                    </li>
-                  ))}
-                </ul>
-                {sortedReviewed.length > reviewedVisible && (
-                  <button
-                    type="button"
-                    onClick={() => setReviewedVisible((v) => v + ARCHIVE_PAGE_SIZE)}
-                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-                  >
-                    Load more (showing {reviewedVisible} of {sortedReviewed.length})
-                  </button>
-                )}
-              </>
-            )}
-          </ArchiveSection>
-          <ArchiveSection
-            title="Recently merged / closed"
-            id="recently-closed"
-            count={sortedClosed.length}
-            countTestId="closed-count-badge"
-            open={closedOpen}
-            onToggle={() => setClosedOpen((o) => !o)}
-            error={closedError}
-            onRetry={() => fetchData(selectedOrg)}
-          >
-            {sortedClosed.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">
-                No closed PRs
-              </p>
-            ) : (
-              <>
-                <ul className="flex flex-col gap-2">
-                  {sortedClosed.slice(0, closedVisible).map((pr) => (
-                    <li key={pr.id}>
-                      <ClosedPrRow pr={pr} now={new Date()} />
-                    </li>
-                  ))}
-                </ul>
-                {sortedClosed.length > closedVisible && (
-                  <button
-                    type="button"
-                    onClick={() => setClosedVisible((v) => v + ARCHIVE_PAGE_SIZE)}
-                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-                  >
-                    Load more (showing {closedVisible} of {sortedClosed.length})
-                  </button>
-                )}
-              </>
-            )}
-          </ArchiveSection>
         </div>
       </main>
     </div>

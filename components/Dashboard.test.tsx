@@ -3143,3 +3143,39 @@ describe("Dashboard — jumping to a section", () => {
     }
   });
 });
+
+// The board used to be rows: review beside stuck, then the two histories beside
+// each other. A grid row is as tall as its tallest cell, so expanding the stuck
+// list pushed "Recently reviewed" — a different set of PRs entirely — down with
+// it. Columns paired by subject remove the coupling; that they are also the
+// pairing the queries make (others' PRs vs your own) is what makes it right
+// rather than merely convenient.
+describe("Dashboard — column pairing", () => {
+  beforeEach(() => {
+    global.fetch = okFetch();
+  });
+
+  const nearestCommon = (a: HTMLElement, b: HTMLElement) => {
+    for (let n = a.parentElement; n; n = n.parentElement) {
+      if (n.contains(b)) return n;
+    }
+    return null;
+  };
+
+  it.each([
+    ["waiting-on-your-review", "recently-reviewed", "stuck-on-checks"],
+    ["stuck-on-checks", "recently-closed", "waiting-on-your-review"],
+  ])("keeps %s and %s in a column that excludes %s", async (queue, history, other) => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("ready pr")).toBeInTheDocument();
+
+    const column = nearestCommon(
+      document.getElementById(queue)!,
+      document.getElementById(history)!,
+    );
+    expect(column).not.toBeNull();
+    // The column that holds both must not reach across to the other queue —
+    // that containment is what a shared grid row would reintroduce.
+    expect(column!.contains(document.getElementById(other))).toBe(false);
+  });
+});

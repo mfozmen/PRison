@@ -61,9 +61,13 @@ expand to the latest 15 with **Load more** for the rest.
   tile never disagrees with the list beneath it, and they cost no extra API
   calls — it is all data already on the page. *Ready to merge* has no tile: it
   is the one queue you want to be long.
-- **Grouping** — flat, by repository, or by check. Each group is a panel you can
-  fold away by its header, so a repo you are not working in today stops taking
-  up the screen while its name and count stay in view. Next to it in the filter
+- **Everything folds by its header.** Each of the four lists, each repo/check
+  group inside them, and both history sections collapse to a single line that
+  keeps its title and count — so a section you are not working in today stops
+  taking up the screen without ever hiding how much is in it. Folds last the
+  sitting, not forever: a board that quietly omitted your review queue tomorrow
+  morning would be worse than a long one.
+- **Grouping** — flat, by repository, or by check. Next to it in the filter
   bar, a **draft filter**: **All**, **Only drafts** to see just what you have in
   progress, or **No drafts** to get them out of the way.
 - **Auto refresh (opt-in).** Turn it on in Settings and pick how often to check

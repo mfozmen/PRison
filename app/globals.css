@@ -34,10 +34,10 @@
   --fg: #0f172a;
   --muted: #475569;
   --brd: #dce3ec;
-  --accent: #16a34a;
-  --danger: #dc2626;
-  --warning: #b45309;
-  --success: #16a34a;
+  --accent: #117e39;
+  --danger: #d52222;
+  --warning: #b25209;
+  --success: #117e39;
   --hover-brightness: 0.95;
   --fsans: var(--font-fira-sans), ui-sans-serif, system-ui, sans-serif;
   --fmono: var(--font-fira-code), ui-monospace, monospace;

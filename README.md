@@ -109,8 +109,8 @@ expand to the latest 15 with **Load more** for the rest.
   changing. **Default** is the original pair; **Aurora** is built from four
   atmospheric emission wavelengths, **İznik** from the metal oxides the 16th
   century tile workshops fired, and **Cyanotype** from the 1842 blueprint
-  reaction and its negative. Every palette but the original light one is measured
-  against WCAG AA by a test. Pick one in Settings, where each row previews itself
+  reaction and its negative. All eight palettes are measured against WCAG AA by
+  a test, with nothing exempt. Pick one in Settings, where each row previews itself
   — the swatch is stamped with that theme, so it renders in the real palette
   rather than a copy that can drift.
 - Responsive two-column layout, minute-level ages, colour-coded lists, and a

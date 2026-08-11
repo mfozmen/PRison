@@ -8,6 +8,7 @@ function renderSection(props: Partial<Parameters<typeof ArchiveSection>[0]> = {}
   render(
     <ArchiveSection
       title="Recently reviewed"
+      id="recently-reviewed"
       count={7}
       countTestId="reviewed-count"
       open={false}
@@ -23,6 +24,15 @@ function renderSection(props: Partial<Parameters<typeof ArchiveSection>[0]> = {}
 }
 
 describe("ArchiveSection", () => {
+  // The section index links here, and a link that moves the viewport without
+  // the caret leaves the next Tab back at the top of the page.
+  it("is a focusable jump target", () => {
+    renderSection();
+    const section = document.getElementById("recently-reviewed");
+    expect(section).not.toBeNull();
+    expect(section).toHaveAttribute("tabindex", "-1");
+  });
+
   it("shows the title and the fetched count", () => {
     renderSection();
     expect(screen.getByRole("button", { name: /recently reviewed/i })).toBeInTheDocument();

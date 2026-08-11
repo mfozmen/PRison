@@ -877,10 +877,12 @@ describe("Dashboard", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("draft stuck pr")).toBeInTheDocument();
 
+    // The section index repeats these names, so find the tile among the tiles
+    // rather than by a page-wide text match.
     const tile = (label: string) =>
       screen
-        .getByText(label)
-        .closest("[data-testid='summary-tile']") as HTMLElement;
+        .getAllByTestId("summary-tile")
+        .find((t) => t.textContent?.includes(label)) as HTMLElement;
     expect(tile("Stuck on checks")).toHaveTextContent("2");
     expect(tile("Waiting on you")).toHaveTextContent("2");
 
@@ -1621,7 +1623,10 @@ describe("Dashboard", () => {
       // beforeEach okFetch returns [READY_PR] for ready endpoints
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("ready pr")).toBeInTheDocument();
-      expect(screen.getByText("Ready to merge")).toBeInTheDocument();
+      // The section's own header, not the index entry that shares its name.
+      expect(
+        screen.getByRole("button", { name: /^ready to merge/i }),
+      ).toBeInTheDocument();
     });
 
     it("shows the empty message when nothing is ready", async () => {
@@ -1644,11 +1649,14 @@ describe("Dashboard", () => {
 
     it("renders the ready list above the two columns", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      expect(await screen.findByText("Ready to merge")).toBeInTheDocument();
-      const html = document.body.innerHTML;
-      expect(html.indexOf("Ready to merge")).toBeLessThan(
-        html.indexOf("PRs waiting on your review"),
-      );
+      expect(await screen.findByText("ready pr")).toBeInTheDocument();
+      // Compare the sections themselves: the index above names them both, so a
+      // text search of the page would only ever measure the index.
+      const ready = document.getElementById("ready-to-merge")!;
+      const review = document.getElementById("waiting-on-your-review")!;
+      expect(
+        ready.compareDocumentPosition(review) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
     });
 
     it("includes ready-to-merge in a Refresh", async () => {
@@ -3097,10 +3105,9 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
   });
 });
 
-// The tiles and the archives link are the whole of #45's answer to a board that
-// no longer fits on a screen. They are plain anchors, so nothing but a matching
-// id makes them work — and an id lives in a different file from every href that
-// names it.
+// The section index is the whole of the answer to a board that no longer fits
+// on a screen. Plain anchors, so nothing but a matching id makes them work —
+// and an id lives in a different file from every href that names it.
 describe("Dashboard — jumping to a section", () => {
   beforeEach(() => {
     global.fetch = okFetch();
@@ -3108,14 +3115,24 @@ describe("Dashboard — jumping to a section", () => {
 
   it("gives every in-page link a target that exists", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("Ready to merge")).toBeInTheDocument();
+    expect(await screen.findByText("ready pr")).toBeInTheDocument();
 
     const hashLinks = Array.from(
       document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]'),
     );
     // Guard against the list going quietly empty and the loop below passing on
-    // nothing: three tiles plus the archives link.
-    expect(hashLinks).toHaveLength(4);
+    // nothing: one entry per section, and every section is in the index.
+    expect(hashLinks).toHaveLength(6);
+    // Every section, not most of them: the arrangement this replaced reached
+    // four of six, and the two it missed were the ones at the foot of the page.
+    expect(hashLinks.map((a) => a.getAttribute("href"))).toEqual([
+      "#ready-to-merge",
+      "#comments-awaiting-reply",
+      "#waiting-on-your-review",
+      "#stuck-on-checks",
+      "#recently-reviewed",
+      "#recently-closed",
+    ]);
     for (const link of hashLinks) {
       const id = link.getAttribute("href")!.slice(1);
       const target = document.getElementById(id);

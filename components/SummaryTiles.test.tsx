@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { SummaryTiles } from "./SummaryTiles";
 
 const NOW = new Date("2026-08-11T12:00:00Z");
@@ -77,32 +77,10 @@ describe("SummaryTiles", () => {
     expect(screen.queryByText(/ready to merge/i)).not.toBeInTheDocument();
   });
 
-  // The count is the reason you want to go there, so the tile is also the way.
-  it.each([
-    ["Waiting on you", "#waiting-on-your-review"],
-    ["Awaiting your reply", "#comments-awaiting-reply"],
-    ["Stuck on checks", "#stuck-on-checks"],
-  ])("links %s to its section", (label, href) => {
+  // Navigation belongs to the section index. Tiles that were links forced a
+  // fourth control onto the row for the sections they could not cover.
+  it("carries no links", () => {
     render(<SummaryTiles {...props} />);
-    expect(screen.getByRole("link", { name: label })).toHaveAttribute(
-      "href",
-      href,
-    );
-  });
-
-  // The age is a fact about the queue, not a second destination.
-  it("keeps the age out of the link", () => {
-    render(<SummaryTiles {...props} />);
-    expect(within(tile("Waiting on you")).getAllByRole("link")).toHaveLength(1);
-  });
-
-  // The two histories sit at the foot of the board and have no tile of their
-  // own; one anchor at the row they share reaches both.
-  it("offers one link to the archives", () => {
-    render(<SummaryTiles {...props} />);
-    expect(screen.getByRole("link", { name: /archives/i })).toHaveAttribute(
-      "href",
-      "#archives",
-    );
+    expect(screen.queryAllByRole("link")).toHaveLength(0);
   });
 });

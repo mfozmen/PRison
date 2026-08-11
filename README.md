@@ -61,10 +61,11 @@ expand to the latest 15 with **Load more** for the rest.
   rest stay quiet. They count the lists as filtered, so a
   tile never disagrees with the list beneath it, and they cost no extra API
   calls — it is all data already on the page. *Ready to merge* has no tile: it
-  is the one queue you want to be long. Each of the three counts is also the way
-  to its list, and one link beside them reaches the histories at the foot of the
-  board — so nothing is more than a click from the top, however long the page
-  gets. They are plain links: the Back button returns you.
+  is the one queue you want to be long.
+- **A section index** under the tiles: every section, in page order, with its
+  count — so nothing is more than a click from the top however long the board
+  gets, including the two histories at the foot of it. They are plain links, so
+  the Back button is the way back and keyboard focus travels with the view.
 - **Everything folds by its header.** Each of the four lists, each repo/check
   group inside them, and both history sections collapse to a single line that
   keeps its title and count — so a section you are not working in today stops

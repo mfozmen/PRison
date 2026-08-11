@@ -6,6 +6,7 @@ import { sortByAgeAsc, sortByAgeDesc, relativeAge } from "@/lib/prioritize";
 import { suggestStuck, suggestReview, suggestReady, suggestComment, needsReview, stuckGroupKeys, reviewDecisionLabel, MERGE_CONFLICT_LABEL } from "@/lib/suggest";
 import { PrList } from "./PrList";
 import { SummaryTiles } from "./SummaryTiles";
+import { SectionIndex } from "./SectionIndex";
 import { PrRow } from "./PrRow";
 import { ClosedPrRow } from "./ClosedPrRow";
 import { ReviewedPrRow } from "./ReviewedPrRow";
@@ -869,6 +870,21 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           }}
           now={new Date()}
         />
+        {/* Where everything is, in the order it appears — including the two
+            histories at the foot of the board, which is the whole point: they
+            are the sections nothing above could reach. Counts match each
+            section's own header, so the visible lists for the work queues and
+            the fetched totals for the archives, exactly as the headers do. */}
+        <SectionIndex
+          sections={[
+            { id: "ready-to-merge", label: "Ready to merge", count: visibleReady.length },
+            { id: "comments-awaiting-reply", label: "Comments awaiting your reply", count: visibleComments.length },
+            { id: "waiting-on-your-review", label: "PRs waiting on your review", count: visibleReviews.length },
+            { id: "stuck-on-checks", label: "PRs stuck on checks", count: visibleStuck.length },
+            { id: "recently-reviewed", label: "Recently reviewed", count: sortedReviewed.length },
+            { id: "recently-closed", label: "Recently merged / closed", count: sortedClosed.length },
+          ]}
+        />
         {/* Ready-to-merge — full-width section above the two-column review/stuck grid */}
         <div className="flex flex-col gap-4">
           {readyError && (
@@ -884,6 +900,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           )}
           <PrList
             title="Ready to merge"
+            id="ready-to-merge"
             items={visibleReady}
             emptyMessage={
               draftFilter === "only"
@@ -1217,9 +1234,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         {/* The two look-back sections share a row: both are archives, both
             start collapsed, and stacking them would push the board into a
             column of headers long after the work queues have ended. */}
-        <div id="archives" tabIndex={-1} className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start scroll-mt-4 focus:outline-none">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           <ArchiveSection
             title="Recently reviewed"
+            id="recently-reviewed"
             count={sortedReviewed.length}
             countTestId="reviewed-count-badge"
             open={reviewedOpen}
@@ -1254,6 +1272,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           </ArchiveSection>
           <ArchiveSection
             title="Recently merged / closed"
+            id="recently-closed"
             count={sortedClosed.length}
             countTestId="closed-count-badge"
             open={closedOpen}

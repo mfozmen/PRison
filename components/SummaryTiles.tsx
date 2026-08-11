@@ -34,77 +34,51 @@ export function SummaryTiles({
   // you. Stuck-on-checks is your own PR waiting on a machine, so it stays
   // neutral — colouring everything would colour nothing.
   //
+  // Navigation lives in the section index, not here. These three tiles were
+  // links for a while, which forced a fourth control onto the row for the two
+  // sections they could not cover: the tiles are a warning row, so "Ready to
+  // merge" is deliberately absent and the histories never belonged. A row that
+  // cannot list every section is not an index.
+  //
   // Each tile carries its own age rather than there being one tile for the
   // worst age across all three. That tile existed and said "LONGEST WAIT 2d",
   // which never named the queue it was reading, so which list it described
   // changed with the data and the reader could not tell. An age belongs to the
   // queue it came from.
   const tiles = [
-    {
-      label: "Waiting on you",
-      queue: waiting,
-      tone: "text-danger",
-      href: "#waiting-on-your-review",
-    },
-    {
-      label: "Awaiting your reply",
-      queue: replies,
-      tone: "text-warning",
-      href: "#comments-awaiting-reply",
-    },
-    {
-      label: "Stuck on checks",
-      queue: stuck,
-      tone: "text-foreground",
-      href: "#stuck-on-checks",
-    },
+    { label: "Waiting on you", queue: waiting, tone: "text-danger" },
+    { label: "Awaiting your reply", queue: replies, tone: "text-warning" },
+    { label: "Stuck on checks", queue: stuck, tone: "text-foreground" },
   ];
 
   return (
-    <div className="flex flex-col gap-2">
-      <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {tiles.map(({ label, queue, tone, href }) => (
-          <div
-            key={label}
-            data-testid="summary-tile"
-            className="relative flex flex-col gap-1 rounded-lg border border-border bg-surface px-4 py-3 transition-colors hover:border-accent focus-within:border-accent"
-          >
-            <dt className="text-xs font-medium tracking-wide text-muted uppercase">
-              <a
-                href={href}
-                className="rounded-sm after:absolute after:inset-0 after:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                {label}
-              </a>
-            </dt>
-            {/* Zeroes render like every other value: a row that changes width as
+    <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {tiles.map(({ label, queue, tone }) => (
+        <div
+          key={label}
+          data-testid="summary-tile"
+          className="flex flex-col gap-1 rounded-lg border border-border bg-surface px-4 py-3"
+        >
+          <dt className="text-xs font-medium tracking-wide text-muted uppercase">
+            {label}
+          </dt>
+          {/* Zeroes render like every other value: a row that changes width as
                 counts drop is harder to read at a glance than a stable one, and
                 "nothing waiting on you" is worth seeing. */}
-            <dd
-              className={`flex items-baseline gap-2 font-mono text-2xl leading-none font-semibold tabular-nums ${tone}`}
-            >
-              {queue.count}
-              {/* An empty queue has no oldest, and "oldest —" would be noise
+          <dd
+            className={`flex items-baseline gap-2 font-mono text-2xl leading-none font-semibold tabular-nums ${tone}`}
+          >
+            {queue.count}
+            {/* An empty queue has no oldest, and "oldest —" would be noise
                   where the 0 above has already said everything. */}
-              {queue.oldest && (
-                <span className="font-sans text-xs font-normal text-muted">
-                  oldest {relativeAge(queue.oldest, now)}
-                </span>
-              )}
-            </dd>
-          </div>
-        ))}
-      </dl>
-      {/* One control, not a second row of chrome: both histories share a row at
-          the foot of the board, so one anchor at that row reaches both. They
-          are the sections the tiles cannot cover — Ready to merge is already at
-          the top, and neither archive is a queue worth a tile of its own. */}
-      <a
-        href="#archives"
-        className="self-end rounded-sm text-xs font-medium text-muted transition-colors hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-      >
-        Jump to archives ↓
-      </a>
-    </div>
+            {queue.oldest && (
+              <span className="font-sans text-xs font-normal text-muted">
+                oldest {relativeAge(queue.oldest, now)}
+              </span>
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }

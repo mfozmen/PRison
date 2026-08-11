@@ -82,6 +82,19 @@ describe("scanSource", () => {
     ]);
   });
 
+  // release-it reads a bare "#15803D" in a commit body as an issue reference and
+  // writes ".../issues/15803D" into the changelog. Nothing was leaked — a colour
+  // was — and the guard has to survive its own release notes.
+  it("does not read a hex colour in an issue URL as a ticket", () => {
+    expect(
+      scanSource("closes [#15803D](https://github.com/acme/repo/issues/15803D)"),
+    ).toEqual([]);
+    // Still caught when the digits actually end the number.
+    expect(scanSource("https://github.com/acme/repo/issues/15803")).toEqual([
+      "ticket:15803",
+    ]);
+  });
+
   it("catches GitHub-minted anchor ids pasted without their URL", () => {
     expect(scanSource("resolved via issuecomment-9998887776")).toEqual([
       "ticket:issuecomment-9998887776",

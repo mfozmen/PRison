@@ -113,7 +113,7 @@ expand to the latest 15 with **Load more** for the rest.
   against WCAG AA by a test. Pick one in Settings, where each row previews itself
   — the swatch is stamped with that theme, so it renders in the real palette
   rather than a copy that can drift.
-- Responsive two-column layout, minute-level ages, color-coded lists, and a
+- Responsive two-column layout, minute-level ages, colour-coded lists, and a
   Refresh button.
 - **Personal account + per-org filter** in the top-right switcher.
 - **Your own access** — sign in with the GitHub CLI or a token; no third-party

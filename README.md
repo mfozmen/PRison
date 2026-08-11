@@ -31,7 +31,7 @@ access. Four lists, oldest first, plus two history sections:
 Both history sections sit side by side, collapsed by default with a count, and
 expand to the latest 15 with **Load more** for the rest.
 
-![The PRison dashboard in dark mode, showing the filter bar's grouping and draft filters above the four PR lists — ready to merge, comments awaiting your reply, PRs waiting on your review, and PRs stuck on checks — with the recently reviewed and recently merged / closed histories collapsed at the bottom](docs/screenshot.png)
+![The PRison dashboard in dark mode. At the top, the filter bar's grouping and draft filters; below it a row of four summary tiles (waiting on you, awaiting your reply, stuck on checks, longest wait); then the four PR lists — ready to merge, comments awaiting your reply, PRs waiting on your review, and PRs stuck on checks — with the recently reviewed and recently merged / closed histories collapsed at the bottom](docs/screenshot.png)
 
 ### Features
 
@@ -54,6 +54,13 @@ expand to the latest 15 with **Load more** for the rest.
   badged **Merged** or **Closed** with how long ago it ended — and next to them
   the PRs you reviewed, so a discussion you left open is one click away instead
   of lost in GitHub's notification list.
+- **Summary tiles** above the lists: how many PRs wait on your review, how many
+  comments wait on your reply, how many of yours are stuck on checks, and the
+  longest anything has been waiting. The two where someone else is held up by
+  you are coloured; the rest stay quiet. They count the lists as filtered, so a
+  tile never disagrees with the list beneath it, and they cost no extra API
+  calls — it is all data already on the page. *Ready to merge* has no tile: it
+  is the one queue you want to be long.
 - **Grouping** — flat, by repository, or by check. Each group is a panel you can
   fold away by its header, so a repo you are not working in today stops taking
   up the screen while its name and count stay in view. Next to it in the filter

@@ -834,6 +834,24 @@ describe("Dashboard", () => {
     );
   });
 
+  // The tiles count the same visible lists the sections render, so a filter can
+  // never leave a tile disagreeing with the list right under it — the one way a
+  // summary row is worse than no summary row at all.
+  it("counts only what the draft filter leaves visible", async () => {
+    global.fetch = draftsAndNot();
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("draft stuck pr")).toBeInTheDocument();
+
+    const tile = (label: string) =>
+      screen.getByText(label).parentElement as HTMLElement;
+    expect(tile("Stuck on checks")).toHaveTextContent("2");
+    expect(tile("Waiting on you")).toHaveTextContent("2");
+
+    fireEvent.click(draftButton(/no drafts/i));
+    await waitFor(() => expect(tile("Stuck on checks")).toHaveTextContent("1"));
+    expect(tile("Waiting on you")).toHaveTextContent("1");
+  });
+
   it("persists the draft filter to localStorage", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();

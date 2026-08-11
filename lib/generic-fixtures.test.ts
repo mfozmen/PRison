@@ -166,7 +166,19 @@ describe("scanSource", () => {
   });
 });
 
-describe("scanCommitMessages", () => {
+// Every test here shells out to real git — `git init`, three `git config`s and
+// a commit each, plus a `clone --depth 1` in the shallow one, so ten-odd
+// synchronous subprocesses per test. That does not fit vitest's 5s default on a
+// loaded machine: measured at ~600ms idle, 1.5-2.5s with a second suite running
+// alongside, and observed timing out at 5.8s and 6.7s on a transiently slow box
+// (one failure in twelve full-suite runs). CI runners are noisier than a
+// laptop, so this was a flake waiting to be blamed on whatever PR happened to
+// be open. The first test also scans this repository's entire history, which
+// only ever grows.
+//
+// The timeout is a ceiling, not a delay: a passing run still finishes in under
+// a second and pays nothing for this.
+describe("scanCommitMessages", { timeout: 30_000 }, () => {
   // The escaped name never appeared in a blob, so the file scan was green while
   // the identifier sat in two public commit messages — and release-it was about to
   // copy one into CHANGELOG.md.

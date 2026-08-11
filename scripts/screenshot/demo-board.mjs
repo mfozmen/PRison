@@ -24,7 +24,9 @@ const stuck = [
     failingChecks: 1, pendingChecks: 0, failing: ["integration-tests"], pending: [],
     checkNames: ["build", "lint", "integration-tests"],
     isDraft: false, blocked: true, readyViaBlocked: false,
-    reviewDecision: "APPROVED", mergeState: "BLOCKED", stuckSince: ago(30),
+    // DIRTY alongside a red check, which is the pair the board used to get
+    // wrong: the conflict is the harder blocker and was the one being hidden.
+    reviewDecision: "APPROVED", mergeState: "DIRTY", stuckSince: ago(30),
   },
   {
     id: "PR_s2", title: "Cache the org lookup for the duration of a request",

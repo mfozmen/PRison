@@ -591,8 +591,11 @@ describe("PrList — collapsing a group", () => {
     fireEvent.click(toggle("acme/alpha"));
     expect(screen.getAllByTestId("row")).toHaveLength(1);
 
+    // Group headers specifically — the section's own fold toggle is a button
+    // too, and counting every button would make this assertion about the
+    // wrong thing.
     rerender(listOf([{ name: "three", repo: "acme/beta" }]));
-    expect(screen.queryAllByRole("button")).toHaveLength(1);
+    expect(screen.queryAllByTestId("group-header")).toHaveLength(1);
 
     rerender(listOf(items));
     expect(screen.getAllByTestId("row")).toHaveLength(3);
@@ -624,5 +627,101 @@ describe("PrList — collapsing a group", () => {
 
     rerender(listOf(items));
     expect(toggle("acme/alpha")).toHaveAttribute("aria-expanded", "true");
+  });
+});
+
+describe("PrList — collapsing the section", () => {
+  const items = ["alpha", "beta", "gamma"];
+  const renderList = (props: Record<string, unknown> = {}) =>
+    render(
+      <PrList
+        title="Ready to merge"
+        items={items}
+        emptyMessage="Nothing here."
+        renderRow={(item) => <div data-testid="row">{item}</div>}
+        {...props}
+      />,
+    );
+  const header = () => screen.getByRole("button", { name: /ready to merge/i });
+
+  it("starts open, so a section never hides work by default", () => {
+    renderList();
+    expect(header()).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByTestId("row")).toHaveLength(3);
+  });
+
+  it("folds the rows away and brings them back", () => {
+    renderList();
+    fireEvent.click(header());
+    expect(header()).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryAllByTestId("row")).toHaveLength(0);
+
+    fireEvent.click(header());
+    expect(screen.getAllByTestId("row")).toHaveLength(3);
+  });
+
+  // The whole reason folding a work queue is safe: what you folded still says
+  // how much is in it.
+  it("keeps the title and the count on screen while folded", () => {
+    renderList();
+    fireEvent.click(header());
+    expect(screen.getByText("Ready to merge")).toBeInTheDocument();
+    expect(screen.getByTestId("count-badge")).toHaveTextContent("3");
+  });
+
+  it("folds the empty message away too, so an empty section costs one line", () => {
+    renderList({ items: [] });
+    expect(screen.getByText("Nothing here.")).toBeInTheDocument();
+    fireEvent.click(header());
+    expect(screen.queryByText("Nothing here.")).not.toBeInTheDocument();
+  });
+
+  it("folds a grouped section whole, groups and all", () => {
+    renderList({
+      items: [
+        { name: "one", repo: "acme/alpha" },
+        { name: "two", repo: "acme/beta" },
+      ],
+      renderRow: (item: { name: string }) => (
+        <div data-testid="row">{item.name}</div>
+      ),
+      groupBy: (item: { repo: string }) => item.repo,
+    });
+    expect(screen.getAllByTestId("group-header")).toHaveLength(2);
+    fireEvent.click(header());
+    expect(screen.queryAllByTestId("group-header")).toHaveLength(0);
+    expect(screen.queryAllByTestId("row")).toHaveLength(0);
+  });
+
+  it("points aria-controls at the body it actually governs", () => {
+    renderList();
+    const id = header().getAttribute("aria-controls");
+    expect(id).toBeTruthy();
+    expect(document.getElementById(id!)).toContainElement(
+      screen.getAllByTestId("row")[0],
+    );
+  });
+
+  // Two sections on one page must not share a fold.
+  it("gives each section its own fold", () => {
+    render(
+      <>
+        <PrList
+          title="Ready to merge"
+          items={items}
+          emptyMessage="Nothing here."
+          renderRow={(item) => <div data-testid="ready-row">{item}</div>}
+        />
+        <PrList
+          title="Stuck on checks"
+          items={items}
+          emptyMessage="Nothing here."
+          renderRow={(item) => <div data-testid="stuck-row">{item}</div>}
+        />
+      </>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /ready to merge/i }));
+    expect(screen.queryAllByTestId("ready-row")).toHaveLength(0);
+    expect(screen.getAllByTestId("stuck-row")).toHaveLength(3);
   });
 });

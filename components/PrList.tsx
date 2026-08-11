@@ -1,4 +1,5 @@
 import React from "react";
+import { DisclosureHeader } from "./DisclosureHeader";
 
 export interface PrListProps<T> {
   title: string;
@@ -30,6 +31,20 @@ export function PrList<T>({
   groupHref,
   countAccent,
 }: PrListProps<T>) {
+  // Open, and component state only — never localStorage.
+  //
+  // These four sections are the product, so a fold that outlived the sitting
+  // would be the one bug this dashboard cannot afford: you would open it in the
+  // morning to a board silently missing the five PRs waiting on your review,
+  // with no memory that you were the one who hid them. Folding is a "not right
+  // now" gesture. It survives a refresh anyway, since a poll re-renders rather
+  // than remounts, and that is the span worth keeping.
+  //
+  // The count stays on the header while folded, so nothing about "there are 6
+  // of these" is ever hidden — only the rows are.
+  const [open, setOpen] = React.useState(true);
+  const bodyId = React.useId();
+
   // Build ordered groups when groupBy or groupKeys is provided. groupKeys takes
   // precedence and supports one-to-many placement (an item may appear in
   // multiple groups). Each entry retains the item's original index so default
@@ -71,44 +86,51 @@ export function PrList<T>({
 
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
-          {title}
-        </h2>
-        <span
-          data-testid="count-badge"
-          className={
-            countAccent && items.length > 0 ? countAccentClasses[countAccent] : neutralBadge
-          }
-        >
-          {items.length}
-        </span>
-      </div>
-      {items.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">
-          {emptyMessage}
-        </p>
-      ) : (groupBy || groupKeys) ? (
-        <div className="flex flex-col">
-          {groups.map(({ key, entries }) => (
-            <PrGroup
-              key={key}
-              groupKey={key}
-              count={entries.length}
-              href={groupHref?.(key)}
-            >
-              {entries.map(({ item, index }) => (
-                <li key={keyExtractor(item, index)}>{renderRow(item)}</li>
+      <DisclosureHeader
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+        title={title}
+        controls={bodyId}
+        badge={
+          <span
+            data-testid="count-badge"
+            className={
+              countAccent && items.length > 0 ? countAccentClasses[countAccent] : neutralBadge
+            }
+          >
+            {items.length}
+          </span>
+        }
+      />
+      {open && (
+        <div id={bodyId} className="flex flex-col gap-3">
+          {items.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">
+              {emptyMessage}
+            </p>
+          ) : (groupBy || groupKeys) ? (
+            <div className="flex flex-col">
+              {groups.map(({ key, entries }) => (
+                <PrGroup
+                  key={key}
+                  groupKey={key}
+                  count={entries.length}
+                  href={groupHref?.(key)}
+                >
+                  {entries.map(({ item, index }) => (
+                    <li key={keyExtractor(item, index)}>{renderRow(item)}</li>
+                  ))}
+                </PrGroup>
               ))}
-            </PrGroup>
-          ))}
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {items.map((item, i) => (
+                <li key={keyExtractor(item, i)}>{renderRow(item)}</li>
+              ))}
+            </ul>
+          )}
         </div>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {items.map((item, i) => (
-            <li key={keyExtractor(item, i)}>{renderRow(item)}</li>
-          ))}
-        </ul>
       )}
     </section>
   );

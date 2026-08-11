@@ -248,7 +248,13 @@ const TICKET_PATTERNS: RegExp[] = [
   // "some-service#90210", and — colours already stripped — "Fixes #90210" too.
   /#(\d{4,})\b/g,
   // ".../pull/90211#discussion_r…" — here the number precedes the "#".
-  /\/(?:pull|issues)\/(\d{4,})/g,
+  //
+  // The trailing (?!\w) is what keeps a hex colour out: release-it turns a bare
+  // "#15803D" in a commit body into ".../issues/15803D" in the changelog, and
+  // without it the digits before the letter read as issue 15803. An issue number
+  // is digits and then something that is not a word character; digits glued to a
+  // letter are not a reference to anything.
+  /\/(?:pull|issues)\/(\d{4,})(?!\w)/g,
   // GitHub mints these; they are always real, and often pasted with the URL
   // trimmed off, leaving only the anchor fragment.
   /(discussion_r\d{6,}|issuecomment-\d{6,}|pullrequestreview-\d{6,})/g,

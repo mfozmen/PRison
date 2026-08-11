@@ -3,6 +3,8 @@ import { DisclosureHeader } from "./DisclosureHeader";
 
 export interface ArchiveSectionProps {
   title: string;
+  /** Anchor target for the section index. */
+  id: string;
   count: number;
   countTestId: string;
   open: boolean;
@@ -19,6 +21,7 @@ export interface ArchiveSectionProps {
 // not "how much is on screen".
 export function ArchiveSection({
   title,
+  id,
   count,
   countTestId,
   open,
@@ -28,7 +31,14 @@ export function ArchiveSection({
   children,
 }: ArchiveSectionProps) {
   return (
-    <div className="flex flex-col gap-4">
+    // tabIndex is what makes this a jump target rather than a scroll position:
+    // the browser moves the caret here too, so the next Tab continues inside the
+    // section instead of at the top of the page.
+    <section
+      id={id}
+      tabIndex={-1}
+      className="flex scroll-mt-4 flex-col gap-4 focus:outline-none"
+    >
       <DisclosureHeader
         open={open}
         onToggle={onToggle}
@@ -56,6 +66,6 @@ export function ArchiveSection({
         </div>
       )}
       {open && children}
-    </div>
+    </section>
   );
 }

@@ -55,9 +55,10 @@ expand to the latest 15 with **Load more** for the rest.
   the PRs you reviewed, so a discussion you left open is one click away instead
   of lost in GitHub's notification list.
 - **Summary tiles** above the lists: how many PRs wait on your review, how many
-  comments wait on your reply, how many of yours are stuck on checks, and the
-  longest anything has been waiting. The two where someone else is held up by
-  you are coloured; the rest stay quiet. They count the lists as filtered, so a
+  comments wait on your reply, how many of yours are stuck on checks — each with
+  how long that queue's oldest one has been sitting, so every age says which list
+  it belongs to. The two where someone else is held up by you are coloured; the
+  rest stay quiet. They count the lists as filtered, so a
   tile never disagrees with the list beneath it, and they cost no extra API
   calls — it is all data already on the page. *Ready to merge* has no tile: it
   is the one queue you want to be long. Each of the three counts is also the way

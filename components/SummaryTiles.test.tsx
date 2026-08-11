@@ -1,41 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import { SummaryTiles, oldestOf } from "./SummaryTiles";
+import { SummaryTiles } from "./SummaryTiles";
 
 const NOW = new Date("2026-08-11T12:00:00Z");
-// The linked tiles wrap their label in an anchor, so walk up to the tile
-// itself rather than assuming the label's parent is it.
+// The tiles wrap their label in an anchor, so walk up to the tile itself
+// rather than assuming the label's parent is it.
 const tile = (label: string) =>
   screen.getByText(label).closest("[data-testid='summary-tile']") as HTMLElement;
 
-describe("oldestOf", () => {
-  it("returns the earliest of the timestamps", () => {
-    expect(
-      oldestOf(
-        "2026-08-11T09:00:00Z",
-        "2026-08-09T09:00:00Z",
-        "2026-08-10T09:00:00Z",
-      ),
-    ).toBe("2026-08-09T09:00:00Z");
-  });
-
-  it("ignores the lists that have no head", () => {
-    expect(oldestOf(undefined, "2026-08-10T09:00:00Z", undefined)).toBe(
-      "2026-08-10T09:00:00Z",
-    );
-  });
-
-  it("returns null when every list is empty", () => {
-    expect(oldestOf(undefined, undefined, undefined)).toBeNull();
-  });
-});
-
 describe("SummaryTiles", () => {
   const props = {
-    waiting: 3,
-    stuck: 5,
-    replies: 2,
-    oldest: "2026-08-09T12:00:00Z",
+    waiting: { count: 3, oldest: "2026-08-09T12:00:00Z" },
+    stuck: { count: 5, oldest: "2026-08-05T12:00:00Z" },
+    replies: { count: 2, oldest: "2026-08-11T08:00:00Z" },
     now: NOW,
   };
 
@@ -46,25 +23,36 @@ describe("SummaryTiles", () => {
     expect(tile("Stuck on checks")).toHaveTextContent("5");
   });
 
-  it("shows the longest wait as an age rather than a timestamp", () => {
+  // The age used to live in a tile of its own that never named the queue it was
+  // reading. Each tile now answers both questions about the same list.
+  it("shows each queue's own oldest wait beside its count", () => {
     render(<SummaryTiles {...props} />);
-    expect(tile("Longest wait")).toHaveTextContent("2d");
+    expect(tile("Waiting on you")).toHaveTextContent("oldest 2d");
+    expect(tile("Awaiting your reply")).toHaveTextContent("oldest 4h");
+    expect(tile("Stuck on checks")).toHaveTextContent("oldest 6d");
+  });
+
+  // There is no fourth queue, and inventing one to fill a grid cell is how the
+  // tile this replaces came to exist.
+  it("has three tiles and no roaming longest-wait tile", () => {
+    render(<SummaryTiles {...props} />);
+    expect(screen.getAllByTestId("summary-tile")).toHaveLength(3);
+    expect(screen.queryByText(/longest wait/i)).not.toBeInTheDocument();
   });
 
   // A zero is information: how many are waiting on you is worth reading when
   // the answer is none, and a row that changes width as counts drop is harder
   // to scan than a stable one.
   it("renders a zero rather than dropping the tile", () => {
-    render(<SummaryTiles {...props} waiting={0} />);
+    render(<SummaryTiles {...props} waiting={{ count: 0 }} />);
     expect(tile("Waiting on you")).toHaveTextContent("0");
-    expect(screen.getAllByTestId("summary-tile")).toHaveLength(4);
+    expect(screen.getAllByTestId("summary-tile")).toHaveLength(3);
   });
 
-  // No queue is not a wait of zero, so it must not read as one.
-  it("shows a dash, not a zero age, when nothing is waiting", () => {
-    render(<SummaryTiles {...props} oldest={null} />);
-    expect(tile("Longest wait")).toHaveTextContent("—");
-    expect(tile("Longest wait")).not.toHaveTextContent("0m");
+  // An empty queue has no oldest, and the 0 has already said so.
+  it("omits the age when the queue is empty", () => {
+    render(<SummaryTiles {...props} waiting={{ count: 0 }} />);
+    expect(tile("Waiting on you")).not.toHaveTextContent(/oldest/);
   });
 
   // Colouring every tile would colour none of them. Only the two where someone
@@ -78,9 +66,6 @@ describe("SummaryTiles", () => {
       "text-warning",
     );
     expect(tile("Stuck on checks").querySelector("dd")).toHaveClass(
-      "text-foreground",
-    );
-    expect(tile("Longest wait").querySelector("dd")).toHaveClass(
       "text-foreground",
     );
   });
@@ -105,13 +90,10 @@ describe("SummaryTiles", () => {
     );
   });
 
-  // It describes whichever queue is worst, so where it would land depends on
-  // the data — a link nobody can predict is worse than no link.
-  it("leaves the longest-wait tile inert", () => {
+  // The age is a fact about the queue, not a second destination.
+  it("keeps the age out of the link", () => {
     render(<SummaryTiles {...props} />);
-    expect(
-      within(tile("Longest wait")).queryByRole("link"),
-    ).not.toBeInTheDocument();
+    expect(within(tile("Waiting on you")).getAllByRole("link")).toHaveLength(1);
   });
 
   // The two histories sit at the foot of the board and have no tile of their

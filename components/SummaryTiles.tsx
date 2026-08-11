@@ -1,16 +1,10 @@
 import { relativeAge } from "@/lib/prioritize";
 
-/**
- * The earliest of the timestamps given, or null when none are present.
- *
- * Compares the ISO strings rather than parsing them: GitHub returns one format
- * with one zone, so lexical order is chronological order, and the codebase
- * already leans on that elsewhere.
- */
-export function oldestOf(...times: Array<string | undefined>): string | null {
-  const present = times.filter((t): t is string => Boolean(t));
-  if (present.length === 0) return null;
-  return present.reduce((a, b) => (a < b ? a : b));
+/** A queue's two facts: how many are in it, and how long the worst one has sat. */
+export interface QueueSummary {
+  count: number;
+  /** Head of the list, which is its oldest — every list is sorted oldest-first. */
+  oldest?: string;
 }
 
 /**
@@ -29,82 +23,74 @@ export function SummaryTiles({
   waiting,
   stuck,
   replies,
-  oldest,
   now,
 }: {
-  waiting: number;
-  stuck: number;
-  replies: number;
-  oldest: string | null;
+  waiting: QueueSummary;
+  stuck: QueueSummary;
+  replies: QueueSummary;
   now: Date;
 }) {
   // Danger and warning go to the two tiles where somebody else is held up by
-  // you. Stuck-on-checks is your own PR waiting on a machine, and the longest
-  // wait is a fact about the others rather than a fourth queue, so both stay
+  // you. Stuck-on-checks is your own PR waiting on a machine, so it stays
   // neutral — colouring everything would colour nothing.
   //
-  // Three of the four tiles name a list further down the page, so each is also
-  // the way to it — the count you just read is the reason you want to go. The
-  // link is the label, stretched over the whole tile by the ::after below, so
-  // the target is the tile rather than a line of 11px text. "Longest wait"
-  // stays inert: it describes whichever of the three is worst, and a link that
-  // lands somewhere different depending on the data is a worse link than none.
+  // Each tile carries its own age rather than there being one tile for the
+  // worst age across all three. That tile existed and said "LONGEST WAIT 2d",
+  // which never named the queue it was reading, so which list it described
+  // changed with the data and the reader could not tell. An age belongs to the
+  // queue it came from.
   const tiles = [
     {
       label: "Waiting on you",
-      value: waiting,
+      queue: waiting,
       tone: "text-danger",
       href: "#waiting-on-your-review",
     },
     {
       label: "Awaiting your reply",
-      value: replies,
+      queue: replies,
       tone: "text-warning",
       href: "#comments-awaiting-reply",
     },
     {
       label: "Stuck on checks",
-      value: stuck,
+      queue: stuck,
       tone: "text-foreground",
       href: "#stuck-on-checks",
-    },
-    {
-      label: "Longest wait",
-      // An em dash, not "0" — no queue is not a wait of zero.
-      value: oldest ? relativeAge(oldest, now) : "—",
-      tone: "text-foreground",
-      href: undefined,
     },
   ];
 
   return (
     <div className="flex flex-col gap-2">
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {tiles.map(({ label, value, tone, href }) => (
+      <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {tiles.map(({ label, queue, tone, href }) => (
           <div
             key={label}
             data-testid="summary-tile"
-            className={`relative flex flex-col gap-1 rounded-lg border border-border bg-surface px-4 py-3 ${href ? "transition-colors hover:border-accent focus-within:border-accent" : ""}`}
+            className="relative flex flex-col gap-1 rounded-lg border border-border bg-surface px-4 py-3 transition-colors hover:border-accent focus-within:border-accent"
           >
             <dt className="text-xs font-medium tracking-wide text-muted uppercase">
-              {href ? (
-                <a
-                  href={href}
-                  className="rounded-sm after:absolute after:inset-0 after:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  {label}
-                </a>
-              ) : (
-                label
-              )}
+              <a
+                href={href}
+                className="rounded-sm after:absolute after:inset-0 after:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                {label}
+              </a>
             </dt>
             {/* Zeroes render like every other value: a row that changes width as
-              counts drop is harder to read at a glance than a stable one, and
-              "nothing waiting on you" is worth seeing. */}
+                counts drop is harder to read at a glance than a stable one, and
+                "nothing waiting on you" is worth seeing. */}
             <dd
-              className={`font-mono text-2xl leading-none font-semibold tabular-nums ${tone}`}
+              className={`flex items-baseline gap-2 font-mono text-2xl leading-none font-semibold tabular-nums ${tone}`}
             >
-              {value}
+              {queue.count}
+              {/* An empty queue has no oldest, and "oldest —" would be noise
+                  where the 0 above has already said everything. */}
+              {queue.oldest && (
+                <span className="font-sans text-xs font-normal text-muted">
+                  oldest {relativeAge(queue.oldest, now)}
+                </span>
+              )}
             </dd>
           </div>
         ))}

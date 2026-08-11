@@ -5,7 +5,7 @@ import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr, Reviewe
 import { sortByAgeAsc, sortByAgeDesc, relativeAge } from "@/lib/prioritize";
 import { suggestStuck, suggestReview, suggestReady, suggestComment, needsReview, stuckGroupKeys, reviewDecisionLabel } from "@/lib/suggest";
 import { PrList } from "./PrList";
-import { SummaryTiles, oldestOf } from "./SummaryTiles";
+import { SummaryTiles } from "./SummaryTiles";
 import { PrRow } from "./PrRow";
 import { ClosedPrRow } from "./ClosedPrRow";
 import { ReviewedPrRow } from "./ReviewedPrRow";
@@ -853,16 +853,20 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         </div>
         {/* Counts of the visible lists, so a tile can never disagree with the
             list under it. Each list is sorted oldest-first, so its head is its
-            longest wait and no scan is needed to find the worst of the three. */}
+            own longest wait — no scan, and no age without a queue to own it. */}
         <SummaryTiles
-          waiting={visibleReviews.length}
-          stuck={visibleStuck.length}
-          replies={visibleComments.length}
-          oldest={oldestOf(
-            visibleReviews[0]?.requestedAt,
-            visibleStuck[0]?.stuckSince,
-            visibleComments[0]?.commentedAt,
-          )}
+          waiting={{
+            count: visibleReviews.length,
+            oldest: visibleReviews[0]?.requestedAt,
+          }}
+          stuck={{
+            count: visibleStuck.length,
+            oldest: visibleStuck[0]?.stuckSince,
+          }}
+          replies={{
+            count: visibleComments.length,
+            oldest: visibleComments[0]?.commentedAt,
+          }}
           now={new Date()}
         />
         {/* Ready-to-merge — full-width section above the two-column review/stuck grid */}

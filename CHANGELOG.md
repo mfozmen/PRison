@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.13.0](https://github.com/mfozmen/PRison/compare/v1.12.0...v1.13.0) (2026-08-11)
+
+### Features
+
+* fold the four work sections by their headers ([#49](https://github.com/mfozmen/PRison/issues/49)) ([0d187ca](https://github.com/mfozmen/PRison/commit/0d187cac620324caf2aa8c0fc3d3a82cab3f561f)), closes [#37](https://github.com/mfozmen/PRison/issues/37) [#47](https://github.com/mfozmen/PRison/issues/47)
+* reach every section from the top of the board ([#51](https://github.com/mfozmen/PRison/issues/51)) ([4b71d19](https://github.com/mfozmen/PRison/commit/4b71d191c4113528da85bed7d677e869fb3f934e))
+* summary tiles above the lists ([#46](https://github.com/mfozmen/PRison/issues/46)) ([0da1325](https://github.com/mfozmen/PRison/commit/0da1325d035388cbfe50ec58a48437a748c913e9)), closes [#38](https://github.com/mfozmen/PRison/issues/38)
+
+### Bug Fixes
+
+* clear WCAG AA on the default light theme ([#44](https://github.com/mfozmen/PRison/issues/44)) ([4fdce4c](https://github.com/mfozmen/PRison/commit/4fdce4c981f3646f2f526e748acae5aeeb24bf84)), closes [#15803D](https://github.com/mfozmen/PRison/issues/15803D) [#16A34A](https://github.com/mfozmen/PRison/issues/16A34A) [#117E39](https://github.com/mfozmen/PRison/issues/117E39) [#DC2626](https://github.com/mfozmen/PRison/issues/DC2626) [#D52222](https://github.com/mfozmen/PRison/issues/D52222) [#B45309](https://github.com/mfozmen/PRison/issues/B45309) [#B25209](https://github.com/mfozmen/PRison/issues/B25209) [#40](https://github.com/mfozmen/PRison/issues/40)
+
 ## [1.12.0](https://github.com/mfozmen/PRison/compare/v1.11.0...v1.12.0) (2026-08-10)
 
 ### Features

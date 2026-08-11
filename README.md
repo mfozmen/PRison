@@ -103,8 +103,18 @@ expand to the latest 15 with **Load more** for the rest.
   Retry yourself. When GitHub asks for longer than a refresh should take — or
   doesn't say at all — PRison steps aside and shows the banner rather than
   guessing, since coming back early only extends the block.
-- **Light / dark theme**, responsive two-column layout, minute-level ages,
-  color-coded lists, and a Refresh button.
+- **Four themes, each with a light and a dark ground.** A theme owns its accent,
+  its three status colours and its typefaces; the ground underneath is a separate
+  choice, so switching it reads as the light changing rather than the theme
+  changing. **Default** is the original pair; **Aurora** is built from four
+  atmospheric emission wavelengths, **İznik** from the metal oxides the 16th
+  century tile workshops fired, and **Cyanotype** from the 1842 blueprint
+  reaction and its negative. Every palette but the original light one is measured
+  against WCAG AA by a test. Pick one in Settings, where each row previews itself
+  — the swatch is stamped with that theme, so it renders in the real palette
+  rather than a copy that can drift.
+- Responsive two-column layout, minute-level ages, colour-coded lists, and a
+  Refresh button.
 - **Personal account + per-org filter** in the top-right switcher.
 - **Your own access** — sign in with the GitHub CLI or a token; no third-party
   app to approve. Every row deep-links to GitHub; PRison never writes anything.
@@ -178,14 +188,16 @@ If `gh` isn't installed or signed in, the app falls back to a paste-a-token form
 Sign in with the GitHub CLI or paste a token. In the top-right: the **switcher**
 scopes to All / your personal account / a single org; the **bell** opens the
 **activity feed** and marks it read; the **sliders icon** opens
-**Settings**, whose menu has four sections — **Comments** (show bot comments,
+**Settings**, whose menu has five sections — **Comments** (show bot comments,
 hide comments you reacted to), **Auto refresh** (on/off, how often to check, and
 the notification permission), **Tracked checks** (name the required checks to
-see as "Awaiting"), and **About** (version, repository, license, and
+see as "Awaiting"), **Appearance** (pick one of the four themes, each previewing
+its own colours and typeface), and **About** (version, repository, license, and
 **Check for updates** — asked for, never automatic, and it links straight to
 the release when there's a newer one); the
-**sun/moon** toggles the theme; **Sign Out** clears the
-stored token. Click a **PR title** (or a suggested-action link) to jump to
+**sun/moon** switches between the current theme's two grounds, and names them —
+it reads "Switch to Aurora Night" rather than "Switch to dark theme";
+**Sign Out** clears the stored token. Click a **PR title** (or a suggested-action link) to jump to
 GitHub — a comment row lands on that exact thread. In the filter bar: **Flat / By
 repo / By check** to group — group headers fold and unfold, and the ↗ beside one
 opens that repository on GitHub — **All / Only drafts / No drafts** to filter by

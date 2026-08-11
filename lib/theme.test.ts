@@ -253,10 +253,12 @@ describe("palette contrast", () => {
     );
   });
 
-  // default/light predates this feature and misses AA on several pairs. It is
-  // deliberately untouched, so that upgrading changes nobody's colours, and is
-  // tracked on its own. Every palette this feature introduced has to clear AA.
+  // All eight, with nothing exempt. default/light used to be: it predates the
+  // theme system and missed AA on seven pairs, and was left alone so that
+  // adding themes changed nobody's colours. #40 corrected it, which is what
+  // let this list stop having an exception to explain.
   it.each([
+    "default/light",
     "default/dark",
     "aurora/light",
     "aurora/dark",

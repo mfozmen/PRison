@@ -196,24 +196,43 @@ If `gh` isn't installed or signed in, the app falls back to a paste-a-token form
 
 ## Usage
 
-Sign in with the GitHub CLI or paste a token. In the top-right: the **switcher**
-scopes to All / your personal account / a single org; the **bell** opens the
-**activity feed** and marks it read; the **sliders icon** opens
-**Settings**, whose menu has five sections — **Comments** (show bot comments,
-hide comments you reacted to), **Auto refresh** (on/off, how often to check, and
-the notification permission), **Tracked checks** (name the required checks to
-see as "Awaiting"), **Appearance** (pick one of the four themes, each previewing
-its own colours and typeface), and **About** (version, repository, license, and
-**Check for updates** — asked for, never automatic, and it links straight to
-the release when there's a newer one); the
-**sun/moon** switches between the current theme's two grounds, and names them —
-it reads "Switch to Aurora Night" rather than "Switch to dark theme";
-**Sign Out** clears the stored token. Click a **PR title** (or a suggested-action link) to jump to
-GitHub — a comment row lands on that exact thread. In the filter bar: **Flat / By
-repo / By check** to group — group headers fold and unfold, and the ↗ beside one
-opens that repository on GitHub — **All / Only drafts / No drafts** to filter by
-draft state, and **Refresh** to re-fetch without reloading — next to it, **Updated Xm
-ago** tells you how fresh the data is.
+Sign in with the GitHub CLI or paste a token.
+
+### Header controls
+
+Top-right, left to right:
+
+| Control | What it does |
+| --- | --- |
+| **Switcher** | Scopes the board to All / your personal account / a single org. |
+| **Bell** | Opens the **activity feed** and marks it read. |
+| **Sliders icon** | Opens **Settings** (below). |
+| **Sun/moon** | Switches between the current theme's two grounds, and names them — it reads "Switch to Aurora Night" rather than "Switch to dark theme". |
+| **Sign Out** | Clears the stored token. |
+
+The Settings menu has five sections:
+
+- **Comments** — show bot comments, hide comments you reacted to.
+- **Auto refresh** — on/off, how often to check, and the notification
+  permission.
+- **Tracked checks** — name the required checks to see as "Awaiting".
+- **Appearance** — pick one of the four themes, each previewing its own colours
+  and typeface.
+- **About** — version, repository, license, and **Check for updates**: asked
+  for, never automatic, and it links straight to the release when there's a
+  newer one.
+
+### Filter bar
+
+| Control | What it does |
+| --- | --- |
+| **Flat / By repo / By check** | Groups the lists. Group headers fold and unfold, and under **By repo** the ↗ beside one opens that repository on GitHub. |
+| **All / Only drafts / No drafts** | Filters by draft state. |
+| **Refresh** | Re-fetches without reloading the page. |
+| **Updated Xm ago** | How fresh the data is, next to Refresh. |
+
+Click a **PR title** (or a suggested-action link) to jump to GitHub — a comment
+row lands on that exact thread.
 
 ## Documentation
 

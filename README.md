@@ -87,8 +87,10 @@ and expand to the latest 15, with **Load more** for the rest.
   refresh considers new, and it is forgotten when you close the tab.
 - **Auto refresh (opt-in).** Turn it on in Settings and pick how often to check
   — every 5, 15, or 30 minutes, or hourly (30 minutes by default). PRison then
-  tells you what *moved*, not just what's new: a PR that became ready to merge,
-  checks that went red, changes requested, a review asked of you, a fresh reply
+  tells you what *moved*, not just what's new: a PR of yours that was approved
+  — you hear that as soon as it happens, not when CI eventually catches up and
+  the PR turns mergeable — a PR that became ready to merge, checks that went
+  red, changes requested, a review asked of you, a fresh reply
   on a thread, or one of your own PRs getting merged — while a PR simply falling
   back to waiting (you pushed a fix) stays quiet. Works only while a PRison tab
   is open — there's no background service.

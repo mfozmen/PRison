@@ -33,6 +33,7 @@ export function parsePollInterval(stored: string | null): number {
 export type ItemStatus =
   | "ready"
   | "merged"
+  | "approved"
   | "changes-requested"
   | "failing"
   | "pending"
@@ -56,7 +57,16 @@ export type StatusEvent = {
 export type StatusSnapshot = Map<string, StatusEvent>;
 
 /** A stuck PR's status: a human blocking it outranks a red check, which
- * outranks everything else that merely holds the merge up.
+ * outranks an approval, which outranks everything else that merely holds the
+ * merge up.
+ *
+ * Approval sits below a red check because the check is the thing you can act
+ * on, and above waiting because it is the outcome you were waiting for. It
+ * needs its own status rather than arriving as `ready`: an approved PR reaches
+ * the ready list only once nothing else blocks it, so waiting for that means a
+ * PR approved while CI is still running — or one needing a second approval —
+ * says nothing at all, and "changes requested, then approved" reads as a fall
+ * back to waiting, which is exactly what the pending rule suppresses.
  *
  * Waiting on CI and waiting on a review gate deliberately share one status.
  * They are the same news to the reader, and splitting them would fire a
@@ -67,7 +77,8 @@ function stuckStatus(pr: StuckPr): ItemStatus {
   // failingChecks, not failing.length: a red check that reports no name is
   // counted but never named, and reading it as "waiting" would silence the
   // notification for a PR the card itself shows as failing.
-  return pr.failingChecks > 0 ? "failing" : "pending";
+  if (pr.failingChecks > 0) return "failing";
+  return pr.reviewDecision === "APPROVED" ? "approved" : "pending";
 }
 
 /** Snapshot what every visible item is doing, keyed by id.
@@ -140,6 +151,7 @@ export function diffStatuses(
 export const PHRASES: Record<ItemStatus, string> = {
   ready: "is ready to merge",
   merged: "was merged",
+  approved: "— approved",
   "changes-requested": "— changes requested",
   failing: "— checks failing",
   pending: "— waiting on checks or review",

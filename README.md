@@ -91,7 +91,8 @@ and expand to the latest 15, with **Load more** for the rest.
   — you hear that as soon as it happens, not when CI eventually catches up and
   the PR turns mergeable — a PR that became ready to merge, one that fell into
   a merge conflict because somebody else merged first, checks that went
-  red, changes requested, a review asked of you, a fresh reply
+  red, changes requested, a review asked of you, an author answering the review
+  you left with code, a fresh reply
   on a thread, or one of your own PRs getting merged — while a PR simply falling
   back to waiting (you pushed a fix) stays quiet. Works only while a PRison tab
   is open — there's no background service.

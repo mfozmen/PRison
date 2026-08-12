@@ -673,6 +673,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       reviews: visibleReviews,
       comments: visibleComments,
       closed: sortedClosed,
+      reviewed: sortedReviewed,
     });
     const events = diffStatuses(prev, visible);
     // Unconditionally, including when nothing was reported: diffStatuses

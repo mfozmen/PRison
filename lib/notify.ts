@@ -3,7 +3,7 @@
 // Notifications fire only while a PRison tab is open — there is no service
 // worker, so closing the last tab stops both polling and notifications.
 
-import type { StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr } from "./types";
+import type { StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr, ReviewedPr } from "./types";
 
 /** Selectable auto-refresh intervals. Each poll costs 6 endpoint calls (the
  * comments one runs two searches), so the shortest option is 5 minutes —
@@ -39,6 +39,7 @@ export type ItemStatus =
   | "failing"
   | "pending"
   | "review"
+  | "answered"
   | "comment";
 
 export type StatusEvent = {
@@ -92,16 +93,19 @@ function stuckStatus(pr: StuckPr): ItemStatus {
 /** Snapshot what every visible item is doing, keyed by id.
  *
  * Callers pass the *visible* (filtered, post-arbitration) lists, so a hidden
- * bot comment or a filtered draft can never announce itself. The closed list
- * is the one exception: it is collapsed by default, and a merge is worth
- * hearing about whether or not the section happens to be expanded. Closed PRs
- * contribute only when merged — a close without a merge isn't progress. */
+ * bot comment or a filtered draft can never announce itself. The two history
+ * sections are the exception to "visible": both are collapsed by default, and
+ * neither a merge nor an author answering your review stops being news because
+ * the section happens to be folded. Each contributes on one condition only —
+ * closed PRs when merged (a close without a merge isn't progress), reviewed
+ * PRs when the author has pushed since you looked. */
 export function snapshotStatuses(lists: {
   ready: readonly ReadyPr[];
   stuck: readonly StuckPr[];
   reviews: readonly ReviewRequest[];
   comments: readonly PrComment[];
   closed: readonly ClosedPr[];
+  reviewed: readonly ReviewedPr[];
 }): StatusSnapshot {
   const snapshot: StatusSnapshot = new Map();
   const add = (
@@ -125,6 +129,17 @@ export function snapshotStatuses(lists: {
   // activity at all — stamping it would re-announce "needs your review" every
   // time someone so much as commented.
   for (const req of lists.reviews) add(req, "review");
+  // A PR you already reviewed contributes only once the author has answered
+  // with code. Reviewing it is something you just did yourself, and a review
+  // the author dismissed is not a request for anything.
+  //
+  // Stamped with your own review time so a second round works: after you
+  // review again the stamp moves, and the next push the author makes reads as
+  // news rather than as the same "answered" already on record. It goes after
+  // the review requests, so a PR asked of you again keeps the stronger status.
+  for (const pr of lists.reviewed) {
+    if (pr.updatedSince) add(pr, "answered", pr.reviewedAt);
+  }
   for (const c of lists.comments) add(c, "comment", c.commentedAt);
   return snapshot;
 }
@@ -165,6 +180,7 @@ export const PHRASES: Record<ItemStatus, string> = {
   failing: "— checks failing",
   pending: "— waiting on checks or review",
   review: "needs your review",
+  answered: "— updated since your review",
   comment: "— new reply",
 };
 

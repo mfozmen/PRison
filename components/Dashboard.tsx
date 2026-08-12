@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useTransition } from "react";
 import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr, ReviewedPr } from "@/lib/types";
 import { sortByAgeAsc, sortByAgeDesc, relativeAge } from "@/lib/prioritize";
+import { parseTerms, matches } from "@/lib/search";
 import { suggestStuck, suggestReview, suggestReady, suggestComment, needsReview, stuckGroupKeys, reviewDecisionLabel, MERGE_CONFLICT_LABEL } from "@/lib/suggest";
 import { PrList } from "./PrList";
 import { SummaryTiles } from "./SummaryTiles";
@@ -75,6 +76,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // so reacted threads are hidden by default; client-side to keep the toggle instant.
   const [hideReacted, setHideReacted] = useState(true);
   const [groupBy, setGroupBy] = useState<"flat" | "repo" | "check">("flat");
+  // Component state, never persisted — the rule the section folds follow: a
+  // query that outlived the sitting would hide work tomorrow morning with no
+  // memory that you were the one who hid it.
+  const [query, setQuery] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [pollInterval, setPollInterval] = useState(DEFAULT_POLL_INTERVAL_MS);
   // Held here rather than read during render: the browser re-renders nothing
@@ -603,6 +608,43 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // Newest-close first; the section renders only the first closedVisible rows.
   const sortedClosed = sortByAgeDesc(closedPrs, (pr) => pr.endedAt);
 
+  // The search box narrows what is on screen, and every count on the board is
+  // derived from these — so the tiles, the section index and each header follow
+  // without being told.
+  //
+  // Deliberately downstream of the visible* lists rather than folded into them:
+  // change detection reads visible*, and a query is a way of looking rather
+  // than a statement about what interests you. Filtering the snapshot would
+  // make every row you typed past "vanish", then report the lot as news the
+  // moment you cleared the box.
+  const terms = parseTerms(query);
+  const shownReady = visibleReady.filter((pr) =>
+    matches(terms, pr.title, pr.repo, pr.number, pr.checkNames),
+  );
+  const shownReviews = visibleReviews.filter((req) =>
+    matches(terms, req.title, req.repo, req.number, req.author),
+  );
+  const shownStuck = visibleStuck.filter((pr) =>
+    // Check names are the useful half here: "which of mine is integration-tests
+    // red on" is a question the board can answer and could not be asked.
+    matches(terms, pr.title, pr.repo, pr.number, pr.checkNames),
+  );
+  const shownComments = visibleComments.filter((c) =>
+    matches(terms, c.preview, c.repo, c.number, c.author, c.path),
+  );
+  const shownReviewed = sortedReviewed.filter((pr) =>
+    matches(terms, pr.title, pr.repo, pr.number, pr.author),
+  );
+  const shownClosed = sortedClosed.filter((pr) =>
+    matches(terms, pr.title, pr.repo, pr.number),
+  );
+
+  // A section emptied by the query must not read like a section that is
+  // legitimately empty: "no PRs waiting on your review" is good news, "none of
+  // them match" is not.
+  const emptyText = (base: string) =>
+    terms.length > 0 ? `Nothing here matches “${query.trim()}”` : base;
+
   // Change detection, against the visible (filtered) lists — a hidden bot
   // comment, a reacted thread, or a filtered draft must never announce itself.
   // The closed list is passed whole rather than as its rendered slice: the
@@ -809,6 +851,20 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               </button>
             ))}
           </div>
+          {/* type="search" for the browser's own clear affordance rather than a
+              hand-built one; Escape is the keyboard half of the same thing. A
+              filter you cannot see the end of is one you forget is on. */}
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setQuery("");
+            }}
+            aria-label="Search the board"
+            placeholder="Search title, repo, author, check…"
+            className="min-h-[44px] w-full rounded-md bg-surface px-4 text-sm text-foreground placeholder:text-muted focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none sm:w-64"
+          />
           {/* Deliberately not a live region: the label re-renders every minute
               as it ages, and announcing "Updated 4m ago" on a loop would talk
               over everything else for as long as the tab is open. */}
@@ -857,16 +913,16 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             own longest wait — no scan, and no age without a queue to own it. */}
         <SummaryTiles
           waiting={{
-            count: visibleReviews.length,
-            oldest: visibleReviews[0]?.requestedAt,
+            count: shownReviews.length,
+            oldest: shownReviews[0]?.requestedAt,
           }}
           stuck={{
-            count: visibleStuck.length,
-            oldest: visibleStuck[0]?.stuckSince,
+            count: shownStuck.length,
+            oldest: shownStuck[0]?.stuckSince,
           }}
           replies={{
-            count: visibleComments.length,
-            oldest: visibleComments[0]?.commentedAt,
+            count: shownComments.length,
+            oldest: shownComments[0]?.commentedAt,
           }}
           now={new Date()}
         />
@@ -877,12 +933,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             the fetched totals for the archives, exactly as the headers do. */}
         <SectionIndex
           sections={[
-            { id: "ready-to-merge", label: "Ready to merge", count: visibleReady.length },
-            { id: "comments-awaiting-reply", label: "Comments awaiting your reply", count: visibleComments.length },
-            { id: "waiting-on-your-review", label: "PRs waiting on your review", count: visibleReviews.length },
-            { id: "stuck-on-checks", label: "PRs stuck on checks", count: visibleStuck.length },
-            { id: "recently-reviewed", label: "Recently reviewed", count: sortedReviewed.length },
-            { id: "recently-closed", label: "Recently merged / closed", count: sortedClosed.length },
+            { id: "ready-to-merge", label: "Ready to merge", count: shownReady.length },
+            { id: "comments-awaiting-reply", label: "Comments awaiting your reply", count: shownComments.length },
+            { id: "waiting-on-your-review", label: "PRs waiting on your review", count: shownReviews.length },
+            { id: "stuck-on-checks", label: "PRs stuck on checks", count: shownStuck.length },
+            { id: "recently-reviewed", label: "Recently reviewed", count: shownReviewed.length },
+            { id: "recently-closed", label: "Recently merged / closed", count: shownClosed.length },
           ]}
         />
         {/* Ready-to-merge — full-width section above the two-column review/stuck grid */}
@@ -901,12 +957,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           <PrList
             title="Ready to merge"
             id="ready-to-merge"
-            items={visibleReady}
-            emptyMessage={
+            items={shownReady}
+            emptyMessage={emptyText(
               draftFilter === "only"
                 ? "Drafts are never ready to merge"
-                : "Nothing ready to merge"
-            }
+                : "Nothing ready to merge",
+            )}
             keyExtractor={(pr) => pr.id}
             countAccent="success"
             renderRow={(pr) => (
@@ -945,8 +1001,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           <PrList
             title="Comments awaiting your reply"
             id="comments-awaiting-reply"
-            items={visibleComments}
-            emptyMessage="No comments awaiting your reply 🎉"
+            items={shownComments}
+            emptyMessage={emptyText("No comments awaiting your reply 🎉")}
             keyExtractor={(c) => c.id}
             countAccent="warning"
             groupBy={groupBy === "repo" ? (c) => c.repo : undefined}
@@ -1026,8 +1082,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               <PrList
                 title="PRs waiting on your review"
                 id="waiting-on-your-review"
-                items={visibleReviews}
-                emptyMessage="No PRs waiting on your review 🎉"
+                items={shownReviews}
+                emptyMessage={emptyText("No PRs waiting on your review 🎉")}
                 keyExtractor={(req) => req.id}
                 groupBy={groupBy === "repo" ? (req) => req.repo : undefined}
                 groupHref={
@@ -1083,33 +1139,33 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             <ArchiveSection
               title="Recently reviewed"
               id="recently-reviewed"
-              count={sortedReviewed.length}
+              count={shownReviewed.length}
               countTestId="reviewed-count-badge"
               open={reviewedOpen}
               onToggle={() => setReviewedOpen((o) => !o)}
               error={reviewedError}
               onRetry={() => fetchData(selectedOrg)}
             >
-              {sortedReviewed.length === 0 ? (
+              {shownReviewed.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">
-                  No PRs you have reviewed are still open
+                  {emptyText("No PRs you have reviewed are still open")}
                 </p>
               ) : (
                 <>
                   <ul className="flex flex-col gap-2">
-                    {sortedReviewed.slice(0, reviewedVisible).map((pr) => (
+                    {shownReviewed.slice(0, reviewedVisible).map((pr) => (
                       <li key={pr.id}>
                         <ReviewedPrRow pr={pr} now={new Date()} />
                       </li>
                     ))}
                   </ul>
-                  {sortedReviewed.length > reviewedVisible && (
+                  {shownReviewed.length > reviewedVisible && (
                     <button
                       type="button"
                       onClick={() => setReviewedVisible((v) => v + ARCHIVE_PAGE_SIZE)}
                       className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
                     >
-                      Load more (showing {reviewedVisible} of {sortedReviewed.length})
+                      Load more (showing {reviewedVisible} of {shownReviewed.length})
                     </button>
                   )}
                 </>
@@ -1133,8 +1189,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               <PrList
                 title="PRs stuck on checks"
                 id="stuck-on-checks"
-                items={visibleStuck}
-                emptyMessage="No PRs stuck on checks 🎉"
+                items={shownStuck}
+                emptyMessage={emptyText("No PRs stuck on checks 🎉")}
                 keyExtractor={(pr) => pr.id}
                 countAccent="danger"
                 groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
@@ -1281,33 +1337,33 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             <ArchiveSection
               title="Recently merged / closed"
               id="recently-closed"
-              count={sortedClosed.length}
+              count={shownClosed.length}
               countTestId="closed-count-badge"
               open={closedOpen}
               onToggle={() => setClosedOpen((o) => !o)}
               error={closedError}
               onRetry={() => fetchData(selectedOrg)}
             >
-              {sortedClosed.length === 0 ? (
+              {shownClosed.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">
-                  No closed PRs
+                  {emptyText("No closed PRs")}
                 </p>
               ) : (
                 <>
                   <ul className="flex flex-col gap-2">
-                    {sortedClosed.slice(0, closedVisible).map((pr) => (
+                    {shownClosed.slice(0, closedVisible).map((pr) => (
                       <li key={pr.id}>
                         <ClosedPrRow pr={pr} now={new Date()} />
                       </li>
                     ))}
                   </ul>
-                  {sortedClosed.length > closedVisible && (
+                  {shownClosed.length > closedVisible && (
                     <button
                       type="button"
                       onClick={() => setClosedVisible((v) => v + ARCHIVE_PAGE_SIZE)}
                       className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
                     >
-                      Load more (showing {closedVisible} of {sortedClosed.length})
+                      Load more (showing {closedVisible} of {shownClosed.length})
                     </button>
                   )}
                 </>

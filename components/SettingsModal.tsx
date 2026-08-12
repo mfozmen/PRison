@@ -100,7 +100,7 @@ function toDraft(entries: StoredCheck[]): ChecksDraft {
   const names = (required: boolean) =>
     entries
       .map((e) => (typeof e === "string" ? { name: e, required: true } : e))
-      .filter((c) => c?.name && c.required !== false === required)
+      .filter((c) => c?.name && (c.required !== false) === required)
       .map((c) => c.name)
       .join(", ");
   return { required: names(true), optional: names(false) };
@@ -294,7 +294,7 @@ export function SettingsModal({
   }
 
   function rebuildAndNotify(newRows: RepoRow[]) {
-    const newRepos: Record<string, StoredCheck[]> = {};
+    const newRepos: Record<string, TrackedCheck[]> = {};
     for (const row of newRows) {
       const repo = row.repo.trim();
       if (!repo) continue;
@@ -302,9 +302,7 @@ export function SettingsModal({
       // later row's checks join the earlier row's rather than replacing them.
       const merged = [...(newRepos[repo] ?? []), ...toStored(row)];
       const seen = new Set<string>();
-      newRepos[repo] = merged.filter(
-        (c) => !seen.has((c as TrackedCheck).name) && seen.add((c as TrackedCheck).name),
-      );
+      newRepos[repo] = merged.filter((c) => !seen.has(c.name) && seen.add(c.name));
     }
     onChange({ ...value, repos: newRepos });
   }

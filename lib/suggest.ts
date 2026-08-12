@@ -44,7 +44,7 @@ export function stuckGroupKeys(pr: StuckPr, tracked: TrackedChecks): string[] {
   const keys = [
     ...pr.failing,
     ...pr.pending,
-    ...awaitingChecks(pr.repo, pr.checkNames, tracked),
+    ...awaitingChecks(pr.repo, pr.checkNames, tracked).map((c) => c.name),
   ];
   if (needsReview(pr.reviewDecision)) {
     keys.push(reviewDecisionLabel(pr.reviewDecision));

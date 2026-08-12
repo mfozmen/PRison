@@ -7,7 +7,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import type { TrackedChecks } from "@/lib/tracked-checks";
+import type { TrackedChecks, TrackedCheck, StoredCheck } from "@/lib/tracked-checks";
 import { RepoCombobox } from "./RepoCombobox";
 import { POLL_INTERVAL_OPTIONS } from "@/lib/notify";
 import {
@@ -65,31 +65,55 @@ const SECTIONS = [
 
 type SectionId = (typeof SECTIONS)[number]["id"];
 
-interface RepoRow {
-  repo: string;
-  checks: string;
+// Two fields rather than one list with a toggle per name: the names are typed
+// as free text, and a control that has to attach itself to a substring of an
+// input the user is still editing is a lot of machinery for a boolean.
+interface ChecksDraft {
+  required: string;
+  optional: string;
 }
 
-function parseChecks(input: string): string[] {
+interface RepoRow extends ChecksDraft {
+  repo: string;
+}
+
+const EMPTY_DRAFT: ChecksDraft = { required: "", optional: "" };
+
+function parseChecks(input: string, required: boolean): TrackedCheck[] {
   return input
     .split(",")
     .map((s) => s.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((name) => ({ name, required }));
 }
 
-function seedOrgDrafts(orgs: Record<string, string[]>): Record<string, string> {
-  const drafts: Record<string, string> = {};
-  for (const [login, checks] of Object.entries(orgs)) {
-    drafts[login] = checks.join(", ");
-  }
-  return drafts;
+/** Both fields back into one stored list, required first. Names are unique
+ * across the pair — typing one into both fields would otherwise leave which
+ * one wins up to the order they happen to be read in. */
+function toStored(draft: ChecksDraft): TrackedCheck[] {
+  const checks = [...parseChecks(draft.required, true), ...parseChecks(draft.optional, false)];
+  const seen = new Set<string>();
+  return checks.filter((c) => !seen.has(c.name) && seen.add(c.name));
 }
 
-function seedRows(repos: Record<string, string[]>): RepoRow[] {
-  return Object.entries(repos).map(([repo, checks]) => ({
-    repo,
-    checks: checks.join(", "),
-  }));
+function toDraft(entries: StoredCheck[]): ChecksDraft {
+  const names = (required: boolean) =>
+    entries
+      .map((e) => (typeof e === "string" ? { name: e, required: true } : e))
+      .filter((c) => c?.name && c.required !== false === required)
+      .map((c) => c.name)
+      .join(", ");
+  return { required: names(true), optional: names(false) };
+}
+
+function seedOrgDrafts(orgs: Record<string, StoredCheck[]>): Record<string, ChecksDraft> {
+  return Object.fromEntries(
+    Object.entries(orgs).map(([login, checks]) => [login, toDraft(checks)]),
+  );
+}
+
+function seedRows(repos: Record<string, StoredCheck[]>): RepoRow[] {
+  return Object.entries(repos).map(([repo, checks]) => ({ repo, ...toDraft(checks) }));
 }
 
 function SettingCheckbox({
@@ -215,7 +239,7 @@ export function SettingsModal({
 
   // Raw input drafts are buffered locally so the user can freely type
   // commas/spaces; we only parse into string[] when pushing changes up.
-  const [orgDrafts, setOrgDrafts] = useState<Record<string, string>>(() =>
+  const [orgDrafts, setOrgDrafts] = useState<Record<string, ChecksDraft>>(() =>
     seedOrgDrafts(value.orgs),
   );
 
@@ -259,30 +283,35 @@ export function SettingsModal({
 
   if (!open) return null;
 
-  function handleOrgChange(orgLogin: string, inputValue: string) {
-    setOrgDrafts((prev) => ({ ...prev, [orgLogin]: inputValue }));
-    const parsed = parseChecks(inputValue);
-    onChange({ ...value, orgs: { ...value.orgs, [orgLogin]: parsed } });
+  function handleOrgChange(
+    orgLogin: string,
+    field: keyof ChecksDraft,
+    inputValue: string,
+  ) {
+    const draft = { ...(orgDrafts[orgLogin] ?? EMPTY_DRAFT), [field]: inputValue };
+    setOrgDrafts((prev) => ({ ...prev, [orgLogin]: draft }));
+    onChange({ ...value, orgs: { ...value.orgs, [orgLogin]: toStored(draft) } });
   }
 
   function rebuildAndNotify(newRows: RepoRow[]) {
-    const newRepos: Record<string, string[]> = {};
+    const newRepos: Record<string, StoredCheck[]> = {};
     for (const row of newRows) {
       const repo = row.repo.trim();
       if (!repo) continue;
-      const existing = newRepos[repo] ?? [];
-      const merged = [...existing];
-      for (const c of parseChecks(row.checks)) {
-        if (!merged.includes(c)) merged.push(c);
-      }
-      newRepos[repo] = merged;
+      // Two rows can name the same repo while one of them is mid-edit; the
+      // later row's checks join the earlier row's rather than replacing them.
+      const merged = [...(newRepos[repo] ?? []), ...toStored(row)];
+      const seen = new Set<string>();
+      newRepos[repo] = merged.filter(
+        (c) => !seen.has((c as TrackedCheck).name) && seen.add((c as TrackedCheck).name),
+      );
     }
     onChange({ ...value, repos: newRepos });
   }
 
   function handleRowChange(
     index: number,
-    field: "repo" | "checks",
+    field: "repo" | keyof ChecksDraft,
     inputValue: string,
   ) {
     const newRows = rows.map((row, i) =>
@@ -293,7 +322,7 @@ export function SettingsModal({
   }
 
   function addRow() {
-    setRows([...rows, { repo: "", checks: "" }]);
+    setRows([...rows, { repo: "", ...EMPTY_DRAFT }]);
   }
 
   function removeRow(index: number) {
@@ -553,9 +582,11 @@ export function SettingsModal({
             {section === "tracked-checks" && (
               <div>
                 <p className="mb-6 text-sm text-muted">
-                  Name the required checks each PR needs (e.g. a manual qa/smoke).
-                  We&apos;ll show them as Awaiting until they report — handy for gates
-                  GitHub doesn&apos;t expose.
+                  Name the checks each PR needs (e.g. a manual qa/smoke). We&apos;ll show
+                  them as Awaiting until they report — handy for gates GitHub
+                  doesn&apos;t expose. A <strong className="font-medium text-foreground">required</strong>{" "}
+                  one holds the PR out of Ready to merge; anything you list as not
+                  required is shown for information and blocks nothing.
                 </p>
 
                 {/* Owner defaults — organizations *and* the personal account.
@@ -580,11 +611,19 @@ export function SettingsModal({
                           <input
                             id={`org-input-${owner}`}
                             type="text"
-                            aria-label={`${owner} check names`}
-                            placeholder="e.g. qa/smoke, Automation Result"
-                            value={orgDrafts[owner] ?? ""}
-                            onChange={(e) => handleOrgChange(owner, e.target.value)}
+                            aria-label={`${owner} required check names`}
+                            placeholder="Required — e.g. qa/smoke, Automation Result"
+                            value={orgDrafts[owner]?.required ?? ""}
+                            onChange={(e) => handleOrgChange(owner, "required", e.target.value)}
                             className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                          />
+                          <input
+                            type="text"
+                            aria-label={`${owner} check names that are not required`}
+                            placeholder="Not required — shown, never blocking"
+                            value={orgDrafts[owner]?.optional ?? ""}
+                            onChange={(e) => handleOrgChange(owner, "optional", e.target.value)}
+                            className="rounded-md border border-dashed border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
                           />
                         </div>
                       ))}
@@ -616,13 +655,23 @@ export function SettingsModal({
                         />
                         <input
                           type="text"
-                          aria-label="Check names for this repo override"
-                          placeholder="e.g. qa/smoke"
-                          value={row.checks}
+                          aria-label="Required check names for this repo override"
+                          placeholder="Required — e.g. qa/smoke"
+                          value={row.required}
                           onChange={(e) =>
-                            handleRowChange(index, "checks", e.target.value)
+                            handleRowChange(index, "required", e.target.value)
                           }
                           className="flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                        />
+                        <input
+                          type="text"
+                          aria-label="Check names for this repo override that are not required"
+                          placeholder="Not required"
+                          value={row.optional}
+                          onChange={(e) =>
+                            handleRowChange(index, "optional", e.target.value)
+                          }
+                          className="flex-1 rounded-md border border-dashed border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
                         />
                         <button
                           type="button"

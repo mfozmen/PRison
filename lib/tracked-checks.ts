@@ -1,42 +1,80 @@
-export type TrackedChecks = { orgs: Record<string, string[]>; repos: Record<string, string[]> };
+/** A check the user has named, and whether they said it blocks the merge.
+ *
+ * GitHub does not tell a non-admin which checks are required, which is the
+ * whole reason this feature exists — but the user knows, and saying so is what
+ * lets the board draw a gate differently from a job you merely like to watch. */
+export type TrackedCheck = { name: string; required: boolean };
+
+/** As stored. A bare string is a name the user gave before there was anything
+ * to say about it, and those were all treated as blocking — so it reads as
+ * required, and nothing already in localStorage changes meaning on upgrade. */
+export type StoredCheck = string | TrackedCheck;
+
+export type TrackedChecks = {
+  orgs: Record<string, StoredCheck[]>;
+  repos: Record<string, StoredCheck[]>;
+};
 export const EMPTY_TRACKED: TrackedChecks = { orgs: {}, repos: {} };
 
-/**
- * Returns the configured check names for a repo:
- * 1. if cfg.repos[repo] is defined → return it (repo override beats org default)
- * 2. else if cfg.orgs[repo.split("/")[0]] is defined → return it (org default)
- * 3. else → []
- */
-export function resolveTracked(repo: string, cfg: TrackedChecks): string[] {
-  const repoVal = cfg.repos[repo];
-  if (Array.isArray(repoVal)) return repoVal;
-  const org = repo.split("/")[0];
-  const orgVal = cfg.orgs[org];
-  if (Array.isArray(orgVal)) return orgVal;
-  return [];
+/** How the board should draw a check name it has in hand:
+ * `required` and `optional` are what the user said, `unknown` is the honest
+ * answer for a name they never mentioned — which is most of them, and is the
+ * meaning the dashed chip has always carried. */
+export type Requirement = "required" | "optional" | "unknown";
+
+function normalize(entry: StoredCheck): TrackedCheck | null {
+  if (typeof entry === "string") return entry ? { name: entry, required: true } : null;
+  if (typeof entry !== "object" || entry === null) return null;
+  const { name, required } = entry as Partial<TrackedCheck>;
+  return typeof name === "string" && name ? { name, required: required !== false } : null;
 }
 
 /**
- * Returns tracked check names that are NOT in presentCheckNames.
+ * Returns the configured checks for a repo:
+ * 1. if cfg.repos[repo] is defined → return it (repo override beats org default)
+ * 2. else if cfg.orgs[repo.split("/")[0]] is defined → return it (org default)
+ * 3. else → []
+ *
+ * Entries are normalized, and unusable ones — a number, a nameless object —
+ * are dropped rather than thrown on: this config is hand-editable localStorage.
+ */
+export function resolveTracked(repo: string, cfg: TrackedChecks): TrackedCheck[] {
+  const repoVal = cfg.repos[repo];
+  const orgVal = cfg.orgs[repo.split("/")[0]];
+  const entries = Array.isArray(repoVal) ? repoVal : Array.isArray(orgVal) ? orgVal : [];
+  return entries.map(normalize).filter((c): c is TrackedCheck => c !== null);
+}
+
+/** What the user said about a check name on this repo, for a check GitHub did
+ * report. Unknown when they never named it — which must stay distinguishable
+ * from "they said it doesn't block", or the dashed chip stops meaning anything. */
+export function checkRequirement(
+  repo: string,
+  name: string,
+  cfg: TrackedChecks,
+): Requirement {
+  const tracked = resolveTracked(repo, cfg).find((c) => c.name === name);
+  if (!tracked) return "unknown";
+  return tracked.required ? "required" : "optional";
+}
+
+/**
+ * Returns tracked checks that are NOT in presentCheckNames.
  * Uses resolveTracked; filters names NOT present (case-sensitive exact match);
- * dedupes; preserves order of the tracked list.
+ * dedupes by name, first entry wins; preserves order of the tracked list.
  */
 export function awaitingChecks(
   repo: string,
   presentCheckNames: string[],
   cfg: TrackedChecks,
-): string[] {
-  const tracked = resolveTracked(repo, cfg);
-  const presentSet = new Set(presentCheckNames);
+): TrackedCheck[] {
+  const present = new Set(presentCheckNames);
   const seen = new Set<string>();
-  const result: string[] = [];
-  for (const name of tracked) {
-    if (!seen.has(name)) {
-      seen.add(name);
-      if (!presentSet.has(name)) {
-        result.push(name);
-      }
-    }
+  const result: TrackedCheck[] = [];
+  for (const check of resolveTracked(repo, cfg)) {
+    if (seen.has(check.name)) continue;
+    seen.add(check.name);
+    if (!present.has(check.name)) result.push(check);
   }
   return result;
 }
@@ -58,12 +96,9 @@ export function parseTracked(raw: string | null): TrackedChecks {
     return EMPTY_TRACKED;
   }
   const obj = parsed as Record<string, unknown>;
-  return {
-    orgs: (typeof obj.orgs === "object" && obj.orgs !== null && !Array.isArray(obj.orgs))
-      ? (obj.orgs as Record<string, string[]>)
-      : {},
-    repos: (typeof obj.repos === "object" && obj.repos !== null && !Array.isArray(obj.repos))
-      ? (obj.repos as Record<string, string[]>)
-      : {},
-  };
+  const map = (value: unknown): Record<string, StoredCheck[]> =>
+    typeof value === "object" && value !== null && !Array.isArray(value)
+      ? (value as Record<string, StoredCheck[]>)
+      : {};
+  return { orgs: map(obj.orgs), repos: map(obj.repos) };
 }

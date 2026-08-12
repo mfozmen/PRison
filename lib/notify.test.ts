@@ -96,6 +96,11 @@ describe("snapshotStatuses", () => {
   });
 
   it.each([
+    // A conflict outranks even a human: nothing moves until it is resolved.
+    [
+      "conflict",
+      stuckPr({ mergeState: "DIRTY", reviewDecision: "CHANGES_REQUESTED", failing: ["build"] }),
+    ],
     ["changes-requested", stuckPr({ reviewDecision: "CHANGES_REQUESTED", failing: ["build"] })],
     ["failing", stuckPr({ failing: ["build"], pending: ["lint"] })],
     // A red check outranks the approval: the check is the thing you can act on.
@@ -105,6 +110,17 @@ describe("snapshotStatuses", () => {
   ] as const)("reports a stuck PR as %s", (status, pr) => {
     const snapshot = snapshotStatuses({ ...EMPTY, stuck: [pr] });
     expect(snapshot.get(pr.id)?.status).toBe(status);
+  });
+
+  // The route a conflict actually arrives by: the PR was mergeable until
+  // someone else merged something. Read as "pending" it would be swallowed.
+  it("announces a PR that fell out of the ready list into a conflict", () => {
+    const mergeable = snapshotStatuses({ ...EMPTY, ready: [readyPr({ id: "PR_x" })] });
+    const conflicted = snapshotStatuses({
+      ...EMPTY,
+      stuck: [stuckPr({ id: "PR_x", mergeState: "DIRTY" })],
+    });
+    expect(diffStatuses(mergeable, conflicted).map((e) => e.status)).toEqual(["conflict"]);
   });
 
   // The whole reason `approved` exists rather than waiting for `ready`: an
@@ -255,6 +271,7 @@ describe("describeEvents", () => {
   it.each([
     ["merged", "acme/api #2 was merged"],
     ["approved", "acme/api #2 — approved"],
+    ["conflict", "acme/api #2 — merge conflict"],
     ["changes-requested", "acme/api #2 — changes requested"],
     ["failing", "acme/api #2 — checks failing"],
     ["pending", "acme/api #2 — waiting on checks or review"],

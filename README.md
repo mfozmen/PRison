@@ -53,7 +53,13 @@ and expand to the latest 15, with **Load more** for the rest.
   checks you care about — a default per owner (your personal account and every
   org) plus per-repo overrides, with a
   type-to-search repo picker — and PRison shows them as **"⏳ Awaiting: &lt;name&gt;"**
-  on a blocked PR until they report.
+  on a blocked PR until they report. Say which of them are **required** and the
+  board stops guessing: a required one is drawn solid and holds the PR out of
+  *Ready to merge*; anything you list as not required is shown for information,
+  drawn dashed, and blocks nothing — including when GitHub does report it, so a
+  red job that cannot hold the merge up stops reading like one that can. A check
+  you never named keeps the dashed chip, which is what "PRison doesn't know"
+  looks like.
 - **History you can walk back into.** Merged and closed-without-merging PRs, each
   badged **Merged** or **Closed** with how long ago it ended — and next to them
   the PRs you reviewed, so a discussion you left open is one click away instead
@@ -234,7 +240,8 @@ The Settings menu has five sections:
 - **Comments** — show bot comments, hide comments you reacted to.
 - **Auto refresh** — on/off, how often to check, and the notification
   permission.
-- **Tracked checks** — name the required checks to see as "Awaiting".
+- **Tracked checks** — name the checks to see as "Awaiting", in two fields:
+  required ones (which hold a PR out of Ready) and not-required ones.
 - **Appearance** — pick one of the four themes, each previewing its own colours
   and typeface.
 - **About** — version, repository, license, and **Check for updates**: asked

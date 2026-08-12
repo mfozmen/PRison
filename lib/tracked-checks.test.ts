@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { resolveTracked, awaitingChecks, parseTracked, EMPTY_TRACKED } from "./tracked-checks";
+import {
+  resolveTracked,
+  awaitingChecks,
+  checkRequirement,
+  parseTracked,
+  EMPTY_TRACKED,
+} from "./tracked-checks";
+
+// A name the user typed before there was anything to say about it. Every one of
+// them held a PR out of Ready, so that is what it has to keep meaning.
+const req = (name: string) => ({ name, required: true });
+const opt = (name: string) => ({ name, required: false });
 
 describe("resolveTracked", () => {
   const cfg = {
@@ -8,11 +19,27 @@ describe("resolveTracked", () => {
   };
 
   it("repo override beats org default", () => {
-    expect(resolveTracked("acme/frontend", cfg)).toEqual(["ci/lint", "ci/test"]);
+    expect(resolveTracked("acme/frontend", cfg)).toEqual([req("ci/lint"), req("ci/test")]);
   });
 
   it("org default applies when no repo key", () => {
-    expect(resolveTracked("acme/backend", cfg)).toEqual(["build", "test"]);
+    expect(resolveTracked("acme/backend", cfg)).toEqual([req("build"), req("test")]);
+  });
+
+  it("reads a bare name as required, so nothing already stored changes meaning", () => {
+    expect(resolveTracked("acme/backend", { orgs: { acme: ["build"] }, repos: {} })).toEqual([
+      req("build"),
+    ]);
+  });
+
+  it("keeps a check the user marked as not blocking the merge", () => {
+    const marked = { orgs: {}, repos: { "acme/app": [req("qa/smoke"), opt("nightly-e2e")] } };
+    expect(resolveTracked("acme/app", marked)).toEqual([req("qa/smoke"), opt("nightly-e2e")]);
+  });
+
+  it("drops entries a hand-edited config left unusable", () => {
+    const junk = { orgs: {}, repos: { "acme/app": [5, null, { required: true }, "", "build"] } };
+    expect(resolveTracked("acme/app", junk as never)).toEqual([req("build")]);
   });
 
   it("returns [] when neither configured", () => {
@@ -26,12 +53,20 @@ describe("awaitingChecks", () => {
     repos: { "acme/app": ["build", "test", "deploy", "test"] }, // duplicate "test"
   };
 
+  const names = (repo: string, present: string[], config = cfg) =>
+    awaitingChecks(repo, present, config).map((c) => c.name);
+
   it("check present in checkNames is filtered out", () => {
-    expect(awaitingChecks("acme/app", ["build"], cfg)).not.toContain("build");
+    expect(names("acme/app", ["build"])).not.toContain("build");
   });
 
   it("check absent appears in result", () => {
-    expect(awaitingChecks("acme/app", ["build"], cfg)).toContain("test");
+    expect(names("acme/app", ["build"])).toContain("test");
+  });
+
+  it("says of each awaited check whether it blocks the merge", () => {
+    const marked = { orgs: {}, repos: { "acme/app": [req("qa/smoke"), opt("nightly-e2e")] } };
+    expect(awaitingChecks("acme/app", [], marked)).toEqual([req("qa/smoke"), opt("nightly-e2e")]);
   });
 
   it("empty tracked (no config for repo) returns []", () => {
@@ -39,13 +74,30 @@ describe("awaitingChecks", () => {
   });
 
   it("dedup: tracked list has duplicate entry for 'test' → appears once", () => {
-    const result = awaitingChecks("acme/app", [], cfg);
-    const testCount = result.filter((n) => n === "test").length;
-    expect(testCount).toBe(1);
+    expect(names("acme/app", []).filter((n) => n === "test")).toHaveLength(1);
   });
 
   it("case-sensitive: 'Build' does not match 'build', so 'build' still appears", () => {
-    expect(awaitingChecks("acme/app", ["Build"], cfg)).toContain("build");
+    expect(names("acme/app", ["Build"])).toContain("build");
+  });
+});
+
+describe("checkRequirement", () => {
+  const cfg = {
+    orgs: {},
+    repos: { "acme/app": [req("qa/smoke"), opt("nightly-e2e")] },
+  };
+
+  it("reports what the user said about a check GitHub did report", () => {
+    expect(checkRequirement("acme/app", "qa/smoke", cfg)).toBe("required");
+    expect(checkRequirement("acme/app", "nightly-e2e", cfg)).toBe("optional");
+  });
+
+  // The distinction the dashed chip has always carried. Collapsing it into
+  // "optional" would claim knowledge PRison does not have.
+  it("reports a name the user never mentioned as unknown", () => {
+    expect(checkRequirement("acme/app", "build", cfg)).toBe("unknown");
+    expect(checkRequirement("other/repo", "qa/smoke", cfg)).toBe("unknown");
   });
 });
 
@@ -63,7 +115,7 @@ describe("resolveTracked — malformed config guard", () => {
       orgs: { acme: ["build"] },
       repos: { "acme/app": 5 },
     } as unknown as import("./tracked-checks").TrackedChecks;
-    expect(resolveTracked("acme/app", malformed)).toEqual(["build"]);
+    expect(resolveTracked("acme/app", malformed)).toEqual([req("build")]);
   });
 
   it("awaitingChecks does not throw on malformed config (returns [])", () => {

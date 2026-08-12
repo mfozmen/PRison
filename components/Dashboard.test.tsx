@@ -1360,7 +1360,7 @@ describe("Dashboard", () => {
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       // Chip renders the name as text content and carries an accessible label
       expect(screen.getByText("qa/smoke")).toBeInTheDocument();
-      expect(screen.getByLabelText("Awaiting: qa/smoke")).toBeInTheDocument();
+      expect(screen.getByLabelText("Awaiting required check: qa/smoke")).toBeInTheDocument();
     });
 
     it("does NOT show an awaiting chip when the tracked check is present in checkNames", async () => {
@@ -1373,6 +1373,65 @@ describe("Dashboard", () => {
       // No visible "Awaiting:" label and no accessible awaiting chip
       expect(screen.queryByText("Awaiting:")).not.toBeInTheDocument();
       expect(screen.queryByLabelText(/^Awaiting:/)).not.toBeInTheDocument();
+    });
+
+    // The dashed chip means "PRison does not know whether this blocks the
+    // merge". Once the user has said so, it should stop hedging.
+    it("says of an awaiting check whether the user marked it required", async () => {
+      localStorage.setItem(
+        "prison.trackedChecks",
+        JSON.stringify({
+          orgs: {
+            acme: [
+              { name: "qa/smoke", required: true },
+              { name: "nightly-e2e", required: false },
+            ],
+          },
+          repos: {},
+        }),
+      );
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+      expect(screen.getByLabelText("Awaiting required check: qa/smoke")).toBeInTheDocument();
+      expect(screen.getByLabelText("Awaiting: nightly-e2e")).toBeInTheDocument();
+    });
+
+    // A check that cannot block the merge must not act like one.
+    it("does not hold a PR out of Ready for a check marked not required", async () => {
+      localStorage.setItem(
+        "prison.trackedChecks",
+        JSON.stringify({ orgs: { acme: [{ name: "nightly-e2e", required: false }] }, repos: {} }),
+      );
+      global.fetch = vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          headers: { get: () => null },
+          json: () =>
+            Promise.resolve(
+              url.includes("ready")
+                ? [{ ...READY_PR, viaBlocked: true, checkNames: ["build"] }]
+                : url.includes("stuck") || url.includes("reviewed") || url.includes("closed") || url.includes("pr-comments")
+                  ? []
+                  : [REVIEW_PR],
+            ),
+        }),
+      ) as unknown as typeof fetch;
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      // In Ready to merge, not held back in Stuck on checks.
+      const ready = await screen.findByText("ready pr");
+      expect(ready.closest("section")?.id).toBe("ready-to-merge");
+    });
+
+    // The same knowledge applied to a check GitHub did report: a red job that
+    // cannot block the merge should not read like one that can.
+    it("marks a reported check the user said is not required", async () => {
+      localStorage.setItem(
+        "prison.trackedChecks",
+        JSON.stringify({ orgs: { acme: [{ name: "build", required: false }] }, repos: {} }),
+      );
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+      expect(screen.getByLabelText("build — not required")).toBeInTheDocument();
     });
 
     it("opening settings via gear button renders the tracked checks panel", async () => {

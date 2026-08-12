@@ -14,7 +14,7 @@ import { ReviewedPrRow } from "./ReviewedPrRow";
 import { ArchiveSection } from "./ArchiveSection";
 import { Header } from "./Header";
 import { SettingsModal } from "./SettingsModal";
-import { type TrackedChecks, EMPTY_TRACKED, parseTracked, awaitingChecks } from "@/lib/tracked-checks";
+import { type TrackedChecks, EMPTY_TRACKED, parseTracked, awaitingChecks, checkRequirement } from "@/lib/tracked-checks";
 import {
   DEFAULT_POLL_INTERVAL_MS,
   parsePollInterval,
@@ -533,7 +533,30 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // in exactly one list based on whether its tracked checks are present in the rollup.
   // If awaiting checks are absent → stuck (with awaiting chips); if all present → ready.
   const isAwaiting = (repo: string, checkNames: string[]) =>
-    awaitingChecks(repo, checkNames, tracked).length > 0;
+    awaitingChecks(repo, checkNames, tracked).some((c) => c.required);
+
+  // A check GitHub did report, drawn in its own colours unless the user has
+  // said it cannot block the merge — then it is dashed and muted like an
+  // awaited one, because a red job that holds nothing up should not read like
+  // one that does. A name they never mentioned keeps its colours: the dashed
+  // style means "not blocking", and claiming that of an unknown check would be
+  // inventing knowledge PRison doesn't have.
+  const checkChip = (repo: string, name: string, tone: "danger" | "warning") =>
+    checkRequirement(repo, name, tracked) === "optional"
+      ? {
+          "aria-label": `${name} — not required`,
+          title: `${name} — not required`,
+          className:
+            "rounded border border-dashed border-muted/60 px-1.5 py-0.5 text-xs font-medium text-muted",
+        }
+      : {
+          // Spelled out, not interpolated: Tailwind scans the source for whole
+          // class names and would never emit a composed one.
+          className:
+            tone === "danger"
+              ? "bg-danger/10 text-danger ring-1 ring-inset ring-danger/30 rounded px-1.5 py-0.5 text-xs font-medium"
+              : "bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium",
+        };
 
   // One home for the rule, because three lists apply it and three copies is how
   // they stop agreeing.
@@ -1277,18 +1300,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                       <div className="flex flex-wrap gap-1 items-center">
                         {conflictChip}
                         {showFailingNames.map((name, i) => (
-                          <span
-                            key={`fail-${i}-${name}`}
-                            className="bg-danger/10 text-danger ring-1 ring-inset ring-danger/30 rounded px-1.5 py-0.5 text-xs font-medium"
-                          >
+                          <span key={`fail-${i}-${name}`} {...checkChip(pr.repo, name, "danger")}>
                             {name}
                           </span>
                         ))}
                         {showPendingNames.map((name, i) => (
-                          <span
-                            key={`pend-${i}-${name}`}
-                            className="bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium"
-                          >
+                          <span key={`pend-${i}-${name}`} {...checkChip(pr.repo, name, "warning")}>
                             {name}
                           </span>
                         ))}
@@ -1296,12 +1313,20 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                           <span className="text-xs text-muted">+{overflow} more</span>
                         )}
                         {hasAwaiting &&
-                          awaiting.map((name) => (
+                          awaiting.map(({ name, required }) => (
                             <span
                               key={`await-${name}`}
-                              aria-label={`Awaiting: ${name}`}
-                              title={`Awaiting: ${name}`}
-                              className="inline-flex items-center gap-1 rounded border border-dashed border-muted/60 px-1.5 py-0.5 text-xs font-medium text-muted"
+                              aria-label={
+                                required ? `Awaiting required check: ${name}` : `Awaiting: ${name}`
+                              }
+                              title={
+                                required ? `Awaiting required check: ${name}` : `Awaiting: ${name}`
+                              }
+                              className={
+                                required
+                                  ? "inline-flex items-center gap-1 rounded bg-warning/10 px-1.5 py-0.5 text-xs font-medium text-warning ring-1 ring-inset ring-warning/30"
+                                  : "inline-flex items-center gap-1 rounded border border-dashed border-muted/60 px-1.5 py-0.5 text-xs font-medium text-muted"
+                              }
                             >
                               <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3" />

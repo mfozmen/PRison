@@ -120,6 +120,24 @@ describe("stuckGroupKeys", () => {
       "Review required",
     ]);
   });
+  // Group-by-check names the reasons a PR is stuck. A check the user said
+  // cannot block the merge is not one of them.
+  it("leaves a not-required awaiting check out of the buckets", () => {
+    const tracked = {
+      orgs: {},
+      repos: { "acme/b": [{ name: "nightly-e2e", required: false }] },
+    };
+    expect(stuckGroupKeys(s({ failing: ["build"], checkNames: [] }), tracked)).toEqual(["build"]);
+  });
+
+  it("falls back to Other when only a not-required check is outstanding", () => {
+    const tracked = {
+      orgs: {},
+      repos: { "acme/b": [{ name: "nightly-e2e", required: false }] },
+    };
+    expect(stuckGroupKeys(s({ checkNames: [] }), tracked)).toEqual(["Other"]);
+  });
+
   // "Other" is for blockers the board cannot name, and it can name this one.
   it("DIRTY with nothing else against it → 'Merge conflict' (not Other)", () => {
     expect(stuckGroupKeys(s({ mergeState: "DIRTY" }), EMPTY_TRACKED)).toEqual([

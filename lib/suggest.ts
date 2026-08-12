@@ -44,7 +44,12 @@ export function stuckGroupKeys(pr: StuckPr, tracked: TrackedChecks): string[] {
   const keys = [
     ...pr.failing,
     ...pr.pending,
-    ...awaitingChecks(pr.repo, pr.checkNames, tracked),
+    // Required only: these buckets name the reasons a PR is stuck, and a check
+    // the user said cannot block the merge is not one of them — bucketing under
+    // it would claim the PR is waiting on something it is free to merge without.
+    ...awaitingChecks(pr.repo, pr.checkNames, tracked)
+      .filter((c) => c.required)
+      .map((c) => c.name),
   ];
   if (needsReview(pr.reviewDecision)) {
     keys.push(reviewDecisionLabel(pr.reviewDecision));

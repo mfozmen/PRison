@@ -27,6 +27,10 @@ export type ReviewRequest = {
   number: number;
   author: string;
   requestedAt: string; // ISO
+  // requestedAt came from the viewer's own REVIEW_REQUESTED_EVENT rather than
+  // from the PR's updatedAt. A team-originated request leaves no such event, and
+  // updatedAt moves on any activity — only the direct one dates the request.
+  requestedDirectly: boolean;
   isDraft: boolean;
 };
 

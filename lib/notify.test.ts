@@ -201,20 +201,31 @@ describe("snapshotStatuses", () => {
     );
   });
 
-  it("leaves a review request unstamped", () => {
-    // requestedAt falls back to the PR's updatedAt for a team-originated
-    // request, and that moves on any activity — stamping it would re-announce
-    // "needs your review" every time someone commented on the PR.
-    const first = snapshotStatuses({
-      ...EMPTY,
-      reviews: [reviewRequest({ requestedAt: "2026-06-25T09:00:00Z" })],
-    });
+  it("leaves a team-originated review request unstamped", () => {
+    // Without its own REVIEW_REQUESTED_EVENT, requestedAt is the PR's updatedAt
+    // standing in — and that moves on any activity, so stamping it would
+    // re-announce "needs your review" every time someone commented.
+    const team = (requestedAt: string) =>
+      snapshotStatuses({
+        ...EMPTY,
+        reviews: [reviewRequest({ requestedAt, requestedDirectly: false })],
+      });
+    const first = team("2026-06-25T09:00:00Z");
     expect(first.get("PR_review")?.at).toBeUndefined();
-    const touched = snapshotStatuses({
-      ...EMPTY,
-      reviews: [reviewRequest({ requestedAt: "2026-06-25T11:30:00Z" })],
-    });
-    expect(diffStatuses(first, touched)).toEqual([]);
+    expect(diffStatuses(first, team("2026-06-25T11:30:00Z"))).toEqual([]);
+  });
+
+  // You review the PR, it leaves the queue, the author pushes and asks again.
+  // The snapshot never forgets an id, so without the stamp it comes back
+  // already on record as "review" and says nothing.
+  it("announces a review requested of you a second time", () => {
+    const asked = (requestedAt: string) =>
+      snapshotStatuses({ ...EMPTY, reviews: [reviewRequest({ requestedAt })] });
+    const first = asked("2026-06-22T00:00:00Z");
+    expect(first.get("PR_review")?.at).toBe("2026-06-22T00:00:00Z");
+    expect(diffStatuses(first, asked("2026-06-26T00:00:00Z")).map((e) => e.status)).toEqual([
+      "review",
+    ]);
   });
 
   it("reports a red check that reports no name as failing", () => {

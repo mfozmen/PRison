@@ -124,11 +124,16 @@ export function snapshotStatuses(lists: {
   }
   for (const pr of lists.ready) add(pr, "ready");
   for (const pr of lists.stuck) add(pr, stuckStatus(pr));
-  // No freshness stamp on a review request: requestedAt falls back to the PR's
-  // updatedAt when the request came through a team, and that moves on any
-  // activity at all — stamping it would re-announce "needs your review" every
-  // time someone so much as commented.
-  for (const req of lists.reviews) add(req, "review");
+  // Stamped only when requestedAt dates the request itself. A second, genuine
+  // request otherwise says nothing: the snapshot never forgets an id, so the PR
+  // that left the queue when you reviewed it comes back already on record as
+  // "review". The stamp is what makes the new request visible — and it is
+  // withheld for a team-originated request, where requestedAt falls back to the
+  // PR's updatedAt and would re-announce "needs your review" every time anyone
+  // so much as commented.
+  for (const req of lists.reviews) {
+    add(req, "review", req.requestedDirectly ? req.requestedAt : undefined);
+  }
   // A PR you already reviewed contributes only once the author has answered
   // with code. Reviewing it is something you just did yourself, and a review
   // the author dismissed is not a request for anything.

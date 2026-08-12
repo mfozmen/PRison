@@ -52,6 +52,7 @@ export function reviewRequest(overrides: Partial<ReviewRequest> = {}): ReviewReq
     number: 9,
     author: "alice",
     requestedAt: "2026-06-22T00:00:00Z",
+    requestedDirectly: true,
     isDraft: false,
     ...overrides,
   };

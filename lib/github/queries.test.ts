@@ -951,6 +951,7 @@ describe("parseReviewRequests", () => {
       ] },
     };
     expect(parseReviewRequests(reRequested, "me")[0].requestedAt).toBe("2026-07-06T13:04:00Z");
+    expect(parseReviewRequests(reRequested, "me")[0].requestedDirectly).toBe(true);
   });
 
   it("falls back to updatedAt when viewerLogin has no matching timeline event", () => {
@@ -967,6 +968,8 @@ describe("parseReviewRequests", () => {
     };
     const reqs = parseReviewRequests(rawNoMatch, "me");
     expect(reqs[0].requestedAt).toBe("2026-06-21T00:00:00Z");
+    // And says so: updatedAt dates the PR, not the request.
+    expect(reqs[0].requestedDirectly).toBe(false);
   });
 
   it("returns [] when search.nodes is absent", () => {

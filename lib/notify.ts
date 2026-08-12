@@ -33,6 +33,7 @@ export function parsePollInterval(stored: string | null): number {
 export type ItemStatus =
   | "ready"
   | "merged"
+  | "conflict"
   | "approved"
   | "changes-requested"
   | "failing"
@@ -56,9 +57,15 @@ export type StatusEvent = {
 
 export type StatusSnapshot = Map<string, StatusEvent>;
 
-/** A stuck PR's status: a human blocking it outranks a red check, which
- * outranks an approval, which outranks everything else that merely holds the
- * merge up.
+/** A stuck PR's status: a conflict outranks a human blocking it, which
+ * outranks a red check, which outranks an approval, which outranks everything
+ * else that merely holds the merge up.
+ *
+ * A conflict goes first because nothing else on the PR matters until it is
+ * resolved — the same reason it outranks the check state on the card. Without
+ * it the news never arrives at all: a conflicted PR with green checks reads as
+ * "pending", and the usual route in is from the ready list, so the transition
+ * is ready → pending — suppressed by the rule below.
  *
  * Approval sits below a red check because the check is the thing you can act
  * on, and above waiting because it is the outcome you were waiting for. It
@@ -73,6 +80,7 @@ export type StatusSnapshot = Map<string, StatusEvent>;
  * notification the moment CI finished green on a PR still awaiting review —
  * announcing a step forward as if it were a setback. */
 function stuckStatus(pr: StuckPr): ItemStatus {
+  if (pr.mergeState === "DIRTY") return "conflict";
   if (pr.reviewDecision === "CHANGES_REQUESTED") return "changes-requested";
   // failingChecks, not failing.length: a red check that reports no name is
   // counted but never named, and reading it as "waiting" would silence the
@@ -151,6 +159,7 @@ export function diffStatuses(
 export const PHRASES: Record<ItemStatus, string> = {
   ready: "is ready to merge",
   merged: "was merged",
+  conflict: "— merge conflict",
   approved: "— approved",
   "changes-requested": "— changes requested",
   failing: "— checks failing",

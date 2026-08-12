@@ -287,6 +287,10 @@ export function parseReviewRequests(raw: any, viewerLogin: string): ReviewReques
         repo: n.repository?.nameWithOwner ?? "",
         author: n.author?.login ?? "unknown",
         requestedAt: mine?.createdAt ?? n.updatedAt ?? "",
+        // Whether that timestamp is the request itself or the PR's updatedAt
+        // standing in for it. The fallback moves on any activity at all, so
+        // only the real one can be treated as "this was requested again".
+        requestedDirectly: !!mine?.createdAt,
         isDraft: n.isDraft ?? false,
       } as ReviewRequest;
     });

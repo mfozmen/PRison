@@ -35,7 +35,7 @@ under the queue it is the history of, and the columns grow independently, so
 expanding one never moves the other. Both histories start collapsed with a count
 and expand to the latest 15, with **Load more** for the rest.
 
-![The PRison dashboard in dark mode. The filter bar's grouping and draft filters sit at the top; under them three summary tiles (waiting on you, awaiting your reply, stuck on checks), each showing a count and its oldest wait, then a row of links to all six sections with their counts. Ready to merge and Comments awaiting your reply run full width; below them two columns pair each queue with its history — PRs waiting on your review above Recently reviewed on the left, PRs stuck on checks above Recently merged / closed on the right. One stuck PR is tagged both Merge conflict and a failing check](docs/screenshot.png)
+![The PRison dashboard in dark mode. The filter bar's grouping and draft filters and a search box sit at the top; under them three summary tiles (waiting on you, awaiting your reply, stuck on checks), each showing a count and its oldest wait, then a row of links to all six sections with their counts. Ready to merge and Comments awaiting your reply run full width; below them two columns pair each queue with its history — PRs waiting on your review above Recently reviewed on the left, PRs stuck on checks above Recently merged / closed on the right. One stuck PR is tagged both Merge conflict and a failing check](docs/screenshot.png)
 
 ### Features
 

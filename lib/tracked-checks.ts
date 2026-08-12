@@ -29,6 +29,10 @@ function normalize(entry: StoredCheck): TrackedCheck | null {
   return typeof name === "string" && name ? { name, required: required !== false } : null;
 }
 
+function normalizeAll(entries: StoredCheck[]): TrackedCheck[] {
+  return entries.map(normalize).filter((c): c is TrackedCheck => c !== null);
+}
+
 /**
  * Returns the configured checks for a repo:
  * 1. if cfg.repos[repo] is defined → return it (repo override beats org default)
@@ -40,9 +44,9 @@ function normalize(entry: StoredCheck): TrackedCheck | null {
  */
 export function resolveTracked(repo: string, cfg: TrackedChecks): TrackedCheck[] {
   const repoVal = cfg.repos[repo];
+  if (Array.isArray(repoVal)) return normalizeAll(repoVal);
   const orgVal = cfg.orgs[repo.split("/")[0]];
-  const entries = Array.isArray(repoVal) ? repoVal : Array.isArray(orgVal) ? orgVal : [];
-  return entries.map(normalize).filter((c): c is TrackedCheck => c !== null);
+  return Array.isArray(orgVal) ? normalizeAll(orgVal) : [];
 }
 
 /** What the user said about a check name on this repo, for a check GitHub did

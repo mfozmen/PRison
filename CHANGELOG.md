@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.15.0](https://github.com/mfozmen/PRison/compare/v1.14.0...v1.15.0) (2026-08-12)
+
+### Features
+
+* one search box across the whole board ([#63](https://github.com/mfozmen/PRison/issues/63)) ([3931560](https://github.com/mfozmen/PRison/commit/393156062c226c446a4d9726ec536fd4716d5b72)), closes [#62](https://github.com/mfozmen/PRison/issues/62)
+
 ## [1.14.0](https://github.com/mfozmen/PRison/compare/v1.13.0...v1.14.0) (2026-08-11)
 
 ### Features

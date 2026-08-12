@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr } from "./types";
+import type { StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr, ReviewedPr } from "./types";
 import type { StatusEvent } from "./notify";
 import type { ActivityEntry } from "./activity";
 
@@ -100,6 +100,22 @@ export function closedPr(overrides: Partial<ClosedPr> = {}): ClosedPr {
     number: 4,
     merged: true,
     endedAt: "2026-06-24T00:00:00Z",
+    ...overrides,
+  };
+}
+
+export function reviewedPr(overrides: Partial<ReviewedPr> = {}): ReviewedPr {
+  return {
+    id: "PR_reviewed",
+    title: "Split the importer into a queue worker",
+    url: "https://github.com/globex/backend/pull/6",
+    repo: "globex/backend",
+    number: 6,
+    author: "carol",
+    state: "CHANGES_REQUESTED",
+    reviewedAt: "2026-06-23T00:00:00Z",
+    updatedSince: false,
+    isDraft: false,
     ...overrides,
   };
 }

@@ -22,6 +22,7 @@ import {
   stuckPr,
   reviewRequest,
   readyPr,
+  reviewedPr,
   prComment,
   closedPr,
   statusEvent as event,
@@ -31,7 +32,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const EMPTY = { ready: [], stuck: [], reviews: [], comments: [], closed: [] };
+const EMPTY = { ready: [], stuck: [], reviews: [], comments: [], closed: [], reviewed: [] };
 
 describe("parsePollInterval", () => {
   it("accepts any offered option", () => {
@@ -110,6 +111,41 @@ describe("snapshotStatuses", () => {
   ] as const)("reports a stuck PR as %s", (status, pr) => {
     const snapshot = snapshotStatuses({ ...EMPTY, stuck: [pr] });
     expect(snapshot.get(pr.id)?.status).toBe(status);
+  });
+
+  // The Recently reviewed section's whole reason to exist — did they answer
+  // what you asked for? — was the one thing on the board nothing pushed.
+  it("announces the author answering your review with code", () => {
+    const waiting = snapshotStatuses({ ...EMPTY, reviewed: [reviewedPr()] });
+    expect(waiting.size).toBe(0);
+    const answered = snapshotStatuses({
+      ...EMPTY,
+      reviewed: [reviewedPr({ updatedSince: true })],
+    });
+    expect(diffStatuses(waiting, answered).map((e) => e.status)).toEqual(["answered"]);
+  });
+
+  it("announces a second round after you review again", () => {
+    // Stamped with your own review time, so "they pushed again" is news rather
+    // than the "answered" already on record from the first round.
+    const first = snapshotStatuses({
+      ...EMPTY,
+      reviewed: [reviewedPr({ updatedSince: true })],
+    });
+    const second = snapshotStatuses({
+      ...EMPTY,
+      reviewed: [reviewedPr({ updatedSince: true, reviewedAt: "2026-06-26T00:00:00Z" })],
+    });
+    expect(diffStatuses(first, second).map((e) => e.status)).toEqual(["answered"]);
+  });
+
+  it("lets a re-requested review outrank the history it also appears in", () => {
+    const snapshot = snapshotStatuses({
+      ...EMPTY,
+      reviews: [reviewRequest({ id: "PR_x" })],
+      reviewed: [reviewedPr({ id: "PR_x", updatedSince: true })],
+    });
+    expect(snapshot.get("PR_x")?.status).toBe("review");
   });
 
   // The route a conflict actually arrives by: the PR was mergeable until
@@ -276,6 +312,7 @@ describe("describeEvents", () => {
     ["failing", "acme/api #2 — checks failing"],
     ["pending", "acme/api #2 — waiting on checks or review"],
     ["review", "acme/api #2 needs your review"],
+    ["answered", "acme/api #2 — updated since your review"],
     ["comment", "acme/api #2 — new reply"],
   ] as const)("phrases %s", (status, expected) => {
     expect(describeEvents([event({ status })])).toBe(expected);

@@ -79,6 +79,12 @@ and expand to the latest 15, with **Load more** for the rest.
 - **Grouping** — flat, by repository, or by check. Next to it in the filter
   bar, a **draft filter**: **All**, **Only drafts** to see just what you have in
   progress, or **No drafts** to get them out of the way.
+- **One search box over the whole board.** Type a word and every list narrows at
+  once — title, repository, PR number, author, comment text, file path, and the
+  names of the checks that are red on a PR. Terms are ANDed and each may land on
+  a different field, so `acme 482` finds that one PR. It filters what is already
+  on the page rather than asking GitHub anything, it never touches what auto
+  refresh considers new, and it is forgotten when you close the tab.
 - **Auto refresh (opt-in).** Turn it on in Settings and pick how often to check
   — every 5, 15, or 30 minutes, or hourly (30 minutes by default). PRison then
   tells you what *moved*, not just what's new: a PR that became ready to merge,
@@ -237,6 +243,7 @@ The Settings menu has five sections:
 | --- | --- |
 | **Flat / By repo / By check** | Groups the lists. Group headers fold and unfold, and under **By repo** the ↗ beside one opens that repository on GitHub. |
 | **All / Only drafts / No drafts** | Filters by draft state. |
+| **Search** | Narrows every list to the rows matching all your terms; Esc clears it. |
 | **Refresh** | Re-fetches without reloading the page. |
 | **Updated Xm ago** | How fresh the data is, next to Refresh. |
 

@@ -3179,3 +3179,105 @@ describe("Dashboard — column pairing", () => {
     expect(column!.contains(document.getElementById(other))).toBe(false);
   });
 });
+
+// One box over six lists. The rows are already on the page, so this filters
+// what is rendered rather than asking GitHub anything.
+describe("Dashboard — searching the board", () => {
+  beforeEach(() => {
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        headers: { get: () => null },
+        json: () =>
+          Promise.resolve(
+            url.includes("reviewed")
+              ? []
+              : url.includes("closed")
+                ? []
+                : url.includes("pr-comments")
+                  ? [COMMENT]
+                  : url.includes("ready")
+                    ? [READY_PR]
+                    : url.includes("stuck")
+                      ? [STUCK_PR]
+                      : [REVIEW_PR],
+          ),
+      }),
+    ) as unknown as typeof fetch;
+  });
+
+  const search = async (text: string) => {
+    const box = await screen.findByRole("searchbox", { name: /search the board/i });
+    fireEvent.change(box, { target: { value: text } });
+    return box;
+  };
+
+  it("narrows every list at once", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    await search("stuck");
+    expect(screen.getByText("stuck pr")).toBeInTheDocument();
+    // Rows from the other lists are gone, not merely reordered.
+    expect(screen.queryByText("ready pr")).not.toBeInTheDocument();
+    expect(screen.queryByText("review pr")).not.toBeInTheDocument();
+    expect(screen.queryByText("please fix the null check")).not.toBeInTheDocument();
+  });
+
+  // The question the board could answer and could not be asked.
+  it("finds a PR by the name of the check that is red on it", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    await search("build");
+    expect(screen.getByText("stuck pr")).toBeInTheDocument();
+    expect(screen.queryByText("review pr")).not.toBeInTheDocument();
+  });
+
+  it("requires every term, each free to match a different field", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("review pr")).toBeInTheDocument();
+
+    // "alice" is the author, "acme/c" the repo — different fields, one row.
+    await search("alice acme/c");
+    expect(screen.getByText("review pr")).toBeInTheDocument();
+
+    await search("alice acme/gamma");
+    expect(screen.queryByText("review pr")).not.toBeInTheDocument();
+  });
+
+  // Good news and no-match must not look the same.
+  it("says a section is filtered rather than empty", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("review pr")).toBeInTheDocument();
+
+    await search("zzz");
+    expect(screen.getAllByText(/nothing here matches “zzz”/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText("No PRs waiting on your review 🎉")).not.toBeInTheDocument();
+  });
+
+  it("counts what is on screen, so the tiles and the index agree with it", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    await search("stuck");
+    const tile = screen
+      .getAllByTestId("summary-tile")
+      .find((t) => t.textContent?.includes("Waiting on you")) as HTMLElement;
+    expect(tile).toHaveTextContent("0");
+    expect(
+      screen.getByRole("link", { name: /PRs waiting on your review/i }),
+    ).toHaveTextContent("0");
+  });
+
+  it("brings everything back on Escape", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("ready pr")).toBeInTheDocument();
+
+    const box = await search("stuck");
+    expect(screen.queryByText("ready pr")).not.toBeInTheDocument();
+
+    fireEvent.keyDown(box, { key: "Escape" });
+    expect(await screen.findByText("ready pr")).toBeInTheDocument();
+  });
+});

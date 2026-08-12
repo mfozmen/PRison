@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.16.0](https://github.com/mfozmen/PRison/compare/v1.15.0...v1.16.0) (2026-08-12)
+
+### Bug Fixes
+
+* announce a merge conflict ([#69](https://github.com/mfozmen/PRison/issues/69)) ([dd677a5](https://github.com/mfozmen/PRison/commit/dd677a5bbd0525464d775183ba4804d9114b8498)), closes [#66](https://github.com/mfozmen/PRison/issues/66)
+* announce a review requested of you a second time ([#71](https://github.com/mfozmen/PRison/issues/71)) ([dc39222](https://github.com/mfozmen/PRison/commit/dc392228b4c7064dd66327986ef0ceddf513389e)), closes [#68](https://github.com/mfozmen/PRison/issues/68)
+* announce an approval on your own PR ([#65](https://github.com/mfozmen/PRison/issues/65)) ([cb0baa5](https://github.com/mfozmen/PRison/commit/cb0baa52637bce902c76b06ba509cf8f9ff42273)), closes [#64](https://github.com/mfozmen/PRison/issues/64)
+* announce the author answering your review ([#72](https://github.com/mfozmen/PRison/issues/72)) ([d20ebae](https://github.com/mfozmen/PRison/commit/d20ebae5085e1141c72465e399eb572ccc5737fd)), closes [#67](https://github.com/mfozmen/PRison/issues/67)
+
 ## [1.15.0](https://github.com/mfozmen/PRison/compare/v1.14.0...v1.15.0) (2026-08-12)
 
 ### Features

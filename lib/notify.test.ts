@@ -98,10 +98,38 @@ describe("snapshotStatuses", () => {
   it.each([
     ["changes-requested", stuckPr({ reviewDecision: "CHANGES_REQUESTED", failing: ["build"] })],
     ["failing", stuckPr({ failing: ["build"], pending: ["lint"] })],
+    // A red check outranks the approval: the check is the thing you can act on.
+    ["failing", stuckPr({ reviewDecision: "APPROVED", failing: ["build"] })],
+    ["approved", stuckPr({ reviewDecision: "APPROVED", pending: ["lint"] })],
     ["pending", stuckPr({ pending: ["lint"] })],
   ] as const)("reports a stuck PR as %s", (status, pr) => {
     const snapshot = snapshotStatuses({ ...EMPTY, stuck: [pr] });
     expect(snapshot.get(pr.id)?.status).toBe(status);
+  });
+
+  // The whole reason `approved` exists rather than waiting for `ready`: an
+  // approved PR only reaches the ready list once nothing else blocks it.
+  it("announces an approval on a PR that is still blocked by something else", () => {
+    const waiting = snapshotStatuses({ ...EMPTY, stuck: [stuckPr({ pending: ["lint"] })] });
+    const approved = snapshotStatuses({
+      ...EMPTY,
+      stuck: [stuckPr({ reviewDecision: "APPROVED", pending: ["lint"] })],
+    });
+    expect(diffStatuses(waiting, approved).map((e) => e.status)).toEqual(["approved"]);
+  });
+
+  // The suppression of transitions into "pending" was written for "you pushed
+  // a fix", and used to swallow this — the most welcome news on your own PR.
+  it("announces changes-requested turning into an approval", () => {
+    const requested = snapshotStatuses({
+      ...EMPTY,
+      stuck: [stuckPr({ reviewDecision: "CHANGES_REQUESTED", pending: ["lint"] })],
+    });
+    const approved = snapshotStatuses({
+      ...EMPTY,
+      stuck: [stuckPr({ reviewDecision: "APPROVED", pending: ["lint"] })],
+    });
+    expect(diffStatuses(requested, approved).map((e) => e.status)).toEqual(["approved"]);
   });
 
   it("does not distinguish waiting on CI from waiting on a review gate", () => {
@@ -226,6 +254,7 @@ describe("describeEvents", () => {
 
   it.each([
     ["merged", "acme/api #2 was merged"],
+    ["approved", "acme/api #2 — approved"],
     ["changes-requested", "acme/api #2 — changes requested"],
     ["failing", "acme/api #2 — checks failing"],
     ["pending", "acme/api #2 — waiting on checks or review"],

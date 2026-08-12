@@ -167,5 +167,8 @@ try {
 } finally {
   cdp?.close();
   chrome.kill();
-  rmSync(profile, { recursive: true, force: true });
+  // kill() returns before Chrome has finished flushing its profile, so the
+  // first rm hits a directory that is still growing. Retry rather than exit
+  // non-zero on a throwaway temp dir after the PNG is already written.
+  rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }

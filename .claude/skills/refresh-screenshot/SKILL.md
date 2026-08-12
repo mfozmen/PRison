@@ -1,9 +1,24 @@
 ---
 name: refresh-screenshot
-description: Regenerate docs/screenshot.png from synthetic data. Use when the dashboard UI changed and the README screenshot no longer shows it — a new filter, a new section, a restyled card. Drives headless Chrome from a script; never captures real GitHub data.
+description: Regenerate docs/screenshot.png from synthetic data. Use when the dashboard UI changed and the README screenshot no longer shows it — a new filter, a new section, a restyled card — and as part of shipping any such PR, before merging and before a release. Drives headless Chrome from a script; never captures real GitHub data.
 ---
 
 # Refreshing docs/screenshot.png
+
+## When this is part of the job, not a separate request
+
+Any PR that changes what the board **looks like** — a new control in the filter
+bar, a new section, a moved column, a restyled card, a new badge — is not
+finished until this has run. The screenshot is the first thing anyone sees on
+the README, and a shot that predates the control is a bug report waiting to be
+filed. Do it **on the feature branch before merging**, so the README and the
+picture ship together; a release cut over a stale screenshot publishes the old
+board to Docker Hub and the repo page at once.
+
+Check this before every merge and every release, without being asked: if the
+diff touched a component that renders, open `docs/screenshot.png` and see
+whether it still matches. If the composition changed, the alt text on line 38
+of the README changes with it.
 
 The README screenshot goes stale every time the dashboard gains a control. Two
 files do the whole job:

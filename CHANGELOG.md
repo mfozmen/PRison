@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.17.0](https://github.com/mfozmen/PRison/compare/v1.16.0...v1.17.0) (2026-08-12)
+
+### Features
+
+* say which tracked checks are required ([#74](https://github.com/mfozmen/PRison/issues/74)) ([340f3e7](https://github.com/mfozmen/PRison/commit/340f3e77fbae6afb10675103fc55b829eb5f13c2)), closes [#73](https://github.com/mfozmen/PRison/issues/73)
+
 ## [1.16.0](https://github.com/mfozmen/PRison/compare/v1.15.0...v1.16.0) (2026-08-12)
 
 ### Bug Fixes

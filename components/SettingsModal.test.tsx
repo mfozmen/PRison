@@ -49,30 +49,40 @@ describe("SettingsModal", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders org inputs from props with correct values", () => {
-    const value: TrackedChecks = {
-      orgs: { acme: ["qa/smoke", "lint"], beta: ["ci/test"] },
-      repos: {},
-    };
+
+
+
+
+
+
+
+
+
+
+
+
+  it("lists every stored check with its own name field and mark", () => {
     render(
       <SettingsModal
         {...filterProps}
-        owners={owners}
+        owners={["acme"]}
         availableRepos={[]}
-        value={value}
+        value={{ orgs: { acme: ["qa/smoke", { name: "nightly-e2e", required: false }] }, repos: {} }}
         onChange={vi.fn()}
         open={true}
         onClose={vi.fn()}
       />,
     );
     selectSection("Tracked checks");
-    const acmeInput = screen.getByRole("textbox", { name: "acme check names" });
-    expect(acmeInput).toHaveValue("qa/smoke, lint");
-    const betaInput = screen.getByRole("textbox", { name: "beta check names" });
-    expect(betaInput).toHaveValue("ci/test");
+    expect(screen.getByRole("textbox", { name: "Check 1 for acme" })).toHaveValue("qa/smoke");
+    expect(screen.getByRole("textbox", { name: "Check 2 for acme" })).toHaveValue("nightly-e2e");
+    expect(screen.getByRole("checkbox", { name: "qa/smoke is required for acme" })).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "nightly-e2e is required for acme" }),
+    ).not.toBeChecked();
   });
 
-  it("editing an org input calls onChange with correct shape", () => {
+  it("decides the mark while adding, not after", () => {
     const onChange = vi.fn();
     render(
       <SettingsModal
@@ -86,15 +96,133 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Tracked checks");
-    const input = screen.getByRole("textbox", { name: "acme check names" });
-    fireEvent.change(input, { target: { value: "qa/smoke, lint" } });
+    // The name is not stored until Add, so nothing is announced per keystroke
+    // and the box is answered before the check exists.
+    fireEvent.change(screen.getByRole("textbox", { name: "New check for acme" }), {
+      target: { value: "nightly-e2e" },
+    });
+    fireEvent.click(screen.getByRole("checkbox", { name: "New check is required for acme" }));
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Add check to acme" }));
     expect(onChange).toHaveBeenCalledWith({
-      orgs: { acme: [required("qa/smoke"), required("lint")] },
+      orgs: { acme: [{ name: "nightly-e2e", required: false }] },
       repos: {},
     });
   });
 
-  it("unticking a name's Required box marks it as blocking nothing", () => {
+  it("clears the add field and returns to Required after adding", () => {
+    render(
+      <SettingsModal
+        {...filterProps}
+        owners={["acme"]}
+        availableRepos={[]}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    const field = screen.getByRole("textbox", { name: "New check for acme" });
+    const box = screen.getByRole("checkbox", { name: "New check is required for acme" });
+    fireEvent.change(field, { target: { value: "lint" } });
+    fireEvent.click(box);
+    fireEvent.click(screen.getByRole("button", { name: "Add check to acme" }));
+    expect(field).toHaveValue("");
+    expect(box).toBeChecked();
+  });
+
+  it("adds on Enter, so the keyboard alone gets through the list", () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        owners={["acme"]}
+        availableRepos={[]}
+        value={emptyValue}
+        onChange={onChange}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    const field = screen.getByRole("textbox", { name: "New check for acme" });
+    fireEvent.change(field, { target: { value: "lint" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(onChange).toHaveBeenCalledWith({ orgs: { acme: [required("lint")] }, repos: {} });
+  });
+
+  it("refuses a blank name and a name already in the list", () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        owners={["acme"]}
+        availableRepos={[]}
+        value={{ orgs: { acme: ["lint"] }, repos: {} }}
+        onChange={onChange}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    const field = screen.getByRole("textbox", { name: "New check for acme" });
+    const add = screen.getByRole("button", { name: "Add check to acme" });
+    fireEvent.change(field, { target: { value: "   " } });
+    fireEvent.click(add);
+    fireEvent.change(field, { target: { value: "lint" } });
+    fireEvent.click(add);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("renames a check in place, keeping its mark", () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        owners={["acme"]}
+        availableRepos={[]}
+        value={{ orgs: { acme: [{ name: "nightly-e2e", required: false }, "lint"] }, repos: {} }}
+        onChange={onChange}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    fireEvent.change(screen.getByRole("textbox", { name: "Check 1 for acme" }), {
+      target: { value: "nightly-e2e-v2" },
+    });
+    expect(onChange).toHaveBeenLastCalledWith({
+      orgs: { acme: [{ name: "nightly-e2e-v2", required: false }, required("lint")] },
+      repos: {},
+    });
+  });
+
+  it("keeps the row while its name is emptied mid-edit", () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        owners={["acme"]}
+        availableRepos={[]}
+        value={{ orgs: { acme: ["lint"] }, repos: {} }}
+        onChange={onChange}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    const field = screen.getByRole("textbox", { name: "Check 1 for acme" });
+    // Clearing the field is how a rename starts; the row has to survive it or
+    // the user loses the control they were typing into.
+    fireEvent.change(field, { target: { value: "" } });
+    expect(onChange).toHaveBeenLastCalledWith({ orgs: { acme: [] }, repos: {} });
+    expect(field).toBeInTheDocument();
+    fireEvent.change(field, { target: { value: "ci" } });
+    expect(onChange).toHaveBeenLastCalledWith({ orgs: { acme: [required("ci")] }, repos: {} });
+  });
+
+  it("unticks a stored check without touching the others", () => {
     const onChange = vi.fn();
     render(
       <SettingsModal
@@ -108,62 +236,35 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Tracked checks");
-    // Every name starts required — that is what the list has always meant.
-    const box = screen.getByRole("checkbox", { name: "nightly-e2e is required for acme" });
-    expect(box).toBeChecked();
-    fireEvent.click(box);
+    fireEvent.click(screen.getByRole("checkbox", { name: "nightly-e2e is required for acme" }));
     expect(onChange).toHaveBeenLastCalledWith({
       orgs: { acme: [required("qa/smoke"), { name: "nightly-e2e", required: false }] },
       repos: {},
     });
   });
 
-  it("shows a box per name, ticked to match what is stored", () => {
-    render(
-      <SettingsModal
-        {...filterProps}
-        owners={["acme"]}
-        availableRepos={[]}
-        value={{ orgs: { acme: ["lint", { name: "nightly-e2e", required: false }] }, repos: {} }}
-        onChange={vi.fn()}
-        open={true}
-        onClose={vi.fn()}
-      />,
-    );
-    selectSection("Tracked checks");
-    // The names still live in one field; only the mark moved to a control.
-    expect(screen.getByRole("textbox", { name: "acme check names" })).toHaveValue(
-      "lint, nightly-e2e",
-    );
-    expect(screen.getByRole("checkbox", { name: "lint is required for acme" })).toBeChecked();
-    expect(
-      screen.getByRole("checkbox", { name: "nightly-e2e is required for acme" }),
-    ).not.toBeChecked();
-  });
-
-  it("keeps a name unticked when the field is edited around it", () => {
+  it("removes a single check from the list", () => {
     const onChange = vi.fn();
     render(
       <SettingsModal
         {...filterProps}
         owners={["acme"]}
         availableRepos={[]}
-        value={{ orgs: { acme: [{ name: "nightly-e2e", required: false }] }, repos: {} }}
+        value={{ orgs: { acme: ["qa/smoke", "lint"] }, repos: {} }}
         onChange={onChange}
         open={true}
         onClose={vi.fn()}
       />,
     );
     selectSection("Tracked checks");
-    // Typing another name re-derives the whole list; a mark the user already
-    // set must survive that, or the box un-ticks itself on the next keystroke.
-    fireEvent.change(screen.getByRole("textbox", { name: "acme check names" }), {
-      target: { value: "nightly-e2e, lint" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Remove qa/smoke from acme" }));
     expect(onChange).toHaveBeenLastCalledWith({
-      orgs: { acme: [{ name: "nightly-e2e", required: false }, required("lint")] },
+      orgs: { acme: [required("lint")] },
       repos: {},
     });
+    expect(
+      screen.queryByRole("checkbox", { name: "qa/smoke is required for acme" }),
+    ).not.toBeInTheDocument();
   });
 
   it("names the same check once per owner it is tracked for", () => {
@@ -185,113 +286,7 @@ describe("SettingsModal", () => {
     expect(screen.getByRole("checkbox", { name: "lint is required for globex" })).toBeChecked();
   });
 
-  it("keeps a name typed twice as one check", () => {
-    const onChange = vi.fn();
-    render(
-      <SettingsModal
-        {...filterProps}
-        owners={["acme"]}
-        availableRepos={[]}
-        value={{ orgs: {}, repos: {} }}
-        onChange={onChange}
-        open={true}
-        onClose={vi.fn()}
-      />,
-    );
-    selectSection("Tracked checks");
-    fireEvent.change(screen.getByRole("textbox", { name: "acme check names" }), {
-      target: { value: "qa/smoke, qa/smoke" },
-    });
-    expect(onChange).toHaveBeenLastCalledWith({
-      orgs: { acme: [required("qa/smoke")] },
-      repos: {},
-    });
-  });
-
-  it("lets the user type comma-separated org check names across keystrokes", () => {
-    const onChange = vi.fn();
-    render(
-      <SettingsModal
-        {...filterProps}
-        owners={["acme"]}
-        availableRepos={[]}
-        value={emptyValue}
-        onChange={onChange}
-        open={true}
-        onClose={vi.fn()}
-      />,
-    );
-    selectSection("Tracked checks");
-    const input = screen.getByRole("textbox", { name: "acme check names" });
-    // Parent does not feed `value` back; the input must keep the raw draft so a
-    // trailing comma survives long enough to type the second token.
-    fireEvent.change(input, { target: { value: "qa/smoke," } });
-    expect(input).toHaveValue("qa/smoke,");
-    fireEvent.change(input, { target: { value: "qa/smoke, lint" } });
-    expect(input).toHaveValue("qa/smoke, lint");
-    expect(onChange).toHaveBeenLastCalledWith({
-      orgs: { acme: [required("qa/smoke"), required("lint")] },
-      repos: {},
-    });
-  });
-
-  it("re-syncs drafts from props when the modal re-opens", () => {
-    const value: TrackedChecks = {
-      orgs: { acme: ["qa/smoke"] },
-      repos: { "acme/web": [required("Automation Result")] },
-    };
-    const { rerender } = render(
-      <SettingsModal
-        {...filterProps}
-        owners={["acme"]}
-        availableRepos={[]}
-        value={emptyValue}
-        onChange={vi.fn()}
-        open={false}
-        onClose={vi.fn()}
-      />,
-    );
-    // Open with a populated value (e.g. parent hydrated from localStorage).
-    // "acme/web" is in value.repos so it appears in repoOptions even with availableRepos=[].
-    rerender(
-      <SettingsModal
-        {...filterProps}
-        owners={["acme"]}
-        availableRepos={[]}
-        value={value}
-        onChange={vi.fn()}
-        open={true}
-        onClose={vi.fn()}
-      />,
-    );
-    selectSection("Tracked checks");
-    expect(
-      screen.getByRole("textbox", { name: "acme check names" }),
-    ).toHaveValue("qa/smoke");
-    expect(screen.getByRole("combobox", { name: "Repository" })).toHaveValue("acme/web");
-    expect(screen.getByPlaceholderText("e.g. qa/smoke")).toHaveValue(
-      "Automation Result",
-    );
-  });
-
-  it("clicking 'Add override' renders a new repo/checks input row", () => {
-    render(
-      <SettingsModal
-        {...filterProps}
-        availableRepos={someRepos}
-        value={emptyValue}
-        onChange={vi.fn()}
-        open={true}
-        onClose={vi.fn()}
-      />,
-    );
-    selectSection("Tracked checks");
-    expect(screen.queryByRole("combobox", { name: "Repository" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /add override/i }));
-    expect(screen.getByRole("combobox", { name: "Repository" })).toBeInTheDocument();
-  });
-
-  it("editing a repo override calls onChange with correct shape", () => {
+  it("takes checks for a repo override once a repo is picked", () => {
     const onChange = vi.fn();
     render(
       <SettingsModal
@@ -305,24 +300,28 @@ describe("SettingsModal", () => {
     );
     selectSection("Tracked checks");
     fireEvent.click(screen.getByRole("button", { name: /add override/i }));
-    const repoInput = screen.getByRole("combobox", { name: "Repository" });
-    const checksInput = screen.getByPlaceholderText("e.g. qa/smoke");
-    // Focus the combobox to reveal availableRepos as suggestions, then pick one
-    fireEvent.focus(repoInput);
+    // No repo, nothing to attach a check to — the list appears with the repo.
+    expect(
+      screen.queryByRole("textbox", { name: /^New check for/ }),
+    ).not.toBeInTheDocument();
+    fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
-    fireEvent.change(checksInput, { target: { value: "Automation Result" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "New check for acme/web" }), {
+      target: { value: "Automation Result" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add check to acme/web" }));
     expect(onChange).toHaveBeenLastCalledWith({
       orgs: {},
       repos: { "acme/web": [required("Automation Result")] },
     });
   });
 
-  it("skips an override row whose repo field is left empty", () => {
+  it("starts a freshly picked repo with an empty list", () => {
     const onChange = vi.fn();
     render(
       <SettingsModal
         {...filterProps}
-        availableRepos={someRepos}
+        availableRepos={["acme/web"]}
         value={emptyValue}
         onChange={onChange}
         open={true}
@@ -331,12 +330,149 @@ describe("SettingsModal", () => {
     );
     selectSection("Tracked checks");
     fireEvent.click(screen.getByRole("button", { name: /add override/i }));
-    // Fill only the checks field, leaving the repo select on the blank placeholder:
-    // the row must not emit an empty-string repo key.
-    fireEvent.change(screen.getByPlaceholderText("e.g. qa/smoke"), {
-      target: { value: "Automation Result" },
+    fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
+    expect(onChange).toHaveBeenLastCalledWith({ orgs: {}, repos: { "acme/web": [] } });
+  });
+
+  it("carries a repo's checks over when the repo is renamed", () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        availableRepos={["acme/web", "acme/api"]}
+        value={{ orgs: {}, repos: { "acme/web": ["lint"], "beta/api": ["ci"] } }}
+        onChange={onChange}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    const combobox = screen.getAllByRole("combobox", { name: "Repository" })[0];
+    // Clearing the field falls back to the loaded repos as suggestions.
+    fireEvent.change(combobox, { target: { value: "" } });
+    fireEvent.mouseDown(screen.getAllByRole("option", { name: "acme/api" })[0]);
+    // The carried checks arrive normalized; the row that was not touched keeps
+    // its own repo and the shape it was stored in.
+    expect(onChange).toHaveBeenLastCalledWith({
+      orgs: {},
+      repos: { "beta/api": ["ci"], "acme/api": [required("lint")] },
     });
+  });
+
+  it("drops a repo's checks when its override row goes", () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        availableRepos={["acme/web"]}
+        value={{ orgs: {}, repos: { "acme/web": ["lint"] } }}
+        onChange={onChange}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    fireEvent.click(screen.getByRole("button", { name: /remove repo override/i }));
     expect(onChange).toHaveBeenLastCalledWith({ orgs: {}, repos: {} });
+  });
+
+  it("leaves the surviving row's own checks behind when one is removed", () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        availableRepos={["acme/web", "beta/api"]}
+        value={{ orgs: {}, repos: { "acme/web": ["lint"], "beta/api": ["ci"] } }}
+        onChange={onChange}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    // Rows are keyed by identity, not position: removing the first must not
+    // hand its check list to the row that moves up into its place.
+    fireEvent.click(screen.getAllByRole("button", { name: /remove repo override/i })[0]);
+    expect(screen.getByRole("textbox", { name: "Check 1 for beta/api" })).toHaveValue("ci");
+    expect(
+      screen.queryByRole("textbox", { name: "Check 1 for acme/web" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("merges into the existing row when two rows would name one repo", () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        availableRepos={["acme/web", "beta/api"]}
+        value={{ orgs: {}, repos: { "acme/web": ["lint"], "beta/api": ["ci"] } }}
+        onChange={onChange}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    // One row per repo is the invariant; pointing a second row at a repo that
+    // already has one must join the two lists, never overwrite the older.
+    const second = screen.getAllByRole("combobox", { name: "Repository" })[1];
+    fireEvent.change(second, { target: { value: "" } });
+    fireEvent.mouseDown(screen.getAllByRole("option", { name: "acme/web" })[0]);
+    expect(onChange).toHaveBeenLastCalledWith({
+      orgs: {},
+      repos: { "acme/web": [required("lint"), required("ci")] },
+    });
+    expect(screen.getAllByRole("combobox", { name: "Repository" })).toHaveLength(1);
+  });
+
+  it("stores a renamed check trimmed, and never twice under one name", () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        owners={["acme"]}
+        availableRepos={[]}
+        value={{ orgs: { acme: ["qa/smoke", "lint"] }, repos: {} }}
+        onChange={onChange}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    const second = screen.getByRole("textbox", { name: "Check 2 for acme" });
+    // A stray space would stop the name matching what GitHub reports.
+    fireEvent.change(second, { target: { value: " lint " } });
+    expect(onChange).toHaveBeenLastCalledWith({
+      orgs: { acme: [required("qa/smoke"), required("lint")] },
+      repos: {},
+    });
+    // Two rows can read the same name mid-rename; storage keeps one.
+    fireEvent.change(second, { target: { value: "qa/smoke" } });
+    expect(onChange).toHaveBeenLastCalledWith({
+      orgs: { acme: [required("qa/smoke")] },
+      repos: {},
+    });
+    expect(second).toHaveValue("qa/smoke");
+  });
+
+  it("keeps two override rows independent", () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        availableRepos={["acme/web", "beta/api"]}
+        value={{ orgs: {}, repos: { "acme/web": ["lint"], "beta/api": ["ci"] } }}
+        onChange={onChange}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    fireEvent.click(screen.getByRole("checkbox", { name: "ci is required for beta/api" }));
+    expect(onChange).toHaveBeenLastCalledWith({
+      orgs: {},
+      // acme/web was not touched, so it keeps the shape it was stored in.
+      repos: { "acme/web": ["lint"], "beta/api": [{ name: "ci", required: false }] },
+    });
   });
 
   it("clicking the remove button on an override removes that row", () => {
@@ -461,157 +597,10 @@ describe("SettingsModal", () => {
     expect(combobox).toHaveValue("legacy/repo");
   });
 
-  it("selecting a repo and entering checks calls onChange with the right repos shape", () => {
-    const onChange = vi.fn();
-    render(
-      <SettingsModal
-        {...filterProps}
-        availableRepos={["acme/web"]}
-        value={emptyValue}
-        onChange={onChange}
-        open={true}
-        onClose={vi.fn()}
-      />,
-    );
-    selectSection("Tracked checks");
-    fireEvent.click(screen.getByRole("button", { name: /add override/i }));
-    const repoInput = screen.getByRole("combobox", { name: "Repository" });
-    // Focus to show suggestions, then pick one
-    fireEvent.focus(repoInput);
-    fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
-    const checksInput = screen.getByPlaceholderText("e.g. qa/smoke");
-    fireEvent.change(checksInput, { target: { value: "Automation Result" } });
-    expect(onChange).toHaveBeenLastCalledWith({
-      orgs: {},
-      repos: { "acme/web": [required("Automation Result")] },
-    });
-  });
 
-  it("merges checks from two rows targeting the same repo (union, de-duplicated)", () => {
-    const onChange = vi.fn();
-    render(
-      <SettingsModal
-        {...filterProps}
-        availableRepos={["acme/web"]}
-        value={emptyValue}
-        onChange={onChange}
-        open={true}
-        onClose={vi.fn()}
-      />,
-    );
-    selectSection("Tracked checks");
 
-    // Add first row: acme/web → qa/smoke
-    fireEvent.click(screen.getByRole("button", { name: /add override/i }));
-    const [repoInput1] = screen.getAllByRole("combobox", { name: "Repository" });
-    fireEvent.focus(repoInput1);
-    fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
-    const [checksInput1] = screen.getAllByPlaceholderText("e.g. qa/smoke");
-    fireEvent.change(checksInput1, { target: { value: "qa/smoke" } });
 
-    // Add second row: acme/web → Automation Result
-    fireEvent.click(screen.getByRole("button", { name: /add override/i }));
-    const allRepoInputs = screen.getAllByRole("combobox", { name: "Repository" });
-    const repoInput2 = allRepoInputs[allRepoInputs.length - 1];
-    fireEvent.focus(repoInput2);
-    fireEvent.mouseDown(screen.getAllByRole("option", { name: "acme/web" })[0]);
-    const allChecksInputs = screen.getAllByPlaceholderText("e.g. qa/smoke");
-    const checksInput2 = allChecksInputs[allChecksInputs.length - 1];
-    fireEvent.change(checksInput2, { target: { value: "Automation Result" } });
 
-    const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1][0] as TrackedChecks;
-    // Both checks must appear for acme/web — union, de-duplicated
-    expect(lastCall.repos["acme/web"]).toEqual(
-      expect.arrayContaining([required("qa/smoke"), required("Automation Result")]),
-    );
-    expect(lastCall.repos["acme/web"]).toHaveLength(2);
-  });
-
-  it("marks a repo override's own checks with its own boxes", () => {
-    const onChange = vi.fn();
-    render(
-      <SettingsModal
-        {...filterProps}
-        availableRepos={["acme/web"]}
-        value={{ orgs: {}, repos: { "acme/web": ["qa/smoke", "nightly-e2e"] } }}
-        onChange={onChange}
-        open={true}
-        onClose={vi.fn()}
-      />,
-    );
-    selectSection("Tracked checks");
-    fireEvent.click(
-      screen.getByRole("checkbox", { name: "nightly-e2e is required for acme/web" }),
-    );
-    expect(onChange).toHaveBeenLastCalledWith({
-      orgs: {},
-      repos: { "acme/web": [required("qa/smoke"), { name: "nightly-e2e", required: false }] },
-    });
-  });
-
-  it("shows one set of boxes when two rows name the same repo", () => {
-    render(
-      <SettingsModal
-        {...filterProps}
-        availableRepos={["acme/web"]}
-        value={{ orgs: {}, repos: { "acme/web": ["lint"] } }}
-        onChange={vi.fn()}
-        open={true}
-        onClose={vi.fn()}
-      />,
-    );
-    selectSection("Tracked checks");
-    // Rows naming the same repo share one stored list, so a second row's boxes
-    // would be the same controls under the same label — drawn once, on the
-    // first row that names the repo.
-    fireEvent.click(screen.getByRole("button", { name: "Add override" }));
-    const second = screen.getAllByRole("combobox", { name: "Repository" })[1];
-    fireEvent.focus(second);
-    fireEvent.mouseDown(screen.getAllByRole("option", { name: "acme/web" })[0]);
-    expect(second).toHaveValue("acme/web");
-    expect(screen.getAllByRole("checkbox", { name: "lint is required for acme/web" })).toHaveLength(
-      1,
-    );
-  });
-
-  it("distinct repos still map independently with no cross-contamination", () => {
-    const onChange = vi.fn();
-    render(
-      <SettingsModal
-        {...filterProps}
-        availableRepos={["acme/web", "beta/api"]}
-        value={emptyValue}
-        onChange={onChange}
-        open={true}
-        onClose={vi.fn()}
-      />,
-    );
-    selectSection("Tracked checks");
-
-    // Row 1: acme/web → qa/smoke
-    fireEvent.click(screen.getByRole("button", { name: /add override/i }));
-    const [repoInput1] = screen.getAllByRole("combobox", { name: "Repository" });
-    fireEvent.focus(repoInput1);
-    fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
-    const [checksInput1] = screen.getAllByPlaceholderText("e.g. qa/smoke");
-    fireEvent.change(checksInput1, { target: { value: "qa/smoke" } });
-
-    // Row 2: beta/api → lint
-    fireEvent.click(screen.getByRole("button", { name: /add override/i }));
-    const allRepoInputs = screen.getAllByRole("combobox", { name: "Repository" });
-    const repoInput2 = allRepoInputs[allRepoInputs.length - 1];
-    fireEvent.focus(repoInput2);
-    fireEvent.mouseDown(screen.getByRole("option", { name: "beta/api" }));
-    const allChecksInputs = screen.getAllByPlaceholderText("e.g. qa/smoke");
-    const checksInput2 = allChecksInputs[allChecksInputs.length - 1];
-    fireEvent.change(checksInput2, { target: { value: "lint" } });
-
-    const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1][0] as {
-      repos: Record<string, unknown[]>;
-    };
-    expect(lastCall.repos["acme/web"]).toEqual([required("qa/smoke")]);
-    expect(lastCall.repos["beta/api"]).toEqual([required("lint")]);
-  });
 
   it("shows empty-state hint and Add override button when availableRepos and configured repos are both empty", () => {
     render(
@@ -1081,16 +1070,17 @@ describe("SettingsModal — owner defaults cover the personal account", () => {
     // Dashboard passes [login, ...orgs]; the personal account is the head of
     // that list and used to be the one owner with no way to set a default.
     renderTracked({ owners: ["octocat", "acme"] });
-    expect(screen.getByRole("textbox", { name: "octocat check names" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "acme check names" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "New check for octocat" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "New check for acme" })).toBeInTheDocument();
   });
 
   it("stores a personal-account default under that login", () => {
     const onChange = vi.fn();
     renderTracked({ owners: ["octocat"], onChange });
-    fireEvent.change(screen.getByRole("textbox", { name: "octocat check names" }), {
+    fireEvent.change(screen.getByRole("textbox", { name: "New check for octocat" }), {
       target: { value: "qa/smoke" },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Add check to octocat" }));
     // resolveTracked keys on the owner segment of `owner/repo`, so this is the
     // shape that makes octocat/anything pick the default up.
     expect(onChange).toHaveBeenCalledWith({

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.19.0](https://github.com/mfozmen/PRison/compare/v1.18.0...v1.19.0) (2026-08-13)
+
+### Features
+
+* add a tracked check with its mark, and edit it afterwards ([#76](https://github.com/mfozmen/PRison/issues/76)) ([9f94426](https://github.com/mfozmen/PRison/commit/9f9442640d14ab4e5f903971cc68567968a6d449))
+
 ## [1.18.0](https://github.com/mfozmen/PRison/compare/v1.17.0...v1.18.0) (2026-08-13)
 
 ### Features

@@ -109,7 +109,7 @@ describe("SettingsModal", () => {
     );
     selectSection("Tracked checks");
     // Every name starts required — that is what the list has always meant.
-    const box = screen.getByRole("checkbox", { name: "nightly-e2e is required" });
+    const box = screen.getByRole("checkbox", { name: "nightly-e2e is required for acme" });
     expect(box).toBeChecked();
     fireEvent.click(box);
     expect(onChange).toHaveBeenLastCalledWith({
@@ -135,8 +135,10 @@ describe("SettingsModal", () => {
     expect(screen.getByRole("textbox", { name: "acme check names" })).toHaveValue(
       "lint, nightly-e2e",
     );
-    expect(screen.getByRole("checkbox", { name: "lint is required" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "nightly-e2e is required" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "lint is required for acme" })).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "nightly-e2e is required for acme" }),
+    ).not.toBeChecked();
   });
 
   it("keeps a name unticked when the field is edited around it", () => {
@@ -160,6 +162,48 @@ describe("SettingsModal", () => {
     });
     expect(onChange).toHaveBeenLastCalledWith({
       orgs: { acme: [{ name: "nightly-e2e", required: false }, required("lint")] },
+      repos: {},
+    });
+  });
+
+  it("names the same check once per owner it is tracked for", () => {
+    render(
+      <SettingsModal
+        {...filterProps}
+        owners={["acme", "globex"]}
+        availableRepos={[]}
+        value={{ orgs: { acme: ["lint"], globex: ["lint"] }, repos: {} }}
+        onChange={vi.fn()}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    // Both owners render at once, so a bare "lint is required" would name two
+    // different controls — ambiguous to a screen reader, not just to a test.
+    expect(screen.getByRole("checkbox", { name: "lint is required for acme" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "lint is required for globex" })).toBeChecked();
+  });
+
+  it("keeps a name typed twice as one check", () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        owners={["acme"]}
+        availableRepos={[]}
+        value={{ orgs: {}, repos: {} }}
+        onChange={onChange}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    fireEvent.change(screen.getByRole("textbox", { name: "acme check names" }), {
+      target: { value: "qa/smoke, qa/smoke" },
+    });
+    expect(onChange).toHaveBeenLastCalledWith({
+      orgs: { acme: [required("qa/smoke")] },
       repos: {},
     });
   });
@@ -496,7 +540,9 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Tracked checks");
-    fireEvent.click(screen.getByRole("checkbox", { name: "nightly-e2e is required" }));
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "nightly-e2e is required for acme/web" }),
+    );
     expect(onChange).toHaveBeenLastCalledWith({
       orgs: {},
       repos: { "acme/web": [required("qa/smoke"), { name: "nightly-e2e", required: false }] },

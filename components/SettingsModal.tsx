@@ -93,10 +93,13 @@ function toDraft(entries: StoredCheck[]): string {
  * meant since before there was anything else it could mean. An existing one
  * keeps whatever mark it already carries. */
 function withMarks(names: string[], previous: TrackedCheck[]): TrackedCheck[] {
-  return names.map((name) => ({
-    name,
-    required: previous.find((c) => c.name === name)?.required ?? true,
-  }));
+  const seen = new Set<string>();
+  return names
+    .filter((name) => !seen.has(name) && seen.add(name))
+    .map((name) => ({
+      name,
+      required: previous.find((c) => c.name === name)?.required ?? true,
+    }));
 }
 
 function seedOrgDrafts(orgs: Record<string, StoredCheck[]>): Record<string, string> {
@@ -110,11 +113,16 @@ function seedRows(repos: Record<string, StoredCheck[]>): RepoRow[] {
 }
 
 /** The Required boxes for one owner or override, one per name already stored. */
+/** `scope` is the owner or repo the boxes belong to. Owner defaults and repo
+ * overrides render together, so the same check name can appear more than once
+ * on screen and the label has to say which one it marks. */
 function RequiredBoxes({
   checks,
+  scope,
   onToggle,
 }: {
   checks: TrackedCheck[];
+  scope: string;
   onToggle: (name: string, required: boolean) => void;
 }) {
   if (checks.length === 0) return null;
@@ -128,7 +136,7 @@ function RequiredBoxes({
           <input
             type="checkbox"
             checked={check.required}
-            aria-label={`${check.name} is required`}
+            aria-label={`${check.name} is required for ${scope}`}
             onChange={(e) => onToggle(check.name, e.target.checked)}
             className="h-3.5 w-3.5 rounded border-border bg-surface accent-accent"
           />
@@ -652,6 +660,7 @@ export function SettingsModal({
                             className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
                           />
                           <RequiredBoxes
+                            scope={owner}
                             checks={normalizeAll(value.orgs[owner])}
                             onToggle={(name, required) =>
                               handleOrgRequired(owner, name, required)
@@ -720,6 +729,7 @@ export function SettingsModal({
                         </button>
                         </div>
                         <RequiredBoxes
+                          scope={row.repo.trim()}
                           checks={normalizeAll(value.repos[row.repo.trim()])}
                           onToggle={(name, required) =>
                             handleRowRequired(row.repo.trim(), name, required)

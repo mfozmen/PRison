@@ -66,83 +66,116 @@ const SECTIONS = [
 
 type SectionId = (typeof SECTIONS)[number]["id"];
 
-// One field for the names, one box per name for whether it blocks the merge.
-// The names stay free text — typed with commas, kept as a raw draft so a
-// trailing comma survives long enough to type the next one — and the mark
-// rides alongside as a control, because nobody should have to spell "required".
-interface RepoRow {
-  repo: string;
-  checks: string;
-}
-
-function parseChecks(input: string): string[] {
-  return input
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-/** The names as typed, so the field can be seeded from stored config. */
-function toDraft(entries: StoredCheck[]): string {
-  return normalizeAll(entries)
-    .map((c) => c.name)
-    .join(", ");
-}
-
-/** A freshly typed name is required — that is what every name in this list has
- * meant since before there was anything else it could mean. An existing one
- * keeps whatever mark it already carries. */
-function withMarks(names: string[], previous: TrackedCheck[]): TrackedCheck[] {
-  const seen = new Set<string>();
-  return names
-    .filter((name) => !seen.has(name) && seen.add(name))
-    .map((name) => ({
-      name,
-      required: previous.find((c) => c.name === name)?.required ?? true,
-    }));
-}
-
-function seedOrgDrafts(orgs: Record<string, StoredCheck[]>): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(orgs).map(([login, checks]) => [login, toDraft(checks)]),
-  );
-}
-
-function seedRows(repos: Record<string, StoredCheck[]>): RepoRow[] {
-  return Object.entries(repos).map(([repo, checks]) => ({ repo, checks: toDraft(checks) }));
-}
-
-/** The Required boxes for one owner or override, one per name already stored.
- * `scope` is the owner or repo the boxes belong to. Owner defaults and repo
- * overrides render together, so the same check name can appear more than once
- * on screen and the label has to say which one it marks. */
-function RequiredBoxes({
-  checks,
+// A tracked check is a name plus whether it blocks the merge, so adding one
+// asks both questions at once: type the name, answer the box, press Add. The
+// list below is the same two controls per row, which is what makes an existing
+// check editable rather than something you have to delete and retype.
+function CheckList({
   scope,
-  onToggle,
+  checks,
+  onChange,
 }: {
-  checks: TrackedCheck[];
   scope: string;
-  onToggle: (name: string, required: boolean) => void;
+  checks: StoredCheck[] | undefined;
+  onChange: (next: TrackedCheck[]) => void;
 }) {
-  if (checks.length === 0) return null;
+  // The rows are held locally so a name can pass through empty on its way to a
+  // new one; only named checks are pushed up. The modal unmounts when it
+  // closes, so this is re-seeded from props every time it opens.
+  const [items, setItems] = useState<TrackedCheck[]>(() => normalizeAll(checks));
+  const [draft, setDraft] = useState("");
+  const [draftRequired, setDraftRequired] = useState(true);
+
+  function commit(next: TrackedCheck[]) {
+    setItems(next);
+    onChange(next.filter((c) => c.name.trim() !== ""));
+  }
+
+  function add() {
+    const name = draft.trim();
+    if (!name || items.some((c) => c.name === name)) return;
+    commit([...items, { name, required: draftRequired }]);
+    setDraft("");
+    setDraftRequired(true);
+  }
+
+  const fieldClass =
+    "min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent";
+  const boxClass = "h-4 w-4 rounded border-border bg-surface accent-accent";
+
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1">
-      {checks.map((check) => (
-        <label
-          key={check.name}
-          className="flex cursor-pointer items-center gap-1.5 text-xs text-muted select-none"
-        >
+    <div className="space-y-1.5">
+      {items.map((check, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <input
+            type="text"
+            aria-label={`Check ${i + 1} for ${scope}`}
+            value={check.name}
+            onChange={(e) =>
+              commit(items.map((c, j) => (j === i ? { ...c, name: e.target.value } : c)))
+            }
+            className={fieldClass}
+          />
+          <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-muted select-none">
+            <input
+              type="checkbox"
+              checked={check.required}
+              aria-label={`${check.name} is required for ${scope}`}
+              onChange={(e) =>
+                commit(
+                  items.map((c, j) => (j === i ? { ...c, required: e.target.checked } : c)),
+                )
+              }
+              className={boxClass}
+            />
+            Required
+          </label>
+          <button
+            type="button"
+            aria-label={`Remove ${check.name} from ${scope}`}
+            onClick={() => commit(items.filter((_, j) => j !== i))}
+            className="flex min-h-[44px] min-w-[44px] shrink-0 cursor-pointer items-center justify-center text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path
+                d="M11 3L3 11M3 3l8 8"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+      ))}
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          aria-label={`New check for ${scope}`}
+          placeholder="e.g. qa/smoke"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          className={fieldClass}
+        />
+        <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-muted select-none">
           <input
             type="checkbox"
-            checked={check.required}
-            aria-label={`${check.name} is required for ${scope}`}
-            onChange={(e) => onToggle(check.name, e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-border bg-surface accent-accent"
+            checked={draftRequired}
+            aria-label={`New check is required for ${scope}`}
+            onChange={(e) => setDraftRequired(e.target.checked)}
+            className={boxClass}
           />
-          {check.name}
+          Required
         </label>
-      ))}
+        <SettingButton onClick={add} className="shrink-0 py-1.5" ariaLabel={`Add check to ${scope}`}>
+          Add
+        </SettingButton>
+      </div>
     </div>
   );
 }
@@ -172,15 +205,18 @@ function SettingCheckbox({
 function SettingButton({
   onClick,
   className = "",
+  ariaLabel,
   children,
 }: {
   onClick: () => void;
   className?: string;
+  ariaLabel?: string;
   children: ReactNode;
 }) {
   return (
     <button
       type="button"
+      aria-label={ariaLabel}
       onClick={onClick}
       className={`min-h-[44px] cursor-pointer rounded-md border border-border bg-surface px-3 text-sm font-medium text-foreground transition-colors hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${className}`}
     >
@@ -268,13 +304,9 @@ export function SettingsModal({
 
   const [section, setSection] = useState<SectionId>(SECTIONS[0].id);
 
-  // Raw input drafts are buffered locally so the user can freely type
-  // commas/spaces; we only parse into string[] when pushing changes up.
-  const [orgDrafts, setOrgDrafts] = useState<Record<string, string>>(() =>
-    seedOrgDrafts(value.orgs),
-  );
-
-  const [rows, setRows] = useState<RepoRow[]>(() => seedRows(value.repos));
+  // An override row is just the repo it targets; its checks live in `value`,
+  // where CheckList reads and writes them.
+  const [rows, setRows] = useState<string[]>(() => Object.keys(value.repos));
 
   // Re-seed local drafts from props each time the modal opens, so a parent
   // that hydrates `value` after mount (e.g. from localStorage) is reflected
@@ -286,8 +318,7 @@ export function SettingsModal({
   if (open !== wasOpen) {
     setWasOpen(open);
     if (open) {
-      setOrgDrafts(seedOrgDrafts(value.orgs));
-      setRows(seedRows(value.repos));
+      setRows(Object.keys(value.repos));
       setSection(SECTIONS[0].id);
       // A result from the last time the modal was open is stale by an unknown
       // amount; better to offer the check again than to show an old answer.
@@ -314,63 +345,35 @@ export function SettingsModal({
 
   if (!open) return null;
 
-  function handleOrgChange(orgLogin: string, inputValue: string) {
-    setOrgDrafts((prev) => ({ ...prev, [orgLogin]: inputValue }));
-    const checks = withMarks(parseChecks(inputValue), normalizeAll(value.orgs[orgLogin]));
+  function setOrgChecks(orgLogin: string, checks: TrackedCheck[]) {
     onChange({ ...value, orgs: { ...value.orgs, [orgLogin]: checks } });
   }
 
-  function handleOrgRequired(orgLogin: string, name: string, required: boolean) {
-    const checks = normalizeAll(value.orgs[orgLogin]).map((c) =>
-      c.name === name ? { ...c, required } : c,
-    );
-    onChange({ ...value, orgs: { ...value.orgs, [orgLogin]: checks } });
-  }
-
-  function rebuildAndNotify(newRows: RepoRow[]) {
-    const newRepos: Record<string, TrackedCheck[]> = {};
-    for (const row of newRows) {
-      const repo = row.repo.trim();
-      if (!repo) continue;
-      // Two rows can name the same repo while one of them is mid-edit; the
-      // later row's checks join the earlier row's rather than replacing them.
-      const merged = [
-        ...(newRepos[repo] ?? []),
-        ...withMarks(parseChecks(row.checks), normalizeAll(value.repos[repo])),
-      ];
-      const seen = new Set<string>();
-      newRepos[repo] = merged.filter((c) => !seen.has(c.name) && seen.add(c.name));
-    }
-    onChange({ ...value, repos: newRepos });
-  }
-
-  function handleRowRequired(repo: string, name: string, required: boolean) {
-    const checks = normalizeAll(value.repos[repo]).map((c) =>
-      c.name === name ? { ...c, required } : c,
-    );
+  function setRepoChecks(repo: string, checks: TrackedCheck[]) {
     onChange({ ...value, repos: { ...value.repos, [repo]: checks } });
   }
 
-  function handleRowChange(
-    index: number,
-    field: "repo" | "checks",
-    inputValue: string,
-  ) {
-    const newRows = rows.map((row, i) =>
-      i === index ? { ...row, [field]: inputValue } : row,
-    );
-    setRows(newRows);
-    rebuildAndNotify(newRows);
+  /** Renaming the repo moves the checks with it — they were named for this
+   * override, not for the repo that happened to be typed first. */
+  function handleRowChange(index: number, repo: string) {
+    const previous = rows[index];
+    setRows(rows.map((r, i) => (i === index ? repo : r)));
+    const repos = { ...value.repos };
+    const carried = repos[previous];
+    delete repos[previous];
+    repos[repo] = carried ?? [];
+    onChange({ ...value, repos });
   }
 
   function addRow() {
-    setRows([...rows, { repo: "", checks: "" }]);
+    setRows([...rows, ""]);
   }
 
   function removeRow(index: number) {
-    const newRows = rows.filter((_, i) => i !== index);
-    setRows(newRows);
-    rebuildAndNotify(newRows);
+    setRows(rows.filter((_, i) => i !== index));
+    const repos = { ...value.repos };
+    delete repos[rows[index]];
+    onChange({ ...value, repos });
   }
 
   // Arrow keys move between sections. The menu is a horizontal strip below the
@@ -626,10 +629,10 @@ export function SettingsModal({
                 <p className="mb-6 text-sm text-muted">
                   Name the checks each PR needs (e.g. a manual qa/smoke). We&apos;ll show
                   them as Awaiting until they report — handy for gates GitHub
-                  doesn&apos;t expose. A{" "}
-                  <strong className="font-medium text-foreground">Required</strong> one
-                  holds the PR out of Ready to merge; untick the box and the check is
-                  shown for information and blocks nothing.
+                  doesn&apos;t expose. Tick{" "}
+                  <strong className="font-medium text-foreground">Required</strong> and the
+                  check holds the PR out of Ready to merge; leave it unticked and the
+                  check is shown for information and blocks nothing.
                 </p>
 
                 {/* Owner defaults — organizations *and* the personal account.
@@ -642,30 +645,14 @@ export function SettingsModal({
                     <h4 className="mb-2 text-sm font-medium text-foreground">
                       Owner defaults
                     </h4>
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       {owners.map((owner) => (
-                        <div key={owner} className="flex flex-col gap-1">
-                          <label
-                            className="text-sm text-muted"
-                            htmlFor={`org-input-${owner}`}
-                          >
-                            {owner}
-                          </label>
-                          <input
-                            id={`org-input-${owner}`}
-                            type="text"
-                            aria-label={`${owner} check names`}
-                            placeholder="e.g. qa/smoke, Automation Result"
-                            value={orgDrafts[owner] ?? ""}
-                            onChange={(e) => handleOrgChange(owner, e.target.value)}
-                            className="rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                          />
-                          <RequiredBoxes
+                        <div key={owner} className="flex flex-col gap-2">
+                          <span className="text-sm text-muted">{owner}</span>
+                          <CheckList
                             scope={owner}
-                            checks={normalizeAll(value.orgs[owner])}
-                            onToggle={(name, required) =>
-                              handleOrgRequired(owner, name, required)
-                            }
+                            checks={value.orgs[owner]}
+                            onChange={(checks) => setOrgChecks(owner, checks)}
                           />
                         </div>
                       ))}
@@ -686,31 +673,21 @@ export function SettingsModal({
                       No repositories loaded yet &mdash; you can search any repo by name below.
                     </p>
                   )}
-                  <div className="mb-3 space-y-2">
-                    {rows.map((row, index) => (
-                      <div key={index} className="flex flex-col gap-1">
+                  <div className="mb-3 space-y-4">
+                    {rows.map((repo, index) => (
+                      <div key={index} className="flex flex-col gap-2">
                         <div className="flex items-center gap-2">
                           <RepoCombobox
-                            value={row.repo}
-                            onChange={(repo) => handleRowChange(index, "repo", repo)}
+                            value={repo}
+                            onChange={(next) => handleRowChange(index, next)}
                             suggestions={availableRepos}
                             owners={owners}
-                          />
-                          <input
-                            type="text"
-                            aria-label="Check names for this repo override"
-                            placeholder="e.g. qa/smoke"
-                            value={row.checks}
-                            onChange={(e) =>
-                              handleRowChange(index, "checks", e.target.value)
-                            }
-                            className="flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
                           />
                           <button
                             type="button"
                             aria-label="Remove repo override"
                             onClick={() => removeRow(index)}
-                            className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                            className="flex min-h-[44px] min-w-[44px] shrink-0 cursor-pointer items-center justify-center text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                           >
                             <svg
                               aria-hidden="true"
@@ -729,19 +706,16 @@ export function SettingsModal({
                             </svg>
                           </button>
                         </div>
-                        {/* Rows naming the same repo share one stored list, so
-                            a later row's boxes would be the same controls under
-                            the same label — draw them on the first row only. */}
-                        {rows.findIndex(
-                          (r) => r.repo.trim() === row.repo.trim(),
-                        ) === index && (
-                          <RequiredBoxes
-                            scope={row.repo.trim()}
-                            checks={normalizeAll(value.repos[row.repo.trim()])}
-                            onToggle={(name, required) =>
-                              handleRowRequired(row.repo.trim(), name, required)
-                            }
-                          />
+                        {/* A check belongs to a repo, so there is nothing to
+                            add one to until the row names one. */}
+                        {repo.trim() !== "" && (
+                          <div className="border-l border-border pl-3">
+                            <CheckList
+                              scope={repo}
+                              checks={value.repos[repo]}
+                              onChange={(checks) => setRepoChecks(repo, checks)}
+                            />
+                          </div>
                         )}
                       </div>
                     ))}

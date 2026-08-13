@@ -29,7 +29,10 @@ function normalize(entry: StoredCheck): TrackedCheck | null {
   return typeof name === "string" && name ? { name, required: required !== false } : null;
 }
 
-function normalizeAll(entries: StoredCheck[]): TrackedCheck[] {
+/** Normalized entries, with unusable ones dropped. Exported because the
+ * settings form reads the same stored shape straight out of props. */
+export function normalizeAll(entries: StoredCheck[] | undefined): TrackedCheck[] {
+  if (!entries) return [];
   return entries.map(normalize).filter((c): c is TrackedCheck => c !== null);
 }
 

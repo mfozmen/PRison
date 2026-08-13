@@ -352,11 +352,11 @@ describe("SettingsModal", () => {
     // Clearing the field falls back to the loaded repos as suggestions.
     fireEvent.change(combobox, { target: { value: "" } });
     fireEvent.mouseDown(screen.getAllByRole("option", { name: "acme/api" })[0]);
-    // The stored entry rides along as-is; normalization happens on read, and
-    // the row that was not touched keeps its own repo.
+    // The carried checks arrive normalized; the row that was not touched keeps
+    // its own repo and the shape it was stored in.
     expect(onChange).toHaveBeenLastCalledWith({
       orgs: {},
-      repos: { "beta/api": ["ci"], "acme/api": ["lint"] },
+      repos: { "beta/api": ["ci"], "acme/api": [required("lint")] },
     });
   });
 
@@ -375,6 +375,83 @@ describe("SettingsModal", () => {
     selectSection("Tracked checks");
     fireEvent.click(screen.getByRole("button", { name: /remove repo override/i }));
     expect(onChange).toHaveBeenLastCalledWith({ orgs: {}, repos: {} });
+  });
+
+  it("leaves the surviving row's own checks behind when one is removed", () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        availableRepos={["acme/web", "beta/api"]}
+        value={{ orgs: {}, repos: { "acme/web": ["lint"], "beta/api": ["ci"] } }}
+        onChange={onChange}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    // Rows are keyed by identity, not position: removing the first must not
+    // hand its check list to the row that moves up into its place.
+    fireEvent.click(screen.getAllByRole("button", { name: /remove repo override/i })[0]);
+    expect(screen.getByRole("textbox", { name: "Check 1 for beta/api" })).toHaveValue("ci");
+    expect(
+      screen.queryByRole("textbox", { name: "Check 1 for acme/web" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("merges into the existing row when two rows would name one repo", () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        availableRepos={["acme/web", "beta/api"]}
+        value={{ orgs: {}, repos: { "acme/web": ["lint"], "beta/api": ["ci"] } }}
+        onChange={onChange}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    // One row per repo is the invariant; pointing a second row at a repo that
+    // already has one must join the two lists, never overwrite the older.
+    const second = screen.getAllByRole("combobox", { name: "Repository" })[1];
+    fireEvent.change(second, { target: { value: "" } });
+    fireEvent.mouseDown(screen.getAllByRole("option", { name: "acme/web" })[0]);
+    expect(onChange).toHaveBeenLastCalledWith({
+      orgs: {},
+      repos: { "acme/web": [required("lint"), required("ci")] },
+    });
+    expect(screen.getAllByRole("combobox", { name: "Repository" })).toHaveLength(1);
+  });
+
+  it("stores a renamed check trimmed, and never twice under one name", () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        owners={["acme"]}
+        availableRepos={[]}
+        value={{ orgs: { acme: ["qa/smoke", "lint"] }, repos: {} }}
+        onChange={onChange}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    const second = screen.getByRole("textbox", { name: "Check 2 for acme" });
+    // A stray space would stop the name matching what GitHub reports.
+    fireEvent.change(second, { target: { value: " lint " } });
+    expect(onChange).toHaveBeenLastCalledWith({
+      orgs: { acme: [required("qa/smoke"), required("lint")] },
+      repos: {},
+    });
+    // Two rows can read the same name mid-rename; storage keeps one.
+    fireEvent.change(second, { target: { value: "qa/smoke" } });
+    expect(onChange).toHaveBeenLastCalledWith({
+      orgs: { acme: [required("qa/smoke")] },
+      repos: {},
+    });
+    expect(second).toHaveValue("qa/smoke");
   });
 
   it("keeps two override rows independent", () => {

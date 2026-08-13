@@ -70,6 +70,14 @@ type SectionId = (typeof SECTIONS)[number]["id"];
 // asks both questions at once: type the name, answer the box, press Add. The
 // list below is the same two controls per row, which is what makes an existing
 // check editable rather than something you have to delete and retype.
+type OverrideRow = { id: number; repo: string };
+
+// Row identity only has to be unique within one open modal.
+let rowIdCounter = 0;
+function nextRowId() {
+  return ++rowIdCounter;
+}
+
 function CheckList({
   scope,
   checks,
@@ -88,7 +96,15 @@ function CheckList({
 
   function commit(next: TrackedCheck[]) {
     setItems(next);
-    onChange(next.filter((c) => c.name.trim() !== ""));
+    // Names are trimmed on the way out, not while typing — a name with a space
+    // in it has to survive being typed. Storage keeps one entry per name, so a
+    // rename passing through a name that already exists can't leave two.
+    const seen = new Set<string>();
+    onChange(
+      next
+        .map((c) => ({ ...c, name: c.name.trim() }))
+        .filter((c) => c.name !== "" && !seen.has(c.name) && seen.add(c.name)),
+    );
   }
 
   function add() {
@@ -305,8 +321,12 @@ export function SettingsModal({
   const [section, setSection] = useState<SectionId>(SECTIONS[0].id);
 
   // An override row is just the repo it targets; its checks live in `value`,
-  // where CheckList reads and writes them.
-  const [rows, setRows] = useState<string[]>(() => Object.keys(value.repos));
+  // where CheckList reads and writes them. The id is what keeps a row's
+  // CheckList with that row: keyed by position, removing a row would hand its
+  // check list to whichever row moved up into its place.
+  const [rows, setRows] = useState<OverrideRow[]>(() =>
+    Object.keys(value.repos).map((repo) => ({ id: nextRowId(), repo })),
+  );
 
   // Re-seed local drafts from props each time the modal opens, so a parent
   // that hydrates `value` after mount (e.g. from localStorage) is reflected
@@ -318,7 +338,7 @@ export function SettingsModal({
   if (open !== wasOpen) {
     setWasOpen(open);
     if (open) {
-      setRows(Object.keys(value.repos));
+      setRows(Object.keys(value.repos).map((repo) => ({ id: nextRowId(), repo })));
       setSection(SECTIONS[0].id);
       // A result from the last time the modal was open is stale by an unknown
       // amount; better to offer the check again than to show an old answer.
@@ -354,25 +374,34 @@ export function SettingsModal({
   }
 
   /** Renaming the repo moves the checks with it — they were named for this
-   * override, not for the repo that happened to be typed first. */
+   * override, not for the repo that happened to be typed first. One row per
+   * repo is the invariant, so pointing a row at a repo another row already
+   * holds joins the two lists rather than overwriting the older one. */
   function handleRowChange(index: number, repo: string) {
-    const previous = rows[index];
-    setRows(rows.map((r, i) => (i === index ? repo : r)));
+    const previous = rows[index].repo;
+    const clash = rows.findIndex((r, i) => i !== index && r.repo === repo);
+    setRows(
+      rows
+        .map((r, i) => (i === index ? { ...r, repo } : r))
+        .filter((_, i) => i !== clash),
+    );
     const repos = { ...value.repos };
-    const carried = repos[previous];
+    const carried = normalizeAll(repos[previous]);
+    const existing = clash >= 0 ? normalizeAll(repos[repo]) : [];
     delete repos[previous];
-    repos[repo] = carried ?? [];
+    const seen = new Set(existing.map((c) => c.name));
+    repos[repo] = [...existing, ...carried.filter((c) => !seen.has(c.name))];
     onChange({ ...value, repos });
   }
 
   function addRow() {
-    setRows([...rows, ""]);
+    setRows([...rows, { id: nextRowId(), repo: "" }]);
   }
 
   function removeRow(index: number) {
     setRows(rows.filter((_, i) => i !== index));
     const repos = { ...value.repos };
-    delete repos[rows[index]];
+    delete repos[rows[index].repo];
     onChange({ ...value, repos });
   }
 
@@ -674,11 +703,11 @@ export function SettingsModal({
                     </p>
                   )}
                   <div className="mb-3 space-y-4">
-                    {rows.map((repo, index) => (
-                      <div key={index} className="flex flex-col gap-2">
+                    {rows.map((row, index) => (
+                      <div key={row.id} className="flex flex-col gap-2">
                         <div className="flex items-center gap-2">
                           <RepoCombobox
-                            value={repo}
+                            value={row.repo}
                             onChange={(next) => handleRowChange(index, next)}
                             suggestions={availableRepos}
                             owners={owners}
@@ -708,12 +737,13 @@ export function SettingsModal({
                         </div>
                         {/* A check belongs to a repo, so there is nothing to
                             add one to until the row names one. */}
-                        {repo.trim() !== "" && (
+                        {row.repo.trim() !== "" && (
                           <div className="border-l border-border pl-3">
                             <CheckList
-                              scope={repo}
-                              checks={value.repos[repo]}
-                              onChange={(checks) => setRepoChecks(repo, checks)}
+                              key={row.repo}
+                              scope={row.repo}
+                              checks={value.repos[row.repo]}
+                              onChange={(checks) => setRepoChecks(row.repo, checks)}
                             />
                           </div>
                         )}

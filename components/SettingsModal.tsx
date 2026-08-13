@@ -112,8 +112,8 @@ function seedRows(repos: Record<string, StoredCheck[]>): RepoRow[] {
   return Object.entries(repos).map(([repo, checks]) => ({ repo, checks: toDraft(checks) }));
 }
 
-/** The Required boxes for one owner or override, one per name already stored. */
-/** `scope` is the owner or repo the boxes belong to. Owner defaults and repo
+/** The Required boxes for one owner or override, one per name already stored.
+ * `scope` is the owner or repo the boxes belong to. Owner defaults and repo
  * overrides render together, so the same check name can appear more than once
  * on screen and the label has to say which one it marks. */
 function RequiredBoxes({
@@ -689,52 +689,59 @@ export function SettingsModal({
                     {rows.map((row, index) => (
                       <div key={index} className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
-                        <RepoCombobox
-                          value={row.repo}
-                          onChange={(repo) => handleRowChange(index, "repo", repo)}
-                          suggestions={availableRepos}
-                          owners={owners}
-                        />
-                        <input
-                          type="text"
-                          aria-label="Check names for this repo override"
-                          placeholder="e.g. qa/smoke"
-                          value={row.checks}
-                          onChange={(e) =>
-                            handleRowChange(index, "checks", e.target.value)
-                          }
-                          className="flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                        />
-                        <button
-                          type="button"
-                          aria-label="Remove repo override"
-                          onClick={() => removeRow(index)}
-                          className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                        >
-                          <svg
-                            aria-hidden="true"
-                            width="14"
-                            height="14"
-                            viewBox="0 0 14 14"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
+                          <RepoCombobox
+                            value={row.repo}
+                            onChange={(repo) => handleRowChange(index, "repo", repo)}
+                            suggestions={availableRepos}
+                            owners={owners}
+                          />
+                          <input
+                            type="text"
+                            aria-label="Check names for this repo override"
+                            placeholder="e.g. qa/smoke"
+                            value={row.checks}
+                            onChange={(e) =>
+                              handleRowChange(index, "checks", e.target.value)
+                            }
+                            className="flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                          />
+                          <button
+                            type="button"
+                            aria-label="Remove repo override"
+                            onClick={() => removeRow(index)}
+                            className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                           >
-                            <path
-                              d="M11 3L3 11M3 3l8 8"
-                              stroke="currentColor"
-                              strokeWidth="1.5"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                        </button>
+                            <svg
+                              aria-hidden="true"
+                              width="14"
+                              height="14"
+                              viewBox="0 0 14 14"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M11 3L3 11M3 3l8 8"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                          </button>
                         </div>
-                        <RequiredBoxes
-                          scope={row.repo.trim()}
-                          checks={normalizeAll(value.repos[row.repo.trim()])}
-                          onToggle={(name, required) =>
-                            handleRowRequired(row.repo.trim(), name, required)
-                          }
-                        />
+                        {/* Rows naming the same repo share one stored list, so
+                            a later row's boxes would be the same controls under
+                            the same label — draw them on the first row only. */}
+                        {rows.findIndex(
+                          (r) => r.repo.trim() === row.repo.trim(),
+                        ) === index && (
+                          <RequiredBoxes
+                            scope={row.repo.trim()}
+                            checks={normalizeAll(value.repos[row.repo.trim()])}
+                            onToggle={(name, required) =>
+                              handleRowRequired(row.repo.trim(), name, required)
+                            }
+                          />
+                        )}
                       </div>
                     ))}
                   </div>

@@ -549,6 +549,31 @@ describe("SettingsModal", () => {
     });
   });
 
+  it("shows one set of boxes when two rows name the same repo", () => {
+    render(
+      <SettingsModal
+        {...filterProps}
+        availableRepos={["acme/web"]}
+        value={{ orgs: {}, repos: { "acme/web": ["lint"] } }}
+        onChange={vi.fn()}
+        open={true}
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    // Rows naming the same repo share one stored list, so a second row's boxes
+    // would be the same controls under the same label — drawn once, on the
+    // first row that names the repo.
+    fireEvent.click(screen.getByRole("button", { name: "Add override" }));
+    const second = screen.getAllByRole("combobox", { name: "Repository" })[1];
+    fireEvent.focus(second);
+    fireEvent.mouseDown(screen.getAllByRole("option", { name: "acme/web" })[0]);
+    expect(second).toHaveValue("acme/web");
+    expect(screen.getAllByRole("checkbox", { name: "lint is required for acme/web" })).toHaveLength(
+      1,
+    );
+  });
+
   it("distinct repos still map independently with no cross-contamination", () => {
     const onChange = vi.fn();
     render(

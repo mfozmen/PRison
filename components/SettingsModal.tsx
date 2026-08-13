@@ -626,9 +626,10 @@ export function SettingsModal({
                 <p className="mb-6 text-sm text-muted">
                   Name the checks each PR needs (e.g. a manual qa/smoke). We&apos;ll show
                   them as Awaiting until they report — handy for gates GitHub
-                  doesn&apos;t expose. A <strong className="font-medium text-foreground">required</strong>{" "}
-                  one holds the PR out of Ready to merge; anything you list as not
-                  required is shown for information and blocks nothing.
+                  doesn&apos;t expose. A{" "}
+                  <strong className="font-medium text-foreground">Required</strong> one
+                  holds the PR out of Ready to merge; untick the box and the check is
+                  shown for information and blocks nothing.
                 </p>
 
                 {/* Owner defaults — organizations *and* the personal account.

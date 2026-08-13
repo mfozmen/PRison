@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.18.0](https://github.com/mfozmen/PRison/compare/v1.17.0...v1.18.0) (2026-08-13)
+
+### Features
+
+* tick a box instead of typing "required" ([#75](https://github.com/mfozmen/PRison/issues/75)) ([2459a5b](https://github.com/mfozmen/PRison/commit/2459a5b20a45528a97b21e498face240031a5633))
+
 ## [1.17.0](https://github.com/mfozmen/PRison/compare/v1.16.0...v1.17.0) (2026-08-12)
 
 ### Features

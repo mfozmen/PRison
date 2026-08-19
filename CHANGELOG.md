@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.20.2](https://github.com/mfozmen/PRison/compare/v1.20.1...v1.20.2) (2026-08-19)
+
+### Bug Fixes
+
+* drop a changes-requested verdict nobody is still making ([#79](https://github.com/mfozmen/PRison/issues/79)) ([d92b77a](https://github.com/mfozmen/PRison/commit/d92b77afe61b861f78bd92056e59370777934ce8))
+
 ## [1.20.1](https://github.com/mfozmen/PRison/compare/v1.20.0...v1.20.1) (2026-08-19)
 
 ### Bug Fixes

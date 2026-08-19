@@ -2020,3 +2020,71 @@ describe("PR_COMMENTS_QUERY — conditional starter field", () => {
     );
   });
 });
+
+describe("a changes-requested verdict that has been superseded", () => {
+  // A raw GraphQL node, which is untyped by nature — the parser's whole job is
+  // to make one of these safe.
+  const node = (over: Record<string, unknown> = {}) => ({
+    id: "1", title: "t", url: "u", number: 1,
+    repository: { nameWithOwner: "acme/api" },
+    mergeStateStatus: "BLOCKED",
+    reviewDecision: "CHANGES_REQUESTED",
+    commits: { nodes: [{ commit: { pushedDate: "2026-08-01T00:00:00Z", statusCheckRollup: null } }] },
+    ...over,
+  });
+  const parse = (over: Record<string, unknown> = {}) =>
+    parseStuckPrs({ search: { nodes: [node(over)] } })[0];
+
+  // GitHub keeps CHANGES_REQUESTED alive until the reviewer approves or their
+  // review is dismissed — a later comment-only review does not clear it, even
+  // though the PR page's own reviewer list stops showing the red mark. Reading
+  // the verdict alone told people to address feedback that had been answered.
+  it("is dropped when the reviewer's latest review is only a comment", () => {
+    const pr = parse({ latestReviews: { nodes: [{ state: "COMMENTED" }] } });
+    expect(pr.reviewDecision).toBe("REVIEW_REQUIRED");
+  });
+
+  it("stands while any reviewer's latest review still asks for changes", () => {
+    const pr = parse({
+      latestReviews: { nodes: [{ state: "COMMENTED" }, { state: "CHANGES_REQUESTED" }] },
+    });
+    expect(pr.reviewDecision).toBe("CHANGES_REQUESTED");
+  });
+
+  it("is dropped when the reviewer came back and approved", () => {
+    const pr = parse({ latestReviews: { nodes: [{ state: "APPROVED" }] } });
+    expect(pr.reviewDecision).toBe("REVIEW_REQUIRED");
+  });
+
+  // No reviews at all under a CHANGES_REQUESTED verdict is not a state GitHub
+  // produces; trusting the verdict is the safe reading of an impossible one.
+  it("stands when there is nothing to read it against", () => {
+    expect(parse({}).reviewDecision).toBe("CHANGES_REQUESTED");
+    expect(parse({ latestReviews: { nodes: [] } }).reviewDecision).toBe("CHANGES_REQUESTED");
+  });
+
+  it("is dropped when the reviewer's review was dismissed", () => {
+    expect(parse({ latestReviews: { nodes: [{ state: "DISMISSED" }] } }).reviewDecision).toBe(
+      "REVIEW_REQUIRED",
+    );
+  });
+
+  it("survives a null in the review list", () => {
+    const pr = parse({ latestReviews: { nodes: [null, { state: "CHANGES_REQUESTED" }] } });
+    expect(pr.reviewDecision).toBe("CHANGES_REQUESTED");
+  });
+
+  it("reads a missing verdict as no verdict", () => {
+    expect(parse({ reviewDecision: null, mergeStateStatus: "DIRTY" }).reviewDecision).toBe("");
+  });
+
+  it("leaves every other verdict exactly as GitHub reported it", () => {
+    for (const decision of ["APPROVED", "REVIEW_REQUIRED", ""]) {
+      const pr = parse({
+        reviewDecision: decision,
+        latestReviews: { nodes: [{ state: "CHANGES_REQUESTED" }] },
+      });
+      expect(pr.reviewDecision).toBe(decision);
+    }
+  });
+});

@@ -69,6 +69,10 @@ export const STUCK_PRS_QUERY = `
       nodes { ... on PullRequest {
         id title url number isDraft mergeStateStatus reviewDecision
         repository { nameWithOwner }
+        # One entry per reviewer, their most recent review of any kind — which
+        # is what the PR page's own reviewer list shows, and what reviewDecision
+        # ignores. See supersededDecision.
+        latestReviews(first: 20) { nodes { state } }
         commits(last: 1) { nodes { commit {
           pushedDate committedDate
           ${CHECK_ROLLUP}
@@ -238,6 +242,32 @@ function isBehindAndGreen(node: any): boolean {
   return failingChecks === 0 && pendingChecks === 0;
 }
 
+/**
+ * GitHub's reviewDecision, minus a changes-requested verdict nobody is still
+ * making.
+ *
+ * CHANGES_REQUESTED survives until the reviewer approves or their review is
+ * dismissed: a later comment-only review from the same person leaves the
+ * verdict standing, while the PR page's reviewer list — which shows each
+ * reviewer's LATEST review — stops showing the red mark. Reading the verdict
+ * alone told people to address feedback that had already been answered, on a
+ * PR GitHub itself no longer draws that way.
+ *
+ * So the verdict is only trusted while some reviewer's latest review still
+ * asks for changes. When none does, the PR is waiting on review rather than on
+ * the author — REVIEW_REQUIRED, not nothing, because it is still unapproved.
+ * Every other verdict is passed through: they are not sticky in this way.
+ */
+function supersededDecision(node: any): string {
+  const decision: string = node.reviewDecision ?? "";
+  if (decision !== "CHANGES_REQUESTED") return decision;
+  const latest: any[] = node.latestReviews?.nodes ?? [];
+  // No reviews under a CHANGES_REQUESTED verdict is not a state GitHub
+  // produces; trusting the verdict is the safe reading of an impossible one.
+  if (latest.length === 0) return decision;
+  return latest.some((r: any) => r?.state === "CHANGES_REQUESTED") ? decision : "REVIEW_REQUIRED";
+}
+
 export function parseStuckPrs(raw: any): StuckPr[] {
   return searchNodes(raw)
     .filter((n: any) => n?.id)
@@ -263,7 +293,7 @@ export function parseStuckPrs(raw: any): StuckPr[] {
         isDraft: n.isDraft ?? false,
         blocked,
         readyViaBlocked,
-        reviewDecision: n.reviewDecision ?? "",
+        reviewDecision: supersededDecision(n),
         mergeState,
         stuckSince: commit.pushedDate ?? commit.committedDate ?? "",
       } as StuckPr;

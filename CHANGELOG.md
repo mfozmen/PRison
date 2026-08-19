@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.20.3](https://github.com/mfozmen/PRison/compare/v1.20.2...v1.20.3) (2026-08-19)
+
+### Bug Fixes
+
+* do not call a PR ready while a tracked check is still awaited ([#80](https://github.com/mfozmen/PRison/issues/80)) ([d91f706](https://github.com/mfozmen/PRison/commit/d91f70662b28f15d187ed68ab2fc188ea333741f))
+
 ## [1.20.2](https://github.com/mfozmen/PRison/compare/v1.20.1...v1.20.2) (2026-08-19)
 
 ### Bug Fixes

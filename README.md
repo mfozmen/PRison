@@ -60,6 +60,16 @@ and expand to the latest 15, with **Load more** for the rest.
   red job that cannot hold the merge up stops reading like one that can. A check
   you never named keeps the dashed chip, which is what "PRison doesn't know"
   looks like.
+- **Ignored checks.** Some checks are broken rather than failing — the flaky
+  one, the one somebody else's team owns. Right-click (or click) its chip on the
+  board and choose **Ignore this check**. It stays on the card, muted instead of
+  red, but its result stops counting: the PR is no longer held out of *Ready to
+  merge* over it, it gets no bucket of its own under *By check*, and it is never
+  awaited. Everything ignored is listed in **Settings → Ignored checks**, under
+  the repo it was ignored on, where it can be renamed, widened to the whole
+  owner, or taken back. A conflict, a review gate, or branch protection still
+  holds the PR: ignoring a check says its result means nothing, never "merge it
+  anyway".
 - **History you can walk back into.** Merged and closed-without-merging PRs, each
   badged **Merged** or **Closed** with how long ago it ended — and next to them
   the PRs you reviewed, so a discussion you left open is one click away instead
@@ -235,13 +245,15 @@ Top-right, left to right:
 | **Sun/moon** | Switches between the current theme's two grounds, and names them — it reads "Switch to Aurora Night" rather than "Switch to dark theme". |
 | **Sign Out** | Clears the stored token. |
 
-The Settings menu has five sections:
+The Settings menu has six sections:
 
 - **Comments** — show bot comments, hide comments you reacted to.
 - **Auto refresh** — on/off, how often to check, and the notification
   permission.
 - **Tracked checks** — add the checks to see as "Awaiting" one at a time, each
   with its own **Required** box, and rename, re-mark, or remove any of them later.
+- **Ignored checks** — everything you wrote off from the board, grouped by
+  repo, plus an owner-wide list for a check that is broken everywhere.
 - **Appearance** — pick one of the four themes, each previewing its own colours
   and typeface.
 - **About** — version, repository, license, and **Check for updates**: asked

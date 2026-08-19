@@ -9,6 +9,7 @@ import {
 } from "react";
 import { normalizeAll } from "@/lib/tracked-checks";
 import type { TrackedChecks, TrackedCheck, StoredCheck } from "@/lib/tracked-checks";
+import { EMPTY_IGNORED, type IgnoredChecks } from "@/lib/ignored-checks";
 import { RepoCombobox } from "./RepoCombobox";
 import { POLL_INTERVAL_OPTIONS } from "@/lib/notify";
 import {
@@ -51,6 +52,11 @@ export interface SettingsModalProps {
   notifPermission: NotificationPermission;
   onEnableNotifications: () => void;
   onTestNotification: () => void;
+  /** Check names written off as broken. Mostly filled from the board — the
+   * chip's own menu is where a bad check is met — so this panel is where the
+   * user finds out what they did there, and takes it back. */
+  ignored?: IgnoredChecks;
+  onIgnoredChange?: (next: IgnoredChecks) => void;
 }
 
 // Comments stays first: it is the section the modal opens on, and the one most
@@ -60,6 +66,7 @@ const SECTIONS = [
   { id: "comments", label: "Comments" },
   { id: "auto-refresh", label: "Auto refresh" },
   { id: "tracked-checks", label: "Tracked checks" },
+  { id: "ignored-checks", label: "Ignored checks" },
   { id: "appearance", label: "Appearance" },
   { id: "about", label: "About" },
 ] as const;
@@ -196,6 +203,84 @@ function CheckList({
   );
 }
 
+/** The names ignored in one scope: an owner or a single repo. Plain strings —
+ * there is nothing to say about a check you have written off beyond its name. */
+function NameList({
+  scope,
+  names,
+  onChange,
+  addLabel,
+}: {
+  scope: string;
+  names: string[];
+  onChange: (next: string[]) => void;
+  addLabel: string;
+}) {
+  const [draft, setDraft] = useState("");
+
+  // Trimmed on the way out, never while typing, and one entry per name — the
+  // same rules the tracked list edits under, for the same reasons.
+  function commit(next: string[]) {
+    const seen = new Set<string>();
+    onChange(next.map((n) => n.trim()).filter((n) => n !== "" && !seen.has(n) && seen.add(n)));
+  }
+
+  function add() {
+    const name = draft.trim();
+    if (!name || names.includes(name)) return;
+    commit([...names, name]);
+    setDraft("");
+  }
+
+  const fieldClass =
+    "min-w-0 flex-1 rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent";
+
+  return (
+    <div className="space-y-1.5">
+      {names.map((name, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <input
+            type="text"
+            aria-label={`Ignored check ${i + 1} for ${scope}`}
+            value={name}
+            onChange={(e) => commit(names.map((n, j) => (j === i ? e.target.value : n)))}
+            className={fieldClass}
+          />
+          <button
+            type="button"
+            aria-label={`Remove ${name} from ${scope}`}
+            onClick={() => commit(names.filter((_, j) => j !== i))}
+            className="flex min-h-[44px] min-w-[44px] shrink-0 cursor-pointer items-center justify-center text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M11 3L3 11M3 3l8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+      ))}
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          aria-label={`New ignored check for ${scope}`}
+          placeholder="e.g. nightly-e2e"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          className={fieldClass}
+        />
+        <SettingButton onClick={add} className="shrink-0 py-1.5" ariaLabel={addLabel}>
+          Ignore
+        </SettingButton>
+      </div>
+    </div>
+  );
+}
+
 function SettingCheckbox({
   checked,
   onChange,
@@ -288,6 +373,8 @@ export function SettingsModal({
   notifPermission,
   onEnableNotifications,
   onTestNotification,
+  ignored = EMPTY_IGNORED,
+  onIgnoredChange = () => {},
 }: SettingsModalProps) {
   // Read inside the component, not at module scope, so tests can stub it.
   const version = appVersion();
@@ -371,6 +458,19 @@ export function SettingsModal({
 
   function setRepoChecks(repo: string, checks: TrackedCheck[]) {
     onChange({ ...value, repos: { ...value.repos, [repo]: checks } });
+  }
+
+  /** An empty list is not a scope: leaving `{"acme/web": []}` behind would keep
+   * drawing a heading for a repo that ignores nothing. */
+  // Only the repos that actually ignore something: the list is written by the
+  // board, not chosen here, so there is no empty row to fill in.
+  const ignoredRepos = Object.keys(ignored.repos);
+
+  function setIgnoredIn(bucket: "orgs" | "repos", scope: string, names: string[]) {
+    const next = { ...ignored[bucket] };
+    if (names.length > 0) next[scope] = names;
+    else delete next[scope];
+    onIgnoredChange({ ...ignored, [bucket]: next });
   }
 
   /** Renaming the repo moves the checks with it — they were named for this
@@ -754,6 +854,67 @@ export function SettingsModal({
                     Add override
                   </SettingButton>
                 </section>
+              </div>
+            )}
+
+            {section === "ignored-checks" && (
+              <div>
+                <p className="mb-6 text-sm text-muted">
+                  A check that is broken rather than failing. An ignored check still
+                  shows on the card &mdash; muted, never red &mdash; but it stops holding
+                  the PR out of{" "}
+                  <strong className="font-medium text-foreground">Ready to merge</strong>,
+                  and it never gets a bucket of its own under By check. Right-click a
+                  check on the board to ignore it; it lands here, under its repo.
+                </p>
+
+                <section className="mb-6">
+                  <h4 className="mb-2 text-sm font-medium text-foreground">Repositories</h4>
+                  {ignoredRepos.length === 0 ? (
+                    <p className="text-xs text-muted">
+                      Nothing ignored for a single repo yet.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {ignoredRepos.map((repo) => (
+                        <div key={repo} className="flex flex-col gap-2">
+                          <span className="text-sm text-muted">{repo}</span>
+                          <div className="border-l border-border pl-3">
+                            <NameList
+                              scope={repo}
+                              names={ignored.repos[repo]}
+                              onChange={(names) => setIgnoredIn("repos", repo, names)}
+                              addLabel={`Ignore for ${repo}`}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                {owners.length > 0 && (
+                  <section>
+                    <h4 className="mb-2 text-sm font-medium text-foreground">Owner-wide</h4>
+                    <p className="mb-3 text-xs text-muted">
+                      Ignored on every repo the owner has &mdash; for a check that is
+                      broken everywhere, not on one repo.
+                    </p>
+                    <div className="space-y-4">
+                      {owners.map((owner) => (
+                        <div key={owner} className="flex flex-col gap-2">
+                          <span className="text-sm text-muted">{owner}</span>
+                          <NameList
+                            scope={owner}
+                            names={ignored.orgs[owner] ?? []}
+                            onChange={(names) => setIgnoredIn("orgs", owner, names)}
+                            addLabel={`Ignore for ${owner}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
               </div>
             )}
 

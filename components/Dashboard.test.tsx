@@ -1434,6 +1434,124 @@ describe("Dashboard", () => {
       expect(screen.getByLabelText("build — not required")).toBeInTheDocument();
     });
 
+  });
+
+  describe("ignored checks", () => {
+    const ignore = (repo: string, ...names: string[]) =>
+      localStorage.setItem("prison.ignoredChecks", JSON.stringify({ orgs: {}, repos: { [repo]: names } }));
+
+    const sectionOf = (name: RegExp) =>
+      screen.getByRole("heading", { name }).closest("section")!;
+
+    // The user's own words: a check they threw out should still be on the card,
+    // just not shouting in red.
+    it("draws an ignored check muted rather than red", async () => {
+      ignore("acme/b", "build");
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "build — ignored" })).toBeInTheDocument();
+    });
+
+    // And the point of saying a check is broken: it stops holding the PR.
+    it("moves the PR to Ready to merge when its only red check is ignored", async () => {
+      ignore("acme/b", "build");
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      const pr = await screen.findByText("stuck pr");
+      expect(pr.closest("section")?.id).toBe("ready-to-merge");
+      expect(within(sectionOf(/stuck on checks/i)).queryByText("stuck pr")).not.toBeInTheDocument();
+    });
+
+    it("still names the ignored check on the ready card", async () => {
+      ignore("acme/b", "build");
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+      expect(
+        within(sectionOf(/ready to merge/i)).getByRole("button", { name: "build — ignored" }),
+      ).toBeInTheDocument();
+    });
+
+    it("keeps the PR stuck while a check nobody ignored is still red", async () => {
+      ignore("acme/b", "lint");
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      const pr = await screen.findByText("stuck pr");
+      expect(pr.closest("section")?.id).toBe("stuck-on-checks");
+    });
+
+    it("ignores a check from its chip menu and remembers it", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "build" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: /ignore this check/i }));
+      expect(JSON.parse(localStorage.getItem("prison.ignoredChecks")!)).toEqual({
+        orgs: {},
+        repos: { "acme/b": ["build"] },
+      });
+      expect(screen.getByText("stuck pr").closest("section")?.id).toBe("ready-to-merge");
+    });
+
+    it("takes it back from the same menu", async () => {
+      ignore("acme/b", "build");
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "build — ignored" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: /stop ignoring/i }));
+      expect(screen.getByText("stuck pr").closest("section")?.id).toBe("stuck-on-checks");
+      expect(screen.getByRole("button", { name: "build" })).toBeInTheDocument();
+    });
+
+    // A tracked check is a name PRison waits for. Ignoring it is saying the
+    // wait was pointless, so the chip that announces the wait has to go too.
+    // The ready card carries the same menu, so the decision can be undone
+    // where its consequence is visible.
+    it("takes it back from the ready card, sending the PR home", async () => {
+      ignore("acme/b", "build");
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+      const card = within(sectionOf(/ready to merge/i));
+      fireEvent.click(card.getByRole("button", { name: "build — ignored" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: /stop ignoring/i }));
+      expect(screen.getByText("stuck pr").closest("section")?.id).toBe("stuck-on-checks");
+    });
+
+    it("never awaits a tracked check that was ignored", async () => {
+      localStorage.setItem(
+        "prison.trackedChecks",
+        JSON.stringify({ orgs: { acme: ["qa/smoke"] }, repos: {} }),
+      );
+      ignore("acme/b", "qa/smoke");
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+      expect(screen.queryByText("qa/smoke")).not.toBeInTheDocument();
+    });
+
+    // A tracked check can turn out to be the broken one, and the awaiting chip
+    // is the only place it is ever drawn.
+    it("ignores an awaited tracked check from its own chip", async () => {
+      localStorage.setItem(
+        "prison.trackedChecks",
+        JSON.stringify({ orgs: { acme: ["qa/smoke"] }, repos: {} }),
+      );
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Awaiting required check: qa/smoke" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: /ignore this check/i }));
+      expect(screen.queryByText("qa/smoke")).not.toBeInTheDocument();
+      expect(JSON.parse(localStorage.getItem("prison.ignoredChecks")!).repos["acme/b"]).toEqual([
+        "qa/smoke",
+      ]);
+    });
+
+    it("hydrates the ignored list from localStorage and persists it back", async () => {
+      ignore("acme/b", "build");
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+      expect(JSON.parse(localStorage.getItem("prison.ignoredChecks")!).repos["acme/b"]).toEqual([
+        "build",
+      ]);
+    });
+  });
+
+  describe("tracked checks, continued", () => {
     it("opening settings via gear button renders the tracked checks panel", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();

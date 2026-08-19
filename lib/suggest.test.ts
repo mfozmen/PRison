@@ -179,3 +179,25 @@ describe("suggestReady", () => {
     });
   });
 });
+
+describe("stuckGroupKeys with ignored checks", () => {
+  const s = (over: Partial<StuckPr> = {}): StuckPr =>
+    stuckPr({ url: "u", repo: "acme/b", blocked: true, mergeState: "BLOCKED", stuckSince: "x", ...over });
+  const ignored = { orgs: {}, repos: { "acme/b": ["flaky"] } };
+
+  // "By check" names the reasons a PR is stuck. A check the user threw out is
+  // not one of them — a bucket for it would collect every PR in the org under
+  // the one name they said they never want to think about again.
+  it("drops an ignored name from the buckets", () => {
+    expect(stuckGroupKeys(s({ failing: ["flaky", "build"] }), EMPTY_TRACKED, ignored)).toEqual(["build"]);
+  });
+
+  it("falls back to Other when every blocker was ignored", () => {
+    expect(stuckGroupKeys(s({ failing: ["flaky"] }), EMPTY_TRACKED, ignored)).toEqual(["Other"]);
+  });
+
+  it("drops an awaited tracked check the user later ignored", () => {
+    const tracked = { orgs: {}, repos: { "acme/b": ["flaky", "qa/smoke"] } };
+    expect(stuckGroupKeys(s({ checkNames: [] }), tracked, ignored)).toEqual(["qa/smoke"]);
+  });
+});

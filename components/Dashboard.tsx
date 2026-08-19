@@ -16,6 +16,17 @@ import { Header } from "./Header";
 import { SettingsModal } from "./SettingsModal";
 import { type TrackedChecks, EMPTY_TRACKED, parseTracked, awaitingChecks, checkRequirement } from "@/lib/tracked-checks";
 import {
+  type IgnoredChecks,
+  EMPTY_IGNORED,
+  parseIgnored,
+  isIgnoredCheck,
+  ignoreCheck,
+  unignoreCheck,
+  readyDespiteIgnored,
+  readyFromStuck,
+} from "@/lib/ignored-checks";
+import { CheckChip } from "./CheckChip";
+import {
   DEFAULT_POLL_INTERVAL_MS,
   parsePollInterval,
   snapshotStatuses,
@@ -94,6 +105,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [nowTick, setNowTick] = useState(0);
 
   const [tracked, setTracked] = useState<TrackedChecks>(EMPTY_TRACKED);
+  const [ignored, setIgnored] = useState<IgnoredChecks>(EMPTY_IGNORED);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [stuckPrs, setStuckPrs] = useState<StuckPr[]>([]);
@@ -333,6 +345,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     const storedAutoRefresh = localStorage.getItem("prison.autoRefresh");
     const storedPollInterval = localStorage.getItem("prison.pollInterval");
     const storedTracked = localStorage.getItem("prison.trackedChecks");
+    const storedIgnored = localStorage.getItem("prison.ignoredChecks");
     const storedClosedOpen = localStorage.getItem("prison.closedOpen");
     const storedReviewedOpen = localStorage.getItem("prison.reviewedOpen");
     const storedActivity = localStorage.getItem(ACTIVITY_KEY);
@@ -379,6 +392,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       }
       // "blocker" (old value) falls through → stays "flat" (default)
       setTracked(parseTracked(storedTracked));
+      setIgnored(parseIgnored(storedIgnored));
       setHydrated(true);
     });
   }, [startTransition, orgs, login]);
@@ -413,6 +427,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     if (!hydrated) return;
     localStorage.setItem("prison.trackedChecks", JSON.stringify(tracked));
   }, [tracked, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.ignoredChecks", JSON.stringify(ignored));
+  }, [ignored, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -527,36 +546,53 @@ export function Dashboard({ orgs, login }: DashboardProps) {
 
   const sortedStuck = sortByAgeAsc(stuckPrs, (pr) => pr.stuckSince);
   const sortedReviews = sortByAgeAsc(reviewReqs, (req) => req.requestedAt);
-  const sortedReady = sortByAgeAsc(readyPrs, (pr) => pr.readySince);
+  // A PR the stuck list holds only because a check the user threw out went red
+  // belongs with the mergeable ones — that is what calling a check broken is
+  // for. Drafts are never promoted: the ready list has none by construction,
+  // and a draft cannot be merged however green it is.
+  const promotedReady = stuckPrs
+    .filter((pr) => !pr.isDraft && readyDespiteIgnored(pr, ignored))
+    .map(readyFromStuck);
+  const sortedReady = sortByAgeAsc([...readyPrs, ...promotedReady], (pr) => pr.readySince);
 
   // Client-side arbitration for BLOCKED+SUCCESS+APPROVED PRs: each such PR lands
   // in exactly one list based on whether its tracked checks are present in the rollup.
   // If awaiting checks are absent → stuck (with awaiting chips); if all present → ready.
-  const isAwaiting = (repo: string, checkNames: string[]) =>
-    awaitingChecks(repo, checkNames, tracked).some((c) => c.required);
+  // Ignoring a check says the name means nothing on this repo any more, so the
+  // wait for it ends with it: an awaiting chip for a check the user threw out
+  // would announce exactly the thing they asked never to hear about again.
+  const awaitingOn = (repo: string, checkNames: string[]) =>
+    awaitingChecks(repo, checkNames, tracked).filter((c) => !isIgnoredCheck(repo, c.name, ignored));
 
-  // A check GitHub did report, drawn in its own colours unless the user has
-  // said it cannot block the merge — then it is dashed and muted like an
-  // awaited one, because a red job that holds nothing up should not read like
-  // one that does. A name they never mentioned keeps its colours: the dashed
-  // style means "not blocking", and claiming that of an unknown check would be
-  // inventing knowledge PRison doesn't have.
-  const checkChip = (repo: string, name: string, tone: "danger" | "warning") =>
-    checkRequirement(repo, name, tracked) === "optional"
-      ? {
-          "aria-label": `${name} — not required`,
-          title: `${name} — not required`,
-          className:
-            "rounded border border-dashed border-muted/60 px-1.5 py-0.5 text-xs font-medium text-muted",
-        }
-      : {
-          // Spelled out, not interpolated: Tailwind scans the source for whole
-          // class names and would never emit a composed one.
-          className:
-            tone === "danger"
-              ? "bg-danger/10 text-danger ring-1 ring-inset ring-danger/30 rounded px-1.5 py-0.5 text-xs font-medium"
-              : "bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium",
-        };
+  const isAwaiting = (repo: string, checkNames: string[]) =>
+    awaitingOn(repo, checkNames).some((c) => c.required);
+
+  const toggleIgnore = (repo: string, name: string) =>
+    setIgnored((cfg) =>
+      isIgnoredCheck(repo, name, cfg) ? unignoreCheck(repo, name, cfg) : ignoreCheck(repo, name, cfg),
+    );
+
+  // A check GitHub did report. It keeps its own colours unless the user has
+  // said something about it: a check they marked as unable to block the merge,
+  // and one they threw out entirely, are both drawn muted and dashed — a red
+  // job that holds nothing up should not read like one that does. A name they
+  // never mentioned keeps its colours, because the muted style means "not
+  // blocking" and claiming that of an unknown check invents knowledge PRison
+  // does not have.
+  const checkChip = (repo: string, name: string, tone: "danger" | "warning", key: string) => {
+    const thrownOut = isIgnoredCheck(repo, name, ignored);
+    const notRequired = checkRequirement(repo, name, tracked) === "optional";
+    return (
+      <CheckChip
+        key={key}
+        name={name}
+        tone={thrownOut || notRequired ? "muted" : tone}
+        ignored={thrownOut}
+        description={!thrownOut && notRequired ? `${name} — not required` : undefined}
+        onToggleIgnore={() => toggleIgnore(repo, name)}
+      />
+    );
+  };
 
   // One home for the rule, because three lists apply it and three copies is how
   // they stop agreeing.
@@ -566,8 +602,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const sortedStuckAll = sortedStuck.filter((pr) => matchesDraft(pr.isDraft));
   // A BLOCKED+approved+green PR with no awaiting tracked checks is already in the ready
   // list; exclude it from stuck so it doesn't appear in both lists.
+  const promotedIds = new Set(promotedReady.map((pr) => pr.id));
   const visibleStuck = sortedStuckAll.filter(
-    (pr) => !(pr.readyViaBlocked && !isAwaiting(pr.repo, pr.checkNames)),
+    (pr) => !(pr.readyViaBlocked && !isAwaiting(pr.repo, pr.checkNames)) && !promotedIds.has(pr.id),
   );
   const visibleReviews = sortedReviews.filter((req) => matchesDraft(req.isDraft));
   // Drafts are already excluded server-side (parseReadyPrs drops drafts), so
@@ -804,6 +841,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         notifPermission={notifPermission}
         onEnableNotifications={handleEnableNotifications}
         onTestNotification={handleTestNotification}
+        ignored={ignored}
+        onIgnoredChange={setIgnored}
       />
       <main className="mx-auto w-full max-w-screen-2xl flex-1 space-y-8 px-4 sm:px-6 lg:px-8 py-8">
         {isPending && (
@@ -999,11 +1038,29 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 now={new Date()}
                 suggestion={suggestReady(pr)}
                 accent="success"
-                detail={pr.needsUpdate ? (
-                  <span className="bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium">
-                    Needs update
-                  </span>
-                ) : undefined}
+                // A PR promoted here over a red check still says so — muted,
+                // because the user already answered for it, but said: a card
+                // with nothing on it would read as spotlessly green.
+                detail={
+                  pr.needsUpdate || pr.ignoredChecks?.length ? (
+                    <div className="flex flex-wrap items-center gap-1">
+                      {pr.needsUpdate && (
+                        <span className="bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium">
+                          Needs update
+                        </span>
+                      )}
+                      {pr.ignoredChecks?.map((name) => (
+                        <CheckChip
+                          key={`ignored-${name}`}
+                          name={name}
+                          tone="muted"
+                          ignored
+                          onToggleIgnore={() => toggleIgnore(pr.repo, name)}
+                        />
+                      ))}
+                    </div>
+                  ) : undefined
+                }
               />
             )}
           />
@@ -1220,7 +1277,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
                 groupKeys={
                   groupBy === "check"
-                    ? (pr) => stuckGroupKeys(pr, tracked)
+                    ? (pr) => stuckGroupKeys(pr, tracked, ignored)
                     : undefined
                 }
                 groupHref={
@@ -1239,7 +1296,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   const showFailingNames = truncate ? pr.failing.slice(0, 2) : pr.failing;
                   const showPendingNames = truncate ? pr.pending.slice(0, 2) : pr.pending;
                   const overflow = totalNames - (showFailingNames.length + showPendingNames.length);
-                  const awaiting = awaitingChecks(pr.repo, pr.checkNames, tracked);
+                  const awaiting = awaitingOn(pr.repo, pr.checkNames);
                   const hasAwaiting = awaiting.length > 0;
                   // A green PR can still be BLOCKED waiting on a code-owner review;
                   // surface that instead of mislabeling it as pending CI. Colour it
@@ -1299,41 +1356,33 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     detail = (
                       <div className="flex flex-wrap gap-1 items-center">
                         {conflictChip}
-                        {showFailingNames.map((name, i) => (
-                          <span key={`fail-${i}-${name}`} {...checkChip(pr.repo, name, "danger")}>
-                            {name}
-                          </span>
-                        ))}
-                        {showPendingNames.map((name, i) => (
-                          <span key={`pend-${i}-${name}`} {...checkChip(pr.repo, name, "warning")}>
-                            {name}
-                          </span>
-                        ))}
+                        {showFailingNames.map((name, i) =>
+                          checkChip(pr.repo, name, "danger", `fail-${i}-${name}`),
+                        )}
+                        {showPendingNames.map((name, i) =>
+                          checkChip(pr.repo, name, "warning", `pend-${i}-${name}`),
+                        )}
                         {overflow > 0 && (
                           <span className="text-xs text-muted">+{overflow} more</span>
                         )}
                         {hasAwaiting &&
                           awaiting.map(({ name, required }) => (
-                            <span
+                            <CheckChip
                               key={`await-${name}`}
-                              aria-label={
+                              name={name}
+                              tone={required ? "warning" : "muted"}
+                              ignored={false}
+                              description={
                                 required ? `Awaiting required check: ${name}` : `Awaiting: ${name}`
                               }
-                              title={
-                                required ? `Awaiting required check: ${name}` : `Awaiting: ${name}`
+                              onToggleIgnore={() => toggleIgnore(pr.repo, name)}
+                              icon={
+                                <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3" />
+                                  <path d="M6 3.5v2.75l1.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
                               }
-                              className={
-                                required
-                                  ? "inline-flex items-center gap-1 rounded bg-warning/10 px-1.5 py-0.5 text-xs font-medium text-warning ring-1 ring-inset ring-warning/30"
-                                  : "inline-flex items-center gap-1 rounded border border-dashed border-muted/60 px-1.5 py-0.5 text-xs font-medium text-muted"
-                              }
-                            >
-                              <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3" />
-                                <path d="M6 3.5v2.75l1.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                              {name}
-                            </span>
+                            />
                           ))}
                         {reviewChip}
                       </div>

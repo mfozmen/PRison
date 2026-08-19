@@ -44,6 +44,10 @@ export type ReadyPr = {
   needsUpdate: boolean;
   checkNames: string[];   // all DISTINCT context display names present in the rollup (any state)
   viaBlocked: boolean;    // true when qualified via isReadyViaBlocked (BLOCKED+APPROVED, no failing/pending check)
+  // Names that are red or still running on this PR and were ignored by the
+  // user — which is why it is in this list at all. Set only by readyFromStuck;
+  // the ready query never sees a PR like this, so nothing server-side fills it.
+  ignoredChecks?: string[];
 };
 
 // A review comment on one of the viewer's own PRs that is still waiting on a

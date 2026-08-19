@@ -684,6 +684,7 @@ describe("SettingsModal", () => {
         "Comments",
         "Auto refresh",
         "Tracked checks",
+        "Ignored checks",
         "Appearance",
         "About",
       ]);
@@ -1184,5 +1185,162 @@ describe("SettingsModal — appearance", () => {
     fireEvent.click(screen.getByRole("radio", { name: /Cyanotype/ }));
     expect(document.documentElement.dataset.mode).toBe("dark");
     expect(localStorage.getItem("prison.mode")).toBeNull();
+  });
+});
+
+describe("SettingsModal — ignored checks", () => {
+  const open = (props: Partial<React.ComponentProps<typeof SettingsModal>> = {}) =>
+    render(
+      <SettingsModal
+        {...filterProps}
+        owners={owners}
+        availableRepos={someRepos}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open
+        onClose={vi.fn()}
+        ignored={{ orgs: {}, repos: {} }}
+        onIgnoredChange={vi.fn()}
+        {...props}
+      />,
+    );
+
+  it("has its own section, apart from tracked checks", () => {
+    open();
+    expect(screen.getByRole("tab", { name: "Ignored checks" })).toBeInTheDocument();
+  });
+
+  // Ignoring starts on the board. The panel is where you find out what you did
+  // there, so an empty one has to say where the names come from.
+  it("says where ignored checks come from while there are none", () => {
+    open();
+    selectSection("Ignored checks");
+    expect(screen.getByText(/right-click a check/i)).toBeInTheDocument();
+  });
+
+  it("lists what a repo ignores, under the repo's name", () => {
+    open({ ignored: { orgs: {}, repos: { "acme/web": ["flaky-e2e"] } } });
+    selectSection("Ignored checks");
+    expect(screen.getByText("acme/web")).toBeInTheDocument();
+    expect(screen.getByLabelText("Ignored check 1 for acme/web")).toHaveValue("flaky-e2e");
+  });
+
+  it("stops ignoring a check when its row is removed", () => {
+    const onIgnoredChange = vi.fn();
+    open({
+      ignored: { orgs: {}, repos: { "acme/web": ["flaky-e2e", "nightly"] } },
+      onIgnoredChange,
+    });
+    selectSection("Ignored checks");
+    fireEvent.click(screen.getByRole("button", { name: "Remove flaky-e2e from acme/web" }));
+    expect(onIgnoredChange).toHaveBeenCalledWith({ orgs: {}, repos: { "acme/web": ["nightly"] } });
+  });
+
+  it("drops the repo entirely once its last ignored check goes", () => {
+    const onIgnoredChange = vi.fn();
+    open({ ignored: { orgs: {}, repos: { "acme/web": ["flaky-e2e"] } }, onIgnoredChange });
+    selectSection("Ignored checks");
+    fireEvent.click(screen.getByRole("button", { name: "Remove flaky-e2e from acme/web" }));
+    expect(onIgnoredChange).toHaveBeenCalledWith({ orgs: {}, repos: {} });
+  });
+
+  it("renames an ignored check in place", () => {
+    const onIgnoredChange = vi.fn();
+    open({ ignored: { orgs: {}, repos: { "acme/web": ["flaky-e2e"] } }, onIgnoredChange });
+    selectSection("Ignored checks");
+    fireEvent.change(screen.getByLabelText("Ignored check 1 for acme/web"), {
+      target: { value: "flaky-e2e-v2" },
+    });
+    expect(onIgnoredChange).toHaveBeenCalledWith({
+      orgs: {},
+      repos: { "acme/web": ["flaky-e2e-v2"] },
+    });
+  });
+
+  // A check that is broken everywhere is worth saying once, and the owner list
+  // is the only place to say it before the board has ever drawn the chip.
+  it("leaves the other names alone while one is renamed", () => {
+    const onIgnoredChange = vi.fn();
+    open({ ignored: { orgs: {}, repos: { "acme/web": ["flaky", "nightly"] } }, onIgnoredChange });
+    selectSection("Ignored checks");
+    fireEvent.change(screen.getByLabelText("Ignored check 1 for acme/web"), {
+      target: { value: "flaky-v2" },
+    });
+    expect(onIgnoredChange).toHaveBeenCalledWith({
+      orgs: {},
+      repos: { "acme/web": ["flaky-v2", "nightly"] },
+    });
+  });
+
+  // The panel is one section of a modal that is rendered plenty of places; a
+  // consumer that never wired ignoring up should get an inert panel, not a
+  // crash on the first keystroke.
+  it("stays inert when nothing is listening", () => {
+    render(
+      <SettingsModal
+        {...filterProps}
+        owners={owners}
+        availableRepos={someRepos}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Ignored checks");
+    fireEvent.change(screen.getByLabelText("New ignored check for acme"), {
+      target: { value: "nightly" },
+    });
+    expect(() =>
+      fireEvent.click(screen.getByRole("button", { name: "Ignore for acme" })),
+    ).not.toThrow();
+  });
+
+  it("ignores a check for every repo an owner has", () => {
+    const onIgnoredChange = vi.fn();
+    open({ onIgnoredChange });
+    selectSection("Ignored checks");
+    fireEvent.change(screen.getByLabelText("New ignored check for acme"), {
+      target: { value: "nightly-e2e" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Ignore for acme" }));
+    expect(onIgnoredChange).toHaveBeenCalledWith({
+      orgs: { acme: ["nightly-e2e"] },
+      repos: {},
+    });
+  });
+
+  it("adds on Enter too", () => {
+    const onIgnoredChange = vi.fn();
+    open({ onIgnoredChange });
+    selectSection("Ignored checks");
+    fireEvent.change(screen.getByLabelText("New ignored check for acme"), {
+      target: { value: "nightly-e2e" },
+    });
+    fireEvent.keyDown(screen.getByLabelText("New ignored check for acme"), { key: "Enter" });
+    expect(onIgnoredChange).toHaveBeenCalledWith({ orgs: { acme: ["nightly-e2e"] }, repos: {} });
+  });
+
+  it("refuses a blank name and one already on the list", () => {
+    const onIgnoredChange = vi.fn();
+    open({ ignored: { orgs: { acme: ["nightly"] }, repos: {} }, onIgnoredChange });
+    selectSection("Ignored checks");
+    fireEvent.click(screen.getByRole("button", { name: "Ignore for acme" }));
+    fireEvent.change(screen.getByLabelText("New ignored check for acme"), {
+      target: { value: "nightly" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Ignore for acme" }));
+    expect(onIgnoredChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps each scope's list to itself", () => {
+    const onIgnoredChange = vi.fn();
+    open({
+      ignored: { orgs: { acme: ["owner-wide"] }, repos: { "acme/web": ["repo-only"] } },
+      onIgnoredChange,
+    });
+    selectSection("Ignored checks");
+    fireEvent.click(screen.getByRole("button", { name: "Remove repo-only from acme/web" }));
+    expect(onIgnoredChange).toHaveBeenCalledWith({ orgs: { acme: ["owner-wide"] }, repos: {} });
   });
 });

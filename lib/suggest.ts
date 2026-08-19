@@ -1,5 +1,6 @@
 import type { StuckPr, ReviewRequest, ReadyPr, PrComment } from "./types";
 import { awaitingChecks, type TrackedChecks } from "./tracked-checks";
+import { resolveIgnored, EMPTY_IGNORED, type IgnoredChecks } from "./ignored-checks";
 
 export type Suggestion = { text: string; href: string };
 
@@ -40,7 +41,12 @@ export function suggestStuck(pr: StuckPr): Suggestion {
 // awaiting tracked checks and the review gate — otherwise a review-blocked PR
 // (no failing/pending check) would fall to "Other". Only truly unattributable
 // PRs get "Other".
-export function stuckGroupKeys(pr: StuckPr, tracked: TrackedChecks): string[] {
+export function stuckGroupKeys(
+  pr: StuckPr,
+  tracked: TrackedChecks,
+  ignored: IgnoredChecks = EMPTY_IGNORED,
+): string[] {
+  const thrownOut = new Set(resolveIgnored(pr.repo, ignored));
   const keys = [
     ...pr.failing,
     ...pr.pending,
@@ -58,7 +64,10 @@ export function stuckGroupKeys(pr: StuckPr, tracked: TrackedChecks): string[] {
   // which is the bucket for blockers the board cannot name — and it can name
   // this one.
   if (pr.mergeState === "DIRTY") keys.push(MERGE_CONFLICT_LABEL);
-  const unique = Array.from(new Set(keys));
+  // A check the user threw out is not a reason a PR is stuck, so it gets no
+  // bucket — a PR left with nothing else against it falls to "Other" like any
+  // other blocker the board cannot name.
+  const unique = Array.from(new Set(keys)).filter((k) => !thrownOut.has(k));
   return unique.length > 0 ? unique : ["Other"];
 }
 

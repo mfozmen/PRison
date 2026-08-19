@@ -76,14 +76,20 @@ export function parseIgnored(raw: string | null): IgnoredChecks {
 
 /** A PR the stuck list is holding only because a check the user threw out went
  * red. It belongs with the ones that can be merged — that is the whole point of
- * saying a check is broken — but only when nothing else is against it: a
- * conflict, a review gate, and branch protection all outlive a check result,
- * and GitHub refuses the merge on the last of those no matter what PRison
- * thinks. Ignoring a check says "this result means nothing to me", never
- * "merge it anyway". */
+ * saying a check is broken.
+ *
+ * BLOCKED does not stand in the way, even though GitHub means "I will not merge
+ * this": a required check going red is exactly what puts a PR there, so it is
+ * the state the user was looking at when they called the check broken, and
+ * refusing to promote it would make ignoring useless precisely where it is
+ * needed. The board already makes that leap for a green BLOCKED PR
+ * (isReadyViaBlocked) — once the ignored result is discounted, this is the same
+ * PR. A conflict and a review gate do stand in the way: both outlive any check
+ * result, and neither is what the user answered for. Ignoring a check says
+ * "this result means nothing to me", never "merge it anyway". */
 export function readyDespiteIgnored(pr: StuckPr, cfg: IgnoredChecks): boolean {
   if (pr.failing.length + pr.pending.length === 0) return false;
-  if (pr.mergeState === "DIRTY" || pr.mergeState === "BLOCKED") return false;
+  if (pr.mergeState === "DIRTY") return false;
   if (needsReview(pr.reviewDecision)) return false;
   const ignored = new Set(resolveIgnored(pr.repo, cfg));
   return [...pr.failing, ...pr.pending].every((name) => ignored.has(name));

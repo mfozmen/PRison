@@ -1470,6 +1470,27 @@ describe("Dashboard", () => {
       ).toBeInTheDocument();
     });
 
+    // The state GitHub puts a PR in when a REQUIRED check is red — the one
+    // that made the user call the check broken in the first place.
+    it("promotes a PR GitHub reports as BLOCKED over the ignored check", async () => {
+      ignore("acme/b", "build");
+      global.fetch = vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          headers: { get: () => null },
+          json: () =>
+            Promise.resolve(
+              url.includes("stuck")
+                ? [{ ...STUCK_PR, blocked: true, mergeState: "BLOCKED", reviewDecision: "APPROVED" }]
+                : [],
+            ),
+        }),
+      ) as unknown as typeof fetch;
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      const pr = await screen.findByText("stuck pr");
+      expect(pr.closest("section")?.id).toBe("ready-to-merge");
+    });
+
     it("keeps the PR stuck while a check nobody ignored is still red", async () => {
       ignore("acme/b", "lint");
       render(<Dashboard orgs={ORGS} login="testuser" />);
@@ -1539,6 +1560,165 @@ describe("Dashboard", () => {
       expect(JSON.parse(localStorage.getItem("prison.ignoredChecks")!).repos["acme/b"]).toEqual([
         "qa/smoke",
       ]);
+    });
+
+    // Regression net around promotion: the stuck payload and the ready payload
+    // can carry the same PR, the counts above the board are derived from the
+    // visible lists, and a draft must never be called ready.
+    it("never promotes a draft, however green ignoring makes it look", async () => {
+      ignore("acme/b", "build");
+      global.fetch = vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          headers: { get: () => null },
+          json: () => Promise.resolve(url.includes("stuck") ? [DRAFT_STUCK_PR] : []),
+        }),
+      ) as unknown as typeof fetch;
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      const pr = await screen.findByText("draft stuck pr");
+      expect(pr.closest("section")?.id).toBe("stuck-on-checks");
+    });
+
+    it("shows a promoted PR once, even when the ready payload names it too", async () => {
+      ignore("acme/b", "build");
+      global.fetch = vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          headers: { get: () => null },
+          json: () =>
+            Promise.resolve(
+              url.includes("ready")
+                ? [{ id: STUCK_PR.id, title: "stuck pr", url: "u", repo: "acme/b", number: 2, readySince: STUCK_PR.stuckSince, needsUpdate: false, checkNames: ["build"], viaBlocked: true }]
+                : url.includes("stuck")
+                  ? [{ ...STUCK_PR, blocked: true, readyViaBlocked: true, reviewDecision: "APPROVED" }]
+                  : [],
+            ),
+        }),
+      ) as unknown as typeof fetch;
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findAllByText("stuck pr")).toHaveLength(1);
+    });
+
+    it("moves the count with the PR", async () => {
+      ignore("acme/b", "build");
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+      // READY_PR plus the promoted one; nothing left stuck.
+      expect(within(sectionOf(/ready to merge/i)).getByTestId("count-badge")).toHaveTextContent("2");
+      expect(within(sectionOf(/stuck on checks/i)).getByTestId("count-badge")).toHaveTextContent("0");
+    });
+
+    it("keeps a promoted PR findable by the name of the check that was ignored", async () => {
+      ignore("acme/b", "build");
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+      fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: "build" } });
+      expect(screen.getByText("stuck pr")).toBeInTheDocument();
+    });
+
+    it("promotes a PR whose checks are merely still running", async () => {
+      ignore("acme/b", "e2e");
+      global.fetch = vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          headers: { get: () => null },
+          json: () =>
+            Promise.resolve(
+              url.includes("stuck")
+                ? [{ ...STUCK_PR, failingChecks: 0, pendingChecks: 1, failing: [], pending: ["e2e"], checkNames: ["e2e"] }]
+                : [],
+            ),
+        }),
+      ) as unknown as typeof fetch;
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      const pr = await screen.findByText("stuck pr");
+      expect(pr.closest("section")?.id).toBe("ready-to-merge");
+    });
+
+    it("leaves the other repo's PR where it was", async () => {
+      ignore("acme/web", "build");
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      const pr = await screen.findByText("stuck pr");
+      expect(pr.closest("section")?.id).toBe("stuck-on-checks");
+      expect(screen.getByRole("button", { name: "build" })).toBeInTheDocument();
+    });
+
+    it("applies an owner-wide ignore to every repo under it", async () => {
+      localStorage.setItem(
+        "prison.ignoredChecks",
+        JSON.stringify({ orgs: { acme: ["build"] }, repos: {} }),
+      );
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      const pr = await screen.findByText("stuck pr");
+      expect(pr.closest("section")?.id).toBe("ready-to-merge");
+    });
+
+    it("survives a hand-edited ignore list", async () => {
+      localStorage.setItem("prison.ignoredChecks", '{"repos":{"acme/b":[7,null,"build"]}}');
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      const pr = await screen.findByText("stuck pr");
+      expect(pr.closest("section")?.id).toBe("ready-to-merge");
+    });
+
+    it("shrugs off a stored value that is not a config at all", async () => {
+      localStorage.setItem("prison.ignoredChecks", "not json");
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      const pr = await screen.findByText("stuck pr");
+      expect(pr.closest("section")?.id).toBe("stuck-on-checks");
+    });
+
+    it("still awaits the tracked checks that were not ignored", async () => {
+      localStorage.setItem(
+        "prison.trackedChecks",
+        JSON.stringify({ orgs: { acme: ["qa/smoke", "manual-signoff"] }, repos: {} }),
+      );
+      ignore("acme/b", "qa/smoke");
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+      expect(screen.getByLabelText("Awaiting required check: manual-signoff")).toBeInTheDocument();
+      expect(screen.queryByText("qa/smoke")).not.toBeInTheDocument();
+    });
+
+    // An awaited check holds the PR out of Ready; ignoring it has to let go of
+    // that hold as well as of the chip.
+    it("stops an ignored tracked check from holding a green PR back", async () => {
+      localStorage.setItem(
+        "prison.trackedChecks",
+        JSON.stringify({ orgs: { acme: ["qa/smoke"] }, repos: {} }),
+      );
+      localStorage.setItem(
+        "prison.ignoredChecks",
+        JSON.stringify({ orgs: { acme: ["qa/smoke"] }, repos: {} }),
+      );
+      global.fetch = vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          headers: { get: () => null },
+          json: () =>
+            Promise.resolve(
+              url.includes("ready")
+                ? [{ ...READY_PR, repo: "acme/b", viaBlocked: true, checkNames: ["build"] }]
+                : [],
+            ),
+        }),
+      ) as unknown as typeof fetch;
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      const pr = await screen.findByText("ready pr");
+      expect(pr.closest("section")?.id).toBe("ready-to-merge");
+    });
+
+    it("ignoring and taking it back leaves the board as it was", async () => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "build" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: /ignore this check/i }));
+      fireEvent.click(screen.getByRole("button", { name: "build — ignored" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: /stop ignoring/i }));
+      expect(screen.getByText("stuck pr").closest("section")?.id).toBe("stuck-on-checks");
+      expect(JSON.parse(localStorage.getItem("prison.ignoredChecks")!)).toEqual({
+        orgs: {},
+        repos: {},
+      });
     });
 
     it("hydrates the ignored list from localStorage and persists it back", async () => {

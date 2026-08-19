@@ -546,22 +546,6 @@ export function Dashboard({ orgs, login }: DashboardProps) {
 
   const sortedStuck = sortByAgeAsc(stuckPrs, (pr) => pr.stuckSince);
   const sortedReviews = sortByAgeAsc(reviewReqs, (req) => req.requestedAt);
-  // A PR the stuck list holds only because a check the user threw out went red
-  // belongs with the mergeable ones — that is what calling a check broken is
-  // for. Drafts are never promoted: the ready list has none by construction,
-  // and a draft cannot be merged however green it is.
-  // A PR can arrive in both payloads — the stuck query keeps the BLOCKED ones
-  // the ready query also claims — so a promotion has to check it is not
-  // repeating what the ready list already says, or the row is drawn twice.
-  const readyIds = new Set(readyPrs.map((pr) => pr.id));
-  const promotedReady = stuckPrs
-    .filter((pr) => !pr.isDraft && !readyIds.has(pr.id) && readyDespiteIgnored(pr, ignored))
-    .map(readyFromStuck);
-  const sortedReady = sortByAgeAsc([...readyPrs, ...promotedReady], (pr) => pr.readySince);
-
-  // Client-side arbitration for BLOCKED+SUCCESS+APPROVED PRs: each such PR lands
-  // in exactly one list based on whether its tracked checks are present in the rollup.
-  // If awaiting checks are absent → stuck (with awaiting chips); if all present → ready.
   // Ignoring a check says the name means nothing on this repo any more, so the
   // wait for it ends with it: an awaiting chip for a check the user threw out
   // would announce exactly the thing they asked never to hear about again.
@@ -575,6 +559,33 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     setIgnored((cfg) =>
       isIgnoredCheck(repo, name, cfg) ? unignoreCheck(repo, name, cfg) : ignoreCheck(repo, name, cfg),
     );
+
+  // A PR the stuck list holds only because a check the user threw out went red
+  // belongs with the mergeable ones — that is what calling a check broken is
+  // for. Drafts are never promoted: the ready list has none by construction,
+  // and a draft cannot be merged however green it is.
+  // A PR can arrive in both payloads — the stuck query keeps the BLOCKED ones
+  // the ready query also claims — so a promotion has to check it is not
+  // repeating what the ready list already says, or the row is drawn twice.
+  const readyIds = new Set(readyPrs.map((pr) => pr.id));
+  const promotedReady = stuckPrs
+    .filter(
+      (pr) =>
+        !pr.isDraft &&
+        !readyIds.has(pr.id) &&
+        // Ignoring answers for the checks GitHub reported. It says nothing
+        // about one the user is still waiting for, and a PR cannot be ready
+        // while a required tracked check has not reported — the same rule the
+        // ready list already applies to the PRs it is handed.
+        !isAwaiting(pr.repo, pr.checkNames) &&
+        readyDespiteIgnored(pr, ignored),
+    )
+    .map(readyFromStuck);
+  const sortedReady = sortByAgeAsc([...readyPrs, ...promotedReady], (pr) => pr.readySince);
+
+  // Client-side arbitration for BLOCKED+SUCCESS+APPROVED PRs: each such PR lands
+  // in exactly one list based on whether its tracked checks are present in the rollup.
+  // If awaiting checks are absent → stuck (with awaiting chips); if all present → ready.
 
   // A check GitHub did report. It keeps its own colours unless the user has
   // said something about it: a check they marked as unable to block the merge,

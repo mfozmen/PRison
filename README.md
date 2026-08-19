@@ -67,9 +67,10 @@ and expand to the latest 15, with **Load more** for the rest.
   merge* over it, it gets no bucket of its own under *By check*, and it is never
   awaited. Everything ignored is listed in **Settings → Ignored checks**, under
   the repo it was ignored on, where it can be renamed, widened to the whole
-  owner, or taken back. A conflict, a review gate, or branch protection still
-  holds the PR: ignoring a check says its result means nothing, never "merge it
-  anyway".
+  owner, or taken back. A conflict or a review gate still holds the PR —
+  ignoring a check says its result means nothing, never "merge it anyway" — but
+  GitHub's own *blocked* state doesn't, since a red **required** check is
+  exactly what puts a PR there.
 - **History you can walk back into.** Merged and closed-without-merging PRs, each
   badged **Merged** or **Closed** with how long ago it ended — and next to them
   the PRs you reviewed, so a discussion you left open is one click away instead

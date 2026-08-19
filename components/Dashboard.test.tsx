@@ -1470,6 +1470,27 @@ describe("Dashboard", () => {
       ).toBeInTheDocument();
     });
 
+    // The state GitHub puts a PR in when a REQUIRED check is red — the one
+    // that made the user call the check broken in the first place.
+    it("promotes a PR GitHub reports as BLOCKED over the ignored check", async () => {
+      ignore("acme/b", "build");
+      global.fetch = vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          headers: { get: () => null },
+          json: () =>
+            Promise.resolve(
+              url.includes("stuck")
+                ? [{ ...STUCK_PR, blocked: true, mergeState: "BLOCKED", reviewDecision: "APPROVED" }]
+                : [],
+            ),
+        }),
+      ) as unknown as typeof fetch;
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      const pr = await screen.findByText("stuck pr");
+      expect(pr.closest("section")?.id).toBe("ready-to-merge");
+    });
+
     it("keeps the PR stuck while a check nobody ignored is still red", async () => {
       ignore("acme/b", "lint");
       render(<Dashboard orgs={ORGS} login="testuser" />);

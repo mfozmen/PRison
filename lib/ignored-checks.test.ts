@@ -148,11 +148,34 @@ describe("readyDespiteIgnored", () => {
   // "merge it anyway".
   it.each([
     ["a merge conflict", { mergeState: "DIRTY" }],
-    ["branch protection", { mergeState: "BLOCKED" }],
     ["a review that was asked for", { reviewDecision: "REVIEW_REQUIRED" }],
     ["changes that were requested", { reviewDecision: "CHANGES_REQUESTED" }],
   ])("is false while %s holds the PR", (_label, over) => {
     expect(readyDespiteIgnored(s({ failing: ["flaky"], ...over }), cfg)).toBe(false);
+  });
+
+  // BLOCKED is what GitHub says when a REQUIRED check is red — which is
+  // precisely the PR the user was looking at when they called the check
+  // broken. Refusing to promote it would leave ignoring useless exactly where
+  // it is needed. The board already makes this leap for a green BLOCKED PR
+  // (readyViaBlocked); once the ignored result is discounted, this is the same
+  // PR. What is left of BLOCKED — a review gate — is checked separately.
+  it.each([
+    ["approved", "APPROVED"],
+    ["a repo that requires no review at all", ""],
+  ])("promotes a BLOCKED PR on %s", (_label, reviewDecision) => {
+    expect(
+      readyDespiteIgnored(s({ failing: ["flaky"], mergeState: "BLOCKED", reviewDecision }), cfg),
+    ).toBe(true);
+  });
+
+  it("still refuses a BLOCKED PR that is waiting on a review", () => {
+    expect(
+      readyDespiteIgnored(
+        s({ failing: ["flaky"], mergeState: "BLOCKED", reviewDecision: "REVIEW_REQUIRED" }),
+        cfg,
+      ),
+    ).toBe(false);
   });
 });
 

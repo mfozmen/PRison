@@ -1491,6 +1491,57 @@ describe("Dashboard", () => {
       expect(pr.closest("section")?.id).toBe("ready-to-merge");
     });
 
+    // Ignoring answers for the checks GitHub reported. It says nothing about a
+    // check the user is still waiting for, and a PR cannot be ready while one
+    // of those has not reported.
+    it("does not promote a PR still awaiting a required tracked check", async () => {
+      localStorage.setItem(
+        "prison.trackedChecks",
+        JSON.stringify({ orgs: { acme: ["qa/smoke"] }, repos: {} }),
+      );
+      ignore("acme/b", "build");
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      const pr = await screen.findByText("stuck pr");
+      expect(pr.closest("section")?.id).toBe("stuck-on-checks");
+      expect(screen.getByLabelText("Awaiting required check: qa/smoke")).toBeInTheDocument();
+    });
+
+    it("promotes once the awaited check reports", async () => {
+      localStorage.setItem(
+        "prison.trackedChecks",
+        JSON.stringify({ orgs: { acme: ["qa/smoke"] }, repos: {} }),
+      );
+      ignore("acme/b", "build");
+      global.fetch = vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          headers: { get: () => null },
+          json: () =>
+            Promise.resolve(
+              url.includes("stuck")
+                ? [{ ...STUCK_PR, checkNames: ["build", "qa/smoke"] }]
+                : [],
+            ),
+        }),
+      ) as unknown as typeof fetch;
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      const pr = await screen.findByText("stuck pr");
+      expect(pr.closest("section")?.id).toBe("ready-to-merge");
+    });
+
+    // A tracked check the user said cannot block the merge never held a PR
+    // back, and promotion is not the place to start.
+    it("promotes while awaiting a check marked not required", async () => {
+      localStorage.setItem(
+        "prison.trackedChecks",
+        JSON.stringify({ orgs: { acme: [{ name: "nightly-e2e", required: false }] }, repos: {} }),
+      );
+      ignore("acme/b", "build");
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      const pr = await screen.findByText("stuck pr");
+      expect(pr.closest("section")?.id).toBe("ready-to-merge");
+    });
+
     it("keeps the PR stuck while a check nobody ignored is still red", async () => {
       ignore("acme/b", "lint");
       render(<Dashboard orgs={ORGS} login="testuser" />);

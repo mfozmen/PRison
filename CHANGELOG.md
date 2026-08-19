@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.20.1](https://github.com/mfozmen/PRison/compare/v1.20.0...v1.20.1) (2026-08-19)
+
+### Bug Fixes
+
+* promote a blocked PR over an ignored check ([#78](https://github.com/mfozmen/PRison/issues/78)) ([03477cc](https://github.com/mfozmen/PRison/commit/03477cc1c7e47f512f70558d10beffc311dc5238))
+
 ## [1.20.0](https://github.com/mfozmen/PRison/compare/v1.19.0...v1.20.0) (2026-08-19)
 
 ### Features

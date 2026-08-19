@@ -550,8 +550,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // belongs with the mergeable ones — that is what calling a check broken is
   // for. Drafts are never promoted: the ready list has none by construction,
   // and a draft cannot be merged however green it is.
+  // A PR can arrive in both payloads — the stuck query keeps the BLOCKED ones
+  // the ready query also claims — so a promotion has to check it is not
+  // repeating what the ready list already says, or the row is drawn twice.
+  const readyIds = new Set(readyPrs.map((pr) => pr.id));
   const promotedReady = stuckPrs
-    .filter((pr) => !pr.isDraft && readyDespiteIgnored(pr, ignored))
+    .filter((pr) => !pr.isDraft && !readyIds.has(pr.id) && readyDespiteIgnored(pr, ignored))
     .map(readyFromStuck);
   const sortedReady = sortByAgeAsc([...readyPrs, ...promotedReady], (pr) => pr.readySince);
 

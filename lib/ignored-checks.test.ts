@@ -216,3 +216,73 @@ describe("readyFromStuck", () => {
     expect(readyFromStuck(stuckPr({ repo: "acme/api", mergeState: "BEHIND" })).needsUpdate).toBe(true);
   });
 });
+
+describe("readyDespiteIgnored — the edges", () => {
+  const s = (over: Partial<StuckPr> = {}): StuckPr =>
+    stuckPr({ repo: "acme/api", url: "u", stuckSince: "x", ...over });
+  const cfg = { orgs: {}, repos: { "acme/api": ["flaky"] } };
+
+  it("promotes on a check that is only still running", () => {
+    expect(readyDespiteIgnored(s({ pending: ["flaky"] }), cfg)).toBe(true);
+  });
+
+  it("promotes when the ignore came from the owner rather than the repo", () => {
+    const owner = { orgs: { acme: ["flaky"] }, repos: {} };
+    expect(readyDespiteIgnored(s({ failing: ["flaky"] }), owner)).toBe(true);
+  });
+
+  it("promotes a branch that is merely behind, badge and all", () => {
+    const pr = s({ failing: ["flaky"], mergeState: "BEHIND" });
+    expect(readyDespiteIgnored(pr, cfg)).toBe(true);
+    expect(readyFromStuck(pr).needsUpdate).toBe(true);
+  });
+
+  it("needs every red and running check ignored, not most of them", () => {
+    expect(readyDespiteIgnored(s({ failing: ["flaky"], pending: ["build"] }), cfg)).toBe(false);
+    expect(readyDespiteIgnored(s({ failing: ["flaky", "build"] }), cfg)).toBe(false);
+  });
+
+  // Ignoring is per repo for a reason: a name that is broken on one repo is
+  // usually a different job on another.
+  it("does not reach a repo the ignore was not made on", () => {
+    expect(readyDespiteIgnored(s({ repo: "acme/web", failing: ["flaky"] }), cfg)).toBe(false);
+  });
+
+  it("is unmoved by an ignored name that never ran", () => {
+    const typo = { orgs: {}, repos: { "acme/api": ["flakey"] } };
+    expect(readyDespiteIgnored(s({ failing: ["flaky"] }), typo)).toBe(false);
+  });
+
+  // Names come from GitHub verbatim and from a text field the user typed into.
+  it("matches the name exactly, case and all", () => {
+    const shouty = { orgs: {}, repos: { "acme/api": ["FLAKY"] } };
+    expect(readyDespiteIgnored(s({ failing: ["flaky"] }), shouty)).toBe(false);
+  });
+
+  it("survives a hand-edited config with junk in it", () => {
+    const junk = { orgs: { acme: 5 }, repos: { "acme/api": [null, "flaky"] } };
+    expect(readyDespiteIgnored(s({ failing: ["flaky"] }), junk as never)).toBe(true);
+  });
+
+  it("is false with an empty config, whatever the PR looks like", () => {
+    expect(readyDespiteIgnored(s({ failing: ["flaky"] }), EMPTY_IGNORED)).toBe(false);
+  });
+});
+
+describe("ignoring and un-ignoring in sequence", () => {
+  it("leaves the config as it found it", () => {
+    const before = { orgs: {}, repos: { "acme/web": ["other"] } };
+    const after = unignoreCheck("acme/api", "flaky", ignoreCheck("acme/api", "flaky", before));
+    expect(after).toEqual(before);
+  });
+
+  it("takes nothing away when the name was never ignored", () => {
+    const cfg = { orgs: {}, repos: { "acme/api": ["flaky"] } };
+    expect(unignoreCheck("acme/api", "never-ignored", cfg)).toEqual(cfg);
+  });
+
+  it("leaves the other repos alone when one is cleared out", () => {
+    const cfg = { orgs: {}, repos: { "acme/api": ["flaky"], "acme/web": ["flaky"] } };
+    expect(unignoreCheck("acme/api", "flaky", cfg).repos).toEqual({ "acme/web": ["flaky"] });
+  });
+});

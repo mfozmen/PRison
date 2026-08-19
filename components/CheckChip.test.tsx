@@ -59,6 +59,14 @@ describe("CheckChip", () => {
     expect(button).toHaveFocus();
   });
 
+  // Opening a menu and leaving focus behind on the button means a keyboard
+  // user has to guess that Tab is what reaches the thing they just opened.
+  it("moves focus into the menu when it opens", () => {
+    chip();
+    fireEvent.click(screen.getByRole("button", { name: /flaky-e2e/ }));
+    expect(screen.getByRole("menuitem", { name: /ignore this check/i })).toHaveFocus();
+  });
+
   it("stays open for a key that is not Escape", () => {
     chip();
     fireEvent.click(screen.getByRole("button", { name: /flaky-e2e/ }));

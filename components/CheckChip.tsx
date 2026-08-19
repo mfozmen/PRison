@@ -38,7 +38,14 @@ export function CheckChip({ name, tone, ignored, description, icon, onToggleIgno
   const menuId = useId();
   const chipRef = useRef<HTMLButtonElement>(null);
   const wrapperRef = useRef<HTMLSpanElement>(null);
+  const itemRef = useRef<HTMLButtonElement>(null);
   const label = `${description ?? name}${ignored ? " — ignored" : ""}`;
+
+  // Opening a menu and leaving focus on the button behind it means anyone
+  // without a mouse has to guess that Tab is what reaches what they opened.
+  useEffect(() => {
+    if (open) itemRef.current?.focus();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -87,6 +94,7 @@ export function CheckChip({ name, tone, ignored, description, icon, onToggleIgno
           className="absolute left-0 top-full z-20 mt-1 w-56 rounded-md border border-border bg-background py-1 shadow-lg"
         >
           <button
+            ref={itemRef}
             type="button"
             role="menuitem"
             onClick={() => {

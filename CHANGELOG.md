@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.20.0](https://github.com/mfozmen/PRison/compare/v1.19.0...v1.20.0) (2026-08-19)
+
+### Features
+
+* ignore a broken check from its own chip ([#77](https://github.com/mfozmen/PRison/issues/77)) ([7cf8f05](https://github.com/mfozmen/PRison/commit/7cf8f0559565ce8293962eb4b5e0812420eb30d8))
+
 ## [1.19.0](https://github.com/mfozmen/PRison/compare/v1.18.0...v1.19.0) (2026-08-13)
 
 ### Features

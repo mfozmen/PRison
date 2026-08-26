@@ -127,7 +127,9 @@ and expand to the latest 15, with **Load more** for the rest.
   a test notification, and says where else to look if nothing appears: your
   operating system decides separately whether the browser may show anything, and
   it refuses in silence. Whatever the notification misses is in the activity
-  feed regardless.
+  feed regardless — and, if your operating system keeps swallowing them, in the
+  menu bar: `extras/menubar/` puts the counts and a native notification there,
+  where nothing has to be permitted for you to see them.
 - **Catch-up on open.** PRison remembers what everything was doing when you
   last closed it, so a review that arrived overnight is still news in the
   morning — the first load reports what moved while no tab was polling,

@@ -13,7 +13,7 @@ you click it, however long that takes. The live totals — what is outstanding
 right now, which is a different question — sit in the dropdown underneath.
 
 ```
-🔒 2
+▮▮▮ 2
   Unread (2)
     acme/web #58 is ready to merge
     globex/api #7 needs your review
@@ -49,8 +49,10 @@ a badge for finished work is worse than no badge.
    ```
 
    Already past that screen? **SwiftBar → Preferences → General** shows the
-   folder it settled on, and `defaults read com.ameba.SwiftBar PluginDirectory`
-   prints it without opening anything.
+   folder it settled on and is where you change it;
+   `defaults read com.ameba.SwiftBar PluginDirectory` prints it without opening
+   anything. Either point SwiftBar at `~/SwiftBar`, or copy the plugin into
+   whichever folder it already uses — the plugin does not care which.
 
 4. macOS will ask to allow notifications the first time one fires. Say yes —
    and check **System Settings → Notifications** afterwards, since an app whose

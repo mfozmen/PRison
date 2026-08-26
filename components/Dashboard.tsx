@@ -789,8 +789,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     // rejected leaves it armed, so Retry still reports what moved, while a
     // board that is legitimately empty spends it and a later org switch can
     // never be mistaken for the catch-up and replay everything into the feed.
-    // A desktop notification still needs an unfocused tab, so opening the app
-    // doesn't notify about what it is already showing.
+    // Never a desktop notification, whether or not the tab is focused: what
+    // the catch-up reports is by definition old, and a browser reloads a tab
+    // on its own — a discarded one Chrome restores in the background is not
+    // the user opening PRison. A banner is a claim that something just
+    // happened; the feed and the bell say what changed without dating it.
     const catchUp = catchUpRef.current && landedRef.current;
     if (catchUp) catchUpRef.current = false;
     if (pollGen !== lastPollGenRef.current || catchUp) {
@@ -804,7 +807,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         // This poll's events only. The accumulated history has a home now, and
         // re-announcing everything still unseen would repeat older events on
         // every poll, since unseen no longer clears when the tab regains focus.
-        if (!document.hasFocus()) showChangeNotification(events);
+        if (!catchUp && !document.hasFocus()) showChangeNotification(events);
       }
     }
   });

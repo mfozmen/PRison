@@ -134,8 +134,9 @@ and expand to the latest 15, with **Load more** for the rest.
   last closed it, so a review that arrived overnight is still news in the
   morning — the first load reports what moved while no tab was polling,
   instead of quietly accepting it as the way things always were. It fills the
-  feed and the bell; it doesn't raise a notification about what the page in
-  front of you is already showing.
+  feed and the bell, never a desktop notification: what it reports is by
+  definition old, and a browser reloads a tab on its own — a discarded one
+  restored in the background is not you opening PRison.
 - **Last refreshed indicator.** The filter bar says how long ago the data
   landed, so you always know whether you're looking at something stale.
 - **Partial-data notice.** When GitHub drops part of a response (an org restricts

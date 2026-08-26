@@ -864,9 +864,7 @@ describe("Dashboard", () => {
     expect(await screen.findByText("Nothing ready to merge")).toBeInTheDocument();
 
     fireEvent.click(draftButton(/only drafts/i));
-    await waitFor(() =>
-      expect(screen.getByText("Drafts are never ready to merge")).toBeInTheDocument(),
-    );
+    expect(await screen.findByText("Drafts are never ready to merge")).toBeInTheDocument();
   });
 
   // The tiles count the same visible lists the sections render, so a filter can

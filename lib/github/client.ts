@@ -99,6 +99,10 @@ export async function ghQuery<T>(
 // Deliberately NOT the hourly point budget (a RATE_LIMITED GraphQL error):
 // that one resets on the hour, so an immediate retry only spends the quota it
 // is out of.
+// Measured, not assumed: a burst against the GraphQL API answers its secondary
+// limit with `Retry-After: 1` (every one of 19 hits in one burst, and again in
+// a second). One second plus the jitter fits the budget, so this window is the
+// one GitHub actually uses — the retry is a live path, not a dead branch.
 const MAX_WAIT_MS = 5_000;
 const JITTER_MS = 2_000;
 function secondaryLimitWaitMs(e: unknown): number | null {

@@ -311,9 +311,10 @@ export function isStatusEvent(value: unknown): value is StatusEvent {
     typeof e.repo === "string" &&
     typeof e.number === "number" &&
     typeof e.status === "string" &&
-    // hasOwnProperty rather than `in`: "constructor" is on every object's
-    // prototype chain and would validate as a status nothing can describe.
-    Object.prototype.hasOwnProperty.call(PHRASES, e.status) &&
+    // An own-property check rather than `in`: "constructor" is on every
+    // object's prototype chain and would validate as a status nothing can
+    // describe.
+    Object.hasOwn(PHRASES, e.status) &&
     typeof e.url === "string" &&
     (e.at === undefined || typeof e.at === "string")
   );

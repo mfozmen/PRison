@@ -15,6 +15,7 @@ import {
   modeLabel,
   themeLabel,
 } from "./theme";
+import type { ThemeId } from "./theme";
 
 /** Runs the real init script — the same string layout.tsx puts in <head> — so
  * a change to it can't pass here and break in the browser. */
@@ -163,6 +164,13 @@ describe("labels", () => {
     expect(modeLabel("iznik", "dark")).toBe("Cobalt");
     expect(modeLabel("cyanotype", "light")).toBe("Negative");
     expect(modeLabel("default", "dark")).toBe("Dark");
+  });
+
+  // The id comes out of localStorage, which is hand-editable: a theme that
+  // was renamed or never existed must still name a ground, not undefined.
+  it("falls back to the default family for an id it does not know", () => {
+    expect(modeLabel("gone" as ThemeId, "dark")).toBe("Dark");
+    expect(themeLabel("gone" as ThemeId)).toBe("Default");
   });
 
   it("names the family", () => {

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.21.0](https://github.com/mfozmen/PRison/compare/v1.20.3...v1.21.0) (2026-08-26)
+
+### Features
+
+* edit tracked and ignored checks one scope at a time ([#81](https://github.com/mfozmen/PRison/issues/81)) ([bd03858](https://github.com/mfozmen/PRison/commit/bd03858feb5b9918dc392948591818316a99d1fd))
+
 ## [1.20.3](https://github.com/mfozmen/PRison/compare/v1.20.2...v1.20.3) (2026-08-19)
 
 ### Bug Fixes

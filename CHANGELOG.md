@@ -1,5 +1,7 @@
 # Changelog
 
+## [1.21.1](https://github.com/mfozmen/PRison/compare/v1.21.0...v1.21.1) (2026-08-26)
+
 ## [1.21.0](https://github.com/mfozmen/PRison/compare/v1.20.3...v1.21.0) (2026-08-26)
 
 ### Features

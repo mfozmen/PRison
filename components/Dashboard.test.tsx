@@ -1817,7 +1817,7 @@ describe("Dashboard", () => {
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       // STUCK_PR.repo = "acme/b", REVIEW_PR.repo = "acme/c", READY_PR.repo = "acme/d"
       openSettings("Tracked checks");
-      const addButton = screen.getByRole("button", { name: /add override/i });
+      const addButton = screen.getByRole("button", { name: /add repository/i });
       expect(addButton).toBeInTheDocument();
       fireEvent.click(addButton);
       // Focus the combobox; empty input shows availableRepos as suggestions

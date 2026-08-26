@@ -35,7 +35,7 @@ export function isNewerVersion(latest: string, current: string): boolean {
   const parts = (v: string) => {
     const nums = v.replace(/^v/, "").split(".");
     if (nums.length !== 3) return null;
-    const parsed = nums.map((n) => (/^\d+$/.test(n) ? Number(n) : NaN));
+    const parsed = nums.map((n) => (/^\d+$/.test(n) ? Number(n) : Number.NaN));
     return parsed.some(Number.isNaN) ? null : parsed;
   };
   const a = parts(latest);

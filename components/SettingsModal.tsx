@@ -293,6 +293,7 @@ function ScopeEditor({
   onAddRepo,
   onRemoveRepo,
   removeLabel,
+  ownerGroupLabel,
   children,
 }: {
   label: string;
@@ -310,11 +311,16 @@ function ScopeEditor({
    * ignore list cleared. The button says Remove either way; this is what a
    * screen reader hears it do. */
   removeLabel: (repo: string) => string;
+  /** What an owner scope means in this panel: a default the repos fall back
+   * to, or an ignore that covers all of them. The picker must not contradict
+   * the sentence under it. */
+  ownerGroupLabel: string;
   children: (scope: Scope) => ReactNode;
 }) {
   // A repo stays on the list once picked, even while its list is empty —
   // otherwise removing the last check would take the scope out from under the
   // user mid-edit.
+  const pickerRef = useRef<HTMLSelectElement>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [adding, setAdding] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
@@ -350,13 +356,14 @@ function ScopeEditor({
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {current && (
           <select
+            ref={pickerRef}
             aria-label={label}
             value={scopeId(current)}
             onChange={(e) => setSelected(e.target.value)}
             className="min-h-[44px] min-w-0 flex-1 cursor-pointer rounded-md border border-border bg-surface px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
           >
             {owners.length > 0 && (
-              <optgroup label="Owner defaults">
+              <optgroup label={ownerGroupLabel}>
                 {owners.map((owner) => (
                   <option key={owner} value={scopeId({ kind: "owner", key: owner })}>
                     {optionLabel({ kind: "owner", key: owner })}
@@ -386,6 +393,9 @@ function ScopeEditor({
               setPicked((p) => p.filter((r) => r !== current.key));
               setSelected(null);
               onRemoveRepo(current.key);
+              // The button goes with the scope it removed; without this the
+              // keyboard lands on <body>, a page away from what it was doing.
+              pickerRef.current?.focus();
             }}
             className="shrink-0 py-1.5"
             ariaLabel={removeLabel(current.key)}
@@ -880,6 +890,7 @@ export function SettingsModal({
                   onAddRepo={(repo) => setRepoChecks(repo, normalizeAll(value.repos[repo]))}
                   onRemoveRepo={removeRepo}
                   removeLabel={(repo) => `Remove ${repo} override`}
+                  ownerGroupLabel="Owner defaults"
                 >
                   {(scope) => (
                     <div>
@@ -927,6 +938,7 @@ export function SettingsModal({
                   }
                   onRemoveRepo={(repo) => setIgnoredIn("repos", repo, [])}
                   removeLabel={(repo) => `Stop ignoring everything for ${repo}`}
+                  ownerGroupLabel="Owner-wide"
                 >
                   {(scope) => (
                     <div>

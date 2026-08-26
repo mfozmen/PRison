@@ -1402,6 +1402,29 @@ describe("SettingsModal — scope picker", () => {
     });
   });
 
+  // An owner scope is a default in one panel and a blanket ignore in the
+  // other; one hard-coded group label would contradict the panel it sits in.
+  it("names the owner group after what the panel does with it", () => {
+    openTracked();
+    const groups = (label: string) =>
+      Array.from(
+        (screen.getByRole("combobox", { name: label }) as HTMLSelectElement).querySelectorAll(
+          "optgroup",
+        ),
+      ).map((g) => g.label);
+    expect(groups("Tracked checks scope")).toContain("Owner defaults");
+    selectSection("Ignored checks");
+    expect(groups("Ignored checks scope")).toContain("Owner-wide");
+  });
+
+  it("puts focus back on the picker after removing a scope", () => {
+    openTracked({ value: { orgs: {}, repos: { "acme/web": ["lint"] } } });
+    fireEvent.click(screen.getByRole("button", { name: "Remove acme/web override" }));
+    // The button unmounts with the scope it removed; focus has to land
+    // somewhere, and the picker is where the work continues.
+    expect(screen.getByRole("combobox", { name: "Tracked checks scope" })).toHaveFocus();
+  });
+
   it("drops a repo's checks when its scope is removed, and falls back", () => {
     const onChange = vi.fn();
     const { rerender } = render(

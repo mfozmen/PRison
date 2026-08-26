@@ -161,7 +161,7 @@ def main():
         cookie = session()
         lists = {path: [i for i in fetch(cookie, path) if keep(path, i)] for path, _, _ in BUCKETS}
     except (urllib.error.URLError, TimeoutError, OSError, ValueError) as e:
-        print(f" ! | image={ICON}")
+        print(f"! | image={ICON}")
         print("---")
         print(f"PRison is not answering at {URL}")
         print(f"{type(e).__name__} | color=red")
@@ -202,8 +202,8 @@ def main():
     # SwiftBar runs the plugin by absolute path, but a hand-run relative one
     # would put a broken callback in the menu.
     me = os.path.abspath(sys.argv[0])
-    count = f" {len(unread)}" if unread else ""
-    print(f"{count} | image={ICON}")
+    # The icon carries the meaning; the number is only drawn when there is one.
+    print(f"{len(unread) if unread else ''} | image={ICON}")
     print("---")
     if unread:
         print(f"Unread ({len(unread)})")

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.22.1](https://github.com/mfozmen/PRison/compare/v1.22.0...v1.22.1) (2026-08-26)
+
+### Features
+
+* PRison's own icon in the menu bar, and docs that survive an install ([#84](https://github.com/mfozmen/PRison/issues/84)) ([d423e3a](https://github.com/mfozmen/PRison/commit/d423e3a46ae0e96825d794ba6b0469f1921299bf))
+
 ## [1.22.0](https://github.com/mfozmen/PRison/compare/v1.21.1...v1.22.0) (2026-08-26)
 
 ### Features

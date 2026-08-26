@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.22.0](https://github.com/mfozmen/PRison/compare/v1.21.1...v1.22.0) (2026-08-26)
+
+### Features
+
+* PRison in the macOS menu bar, and stop banner-ing the catch-up ([#83](https://github.com/mfozmen/PRison/issues/83)) ([02641a1](https://github.com/mfozmen/PRison/commit/02641a1143be73252840a595aeecd159d66813d8))
+
 ## [1.21.1](https://github.com/mfozmen/PRison/compare/v1.21.0...v1.21.1) (2026-08-26)
 
 ## [1.21.0](https://github.com/mfozmen/PRison/compare/v1.20.3...v1.21.0) (2026-08-26)

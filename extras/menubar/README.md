@@ -4,19 +4,33 @@ A browser notification has to survive a lot: the browser open, the tab not
 discarded, the site permission granted, and four separate macOS switches. When
 one of those is off nothing tells you — the notification is simply never drawn.
 
-`prison.1m.py` puts the same counts in the menu bar, where nothing has to be
-allowed for you to see them, and sends a native notification when something
-new lands.
+And a banner that does arrive is gone in seconds, whether or not you were
+looking at the screen — miss it and you have missed it.
+
+`prison.1m.py` is the other half of that. The number in the menu bar is what
+you have **not read yet**: it appears when something lands, and it stays until
+you click it, however long that takes. The live totals — what is outstanding
+right now, which is a different question — sit in the dropdown underneath.
 
 ```
-🔒 3
-  Ready to merge: 0
+🔒 2
+  Unread (2)
+    acme/web #58 is ready to merge
+    globex/api #7 needs your review
+    Mark all read
+  ─────────────
+  Ready to merge: 1
   Waiting on your review: 3
     acme/web #58   Document the deploy rollback steps
     …
   Comments awaiting reply: 0
   Stuck on checks: 1
 ```
+
+Clicking an unread row opens the PR and reads it in one go, so the badge is
+never left standing over something you have already looked at. An item that
+leaves the lists — you merged it, you replied — drops out of unread by itself:
+a badge for finished work is worse than no badge.
 
 ## Install
 
@@ -52,13 +66,15 @@ The three lists where somebody is waiting on you: ready to merge, waiting on
 your review, and comments awaiting reply. Stuck-on-checks PRs are yours and you
 already know about them, so they are shown but never announced.
 
-A notification fires for a PR that was not in that list last run — not for the
-count changing, so one PR moving between lists does not announce itself twice.
-The first run after installing announces nothing: everything is new the first
-time, and saying so is noise.
+A notification fires — and an unread row appears — for a PR that was not in
+that list last run, not for the count changing, so one PR moving between lists
+does not announce itself twice. The first run after installing announces
+nothing and starts with an empty badge: everything is new the first time, and
+saying so is noise.
 
 Wording matches the dashboard's own notifications, so the same event does not
 read as two different things depending on where you saw it.
 
-Ids seen last run are cached in `~/Library/Caches/prison-menubar.json`. Delete
-it to start over.
+What was seen last run, and what is still unread, live in
+`~/Library/Caches/prison-menubar.json`. Delete it to start over — the next run
+seeds itself quietly, as a fresh install does.

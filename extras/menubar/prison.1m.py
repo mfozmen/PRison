@@ -7,9 +7,14 @@ discarded, the site permission, and four macOS switches. The count in the menu
 bar depends on none of that: it is drawn every minute whether or not anything
 is allowed to interrupt you.
 
+The count in the bar is what you have not read yet, not what is outstanding:
+a banner shows the moment something arrives and is gone whether or not you
+were looking, so the menu bar is the other half — it holds what you missed
+until you look, and only then goes quiet. The live totals are one click away
+in the dropdown.
+
 Reads a PRison that is already running (the Docker container, or `npm run
-dev`). Nothing is stored but the ids seen last run, so a notification fires
-once, for the thing that actually changed.
+dev`).
 
 Install: see extras/menubar/README.md.
 """
@@ -24,6 +29,7 @@ Install: see extras/menubar/README.md.
 import json
 import os
 import subprocess
+import sys
 import urllib.error
 import urllib.request
 
@@ -102,12 +108,45 @@ def notify(lines):
 def read_state():
     try:
         with open(STATE) as f:
-            return json.load(f)
+            state = json.load(f)
+        # Written by an older version, which kept only the seen ids.
+        if "seen" not in state:
+            return {"seen": state, "unread": []}
+        return state
     except (OSError, ValueError):
         return None
 
 
+def write_state(state):
+    try:
+        os.makedirs(os.path.dirname(STATE), exist_ok=True)
+        with open(STATE, "w") as f:
+            json.dump(state, f)
+    except OSError:
+        pass  # a menu bar that cannot cache still counts correctly
+
+
+def mark_read(ids):
+    """Clicking an item is reading it. Called back into by the menu, which is
+    why this file takes arguments at all."""
+    state = read_state()
+    if state is None:
+        return
+    keep_all = ids == ["all"]
+    state["unread"] = [] if keep_all else [u for u in state["unread"] if u["id"] not in ids]
+    write_state(state)
+
+
 def main():
+    # The menu calls back in to mark things read: --read <id>… [--open <url>].
+    if len(sys.argv) > 1 and sys.argv[1] == "--read":
+        rest = sys.argv[2:]
+        url = rest[rest.index("--open") + 1] if "--open" in rest else None
+        mark_read(rest[: rest.index("--open")] if url else rest)
+        if url:
+            subprocess.run(["open", url], check=False)
+        return
+
     try:
         cookie = session()
         lists = {path: [i for i in fetch(cookie, path) if keep(path, i)] for path, _, _ in BUCKETS}
@@ -120,9 +159,52 @@ def main():
         print("Refresh now | refresh=true")
         return
 
-    waiting = sum(len(lists[p]) for p in ANNOUNCED)
-    print(f"🔒 {waiting}" if waiting else "🔒")
+    previous = read_state()
+    seen = {path: [i.get("id") for i in lists[path]] for path, _, _ in BUCKETS}
+
+    # Unread carries over until it is read, minus anything that has left the
+    # lists — that one was acted on, and a badge for it is a badge for work
+    # already done.
+    live = {i.get("id") for path, _, _ in BUCKETS for i in lists[path]}
+    unread = [u for u in (previous or {}).get("unread", []) if u["id"] in live]
+    known = {u["id"] for u in unread}
+    arrived = []
+    if previous is not None:  # a first run has nothing to be new against
+        for path, _, phrase in BUCKETS:
+            if path not in ANNOUNCED:
+                continue
+            before = set(previous["seen"].get(path, []))
+            for item in lists[path]:
+                if item.get("id") in before or item.get("id") in known:
+                    continue
+                arrived.append(
+                    {
+                        "id": item.get("id"),
+                        "line": f"{label(item)} {phrase}",
+                        "url": item.get("url", URL),
+                    }
+                )
+    unread += arrived
+    write_state({"seen": seen, "unread": unread})
+    if arrived:
+        notify([a["line"] for a in arrived])
+
+    # SwiftBar runs the plugin by absolute path, but a hand-run relative one
+    # would put a broken callback in the menu.
+    me = os.path.abspath(sys.argv[0])
+    print(f"🔒 {len(unread)}" if unread else "🔒")
     print("---")
+    if unread:
+        print(f"Unread ({len(unread)})")
+        for u in unread:
+            # Opening it is reading it, so the click does both and the badge
+            # is never left standing over something you have already seen.
+            print(
+                f'-- {u["line"]} | bash="{me}" param1=--read param2={u["id"]} '
+                f'param3=--open param4={u["url"]} terminal=false refresh=true'
+            )
+        print(f'Mark all read | bash="{me}" param1=--read param2=all terminal=false refresh=true')
+        print("---")
     for path, heading, _ in BUCKETS:
         items = lists[path]
         print(f"{heading}: {len(items)} | href={URL}")
@@ -132,29 +214,6 @@ def main():
     print("---")
     print(f"Open PRison | href={URL}")
     print("Refresh now | refresh=true")
-
-    # Ids seen last time, per bucket. A first run seeds them without saying
-    # anything: everything is new the first time, and announcing all of it is
-    # noise, not news.
-    previous = read_state()
-    current = {path: [i.get("id") for i in lists[path]] for path, _, _ in BUCKETS}
-    if previous is not None:
-        lines = []
-        for path, _, phrase in BUCKETS:
-            if path not in ANNOUNCED:
-                continue
-            seen = set(previous.get(path, []))
-            for item in lists[path]:
-                if item.get("id") not in seen:
-                    lines.append(f"{label(item)} {phrase}")
-        if lines:
-            notify(lines)
-    try:
-        os.makedirs(os.path.dirname(STATE), exist_ok=True)
-        with open(STATE, "w") as f:
-            json.dump(current, f)
-    except OSError:
-        pass  # a menu bar that cannot cache still counts correctly
 
 
 main()

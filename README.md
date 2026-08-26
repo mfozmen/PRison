@@ -258,6 +258,8 @@ The Settings menu has six sections:
   height of one list however many repos you configure.
 - **Ignored checks** — everything you wrote off from the board, under the repo
   it was ignored on, plus an owner scope for a check that is broken everywhere.
+  A repo can also be picked here, to write a check off before the board has
+  ever drawn its chip.
 - **Appearance** — pick one of the four themes, each previewing its own colours
   and typeface.
 - **About** — version, repository, license, and **Check for updates**: asked

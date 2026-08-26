@@ -1371,6 +1371,37 @@ describe("SettingsModal — scope picker", () => {
     expect(onIgnoredChange).toHaveBeenCalledWith({ orgs: {}, repos: {} });
   });
 
+  // Ignoring usually starts on the board, but a check known to be broken can
+  // be written off before it has ever drawn a chip — same picker, same flow.
+  it("ignores a check on a repo picked here, before the board ever draws it", () => {
+    const onIgnoredChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        owners={owners}
+        availableRepos={someRepos}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open
+        onClose={vi.fn()}
+        ignored={{ orgs: {}, repos: {} }}
+        onIgnoredChange={onIgnoredChange}
+      />,
+    );
+    selectSection("Ignored checks");
+    fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+    fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
+    fireEvent.change(screen.getByLabelText("New ignored check for acme/web"), {
+      target: { value: "nightly-e2e" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Ignore for acme/web" }));
+    expect(onIgnoredChange).toHaveBeenCalledWith({
+      orgs: {},
+      repos: { "acme/web": ["nightly-e2e"] },
+    });
+  });
+
   it("drops a repo's checks when its scope is removed, and falls back", () => {
     const onChange = vi.fn();
     const { rerender } = render(

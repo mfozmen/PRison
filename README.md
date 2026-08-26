@@ -253,8 +253,11 @@ The Settings menu has six sections:
   permission.
 - **Tracked checks** — add the checks to see as "Awaiting" one at a time, each
   with its own **Required** box, and rename, re-mark, or remove any of them later.
-- **Ignored checks** — everything you wrote off from the board, grouped by
-  repo, plus an owner-wide list for a check that is broken everywhere.
+  Both check panels work one scope at a time: pick an owner or a repository from
+  the scope picker at the top and edit just that list, so the panel stays the
+  height of one list however many repos you configure.
+- **Ignored checks** — everything you wrote off from the board, under the repo
+  it was ignored on, plus an owner scope for a check that is broken everywhere.
 - **Appearance** — pick one of the four themes, each previewing its own colours
   and typeface.
 - **About** — version, repository, license, and **Check for updates**: asked

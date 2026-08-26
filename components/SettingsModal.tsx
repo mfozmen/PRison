@@ -77,14 +77,6 @@ type SectionId = (typeof SECTIONS)[number]["id"];
 // asks both questions at once: type the name, answer the box, press Add. The
 // list below is the same two controls per row, which is what makes an existing
 // check editable rather than something you have to delete and retype.
-type OverrideRow = { id: number; repo: string };
-
-// Row identity only has to be unique within one open modal.
-let rowIdCounter = 0;
-function nextRowId() {
-  return ++rowIdCounter;
-}
-
 function CheckList({
   scope,
   checks,
@@ -281,6 +273,146 @@ function NameList({
   );
 }
 
+/** A scope the check panels edit one at a time: an owner default, or one
+ * repo. Stacking every scope made the panel as tall as the config was wide;
+ * picking one keeps it the height of a single list. */
+type Scope = { kind: "owner" | "repo"; key: string };
+
+const scopeId = (s: Scope) => `${s.kind}:${s.key}`;
+
+/** The picker and its one visible list. Both check panels use it, so the two
+ * settings that answer the same question — for which repos? — are worked the
+ * same way. Owners are always offered (a default is what a repo falls back
+ * to); repos are the ones already configured, plus any picked this session. */
+function ScopeEditor({
+  label,
+  owners,
+  repos,
+  availableRepos,
+  count,
+  onAddRepo,
+  onRemoveRepo,
+  removeLabel,
+  children,
+}: {
+  label: string;
+  owners: string[];
+  /** Repos the store already holds something for. */
+  repos: string[];
+  availableRepos: string[];
+  /** How many names a scope holds. Shown on its option, so the picker keeps
+   * the overview the stacked lists used to give, and it decides which scope
+   * the panel opens on. */
+  count: (scope: Scope) => number;
+  onAddRepo?: (repo: string) => void;
+  onRemoveRepo: (repo: string) => void;
+  /** What removing a repo scope means here — an override dropped, or a repo's
+   * ignore list cleared. The button says Remove either way; this is what a
+   * screen reader hears it do. */
+  removeLabel: (repo: string) => string;
+  children: (scope: Scope) => ReactNode;
+}) {
+  // A repo stays on the list once picked, even while its list is empty —
+  // otherwise removing the last check would take the scope out from under the
+  // user mid-edit.
+  const [picked, setPicked] = useState<string[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+
+  const scopes: Scope[] = [
+    ...owners.map((key): Scope => ({ kind: "owner", key })),
+    ...Array.from(new Set([...repos, ...picked])).map((key): Scope => ({ kind: "repo", key })),
+  ];
+
+  // Opening on an empty owner default would hide the one scope the user did
+  // configure behind a picker they have not noticed yet.
+  const current =
+    scopes.find((s) => scopeId(s) === selected) ??
+    scopes.find((s) => count(s) > 0) ??
+    scopes[0];
+
+  const optionLabel = (s: Scope) => {
+    const n = count(s);
+    return n > 0 ? `${s.key} (${n})` : s.key;
+  };
+
+  // The combobox only reports a repo it actually resolved, so there is no
+  // empty name to guard against here.
+  function addRepo(name: string) {
+    setPicked((p) => (p.includes(name) ? p : [...p, name]));
+    setSelected(scopeId({ kind: "repo", key: name }));
+    setAdding(false);
+    onAddRepo?.(name);
+  }
+
+  return (
+    <div>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {current && (
+          <select
+            aria-label={label}
+            value={scopeId(current)}
+            onChange={(e) => setSelected(e.target.value)}
+            className="min-h-[44px] min-w-0 flex-1 cursor-pointer rounded-md border border-border bg-surface px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            <optgroup label="Owner defaults">
+              {owners.map((owner) => (
+                <option key={owner} value={scopeId({ kind: "owner", key: owner })}>
+                  {optionLabel({ kind: "owner", key: owner })}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Repositories">
+              {scopes
+                .filter((s) => s.kind === "repo")
+                .map((s) => (
+                  <option key={s.key} value={scopeId(s)}>
+                    {optionLabel(s)}
+                  </option>
+                ))}
+            </optgroup>
+          </select>
+        )}
+        {!adding && (
+          <SettingButton onClick={() => setAdding(true)} className="shrink-0 py-1.5">
+            Add repository
+          </SettingButton>
+        )}
+        {current?.kind === "repo" && (
+          <SettingButton
+            onClick={() => {
+              setPicked((p) => p.filter((r) => r !== current.key));
+              setSelected(null);
+              onRemoveRepo(current.key);
+            }}
+            className="shrink-0 py-1.5"
+            ariaLabel={removeLabel(current.key)}
+          >
+            Remove
+          </SettingButton>
+        )}
+      </div>
+
+      {adding && (
+        <div className="mb-4 flex items-center gap-2">
+          <RepoCombobox value="" onChange={addRepo} suggestions={availableRepos} owners={owners} />
+          <SettingButton onClick={() => setAdding(false)} className="shrink-0 py-1.5">
+            Cancel
+          </SettingButton>
+        </div>
+      )}
+
+      {current ? (
+        children(current)
+      ) : (
+        <p className="text-xs text-muted">
+          No owners loaded yet &mdash; add a repository by name to configure one.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function SettingCheckbox({
   checked,
   onChange,
@@ -407,14 +539,6 @@ export function SettingsModal({
 
   const [section, setSection] = useState<SectionId>(SECTIONS[0].id);
 
-  // An override row is just the repo it targets; its checks live in `value`,
-  // where CheckList reads and writes them. The id is what keeps a row's
-  // CheckList with that row: keyed by position, removing a row would hand its
-  // check list to whichever row moved up into its place.
-  const [rows, setRows] = useState<OverrideRow[]>(() =>
-    Object.keys(value.repos).map((repo) => ({ id: nextRowId(), repo })),
-  );
-
   // Re-seed local drafts from props each time the modal opens, so a parent
   // that hydrates `value` after mount (e.g. from localStorage) is reflected
   // and edits never silently drop previously stored config. Done during
@@ -425,7 +549,6 @@ export function SettingsModal({
   if (open !== wasOpen) {
     setWasOpen(open);
     if (open) {
-      setRows(Object.keys(value.repos).map((repo) => ({ id: nextRowId(), repo })));
       setSection(SECTIONS[0].id);
       // A result from the last time the modal was open is stale by an unknown
       // amount; better to offer the check again than to show an old answer.
@@ -473,35 +596,12 @@ export function SettingsModal({
     onIgnoredChange({ ...ignored, [bucket]: next });
   }
 
-  /** Renaming the repo moves the checks with it — they were named for this
-   * override, not for the repo that happened to be typed first. One row per
-   * repo is the invariant, so pointing a row at a repo another row already
-   * holds joins the two lists rather than overwriting the older one. */
-  function handleRowChange(index: number, repo: string) {
-    const previous = rows[index].repo;
-    const clash = rows.findIndex((r, i) => i !== index && r.repo === repo);
-    setRows(
-      rows
-        .map((r, i) => (i === index ? { ...r, repo } : r))
-        .filter((_, i) => i !== clash),
-    );
+  /** A repo override goes away with its checks: the list was named for that
+   * override, and leaving it behind would keep gating a repo the user just
+   * said they no longer track separately. */
+  function removeRepo(repo: string) {
     const repos = { ...value.repos };
-    const carried = normalizeAll(repos[previous]);
-    const existing = clash >= 0 ? normalizeAll(repos[repo]) : [];
-    delete repos[previous];
-    const seen = new Set(existing.map((c) => c.name));
-    repos[repo] = [...existing, ...carried.filter((c) => !seen.has(c.name))];
-    onChange({ ...value, repos });
-  }
-
-  function addRow() {
-    setRows([...rows, { id: nextRowId(), repo: "" }]);
-  }
-
-  function removeRow(index: number) {
-    setRows(rows.filter((_, i) => i !== index));
-    const repos = { ...value.repos };
-    delete repos[rows[index].repo];
+    delete repos[repo];
     onChange({ ...value, repos });
   }
 
@@ -764,96 +864,43 @@ export function SettingsModal({
                   check is shown for information and blocks nothing.
                 </p>
 
-                {/* Owner defaults — organizations *and* the personal account.
-                    A default is keyed by the owner segment of `owner/repo`,
-                    which is the login for a personal repo, so resolution has
-                    always handled these; only this list left them out, and a
-                    personal repo's only recourse was a per-repo override. */}
-                {owners.length > 0 && (
-                  <section className="mb-6">
-                    <h4 className="mb-2 text-sm font-medium text-foreground">
-                      Owner defaults
-                    </h4>
-                    <div className="space-y-4">
-                      {owners.map((owner) => (
-                        <div key={owner} className="flex flex-col gap-2">
-                          <span className="text-sm text-muted">{owner}</span>
-                          <CheckList
-                            scope={owner}
-                            checks={value.orgs[owner]}
-                            onChange={(checks) => setOrgChecks(owner, checks)}
-                          />
-                        </div>
-                      ))}
+                {/* Owner defaults cover organizations *and* the personal
+                    account: a default is keyed by the owner segment of
+                    `owner/repo`, which is the login for a personal repo. */}
+                <ScopeEditor
+                  label="Tracked checks scope"
+                  owners={owners}
+                  repos={Object.keys(value.repos)}
+                  availableRepos={availableRepos}
+                  count={(s) =>
+                    normalizeAll(s.kind === "owner" ? value.orgs[s.key] : value.repos[s.key]).length
+                  }
+                  onAddRepo={(repo) => setRepoChecks(repo, normalizeAll(value.repos[repo]))}
+                  onRemoveRepo={removeRepo}
+                  removeLabel={(repo) => `Remove ${repo} override`}
+                >
+                  {(scope) => (
+                    <div>
+                      <p className="mb-3 text-xs text-muted">
+                        {scope.kind === "owner"
+                          ? "The default for every repo this owner has, unless the repo has its own list."
+                          : "Replaces the owner default for this repo."}
+                      </p>
+                      <CheckList
+                        key={scopeId(scope)}
+                        scope={scope.key}
+                        checks={
+                          scope.kind === "owner" ? value.orgs[scope.key] : value.repos[scope.key]
+                        }
+                        onChange={(checks) =>
+                          scope.kind === "owner"
+                            ? setOrgChecks(scope.key, checks)
+                            : setRepoChecks(scope.key, checks)
+                        }
+                      />
                     </div>
-                  </section>
-                )}
-
-                {/* Repository overrides */}
-                <section>
-                  <h4 className="mb-2 text-sm font-medium text-foreground">
-                    Repository overrides
-                  </h4>
-                  <p className="mb-3 text-xs text-muted">
-                    A repo override replaces the owner default for that repo.
-                  </p>
-                  {availableRepos.length === 0 && rows.length === 0 && (
-                    <p className="mb-3 text-xs text-muted">
-                      No repositories loaded yet &mdash; you can search any repo by name below.
-                    </p>
                   )}
-                  <div className="mb-3 space-y-4">
-                    {rows.map((row, index) => (
-                      <div key={row.id} className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                          <RepoCombobox
-                            value={row.repo}
-                            onChange={(next) => handleRowChange(index, next)}
-                            suggestions={availableRepos}
-                            owners={owners}
-                          />
-                          <button
-                            type="button"
-                            aria-label="Remove repo override"
-                            onClick={() => removeRow(index)}
-                            className="flex min-h-[44px] min-w-[44px] shrink-0 cursor-pointer items-center justify-center text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                          >
-                            <svg
-                              aria-hidden="true"
-                              width="14"
-                              height="14"
-                              viewBox="0 0 14 14"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path
-                                d="M11 3L3 11M3 3l8 8"
-                                stroke="currentColor"
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-                        {/* A check belongs to a repo, so there is nothing to
-                            add one to until the row names one. */}
-                        {row.repo.trim() !== "" && (
-                          <div className="border-l border-border pl-3">
-                            <CheckList
-                              key={row.repo}
-                              scope={row.repo}
-                              checks={value.repos[row.repo]}
-                              onChange={(checks) => setRepoChecks(row.repo, checks)}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <SettingButton onClick={addRow} className="py-1.5">
-                    Add override
-                  </SettingButton>
-                </section>
+                </ScopeEditor>
               </div>
             )}
 
@@ -868,53 +915,40 @@ export function SettingsModal({
                   check on the board to ignore it; it lands here, under its repo.
                 </p>
 
-                <section className="mb-6">
-                  <h4 className="mb-2 text-sm font-medium text-foreground">Repositories</h4>
-                  {ignoredRepos.length === 0 ? (
-                    <p className="text-xs text-muted">
-                      Nothing ignored for a single repo yet.
-                    </p>
-                  ) : (
-                    <div className="space-y-4">
-                      {ignoredRepos.map((repo) => (
-                        <div key={repo} className="flex flex-col gap-2">
-                          <span className="text-sm text-muted">{repo}</span>
-                          <div className="border-l border-border pl-3">
-                            <NameList
-                              scope={repo}
-                              names={ignored.repos[repo]}
-                              onChange={(names) => setIgnoredIn("repos", repo, names)}
-                              addLabel={`Ignore for ${repo}`}
-                            />
-                          </div>
-                        </div>
-                      ))}
+                <ScopeEditor
+                  label="Ignored checks scope"
+                  owners={owners}
+                  repos={ignoredRepos}
+                  availableRepos={availableRepos}
+                  count={(s) =>
+                    ((s.kind === "owner" ? ignored.orgs[s.key] : ignored.repos[s.key]) ?? []).length
+                  }
+                  onRemoveRepo={(repo) => setIgnoredIn("repos", repo, [])}
+                  removeLabel={(repo) => `Stop ignoring everything for ${repo}`}
+                >
+                  {(scope) => (
+                    <div>
+                      <p className="mb-3 text-xs text-muted">
+                        {scope.kind === "owner"
+                          ? "Ignored on every repo the owner has — for a check that is broken everywhere, not on one repo."
+                          : "Ignored on this repo. An owner-wide entry still applies on top of it."}
+                      </p>
+                      <NameList
+                        key={scopeId(scope)}
+                        scope={scope.key}
+                        names={
+                          (scope.kind === "owner"
+                            ? ignored.orgs[scope.key]
+                            : ignored.repos[scope.key]) ?? []
+                        }
+                        onChange={(names) =>
+                          setIgnoredIn(scope.kind === "owner" ? "orgs" : "repos", scope.key, names)
+                        }
+                        addLabel={`Ignore for ${scope.key}`}
+                      />
                     </div>
                   )}
-                </section>
-
-                {owners.length > 0 && (
-                  <section>
-                    <h4 className="mb-2 text-sm font-medium text-foreground">Owner-wide</h4>
-                    <p className="mb-3 text-xs text-muted">
-                      Ignored on every repo the owner has &mdash; for a check that is
-                      broken everywhere, not on one repo.
-                    </p>
-                    <div className="space-y-4">
-                      {owners.map((owner) => (
-                        <div key={owner} className="flex flex-col gap-2">
-                          <span className="text-sm text-muted">{owner}</span>
-                          <NameList
-                            scope={owner}
-                            names={ignored.orgs[owner] ?? []}
-                            onChange={(names) => setIgnoredIn("orgs", owner, names)}
-                            addLabel={`Ignore for ${owner}`}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
+                </ScopeEditor>
               </div>
             )}
 

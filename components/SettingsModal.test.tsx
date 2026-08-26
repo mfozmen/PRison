@@ -280,9 +280,12 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Tracked checks");
-    // Both owners render at once, so a bare "lint is required" would name two
-    // different controls — ambiguous to a screen reader, not just to a test.
+    // One scope shows at a time, but the label still carries it: a bare "lint
+    // is required" would say nothing about which list you just changed.
     expect(screen.getByRole("checkbox", { name: "lint is required for acme" })).toBeChecked();
+    fireEvent.change(screen.getByRole("combobox", { name: "Tracked checks scope" }), {
+      target: { value: "owner:globex" },
+    });
     expect(screen.getByRole("checkbox", { name: "lint is required for globex" })).toBeChecked();
   });
 
@@ -299,11 +302,7 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Tracked checks");
-    fireEvent.click(screen.getByRole("button", { name: /add override/i }));
-    // No repo, nothing to attach a check to — the list appears with the repo.
-    expect(
-      screen.queryByRole("textbox", { name: /^New check for/ }),
-    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
     fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
     fireEvent.change(screen.getByRole("textbox", { name: "New check for acme/web" }), {
@@ -329,99 +328,10 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Tracked checks");
-    fireEvent.click(screen.getByRole("button", { name: /add override/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
     fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
     expect(onChange).toHaveBeenLastCalledWith({ orgs: {}, repos: { "acme/web": [] } });
-  });
-
-  it("carries a repo's checks over when the repo is renamed", () => {
-    const onChange = vi.fn();
-    render(
-      <SettingsModal
-        {...filterProps}
-        availableRepos={["acme/web", "acme/api"]}
-        value={{ orgs: {}, repos: { "acme/web": ["lint"], "beta/api": ["ci"] } }}
-        onChange={onChange}
-        open={true}
-        onClose={vi.fn()}
-      />,
-    );
-    selectSection("Tracked checks");
-    const combobox = screen.getAllByRole("combobox", { name: "Repository" })[0];
-    // Clearing the field falls back to the loaded repos as suggestions.
-    fireEvent.change(combobox, { target: { value: "" } });
-    fireEvent.mouseDown(screen.getAllByRole("option", { name: "acme/api" })[0]);
-    // The carried checks arrive normalized; the row that was not touched keeps
-    // its own repo and the shape it was stored in.
-    expect(onChange).toHaveBeenLastCalledWith({
-      orgs: {},
-      repos: { "beta/api": ["ci"], "acme/api": [required("lint")] },
-    });
-  });
-
-  it("drops a repo's checks when its override row goes", () => {
-    const onChange = vi.fn();
-    render(
-      <SettingsModal
-        {...filterProps}
-        availableRepos={["acme/web"]}
-        value={{ orgs: {}, repos: { "acme/web": ["lint"] } }}
-        onChange={onChange}
-        open={true}
-        onClose={vi.fn()}
-      />,
-    );
-    selectSection("Tracked checks");
-    fireEvent.click(screen.getByRole("button", { name: /remove repo override/i }));
-    expect(onChange).toHaveBeenLastCalledWith({ orgs: {}, repos: {} });
-  });
-
-  it("leaves the surviving row's own checks behind when one is removed", () => {
-    const onChange = vi.fn();
-    render(
-      <SettingsModal
-        {...filterProps}
-        availableRepos={["acme/web", "beta/api"]}
-        value={{ orgs: {}, repos: { "acme/web": ["lint"], "beta/api": ["ci"] } }}
-        onChange={onChange}
-        open={true}
-        onClose={vi.fn()}
-      />,
-    );
-    selectSection("Tracked checks");
-    // Rows are keyed by identity, not position: removing the first must not
-    // hand its check list to the row that moves up into its place.
-    fireEvent.click(screen.getAllByRole("button", { name: /remove repo override/i })[0]);
-    expect(screen.getByRole("textbox", { name: "Check 1 for beta/api" })).toHaveValue("ci");
-    expect(
-      screen.queryByRole("textbox", { name: "Check 1 for acme/web" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("merges into the existing row when two rows would name one repo", () => {
-    const onChange = vi.fn();
-    render(
-      <SettingsModal
-        {...filterProps}
-        availableRepos={["acme/web", "beta/api"]}
-        value={{ orgs: {}, repos: { "acme/web": ["lint"], "beta/api": ["ci"] } }}
-        onChange={onChange}
-        open={true}
-        onClose={vi.fn()}
-      />,
-    );
-    selectSection("Tracked checks");
-    // One row per repo is the invariant; pointing a second row at a repo that
-    // already has one must join the two lists, never overwrite the older.
-    const second = screen.getAllByRole("combobox", { name: "Repository" })[1];
-    fireEvent.change(second, { target: { value: "" } });
-    fireEvent.mouseDown(screen.getAllByRole("option", { name: "acme/web" })[0]);
-    expect(onChange).toHaveBeenLastCalledWith({
-      orgs: {},
-      repos: { "acme/web": [required("lint"), required("ci")] },
-    });
-    expect(screen.getAllByRole("combobox", { name: "Repository" })).toHaveLength(1);
   });
 
   it("stores a renamed check trimmed, and never twice under one name", () => {
@@ -467,30 +377,15 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Tracked checks");
+    fireEvent.change(screen.getByRole("combobox", { name: "Tracked checks scope" }), {
+      target: { value: "repo:beta/api" },
+    });
     fireEvent.click(screen.getByRole("checkbox", { name: "ci is required for beta/api" }));
     expect(onChange).toHaveBeenLastCalledWith({
       orgs: {},
       // acme/web was not touched, so it keeps the shape it was stored in.
       repos: { "acme/web": ["lint"], "beta/api": [{ name: "ci", required: false }] },
     });
-  });
-
-  it("clicking the remove button on an override removes that row", () => {
-    render(
-      <SettingsModal
-        {...filterProps}
-        availableRepos={someRepos}
-        value={emptyValue}
-        onChange={vi.fn()}
-        open={true}
-        onClose={vi.fn()}
-      />,
-    );
-    selectSection("Tracked checks");
-    fireEvent.click(screen.getByRole("button", { name: /add override/i }));
-    expect(screen.getByRole("combobox", { name: "Repository" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /remove repo override/i }));
-    expect(screen.queryByRole("combobox", { name: "Repository" })).not.toBeInTheDocument();
   });
 
   it("clicking the close button calls onClose", () => {
@@ -568,7 +463,7 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Tracked checks");
-    fireEvent.click(screen.getByRole("button", { name: /add override/i }));
+    fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
     const combobox = screen.getByRole("combobox", { name: "Repository" });
     // Focus opens the suggestion dropdown; empty input shows availableRepos
     fireEvent.focus(combobox);
@@ -592,9 +487,10 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Tracked checks");
-    // The row is seeded from value.repos; the combobox input displays the repo name
-    const combobox = screen.getByRole("combobox", { name: "Repository" });
-    expect(combobox).toHaveValue("legacy/repo");
+    // A configured repo is a scope whether or not GitHub listed it, so it is
+    // on the picker and the panel opens on it.
+    expect(screen.getByRole("option", { name: "legacy/repo (1)" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Check 1 for legacy/repo" })).toHaveValue("ci");
   });
 
 
@@ -602,7 +498,7 @@ describe("SettingsModal", () => {
 
 
 
-  it("shows empty-state hint and Add override button when availableRepos and configured repos are both empty", () => {
+  it("offers Add repository even when nothing has loaded", () => {
     render(
       <SettingsModal
         {...filterProps}
@@ -614,11 +510,9 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Tracked checks");
-    expect(
-      screen.getByText(/no repositories loaded yet/i),
-    ).toBeInTheDocument();
-    // Add override is always available so the user can search server-side
-    expect(screen.getByRole("button", { name: /add override/i })).toBeInTheDocument();
+    // The combobox searches GitHub, so a repo can be configured before the
+    // board has ever loaded one.
+    expect(screen.getByRole("button", { name: /add repository/i })).toBeInTheDocument();
   });
 
   it("shows the Settings title", () => {
@@ -1071,8 +965,9 @@ describe("SettingsModal — owner defaults cover the personal account", () => {
     // Dashboard passes [login, ...orgs]; the personal account is the head of
     // that list and used to be the one owner with no way to set a default.
     renderTracked({ owners: ["octocat", "acme"] });
+    expect(screen.getByRole("option", { name: "octocat" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "acme" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "New check for octocat" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "New check for acme" })).toBeInTheDocument();
   });
 
   it("stores a personal-account default under that login", () => {
@@ -1090,15 +985,14 @@ describe("SettingsModal — owner defaults cover the personal account", () => {
     });
   });
 
-  it("calls the section what it now is", () => {
+  it("says what an owner scope is for", () => {
     renderTracked({ owners: ["octocat"] });
-    expect(screen.getByText("Owner defaults")).toBeInTheDocument();
-    expect(screen.queryByText("Organization defaults")).not.toBeInTheDocument();
+    expect(screen.getByText(/default for every repo this owner has/i)).toBeInTheDocument();
   });
 
-  it("shows no defaults section when there are no owners at all", () => {
+  it("says there is nothing to configure when no owner has loaded", () => {
     renderTracked({ owners: [] });
-    expect(screen.queryByText("Owner defaults")).not.toBeInTheDocument();
+    expect(screen.getByText(/no owners loaded yet/i)).toBeInTheDocument();
   });
 });
 
@@ -1221,7 +1115,9 @@ describe("SettingsModal — ignored checks", () => {
   it("lists what a repo ignores, under the repo's name", () => {
     open({ ignored: { orgs: {}, repos: { "acme/web": ["flaky-e2e"] } } });
     selectSection("Ignored checks");
-    expect(screen.getByText("acme/web")).toBeInTheDocument();
+    // The picker names the repo and says how much it ignores; the panel opens
+    // on it, because it is the only scope holding anything.
+    expect(screen.getByRole("option", { name: "acme/web (1)" })).toBeInTheDocument();
     expect(screen.getByLabelText("Ignored check 1 for acme/web")).toHaveValue("flaky-e2e");
   });
 
@@ -1340,7 +1236,197 @@ describe("SettingsModal — ignored checks", () => {
       onIgnoredChange,
     });
     selectSection("Ignored checks");
+    fireEvent.change(screen.getByRole("combobox", { name: "Ignored checks scope" }), {
+      target: { value: "repo:acme/web" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Remove repo-only from acme/web" }));
     expect(onIgnoredChange).toHaveBeenCalledWith({ orgs: { acme: ["owner-wide"] }, repos: {} });
+  });
+});
+
+// One scope at a time. The panels used to stack every owner and every repo,
+// so the scroll grew with the number of scopes; a picker keeps the panel the
+// height of one list however many scopes there are. Both check panels use it,
+// so learning it once is enough.
+describe("SettingsModal — scope picker", () => {
+  const openTracked = (props: Partial<React.ComponentProps<typeof SettingsModal>> = {}) => {
+    render(
+      <SettingsModal
+        {...filterProps}
+        owners={owners}
+        availableRepos={someRepos}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open
+        onClose={vi.fn()}
+        {...props}
+      />,
+    );
+    selectSection("Tracked checks");
+  };
+
+  const pick = (label: string, value: string) =>
+    fireEvent.change(screen.getByRole("combobox", { name: label }), { target: { value } });
+
+  it("shows one scope's checks, not every scope's at once", () => {
+    openTracked({ value: { orgs: { acme: ["lint"], beta: ["ci"] }, repos: {} } });
+    expect(screen.getByRole("textbox", { name: "Check 1 for acme" })).toHaveValue("lint");
+    expect(screen.queryByRole("textbox", { name: "Check 1 for beta" })).not.toBeInTheDocument();
+  });
+
+  it("swaps the list when another scope is picked", () => {
+    openTracked({ value: { orgs: { acme: ["lint"], beta: ["ci"] }, repos: {} } });
+    pick("Tracked checks scope", "owner:beta");
+    expect(screen.getByRole("textbox", { name: "Check 1 for beta" })).toHaveValue("ci");
+    expect(screen.queryByRole("textbox", { name: "Check 1 for acme" })).not.toBeInTheDocument();
+  });
+
+  // Opening on an empty owner default would hide the one repo the user
+  // actually configured behind a picker they haven't noticed yet.
+  it("opens on the first scope that has something configured", () => {
+    openTracked({ value: { orgs: {}, repos: { "beta/api": ["ci"] } } });
+    expect(screen.getByRole("textbox", { name: "Check 1 for beta/api" })).toHaveValue("ci");
+  });
+
+  it("offers every owner and every configured repo", () => {
+    openTracked({ value: { orgs: {}, repos: { "beta/api": ["ci"] } } });
+    const options = screen
+      .getAllByRole("option")
+      .map((o) => (o as HTMLOptionElement).value);
+    expect(options).toEqual(["owner:acme", "owner:beta", "repo:beta/api"]);
+  });
+
+  // The stacked lists said at a glance which scope held something; the picker
+  // has to keep saying it, or a configured repo hides behind a name.
+  it("says how much each scope holds", () => {
+    openTracked({ value: { orgs: { acme: ["lint", "ci"] }, repos: { "beta/api": ["qa"] } } });
+    const labels = screen.getAllByRole("option").map((o) => o.textContent);
+    expect(labels).toEqual(["acme (2)", "beta", "beta/api (1)"]);
+  });
+
+  it("adds a repo scope through the combobox and lands on it", () => {
+    const onChange = vi.fn();
+    openTracked({ onChange });
+    fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+    fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
+    expect(onChange).toHaveBeenLastCalledWith({ orgs: {}, repos: { "acme/web": [] } });
+    expect(
+      screen.getByRole("textbox", { name: "New check for acme/web" }),
+    ).toBeInTheDocument();
+  });
+
+  // Picking a repo that already has an override is how you get back to it
+  // when it has scrolled out of mind — it must not read as starting over.
+  it("keeps a repo's checks when it is picked again", () => {
+    const onChange = vi.fn();
+    openTracked({ value: { orgs: {}, repos: { "acme/web": ["lint"] } }, onChange });
+    fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+    fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
+    expect(onChange).toHaveBeenLastCalledWith({
+      orgs: {},
+      repos: { "acme/web": [required("lint")] },
+    });
+  });
+
+  it("lists a repo once however many times it is picked", () => {
+    openTracked();
+    const addAcmeWeb = () => {
+      fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+      fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
+      fireEvent.mouseDown(screen.getAllByRole("option", { name: "acme/web" }).slice(-1)[0]);
+    };
+    addAcmeWeb();
+    addAcmeWeb();
+    expect(screen.getAllByRole("option", { name: "acme/web" })).toHaveLength(1);
+  });
+
+  it("backs out of adding a repository", () => {
+    openTracked();
+    fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+    expect(screen.queryByRole("combobox", { name: "Repository" })).not.toBeInTheDocument();
+  });
+
+  it("clears a repo's whole ignore list from its scope", () => {
+    const onIgnoredChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        owners={owners}
+        availableRepos={someRepos}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open
+        onClose={vi.fn()}
+        ignored={{ orgs: {}, repos: { "acme/web": ["flaky", "nightly"] } }}
+        onIgnoredChange={onIgnoredChange}
+      />,
+    );
+    selectSection("Ignored checks");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Stop ignoring everything for acme/web" }),
+    );
+    expect(onIgnoredChange).toHaveBeenCalledWith({ orgs: {}, repos: {} });
+  });
+
+  it("drops a repo's checks when its scope is removed, and falls back", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <SettingsModal
+        {...filterProps}
+        owners={owners}
+        availableRepos={someRepos}
+        value={{ orgs: {}, repos: { "acme/web": ["lint"] } }}
+        onChange={onChange}
+        open
+        onClose={vi.fn()}
+      />,
+    );
+    selectSection("Tracked checks");
+    fireEvent.click(screen.getByRole("button", { name: "Remove acme/web override" }));
+    expect(onChange).toHaveBeenLastCalledWith({ orgs: {}, repos: {} });
+    // The scope goes with the checks, so the panel has to land somewhere: the
+    // first owner, which is what a repo with no override falls back to anyway.
+    rerender(
+      <SettingsModal
+        {...filterProps}
+        owners={owners}
+        availableRepos={someRepos}
+        value={emptyValue}
+        onChange={onChange}
+        open
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("textbox", { name: "New check for acme" })).toBeInTheDocument();
+  });
+
+  // An owner is not a scope you can remove — it is the default every repo it
+  // owns falls back to, and it is offered whether or not it holds anything.
+  it("offers no remove button on an owner scope", () => {
+    openTracked({ value: { orgs: { acme: ["lint"] }, repos: {} } });
+    expect(screen.queryByRole("button", { name: /remove .* override/i })).not.toBeInTheDocument();
+  });
+
+  it("uses the same picker for ignored checks", () => {
+    render(
+      <SettingsModal
+        {...filterProps}
+        owners={owners}
+        availableRepos={someRepos}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open
+        onClose={vi.fn()}
+        ignored={{ orgs: { beta: ["nightly"] }, repos: {} }}
+        onIgnoredChange={vi.fn()}
+      />,
+    );
+    selectSection("Ignored checks");
+    expect(screen.getByLabelText("Ignored check 1 for beta")).toHaveValue("nightly");
+    pick("Ignored checks scope", "owner:acme");
+    expect(screen.getByLabelText("New ignored check for acme")).toBeInTheDocument();
   });
 });

@@ -294,6 +294,7 @@ appears when something lands and stays until you click it.
 brew install --cask swiftbar
 mkdir -p ~/SwiftBar                          # the folder SwiftBar asks for on first launch
 cp extras/menubar/prison.1m.py ~/SwiftBar/
+chmod +x ~/SwiftBar/prison.1m.py             # the bit survives cp, not a raw download
 ```
 
 It reads a PRison already running on this machine — no token of its own, no

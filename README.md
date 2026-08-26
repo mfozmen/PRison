@@ -292,7 +292,8 @@ appears when something lands and stays until you click it.
 
 ```sh
 brew install --cask swiftbar
-cp extras/menubar/prison.1m.py "$SWIFTBAR_PLUGIN_FOLDER"/
+mkdir -p ~/SwiftBar                          # the folder SwiftBar asks for on first launch
+cp extras/menubar/prison.1m.py ~/SwiftBar/
 ```
 
 It reads a PRison already running on this machine — no token of its own, no

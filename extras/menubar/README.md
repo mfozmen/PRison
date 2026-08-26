@@ -38,12 +38,19 @@ a badge for finished work is worse than no badge.
    `npm run dev`. The plugin reads it over loopback and mints its session from
    `/api/token/env`, so it never needs a token of its own.
 2. `brew install --cask swiftbar` (or xbar — the plugin format is the same).
-3. On first launch SwiftBar asks for a plugin folder. Copy the plugin in:
+3. On first launch SwiftBar asks which folder to load plugins from. It has no
+   default: you pick one, and `~/SwiftBar` is as good as any. Create it first,
+   put the plugin in it, then point SwiftBar at it.
 
    ```sh
-   cp extras/menubar/prison.1m.py "$SWIFTBAR_PLUGIN_FOLDER"/
-   chmod +x "$SWIFTBAR_PLUGIN_FOLDER"/prison.1m.py
+   mkdir -p ~/SwiftBar
+   cp extras/menubar/prison.1m.py ~/SwiftBar/
+   chmod +x ~/SwiftBar/prison.1m.py
    ```
+
+   Already past that screen? **SwiftBar → Preferences → General** shows the
+   folder it settled on, and `defaults read com.ameba.SwiftBar PluginDirectory`
+   prints it without opening anything.
 
 4. macOS will ask to allow notifications the first time one fires. Say yes —
    and check **System Settings → Notifications** afterwards, since an app whose
@@ -54,9 +61,9 @@ to poll less often.
 
 ## Configuration
 
-- `PRISON_URL` — where PRison is, default `http://localhost:3000`. SwiftBar
-  passes its own environment through, so set it in SwiftBar's plugin settings
-  if you moved the port.
+- `PRISON_URL` — where PRison is, default `http://localhost:3000`. Set it in
+  SwiftBar's per-plugin settings if you moved the port. (`$SWIFTBAR_*`
+  variables exist only while a plugin runs; your own shell does not have them.)
 - `PER_BUCKET` at the top of the file — how many PRs each section lists. The
   count next to the heading is always exact.
 

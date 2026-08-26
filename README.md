@@ -127,13 +127,16 @@ and expand to the latest 15, with **Load more** for the rest.
   a test notification, and says where else to look if nothing appears: your
   operating system decides separately whether the browser may show anything, and
   it refuses in silence. Whatever the notification misses is in the activity
-  feed regardless.
+  feed regardless — and, if your operating system keeps swallowing them, in the
+  menu bar: `extras/menubar/` puts an unread count there, where nothing has to
+  be permitted for you to see it and nothing disappears after five seconds.
 - **Catch-up on open.** PRison remembers what everything was doing when you
   last closed it, so a review that arrived overnight is still news in the
   morning — the first load reports what moved while no tab was polling,
   instead of quietly accepting it as the way things always were. It fills the
-  feed and the bell; it doesn't raise a notification about what the page in
-  front of you is already showing.
+  feed and the bell, never a desktop notification: what it reports is by
+  definition old, and a browser reloads a tab on its own — a discarded one
+  restored in the background is not you opening PRison.
 - **Last refreshed indicator.** The filter bar says how long ago the data
   landed, so you always know whether you're looking at something stale.
 - **Partial-data notice.** When GitHub drops part of a response (an org restricts

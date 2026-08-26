@@ -3257,6 +3257,23 @@ describe("Dashboard — auto refresh", () => {
     expect(constructed).toHaveLength(0);
   });
 
+  it("does not notify about the catch-up while the tab is in the background either", async () => {
+    // A tab Chrome discarded and restored on its own is not the user opening
+    // PRison, and what the catch-up reports is by definition old: a banner
+    // claiming it just happened is a lie the feed does not tell.
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    localStorage.setItem(
+      "prison.statusSnapshot",
+      JSON.stringify([
+        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "pending" },
+      ]),
+    );
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    // The bell still carries it — that is where a catch-up belongs.
+    expect(await screen.findByRole("button", { name: /^activity, 1 unseen$/i })).toBeInTheDocument();
+    expect(constructed).toHaveLength(0);
+  });
+
   it("re-reads permission when the test notification is sent", async () => {
     localStorage.setItem("prison.autoRefresh", "true");
     render(<Dashboard orgs={ORGS} login="testuser" />);

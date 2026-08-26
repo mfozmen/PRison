@@ -337,6 +337,18 @@ function ScopeEditor({
     scopes.find((s) => count(s) > 0) ??
     scopes[0];
 
+  // Pin whatever we landed on, so the fallback above only ever decides where
+  // the panel opens. Emptying a list row by row would otherwise drop its
+  // count to zero — and, for a repo, take the scope off the list entirely —
+  // moving the panel somewhere else mid-edit. A repo is held open the same
+  // way one picked from the combobox is.
+  if (current && selected !== scopeId(current)) {
+    setSelected(scopeId(current));
+    // Duplicates are harmless — the scope list is deduped — and this runs
+    // once, since the next render finds the scope by the id just pinned.
+    if (current.kind === "repo") setPicked((p) => [...p, current.key]);
+  }
+
   const optionLabel = (s: Scope) => {
     const n = count(s);
     return n > 0 ? `${s.key} (${n})` : s.key;

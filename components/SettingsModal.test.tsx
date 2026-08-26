@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { SettingsModal } from "./SettingsModal";
@@ -1425,40 +1426,67 @@ describe("SettingsModal — scope picker", () => {
     expect(screen.getByRole("combobox", { name: "Tracked checks scope" })).toHaveFocus();
   });
 
-  it("drops a repo's checks when its scope is removed, and falls back", () => {
-    const onChange = vi.fn();
-    const { rerender } = render(
-      <SettingsModal
-        {...filterProps}
-        owners={owners}
-        availableRepos={someRepos}
-        value={{ orgs: {}, repos: { "acme/web": ["lint"] } }}
-        onChange={onChange}
-        open
-        onClose={vi.fn()}
-      />,
-    );
-    selectSection("Tracked checks");
-    fireEvent.click(screen.getByRole("button", { name: "Remove acme/web override" }));
-    expect(onChange).toHaveBeenLastCalledWith({ orgs: {}, repos: {} });
-    // The scope goes with the checks, so the panel has to land somewhere: the
-    // first owner, which is what a repo with no override falls back to anyway.
-    rerender(
+  // Emptying a list row by row is not a request to go somewhere else. The
+  // scope the panel opened on is pinned, so only an explicit pick — or the
+  // scope-level Remove — moves the view.
+  it("stays on the scope it opened on once its last name is removed", () => {
+    const onIgnoredChange = vi.fn();
+    const props = (ignored: { orgs: Record<string, string[]>; repos: Record<string, string[]> }) => (
       <SettingsModal
         {...filterProps}
         owners={owners}
         availableRepos={someRepos}
         value={emptyValue}
-        onChange={onChange}
+        onChange={vi.fn()}
         open
         onClose={vi.fn()}
-      />,
+        ignored={ignored}
+        onIgnoredChange={onIgnoredChange}
+      />
     );
-    expect(screen.getByRole("textbox", { name: "New check for acme" })).toBeInTheDocument();
+    const { rerender } = render(props({ orgs: {}, repos: { "acme/web": ["flaky"] } }));
+    selectSection("Ignored checks");
+    fireEvent.click(screen.getByRole("button", { name: "Remove flaky from acme/web" }));
+    rerender(props({ orgs: {}, repos: {} }));
+    expect(screen.getByLabelText("New ignored check for acme/web")).toBeInTheDocument();
   });
 
-  // An owner is not a scope you can remove — it is the default every repo it
-  // owns falls back to, and it is offered whether or not it holds anything.
+  it("drops a repo's checks when its scope is removed, and falls back", () => {
+    const onChange = vi.fn();
+    // Stateful, because the removal and the fallback happen in one commit:
+    // a frozen `value` would show the scope still holding its checks.
+    function Harness() {
+      const [value, setValue] = useState<TrackedChecks>({
+        orgs: {},
+        repos: { "acme/web": ["lint"] },
+      });
+      return (
+        <SettingsModal
+          {...filterProps}
+          owners={owners}
+          availableRepos={someRepos}
+          value={value}
+          onChange={(next) => {
+            onChange(next);
+            setValue(next);
+          }}
+          open
+          onClose={vi.fn()}
+        />
+      );
+    }
+    render(<Harness />);
+    selectSection("Tracked checks");
+    fireEvent.click(screen.getByRole("button", { name: "Remove acme/web override" }));
+    expect(onChange).toHaveBeenLastCalledWith({ orgs: {}, repos: {} });
+    // The scope goes with the checks, so the panel has to land somewhere: the
+    // first owner, which is what a repo with no override falls back to anyway.
+    expect(screen.getByRole("textbox", { name: "New check for acme" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: /^acme\/web/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it("offers no remove button on an owner scope", () => {
     openTracked({ value: { orgs: { acme: ["lint"] }, repos: {} } });
     expect(screen.queryByRole("button", { name: /remove .* override/i })).not.toBeInTheDocument();

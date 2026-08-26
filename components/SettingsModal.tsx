@@ -319,10 +319,10 @@ function ScopeEditor({
   const [adding, setAdding] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
 
-  const scopes: Scope[] = [
-    ...owners.map((key): Scope => ({ kind: "owner", key })),
-    ...Array.from(new Set([...repos, ...picked])).map((key): Scope => ({ kind: "repo", key })),
-  ];
+  const repoScopes: Scope[] = Array.from(new Set([...repos, ...picked])).map(
+    (key): Scope => ({ kind: "repo", key }),
+  );
+  const scopes: Scope[] = [...owners.map((key): Scope => ({ kind: "owner", key })), ...repoScopes];
 
   // Opening on an empty owner default would hide the one scope the user did
   // configure behind a picker they have not noticed yet.
@@ -355,22 +355,24 @@ function ScopeEditor({
             onChange={(e) => setSelected(e.target.value)}
             className="min-h-[44px] min-w-0 flex-1 cursor-pointer rounded-md border border-border bg-surface px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
           >
-            <optgroup label="Owner defaults">
-              {owners.map((owner) => (
-                <option key={owner} value={scopeId({ kind: "owner", key: owner })}>
-                  {optionLabel({ kind: "owner", key: owner })}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Repositories">
-              {scopes
-                .filter((s) => s.kind === "repo")
-                .map((s) => (
+            {owners.length > 0 && (
+              <optgroup label="Owner defaults">
+                {owners.map((owner) => (
+                  <option key={owner} value={scopeId({ kind: "owner", key: owner })}>
+                    {optionLabel({ kind: "owner", key: owner })}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {repoScopes.length > 0 && (
+              <optgroup label="Repositories">
+                {repoScopes.map((s) => (
                   <option key={s.key} value={scopeId(s)}>
                     {optionLabel(s)}
                   </option>
                 ))}
-            </optgroup>
+              </optgroup>
+            )}
           </select>
         )}
         {!adding && (

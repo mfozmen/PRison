@@ -34,6 +34,16 @@ import urllib.error
 import urllib.request
 
 URL = os.environ.get("PRISON_URL", "http://localhost:3000").rstrip("/")
+# PRison's own icon (app/icon.svg), rasterized at 36x36 for a 2x menu bar.
+# Not a template image: this one has a colour, and stamping a green mark flat
+# in one tone is a worse likeness than no likeness. It sits at 20px of the
+# 36px canvas, because the menu bar scales an image to its height and the
+# margin is what keeps the mark the size of its neighbours — a filled square
+# reads heavier than the line glyphs around it, so it is drawn smaller than a
+# straight size match would suggest.
+ICON = (
+    "iVBORw0KGgoAAAANSUhEUgAAACQAAAAkCAYAAADhAJiYAAABq0lEQVR4nOyWsUvDQBTGv6vF2mDVqlVRdBERRIqbYhEcXFzdxN3B7gr+AYLudRDcBDdHXQWp6CZBBHERBVEbrVppWhHjvbSTlLw0jaXD/crR1/c+7j5y15cLoMEIoMFQhjiUIQ5liCPoRhRLzbYGIuENS4hF+bMb1WEIy9r/yZnrmeTxJycWnIDMiDYtLcM4akO3PvIJzhS7ZfRkfDBDxMtzOa/HCcrb5Atu5nJzqCueGeGw2w419vy5OtR/2ZlZw/zgNMzvAjKFN/RrpXUe8gZiLR0IB1twdH+K5ZNNVIunv/3Fy400U8Sj+Yr0k45sMWcPiilHNdJ4wZOh7asD+WSyOHu+xOp5Ctfvd/agmHJUI03dDP0nyhCHMsThydDK2ILsN1FM9YxjazKJ0fYhe1BMOaqRxgueGuNE14hsfiH0hTuR6I0jGorYeYpLjTFka+pmiDowvR4s+amEU43DzZYZlZJOCzrUDNRqiC5X8Ak3c7GG6KYnv3TUjl6ey5EmTpA/vP3S5gb2As3BCIQYlikN1UFX2F0rZy75coWtN6pTcyhDHMoQR8MZ+gUAAP//CT9S3QAAAAZJREFUAwBOQI2I0H0ktAAAAABJRU5ErkJggg=="
+)
 STATE = os.path.expanduser("~/Library/Caches/prison-menubar.json")
 PER_BUCKET = 5  # rows per section in the dropdown; the count is always exact
 MAX_LINES = 3  # notification lines before "+N more", as the dashboard does it
@@ -105,6 +115,11 @@ def notify(lines):
     )
 
 
+def bar(text):
+    """The menu bar line: the icon always, a number only when there is one."""
+    return f"{text} | image={ICON}"
+
+
 def read_state():
     try:
         with open(STATE) as f:
@@ -151,7 +166,7 @@ def main():
         cookie = session()
         lists = {path: [i for i in fetch(cookie, path) if keep(path, i)] for path, _, _ in BUCKETS}
     except (urllib.error.URLError, TimeoutError, OSError, ValueError) as e:
-        print("🔒 !")
+        print(bar("!"))
         print("---")
         print(f"PRison is not answering at {URL}")
         print(f"{type(e).__name__} | color=red")
@@ -192,7 +207,7 @@ def main():
     # SwiftBar runs the plugin by absolute path, but a hand-run relative one
     # would put a broken callback in the menu.
     me = os.path.abspath(sys.argv[0])
-    print(f"🔒 {len(unread)}" if unread else "🔒")
+    print(bar(len(unread) if unread else ""))
     print("---")
     if unread:
         print(f"Unread ({len(unread)})")

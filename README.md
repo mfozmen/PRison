@@ -282,6 +282,26 @@ The Settings menu has six sections:
 Click a **PR title** (or a suggested-action link) to jump to GitHub — a comment
 row lands on that exact thread.
 
+### In the menu bar (macOS)
+
+A desktop notification is only as reliable as the four switches between the
+page and your screen, and it is gone in seconds whether or not you were
+looking. `extras/menubar/prison.1m.py` is a [SwiftBar](https://swiftbar.app)
+(or xbar) plugin that puts an **unread count** in the menu bar instead: it
+appears when something lands and stays until you click it.
+
+```sh
+brew install --cask swiftbar
+mkdir -p ~/SwiftBar                          # the folder SwiftBar asks for on first launch
+cp extras/menubar/prison.1m.py ~/SwiftBar/
+chmod +x ~/SwiftBar/prison.1m.py             # the bit survives cp, not a raw download
+```
+
+It reads a PRison already running on this machine — no token of its own, no
+configuration. Clicking an unread row opens that PR and marks it read; the
+live totals sit one click below. See
+[extras/menubar/README.md](extras/menubar/README.md).
+
 ## Documentation
 
 - [CONTRIBUTING.md](CONTRIBUTING.md) — conventions, tests, and CI setup

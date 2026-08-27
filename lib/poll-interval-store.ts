@@ -51,8 +51,10 @@ export function writeStoredInterval(ms: number): boolean {
     mkdirSync(dirname(intervalFilePath()), { recursive: true });
     writeFileSync(intervalFilePath(), String(ms));
   } catch {
-    // In memory is enough until the next restart; the dashboard writes it
-    // again every time it starts.
+    // In memory is enough for as long as this process lives. Nothing rewrites
+    // it on the next start — the dashboard announces the interval only when it
+    // changes — so a host that cannot write here falls back to the default
+    // after a restart, until the next time somebody picks one.
   }
   return true;
 }

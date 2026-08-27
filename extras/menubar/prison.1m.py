@@ -223,7 +223,9 @@ def main():
     # was drawn last time is redrawn meanwhile, so the bar never blinks and the
     # unread count never disappears between fetches.
     state = read_state()
-    if due_in_seconds(state) > 0 and state and state.get("rows"):
+    # Nothing cached to redraw means this run fetches whatever the interval
+    # says, so there is no point asking what the interval is.
+    if state and state.get("rows") and due_in_seconds(state) > 0:
         print(render(state))
         return
 

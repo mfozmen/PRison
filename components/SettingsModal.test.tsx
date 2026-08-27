@@ -812,11 +812,16 @@ describe("SettingsModal", () => {
       expect(hint.textContent).toMatch(/more than one|several|each/i);
     });
 
-    it("points at the menu bar, which needs nobody's permission", () => {
-      renderWithPermission("granted");
-      const link = screen.getByRole("link", { name: /menu bar/i });
-      expect(link).toHaveAttribute("href", expect.stringContaining("menubar"));
-    });
+    it.each(["granted", "denied", "default"] as NotificationPermission[])(
+      "points at the menu bar whatever the browser answered (%s)",
+      (permission) => {
+        // The reader who most needs an alternative is the one whose browser
+        // said no — and that is the one with no button and no hint above.
+        renderWithPermission(permission);
+        const link = screen.getByRole("link", { name: /menu bar/i });
+        expect(link).toHaveAttribute("href", expect.stringContaining("menubar"));
+      },
+    );
 
     it("keeps the OS hint out of sight until there is a button it explains", () => {
       renderWithPermission("denied");

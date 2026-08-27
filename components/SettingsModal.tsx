@@ -880,19 +880,24 @@ export function SettingsModal({
                       registers more than one entry there, so check each of
                       them. A Focus mode silences everything regardless.
                     </p>
-                    <p className="mt-2 text-xs text-muted">
-                      Tired of asking permission?{" "}
-                      <a
-                        href={`${PROJECT_URL}/tree/main/extras/menubar`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-accent underline underline-offset-2 hover:brightness-110"
-                      >
-                        The menu bar
-                      </a>{" "}
-                      shows the same count without needing any.
-                    </p>
                   </div>
+                )}
+                {/* Outside all three: the reader who most needs an
+                    alternative is the one whose browser said no, and they get
+                    neither a button nor a hint above. */}
+                {autoRefresh && (
+                  <p className="mt-3 text-xs text-muted">
+                    Tired of asking permission?{" "}
+                    <a
+                      href={`${PROJECT_URL}/tree/main/extras/menubar`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-accent underline underline-offset-2 hover:brightness-110"
+                    >
+                      The menu bar
+                    </a>{" "}
+                    shows the same count on macOS without needing any.
+                  </p>
                 )}
               </div>
             )}

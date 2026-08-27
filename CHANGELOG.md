@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.25.0](https://github.com/mfozmen/PRison/compare/v1.24.0...v1.25.0) (2026-08-27)
+
+### Features
+
+* say when a newer PRison is out, without spending the budget to find out ([#99](https://github.com/mfozmen/PRison/issues/99)) ([c171338](https://github.com/mfozmen/PRison/commit/c1713387eb99224f49c0760ba421d50512ee8b1d)), closes [#98](https://github.com/mfozmen/PRison/issues/98)
+
 ## [1.24.0](https://github.com/mfozmen/PRison/compare/v1.23.0...v1.24.0) (2026-08-27)
 
 ### Features

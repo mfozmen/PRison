@@ -1,3 +1,4 @@
+import { upstreamErrorResponse } from "@/lib/github/errors";
 import { ghQuery } from "@/lib/github/client";
 import { REVIEWED_PRS_QUERY, searchQuery, parseReviewedPrs } from "@/lib/github/queries";
 import { resolveScope } from "@/lib/github/scope";
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
       login,
     });
     return Response.json(parseReviewedPrs(data), partial ? { headers: { "X-Partial": "1" } } : undefined);
-  } catch {
-    return new Response("Upstream GitHub error", { status: 502 });
+  } catch (e) {
+    return upstreamErrorResponse(e);
   }
 }

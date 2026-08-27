@@ -1,3 +1,4 @@
+import { upstreamErrorResponse } from "@/lib/github/errors";
 import { ghQuery } from "@/lib/github/client";
 import { CLOSED_PRS_QUERY, searchQuery, parseClosedPrs } from "@/lib/github/queries";
 import { resolveScope } from "@/lib/github/scope";
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
       q: searchQuery("closed", scoped.scope),
     });
     return Response.json(parseClosedPrs(data), partial ? { headers: { "X-Partial": "1" } } : undefined);
-  } catch {
-    return new Response("Upstream GitHub error", { status: 502 });
+  } catch (e) {
+    return upstreamErrorResponse(e);
   }
 }

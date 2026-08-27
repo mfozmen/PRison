@@ -77,6 +77,15 @@ const DRAFT_FILTERS: { value: DraftFilter; label: string }[] = [
   { value: "none", label: "No drafts" },
 ];
 
+/** The clock time a spent budget returns at, in the reader's own timezone —
+ * "at 13:56" is the answer; an ISO string in UTC is a second puzzle. */
+function budgetTime(iso: string): string {
+  const at = new Date(iso);
+  return Number.isNaN(at.getTime())
+    ? "the top of the hour"
+    : at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 export function Dashboard({ orgs, login }: DashboardProps) {
   const [selectedOrg, setSelectedOrg] = useState<string>(ALL);
   const [hydrated, setHydrated] = useState(false);
@@ -94,6 +103,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [query, setQuery] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [pollInterval, setPollInterval] = useState(DEFAULT_POLL_INTERVAL_MS);
+  // undefined = the budget is fine. A string is when it comes back; null is a
+  // spent budget GitHub did not put a time on.
+  const [budgetSpent, setBudgetSpent] = useState<string | null | undefined>(undefined);
   // Held here rather than read during render: the browser re-renders nothing
   // when the user answers its permission prompt, so the answer has to be
   // captured and pushed down. Seeded after mount — never during SSR.
@@ -173,26 +185,36 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             ? `?org=${encodeURIComponent(org)}`
             : "";
       const run = async () => {
+        // A 429 is the hourly point budget, spent — the same wall for every
+        // list, so it is recorded once for the run rather than six times.
+        let spent: string | null | undefined = undefined;
+        const noteBudget = (r: { status: number; headers?: { get?: (h: string) => string | null } }) => {
+          if (r.status === 429) spent = r.headers?.get?.("X-RateLimit-Reset") ?? null;
+        };
         const [stuckResult, reviewResult, readyResult, commentsResult, closedResult, reviewedResult] = await Promise.allSettled([
           fetch(`/api/stuck-prs${qs}`).then(async (r) => {
+            noteBudget(r);
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const partial = r.headers?.get?.("X-Partial") === "1";
             const items = (await r.json()) as StuckPr[];
             return { items, partial };
           }),
           fetch(`/api/review-requests${qs}`).then(async (r) => {
+            noteBudget(r);
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const partial = r.headers?.get?.("X-Partial") === "1";
             const items = (await r.json()) as ReviewRequest[];
             return { items, partial };
           }),
           fetch(`/api/ready-to-merge${qs}`).then(async (r) => {
+            noteBudget(r);
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const partial = r.headers?.get?.("X-Partial") === "1";
             const items = (await r.json()) as ReadyPr[];
             return { items, partial };
           }),
           fetch(`/api/pr-comments${qs}`).then(async (r) => {
+            noteBudget(r);
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const partial = r.headers?.get?.("X-Partial") === "1";
             // This route runs two searches and answers 200 when only one of
@@ -203,12 +225,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             return { items, partial, incomplete };
           }),
           fetch(`/api/closed-prs${qs}`).then(async (r) => {
+            noteBudget(r);
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const partial = r.headers?.get?.("X-Partial") === "1";
             const items = (await r.json()) as ClosedPr[];
             return { items, partial };
           }),
           fetch(`/api/reviewed-prs${qs}`).then(async (r) => {
+            noteBudget(r);
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             const partial = r.headers?.get?.("X-Partial") === "1";
             const items = (await r.json()) as ReviewedPr[];
@@ -217,6 +241,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         ]);
 
         if (latestOrgRef.current !== org) return;
+
+        setBudgetSpent(spent);
 
         // Mark this commit for the detection effect below, which diffs the
         // *visible* (filtered) lists rather than these raw results — so a
@@ -842,6 +868,19 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         onOpenActivity={handleOpenActivity}
         onClearActivity={handleClearActivity}
       />
+      {budgetSpent !== undefined && (
+        <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 pt-4">
+          <div
+            role="status"
+            className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning"
+          >
+            ⏳ GitHub&apos;s API budget for this account is spent
+            {budgetSpent ? ` — PRison can ask again at ${budgetTime(budgetSpent)}` : ""}. Retrying
+            before then fails the same way. Refreshing less often, in Settings → Auto refresh,
+            is what keeps it from running out.
+          </div>
+        </div>
+      )}
       {partial && (
         <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 pt-4">
           <div

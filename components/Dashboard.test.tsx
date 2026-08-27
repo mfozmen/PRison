@@ -316,6 +316,55 @@ describe("Dashboard", () => {
     expect(puts).toHaveLength(0);
   });
 
+  // An hour of "Some data couldn't be loaded" told us nothing: the lists were
+  // failing because the account's hourly GraphQL budget was spent, and no
+  // amount of pressing Retry was going to change that before the hour rolled.
+  it("says the budget is spent, and when it comes back", async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: false,
+        status: 429,
+        headers: { get: (h: string) => (h === "X-RateLimit-Reset" ? "2026-08-27T10:56:46.000Z" : null) },
+        json: () => Promise.resolve([]),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    const banner = await screen.findByText(/github's api budget for this account is spent/i);
+    expect(banner).toBeInTheDocument();
+    // The time is the whole point — "try later" is what we already knew.
+    // The clock is the reader's own, so the shape depends on their locale —
+    // what matters is that a time is there at all.
+    expect(banner.textContent).toMatch(/\b(13:56|1:56|01:56)\b/);
+  });
+
+  it("still says the budget is spent when GitHub gave no usable time", async () => {
+    // Two ways to arrive here: no header at all, or one that is not a time.
+    // Neither is a reason to withhold the diagnosis, which is the useful half.
+    for (const reset of [null, "soon"]) {
+      global.fetch = vi.fn(() =>
+        Promise.resolve({
+          ok: false,
+          status: 429,
+          headers: { get: (h: string) => (h === "X-RateLimit-Reset" ? reset : null) },
+          json: () => Promise.resolve([]),
+        }),
+      ) as unknown as typeof fetch;
+      const view = render(<Dashboard orgs={ORGS} login="testuser" />);
+      const banner = await screen.findByText(/github's api budget for this account is spent/i);
+      expect(banner.textContent).toMatch(reset ? /the top of the hour/ : /spent\. Retrying/);
+      view.unmount();
+    }
+  });
+
+  it("says nothing about the budget when the failure is anything else", async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({ ok: false, status: 500, headers: { get: () => null }, json: () => Promise.resolve([]) }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText(/failed to load stuck prs/i)).toBeInTheDocument();
+    expect(screen.queryByText(/api budget/i)).not.toBeInTheDocument();
+  });
+
   it("shows an error banner and retry when the stuck fetch fails", async () => {
     global.fetch = vi.fn((url: string) =>
       url.includes("stuck")

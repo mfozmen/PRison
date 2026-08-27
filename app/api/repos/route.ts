@@ -1,3 +1,4 @@
+import { upstreamErrorResponse } from "@/lib/github/errors";
 import { ghQuery } from "@/lib/github/client";
 import { REPO_SEARCH_QUERY, parseRepoSearch } from "@/lib/github/queries";
 import { isValidLogin } from "@/lib/github/validate";
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
   try {
     const { data } = await ghQuery(token, REPO_SEARCH_QUERY, { q: searchString });
     return Response.json(parseRepoSearch(data));
-  } catch {
-    return new Response("Upstream GitHub error", { status: 502 });
+  } catch (e) {
+    return upstreamErrorResponse(e);
   }
 }

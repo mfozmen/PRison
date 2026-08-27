@@ -341,3 +341,27 @@ describe("when GitHub's hourly budget is spent", () => {
     expect(res.status).toBe(502);
   });
 });
+
+describe("what it cost", () => {
+  const priced = (nodes: unknown[]) => ({
+    data: {
+      search: { nodes },
+      rateLimit: { cost: 33, remaining: 3900, resetAt: "2026-08-27T13:00:00.000Z" },
+    },
+    partial: false,
+  });
+
+  it("reports the price of the leg that answered, even when the other did not", async () => {
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("me");
+    // The viewer's own search fails, the reviewed one comes back: the price on
+    // the response has to come from the leg that actually reached GitHub.
+    queryMock
+      .mockRejectedValueOnce(new Error("network down"))
+      .mockResolvedValueOnce(priced([]));
+    const res = await GET(new Request("http://localhost/api/pr-comments?user=me"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("X-Cost")).toBe("33");
+    expect(res.headers.get("X-Incomplete")).toBe("1");
+  });
+});

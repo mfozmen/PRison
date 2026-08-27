@@ -106,6 +106,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // undefined = the budget is fine. A string is when it comes back; null is a
   // spent budget GitHub did not put a time on.
   const [budgetSpent, setBudgetSpent] = useState<string | null | undefined>(undefined);
+  // What the last refresh cost, and what GitHub said was left after it. Asked
+  // for because a budget nobody can see is one nobody can spend deliberately.
+  const [budget, setBudget] = useState<{ cost: number; remaining: number; resetAt: string } | null>(
+    null,
+  );
   // Held here rather than read during render: the browser re-renders nothing
   // when the user answers its permission prompt, so the answer has to be
   // captured and pushed down. Seeded after mount — never during SSR.
@@ -188,8 +193,20 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         // A 429 is the hourly point budget, spent — the same wall for every
         // list, so it is recorded once for the run rather than six times.
         let spent: string | null | undefined = undefined;
+        // The refresh's price is the sum of its queries; what is left is
+        // whatever the last one to reach GitHub saw, which is the smallest.
+        let cost = 0;
+        let remaining: number | null = null;
+        let resetAt: string | null = null;
         const noteBudget = (r: { status: number; headers?: { get?: (h: string) => string | null } }) => {
           if (r.status === 429) spent = r.headers?.get?.("X-RateLimit-Reset") ?? null;
+          const priced = Number(r.headers?.get?.("X-Cost"));
+          const left = Number(r.headers?.get?.("X-Budget-Remaining"));
+          if (Number.isFinite(priced)) cost += priced;
+          if (Number.isFinite(left) && r.headers?.get?.("X-Budget-Remaining") !== null) {
+            remaining = remaining === null ? left : Math.min(remaining, left);
+          }
+          resetAt = r.headers?.get?.("X-Budget-Reset") ?? resetAt;
         };
         const [stuckResult, reviewResult, readyResult, commentsResult, closedResult, reviewedResult] = await Promise.allSettled([
           fetch(`/api/stuck-prs${qs}`).then(async (r) => {
@@ -243,6 +260,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         if (latestOrgRef.current !== org) return;
 
         setBudgetSpent(spent);
+        if (remaining !== null && resetAt !== null) setBudget({ cost, remaining, resetAt });
 
         // Mark this commit for the detection effect below, which diffs the
         // *visible* (filtered) lists rather than these raw results — so a
@@ -871,6 +889,18 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       {/* A spent budget is the cause of every list failing, and its own notice
           says so. Six "failed to load — Retry" banners under it would each
           offer the one action that cannot work. */}
+      {budgetSpent === undefined && budget !== null && budget.remaining <= budget.cost * 2 && (
+        <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 pt-4">
+          <div
+            role="status"
+            className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning"
+          >
+            ⚠ GitHub&apos;s hourly API budget is nearly spent — {budget.remaining} points left, and
+            a refresh costs about {budget.cost}. It comes back at {budgetTime(budget.resetAt)};
+            refreshing less often, in Settings → Auto refresh, is what keeps it from running out.
+          </div>
+        </div>
+      )}
       {budgetSpent !== undefined && (
         <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 pt-4">
           <div
@@ -917,6 +947,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         pollInterval={pollInterval}
         onPollIntervalChange={setPollInterval}
         notifPermission={notifPermission}
+        budget={budget}
         onEnableNotifications={handleEnableNotifications}
         onTestNotification={handleTestNotification}
         ignored={ignored}

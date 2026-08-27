@@ -316,6 +316,57 @@ describe("Dashboard", () => {
     expect(puts).toHaveLength(0);
   });
 
+  // Until this, nobody could answer "what does a refresh cost?" — including
+  // the people who had just spent an hour finding out the hard way.
+  it("adds up what the refresh cost and says what is left", async () => {
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        headers: {
+          get: (h: string) =>
+            h === "X-Cost"
+              ? "10"
+              : h === "X-Budget-Remaining"
+                ? String(url.includes("stuck") ? 4200 : 4260)
+                : h === "X-Budget-Reset"
+                  ? "2026-08-27T13:00:00.000Z"
+                  : null,
+        },
+        json: () => Promise.resolve([]),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText(/nothing ready to merge/i)).toBeInTheDocument();
+    openSettings("Auto refresh");
+    // Six endpoints at ten points each, and the smallest remaining is the one
+    // that saw the account last.
+    expect(await screen.findByText(/60 points/i)).toBeInTheDocument();
+    expect(screen.getByText(/4,200|4200/)).toBeInTheDocument();
+  });
+
+  it("warns while there is still budget left to save", async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        headers: {
+          get: (h: string) =>
+            h === "X-Cost"
+              ? "60"
+              : h === "X-Budget-Remaining"
+                ? "120"
+                : h === "X-Budget-Reset"
+                  ? "2026-08-27T13:00:00.000Z"
+                  : null,
+        },
+        json: () => Promise.resolve([]),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    // Two refreshes' worth left, or less: the moment to lengthen the interval
+    // is before the wall, not after it.
+    expect(await screen.findByText(/nearly spent/i)).toBeInTheDocument();
+  });
+
   // An hour of "Some data couldn't be loaded" told us nothing: the lists were
   // failing because the account's hourly GraphQL budget was spent, and no
   // amount of pressing Retry was going to change that before the hour rolled.

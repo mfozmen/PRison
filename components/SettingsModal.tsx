@@ -50,6 +50,9 @@ export interface SettingsModalProps {
   /** Owned by the Dashboard: the browser never re-renders us when the user
    * answers its prompt, so the answer has to arrive as a prop. */
   notifPermission: NotificationPermission;
+  /** What the last refresh cost and what is left of the hour, as GitHub
+   * reported it. Null until a refresh has answered. */
+  budget?: { cost: number; remaining: number; resetAt: string } | null;
   onEnableNotifications: () => void;
   onTestNotification: () => void;
   /** Check names written off as broken. Mostly filled from the board — the
@@ -527,6 +530,7 @@ export function SettingsModal({
   pollInterval,
   onPollIntervalChange,
   notifPermission,
+  budget = null,
   onEnableNotifications,
   onTestNotification,
   ignored = EMPTY_IGNORED,
@@ -837,6 +841,21 @@ export function SettingsModal({
                   of your PRs getting merged. Works while a PRison tab is open;
                   there is no background service.
                 </p>
+                {budget && (
+                  // The allowance is hourly and shared with every other client
+                  // signed in as you, so an interval is a spending decision.
+                  // It was an invisible one until this line.
+                  <p className="mt-2 text-xs text-muted">
+                    That refresh cost{" "}
+                    <strong className="font-medium text-foreground">{budget.cost} points</strong> of
+                    GitHub&apos;s hourly allowance;{" "}
+                    <strong className="font-medium text-foreground">
+                      {budget.remaining.toLocaleString()}
+                    </strong>{" "}
+                    are left until it returns to full. The allowance is per account, so anything
+                    else signed in as you spends from the same pocket.
+                  </p>
+                )}
                 {/* All three only apply while auto refresh is on: with it off
                     nothing polls, so there is no tab badge to promise and no
                     notification to test. */}

@@ -1,3 +1,4 @@
+import { budgetHeaders } from "@/lib/github/budget";
 import { upstreamErrorResponse } from "@/lib/github/errors";
 import { ghQuery } from "@/lib/github/client";
 import { PR_COMMENTS_QUERY, searchQuery, parsePrComments } from "@/lib/github/queries";
@@ -72,8 +73,14 @@ export async function GET(request: Request) {
     incomplete ||
     (own.status === "fulfilled" && own.value.partial) ||
     (reviewed.status === "fulfilled" && reviewed.value.partial);
-  if (!partial) return Response.json(deduped);
-  const headers: Record<string, string> = { "X-Partial": "1" };
+  // Past the check above at least one leg answered, and either one's rateLimit
+  // reports the same remaining — so the price on the response comes from
+  // whichever of them reached GitHub.
+  const dataOf = (r: PromiseSettledResult<{ data: unknown }>) =>
+    r.status === "fulfilled" ? r.value.data : undefined;
+  const answered = dataOf(own) ?? dataOf(reviewed);
+  const headers: Record<string, string> = {};
+  if (partial) headers["X-Partial"] = "1";
   if (incomplete) headers["X-Incomplete"] = "1";
-  return Response.json(deduped, { headers });
+  return Response.json(deduped, { headers: budgetHeaders(answered, headers) });
 }

@@ -9,14 +9,13 @@ import { upstreamErrorResponse } from "./errors";
 // Telling the two apart is what lets the board say so instead of showing the
 // same "couldn't be loaded" it shows for a network blip.
 describe("upstreamErrorResponse", () => {
-  const budgetError = (type: string, headers?: Record<string, string>) => {
-    const err = new GraphqlResponseError({} as any, {} as any, {
+  // The real constructor, with the headers where the real one puts them: the
+  // second argument, not inside `response` — which holds the GraphQL body.
+  const budgetError = (type: string, headers: Record<string, string> = {}) =>
+    new GraphqlResponseError({} as any, headers as any, {
       data: null,
       errors: [{ type, message: "API rate limit exceeded for user ID 1" }],
-    } as any) as any;
-    if (headers) err.response = { headers };
-    return err;
-  };
+    } as any);
 
   it("answers 429 with the reset time when the budget is spent", async () => {
     const res = upstreamErrorResponse(
@@ -42,6 +41,18 @@ describe("upstreamErrorResponse", () => {
     const res = upstreamErrorResponse(budgetError("RATE_LIMITED", { "x-ratelimit-reset": "soon" }));
     expect(res.status).toBe(429);
     expect(res.headers.get("X-RateLimit-Reset")).toBeNull();
+  });
+
+  // octokit's REST errors carry the same headers one level down. Both shapes
+  // reach these routes, so both have to be read.
+  it("finds the reset time under response.headers too", () => {
+    const err = Object.assign(new Error("Request failed"), {
+      errors: [{ type: "RATE_LIMITED" }],
+      response: { headers: { "x-ratelimit-reset": "1787828206" } },
+    });
+    expect(upstreamErrorResponse(err).headers.get("X-RateLimit-Reset")).toBe(
+      "2026-08-27T10:56:46.000Z",
+    );
   });
 
   it("leaves every other failure as the 502 it was", () => {

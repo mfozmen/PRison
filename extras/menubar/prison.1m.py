@@ -142,6 +142,41 @@ def bar(text):
     return f"{text} | image={ICON}"
 
 
+def render(state):
+    """The whole menu, from what the last fetch left behind.
+
+    SwiftBar runs the plugin by absolute path, but a hand-run relative one
+    would put a broken callback in the menu, so the path is resolved here.
+
+    One function for both paths: the run that fetched and the runs that only
+    redraw. Marking something read redraws too — the badge has to drop the
+    moment you click, not at the next fetch, which may be half an hour away."""
+    me = os.path.abspath(sys.argv[0])
+    unread = state.get("unread", [])
+    out = [bar(len(unread) if unread else ""), "---"]
+    if unread:
+        out.append(f"Unread ({len(unread)})")
+        for u in unread:
+            # Opening it is reading it, so the click does both and the badge
+            # is never left standing over something you have already seen.
+            out.append(
+                f'-- {u["line"]} | bash="{me}" param1=--read param2={u["id"]} '
+                f'param3=--open param4={u["url"]} terminal=false refresh=true'
+            )
+        out.append(
+            f'Mark all read | bash="{me}" param1=--read param2=all terminal=false refresh=true'
+        )
+        out.append("---")
+    rows = state.get("rows", {})
+    for path, heading, _ in BUCKETS:
+        listed = rows.get(path, [])
+        out.append(f"{heading}: {state.get('counts', {}).get(path, len(listed))} | href={URL}")
+        for row in listed[:PER_BUCKET]:
+            out.append(f"-- {row['label']}  {row['title']} | href={row['url']}")
+    out += ["---", f"Open PRison | href={URL}", "Refresh now | refresh=true"]
+    return "\n".join(out)
+
+
 def read_state():
     try:
         with open(STATE) as f:
@@ -188,8 +223,8 @@ def main():
     # was drawn last time is redrawn meanwhile, so the bar never blinks and the
     # unread count never disappears between fetches.
     state = read_state()
-    if due_in_seconds(state) > 0 and state and state.get("menu"):
-        print("\n".join(state["menu"]))
+    if due_in_seconds(state) > 0 and state and state.get("rows"):
+        print(render(state))
         return
 
     try:
@@ -231,35 +266,25 @@ def main():
                 )
     unread += arrived
 
-    # SwiftBar runs the plugin by absolute path, but a hand-run relative one
-    # would put a broken callback in the menu.
-    me = os.path.abspath(sys.argv[0])
-    out = [bar(len(unread) if unread else ""), "---"]
-    if unread:
-        out.append(f"Unread ({len(unread)})")
-        for u in unread:
-            # Opening it is reading it, so the click does both and the badge
-            # is never left standing over something you have already seen.
-            out.append(
-                f'-- {u["line"]} | bash="{me}" param1=--read param2={u["id"]} '
-                f'param3=--open param4={u["url"]} terminal=false refresh=true'
-            )
-        out.append(
-            f'Mark all read | bash="{me}" param1=--read param2=all terminal=false refresh=true'
-        )
-        out.append("---")
-    for path, heading, _ in BUCKETS:
-        items = lists[path]
-        out.append(f"{heading}: {len(items)} | href={URL}")
-        for item in items[:PER_BUCKET]:
-            title = str(item.get("title") or item.get("preview") or "").replace("|", "¦")
-            out.append(f"-- {label(item)}  {title[:70]} | href={item.get('url', URL)}")
-    out += ["---", f"Open PRison | href={URL}", "Refresh now | refresh=true"]
-    print("\n".join(out))
-
-    # The menu is cached alongside the ids, because the runs in between do not
-    # fetch and still have to draw something.
-    write_state({"seen": seen, "unread": unread, "menu": out, "fetchedAt": int(time.time())})
+    rows = {
+        path: [
+            {
+                "label": label(item),
+                "title": str(item.get("title") or item.get("preview") or "")
+                .replace("|", "¦")[:70],
+                "url": item.get("url", URL),
+            }
+            for item in lists[path][:PER_BUCKET]
+        ]
+        for path, _, _ in BUCKETS
+    }
+    counts = {path: len(lists[path]) for path, _, _ in BUCKETS}
+    # Kept as data rather than as drawn lines, because a click marks something
+    # read and has to redraw without fetching anything.
+    state = {"seen": seen, "unread": unread, "rows": rows, "counts": counts,
+             "fetchedAt": int(time.time())}
+    write_state(state)
+    print(render(state))
     if arrived:
         notify([a["line"] for a in arrived])
 

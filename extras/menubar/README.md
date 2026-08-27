@@ -93,6 +93,6 @@ Wording matches the dashboard's own notifications, so the same event does not
 read as two different things depending on where you saw it.
 
 What was seen last run, what is still unread, when it last fetched, and the
-menu it drew all live in
+rows it drew all live in
 `~/Library/Caches/prison-menubar.json`. Delete it to start over — the next run
 seeds itself quietly, as a fresh install does.

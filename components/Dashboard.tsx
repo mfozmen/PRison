@@ -1,10 +1,35 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo, useTransition } from "react";
-import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr, ReviewedPr } from "@/lib/types";
+import type { Budget } from "@/lib/github/budget";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  useTransition,
+} from "react";
+import type {
+  Org,
+  StuckPr,
+  ReviewRequest,
+  ReadyPr,
+  PrComment,
+  ClosedPr,
+  ReviewedPr,
+} from "@/lib/types";
 import { sortByAgeAsc, sortByAgeDesc, relativeAge } from "@/lib/prioritize";
 import { parseTerms, matches } from "@/lib/search";
-import { suggestStuck, suggestReview, suggestReady, suggestComment, needsReview, stuckGroupKeys, reviewDecisionLabel, MERGE_CONFLICT_LABEL } from "@/lib/suggest";
+import {
+  suggestStuck,
+  suggestReview,
+  suggestReady,
+  suggestComment,
+  needsReview,
+  stuckGroupKeys,
+  reviewDecisionLabel,
+  MERGE_CONFLICT_LABEL,
+} from "@/lib/suggest";
 import { PrList } from "./PrList";
 import { SummaryTiles } from "./SummaryTiles";
 import { SectionIndex } from "./SectionIndex";
@@ -14,7 +39,13 @@ import { ReviewedPrRow } from "./ReviewedPrRow";
 import { ArchiveSection } from "./ArchiveSection";
 import { Header } from "./Header";
 import { SettingsModal } from "./SettingsModal";
-import { type TrackedChecks, EMPTY_TRACKED, parseTracked, awaitingChecks, checkRequirement } from "@/lib/tracked-checks";
+import {
+  type TrackedChecks,
+  EMPTY_TRACKED,
+  parseTracked,
+  awaitingChecks,
+  checkRequirement,
+} from "@/lib/tracked-checks";
 import {
   type IgnoredChecks,
   EMPTY_IGNORED,
@@ -77,6 +108,17 @@ const DRAFT_FILTERS: { value: DraftFilter; label: string }[] = [
   { value: "none", label: "No drafts" },
 ];
 
+/** A header's number, or null when the header wasn't there to read.
+ *
+ * An empty string counts as absent, because Number("") is 0 and a header
+ * that says nothing would otherwise report a refresh that cost nothing. */
+function number(header: string | null | undefined): number | null {
+  if (header === null || header === undefined || header.trim() === "")
+    return null;
+  const value = Number(header);
+  return Number.isFinite(value) ? value : null;
+}
+
 /** The clock time a spent budget returns at, in the reader's own timezone —
  * "at 13:56" is the answer; an ISO string in UTC is a second puzzle. */
 function budgetTime(iso: string): string {
@@ -105,7 +147,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [pollInterval, setPollInterval] = useState(DEFAULT_POLL_INTERVAL_MS);
   // undefined = the budget is fine. A string is when it comes back; null is a
   // spent budget GitHub did not put a time on.
-  const [budgetSpent, setBudgetSpent] = useState<string | null | undefined>(undefined);
+  const [budgetSpent, setBudgetSpent] = useState<string | null | undefined>(
+    undefined,
+  );
+  // What the last refresh cost, and what GitHub said was left after it. Asked
+  // for because a budget nobody can see is one nobody can spend deliberately.
+  const [budget, setBudget] = useState<Budget | null>(null);
   // Held here rather than read during render: the browser re-renders nothing
   // when the user answers its permission prompt, so the answer has to be
   // captured and pushed down. Seeded after mount — never during SSR.
@@ -188,10 +235,36 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         // A 429 is the hourly point budget, spent — the same wall for every
         // list, so it is recorded once for the run rather than six times.
         let spent: string | null | undefined = undefined;
-        const noteBudget = (r: { status: number; headers?: { get?: (h: string) => string | null } }) => {
-          if (r.status === 429) spent = r.headers?.get?.("X-RateLimit-Reset") ?? null;
+        // The refresh's price is the sum of its queries; what is left is
+        // whatever the last one to reach GitHub saw, which is the smallest.
+        let cost = 0;
+        let remaining: number | null = null;
+        let resetAt: string | null = null;
+        const noteBudget = (r: {
+          status: number;
+          headers?: { get?: (h: string) => string | null };
+        }) => {
+          if (r.status === 429)
+            spent = r.headers?.get?.("X-RateLimit-Reset") ?? null;
+          // A missing header is not a zero: Number(null) is 0, and a route
+          // that never priced itself would otherwise report a free refresh
+          // and an allowance of nothing.
+          const priced = number(r.headers?.get?.("X-Cost"));
+          const left = number(r.headers?.get?.("X-Budget-Remaining"));
+          if (priced !== null) cost += priced;
+          if (left !== null) {
+            remaining = remaining === null ? left : Math.min(remaining, left);
+          }
+          resetAt = r.headers?.get?.("X-Budget-Reset") ?? resetAt;
         };
-        const [stuckResult, reviewResult, readyResult, commentsResult, closedResult, reviewedResult] = await Promise.allSettled([
+        const [
+          stuckResult,
+          reviewResult,
+          readyResult,
+          commentsResult,
+          closedResult,
+          reviewedResult,
+        ] = await Promise.allSettled([
           fetch(`/api/stuck-prs${qs}`).then(async (r) => {
             noteBudget(r);
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -243,6 +316,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         if (latestOrgRef.current !== org) return;
 
         setBudgetSpent(spent);
+        if (remaining !== null && resetAt !== null)
+          setBudget({ cost, remaining, resetAt });
 
         // Mark this commit for the detection effect below, which diffs the
         // *visible* (filtered) lists rather than these raw results — so a
@@ -254,7 +329,16 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         // moves when something actually landed. A fetch where every endpoint
         // rejected refreshed nothing, and claiming otherwise would hide the
         // staleness the label exists to show.
-        if ([stuckResult, reviewResult, readyResult, commentsResult, closedResult, reviewedResult].some((r) => r.status === "fulfilled")) {
+        if (
+          [
+            stuckResult,
+            reviewResult,
+            readyResult,
+            commentsResult,
+            closedResult,
+            reviewedResult,
+          ].some((r) => r.status === "fulfilled")
+        ) {
           setLastRefreshedAt(new Date().toISOString());
           landedRef.current = true;
         }
@@ -270,7 +354,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               ? "Failed to load stuck PRs. Please retry."
               : null,
           );
-          setStuckPrs(stuckResult.status === "fulfilled" ? stuckResult.value.items : []);
+          setStuckPrs(
+            stuckResult.status === "fulfilled" ? stuckResult.value.items : [],
+          );
         }
         if (!silent || reviewResult.status === "fulfilled") {
           setReviewError(
@@ -288,7 +374,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               ? "Failed to load ready-to-merge PRs. Please retry."
               : null,
           );
-          setReadyPrs(readyResult.status === "fulfilled" ? readyResult.value.items : []);
+          setReadyPrs(
+            readyResult.status === "fulfilled" ? readyResult.value.items : [],
+          );
         }
         // A 200 that dropped a whole search is a failure wearing a success's
         // clothes: replacing the list with it would wipe every own-PR thread
@@ -296,7 +384,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         // over again as new.
         if (
           !silent ||
-          (commentsResult.status === "fulfilled" && !commentsResult.value.incomplete)
+          (commentsResult.status === "fulfilled" &&
+            !commentsResult.value.incomplete)
         ) {
           setCommentsError(
             commentsResult.status === "rejected"
@@ -309,7 +398,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 ? "Some comment threads couldn't be loaded. Please retry."
                 : null,
           );
-          setComments(commentsResult.status === "fulfilled" ? commentsResult.value.items : []);
+          setComments(
+            commentsResult.status === "fulfilled"
+              ? commentsResult.value.items
+              : [],
+          );
         }
         if (!silent || closedResult.status === "fulfilled") {
           setClosedError(
@@ -317,7 +410,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               ? "Failed to load closed PRs. Please retry."
               : null,
           );
-          setClosedPrs(closedResult.status === "fulfilled" ? closedResult.value.items : []);
+          setClosedPrs(
+            closedResult.status === "fulfilled" ? closedResult.value.items : [],
+          );
         }
         if (!silent || reviewedResult.status === "fulfilled") {
           setReviewedError(
@@ -325,7 +420,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               ? "Failed to load reviewed PRs. Please retry."
               : null,
           );
-          setReviewedPrs(reviewedResult.status === "fulfilled" ? reviewedResult.value.items : []);
+          setReviewedPrs(
+            reviewedResult.status === "fulfilled"
+              ? reviewedResult.value.items
+              : [],
+          );
         }
         // Fresh list for this scope, so collapse the reveal back to the first
         // page — but never on a silent poll, which refreshes in place and must
@@ -347,7 +446,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             commentsResult.value.partial &&
             !(commentsResult.value.incomplete && !silent)) ||
           (closedResult.status === "fulfilled" && closedResult.value.partial) ||
-          (reviewedResult.status === "fulfilled" && reviewedResult.value.partial);
+          (reviewedResult.status === "fulfilled" &&
+            reviewedResult.value.partial);
         setPartial(anyPartial);
       };
       // Silent polls skip the transition so isPending (the "Loading…" banner
@@ -484,7 +584,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   useEffect(() => {
     if (!hydrated) return;
     localStorage.setItem("prison.pollInterval", String(pollInterval));
-    const announce = shouldAnnounceInterval(announcedIntervalRef.current, pollInterval);
+    const announce = shouldAnnounceInterval(
+      announcedIntervalRef.current,
+      pollInterval,
+    );
     announcedIntervalRef.current = pollInterval;
     if (!announce) return;
     // Nothing on screen depends on the answer: the dashboard keeps its own
@@ -581,7 +684,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       ...stuckPrs.map((p) => p.repo),
       ...reviewReqs.map((r) => r.repo),
       ...readyPrs.map((p) => p.repo),
-    ])
+    ]),
   ).sort();
 
   // Owner logins (personal + orgs) used to scope the repo search to repos the
@@ -594,14 +697,18 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // wait for it ends with it: an awaiting chip for a check the user threw out
   // would announce exactly the thing they asked never to hear about again.
   const awaitingOn = (repo: string, checkNames: string[]) =>
-    awaitingChecks(repo, checkNames, tracked).filter((c) => !isIgnoredCheck(repo, c.name, ignored));
+    awaitingChecks(repo, checkNames, tracked).filter(
+      (c) => !isIgnoredCheck(repo, c.name, ignored),
+    );
 
   const isAwaiting = (repo: string, checkNames: string[]) =>
     awaitingOn(repo, checkNames).some((c) => c.required);
 
   const toggleIgnore = (repo: string, name: string) =>
     setIgnored((cfg) =>
-      isIgnoredCheck(repo, name, cfg) ? unignoreCheck(repo, name, cfg) : ignoreCheck(repo, name, cfg),
+      isIgnoredCheck(repo, name, cfg)
+        ? unignoreCheck(repo, name, cfg)
+        : ignoreCheck(repo, name, cfg),
     );
 
   // A PR the stuck list holds only because a check the user threw out went red
@@ -625,7 +732,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         readyDespiteIgnored(pr, ignored),
     )
     .map(readyFromStuck);
-  const sortedReady = sortByAgeAsc([...readyPrs, ...promotedReady], (pr) => pr.readySince);
+  const sortedReady = sortByAgeAsc(
+    [...readyPrs, ...promotedReady],
+    (pr) => pr.readySince,
+  );
 
   // Client-side arbitration for BLOCKED+SUCCESS+APPROVED PRs: each such PR lands
   // in exactly one list based on whether its tracked checks are present in the rollup.
@@ -638,7 +748,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // never mentioned keeps its colours, because the muted style means "not
   // blocking" and claiming that of an unknown check invents knowledge PRison
   // does not have.
-  const checkChip = (repo: string, name: string, tone: "danger" | "warning", key: string) => {
+  const checkChip = (
+    repo: string,
+    name: string,
+    tone: "danger" | "warning",
+    key: string,
+  ) => {
     const thrownOut = isIgnoredCheck(repo, name, ignored);
     const notRequired = checkRequirement(repo, name, tracked) === "optional";
     return (
@@ -647,7 +762,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         name={name}
         tone={thrownOut || notRequired ? "muted" : tone}
         ignored={thrownOut}
-        description={!thrownOut && notRequired ? `${name} — not required` : undefined}
+        description={
+          !thrownOut && notRequired ? `${name} — not required` : undefined
+        }
         onToggleIgnore={() => toggleIgnore(repo, name)}
       />
     );
@@ -663,9 +780,13 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // list; exclude it from stuck so it doesn't appear in both lists.
   const promotedIds = new Set(promotedReady.map((pr) => pr.id));
   const visibleStuck = sortedStuckAll.filter(
-    (pr) => !(pr.readyViaBlocked && !isAwaiting(pr.repo, pr.checkNames)) && !promotedIds.has(pr.id),
+    (pr) =>
+      !(pr.readyViaBlocked && !isAwaiting(pr.repo, pr.checkNames)) &&
+      !promotedIds.has(pr.id),
   );
-  const visibleReviews = sortedReviews.filter((req) => matchesDraft(req.isDraft));
+  const visibleReviews = sortedReviews.filter((req) =>
+    matchesDraft(req.isDraft),
+  );
   // Drafts are already excluded server-side (parseReadyPrs drops drafts), so
   // "No drafts" is a no-op here and "Only drafts" can only ever come up empty —
   // correctly, since a draft cannot be merged. The empty message says so rather
@@ -683,7 +804,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     reviewedPrs.filter((pr) => !reviewRequestIds.has(pr.id)),
     (pr) => pr.reviewedAt,
   );
-  const sortedReviewed = sortedReviewedAll.filter((pr) => matchesDraft(pr.isDraft));
+  const sortedReviewed = sortedReviewedAll.filter((pr) =>
+    matchesDraft(pr.isDraft),
+  );
 
   // Comments on the viewer's own PRs are only shown for PRs the dashboard is
   // currently showing, so the column can never point at a PR that isn't on
@@ -871,6 +994,22 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       {/* A spent budget is the cause of every list failing, and its own notice
           says so. Six "failed to load — Retry" banners under it would each
           offer the one action that cannot work. */}
+      {budgetSpent === undefined &&
+        budget !== null &&
+        budget.remaining <= budget.cost * 2 && (
+          <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 pt-4">
+            <div
+              role="status"
+              className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning"
+            >
+              ⚠ GitHub&apos;s hourly API budget is nearly spent —{" "}
+              {budget.remaining.toLocaleString()} points left, and a refresh
+              costs about {budget.cost} points. It comes back at{" "}
+              {budgetTime(budget.resetAt)}; refreshing less often, in Settings →
+              Auto refresh, is what keeps it from running out.
+            </div>
+          </div>
+        )}
       {budgetSpent !== undefined && (
         <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 pt-4">
           <div
@@ -878,9 +1017,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning"
           >
             ⏳ GitHub&apos;s API budget for this account is spent
-            {budgetSpent ? ` — PRison can ask again at ${budgetTime(budgetSpent)}` : ""}. Retrying
-            before then fails the same way. Refreshing less often, in Settings → Auto refresh,
-            is what keeps it from running out.
+            {budgetSpent
+              ? ` — PRison can ask again at ${budgetTime(budgetSpent)}`
+              : ""}
+            . Retrying before then fails the same way. Refreshing less often, in
+            Settings → Auto refresh, is what keeps it from running out.
           </div>
         </div>
       )}
@@ -917,6 +1058,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         pollInterval={pollInterval}
         onPollIntervalChange={setPollInterval}
         notifPermission={notifPermission}
+        budget={budget}
         onEnableNotifications={handleEnableNotifications}
         onTestNotification={handleTestNotification}
         ignored={ignored}
@@ -924,7 +1066,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       />
       <main className="mx-auto w-full max-w-screen-2xl flex-1 space-y-8 px-4 sm:px-6 lg:px-8 py-8">
         {isPending && (
-          <p className="flex items-center gap-2 text-sm text-muted" aria-live="polite">
+          <p
+            className="flex items-center gap-2 text-sm text-muted"
+            aria-live="polite"
+          >
             <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
             Loading&hellip;
           </p>
@@ -1074,12 +1219,36 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             the fetched totals for the archives, exactly as the headers do. */}
         <SectionIndex
           sections={[
-            { id: "ready-to-merge", label: "Ready to merge", count: shownReady.length },
-            { id: "comments-awaiting-reply", label: "Comments awaiting your reply", count: shownComments.length },
-            { id: "waiting-on-your-review", label: "PRs waiting on your review", count: shownReviews.length },
-            { id: "stuck-on-checks", label: "PRs stuck on checks", count: shownStuck.length },
-            { id: "recently-reviewed", label: "Recently reviewed", count: shownReviewed.length },
-            { id: "recently-closed", label: "Recently merged / closed", count: shownClosed.length },
+            {
+              id: "ready-to-merge",
+              label: "Ready to merge",
+              count: shownReady.length,
+            },
+            {
+              id: "comments-awaiting-reply",
+              label: "Comments awaiting your reply",
+              count: shownComments.length,
+            },
+            {
+              id: "waiting-on-your-review",
+              label: "PRs waiting on your review",
+              count: shownReviews.length,
+            },
+            {
+              id: "stuck-on-checks",
+              label: "PRs stuck on checks",
+              count: shownStuck.length,
+            },
+            {
+              id: "recently-reviewed",
+              label: "Recently reviewed",
+              count: shownReviewed.length,
+            },
+            {
+              id: "recently-closed",
+              label: "Recently merged / closed",
+              count: shownClosed.length,
+            },
           ]}
         />
         {/* Ready-to-merge — full-width section above the two-column review/stuck grid */}
@@ -1184,9 +1353,28 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 detail={
                   <span className="flex flex-wrap items-center gap-1.5">
                     <span className="inline-flex items-center gap-1 rounded bg-surface px-1.5 py-0.5 text-xs font-medium text-foreground ring-1 ring-inset ring-border">
-                      <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.3" />
-                        <path d="M1 10c0-2.21 1.79-4 4-4s4 1.79 4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                      <svg
+                        aria-hidden="true"
+                        className="shrink-0"
+                        width="11"
+                        height="11"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="5"
+                          cy="3.5"
+                          r="2"
+                          stroke="currentColor"
+                          strokeWidth="1.3"
+                        />
+                        <path
+                          d="M1 10c0-2.21 1.79-4 4-4s4 1.79 4 4"
+                          stroke="currentColor"
+                          strokeWidth="1.3"
+                          strokeLinecap="round"
+                        />
                       </svg>
                       {c.author}
                     </span>
@@ -1200,9 +1388,27 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     )}
                     {c.path && (
                       <span className="inline-flex items-center gap-1 rounded bg-surface px-1.5 py-0.5 font-mono text-xs text-muted ring-1 ring-inset ring-border">
-                        <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M6.5 1H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.5L6.5 1Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-                          <path d="M6.5 1v3.5H10" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+                        <svg
+                          aria-hidden="true"
+                          className="shrink-0"
+                          width="11"
+                          height="11"
+                          viewBox="0 0 12 12"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M6.5 1H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.5L6.5 1Z"
+                            stroke="currentColor"
+                            strokeWidth="1.2"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M6.5 1v3.5H10"
+                            stroke="currentColor"
+                            strokeWidth="1.2"
+                            strokeLinejoin="round"
+                          />
                         </svg>
                         {c.path}
                       </span>
@@ -1272,7 +1478,13 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                           fill="none"
                           xmlns="http://www.w3.org/2000/svg"
                         >
-                          <circle cx="5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.5" />
+                          <circle
+                            cx="5"
+                            cy="3.5"
+                            r="2"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                          />
                           <path
                             d="M1 10c0-2.21 1.79-4 4-4s4 1.79 4 4"
                             stroke="currentColor"
@@ -1321,10 +1533,13 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   {shownReviewed.length > reviewedVisible && (
                     <button
                       type="button"
-                      onClick={() => setReviewedVisible((v) => v + ARCHIVE_PAGE_SIZE)}
+                      onClick={() =>
+                        setReviewedVisible((v) => v + ARCHIVE_PAGE_SIZE)
+                      }
                       className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
                     >
-                      Load more (showing {reviewedVisible} of {shownReviewed.length})
+                      Load more (showing {reviewedVisible} of{" "}
+                      {shownReviewed.length})
                     </button>
                   )}
                 </>
@@ -1364,16 +1579,23 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     : undefined
                 }
                 renderRow={(pr) => {
-                  const hasNames = pr.failing.length > 0 || pr.pending.length > 0;
+                  const hasNames =
+                    pr.failing.length > 0 || pr.pending.length > 0;
                   const totalNames = pr.failing.length + pr.pending.length;
                   // Only truncate when there are more than 4 names total; otherwise
                   // show every name. The "+N more" count is derived from what is
                   // actually rendered so lopsided check lists never hide a chip
                   // without an indicator.
                   const truncate = totalNames > 4;
-                  const showFailingNames = truncate ? pr.failing.slice(0, 2) : pr.failing;
-                  const showPendingNames = truncate ? pr.pending.slice(0, 2) : pr.pending;
-                  const overflow = totalNames - (showFailingNames.length + showPendingNames.length);
+                  const showFailingNames = truncate
+                    ? pr.failing.slice(0, 2)
+                    : pr.failing;
+                  const showPendingNames = truncate
+                    ? pr.pending.slice(0, 2)
+                    : pr.pending;
+                  const overflow =
+                    totalNames -
+                    (showFailingNames.length + showPendingNames.length);
                   const awaiting = awaitingOn(pr.repo, pr.checkNames);
                   const hasAwaiting = awaiting.length > 0;
                   // A green PR can still be BLOCKED waiting on a code-owner review;
@@ -1381,7 +1603,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   // with the repo's status vocabulary: CHANGES_REQUESTED is a negative
                   // signal (danger/red), REVIEW_REQUIRED is merely waiting (warning/amber).
                   const reviewNeeded = needsReview(pr.reviewDecision);
-                  const changesRequested = pr.reviewDecision === "CHANGES_REQUESTED";
+                  const changesRequested =
+                    pr.reviewDecision === "CHANGES_REQUESTED";
                   const reviewChip = reviewNeeded ? (
                     <span
                       key="review"
@@ -1391,17 +1614,55 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                           : "bg-warning/10 text-warning ring-warning/30"
                       }`}
                     >
-                      <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="5" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.3" />
-                        <path d="M1 10c0-2.21 1.79-4 4-4s4 1.79 4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                      <svg
+                        aria-hidden="true"
+                        className="shrink-0"
+                        width="11"
+                        height="11"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle
+                          cx="5"
+                          cy="3.5"
+                          r="2"
+                          stroke="currentColor"
+                          strokeWidth="1.3"
+                        />
+                        <path
+                          d="M1 10c0-2.21 1.79-4 4-4s4 1.79 4 4"
+                          stroke="currentColor"
+                          strokeWidth="1.3"
+                          strokeLinecap="round"
+                        />
                       </svg>
                       {reviewDecisionLabel(pr.reviewDecision)}
                     </span>
                   ) : null;
                   const noteIcon = (
-                    <svg aria-hidden="true" className="shrink-0" width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3"/>
-                      <path d="M7 6v4M7 4.5v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                    <svg
+                      aria-hidden="true"
+                      className="shrink-0"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 14 14"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <circle
+                        cx="7"
+                        cy="7"
+                        r="5.5"
+                        stroke="currentColor"
+                        strokeWidth="1.3"
+                      />
+                      <path
+                        d="M7 6v4M7 4.5v.5"
+                        stroke="currentColor"
+                        strokeWidth="1.3"
+                        strokeLinecap="round"
+                      />
                     </svg>
                   );
                   const noteSpan = (text: string) => (
@@ -1422,9 +1683,27 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                       key="conflict"
                       className="inline-flex items-center gap-1 rounded bg-danger/10 px-1.5 py-0.5 text-xs font-medium text-danger ring-1 ring-inset ring-danger/30"
                     >
-                      <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M3.5 2.5v7M8.5 2.5v7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                        <path d="M2 4.5 4 6.5m0-2L2 6.5M7 4.5l2 2m0-2-2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                      <svg
+                        aria-hidden="true"
+                        className="shrink-0"
+                        width="11"
+                        height="11"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M3.5 2.5v7M8.5 2.5v7"
+                          stroke="currentColor"
+                          strokeWidth="1.3"
+                          strokeLinecap="round"
+                        />
+                        <path
+                          d="M2 4.5 4 6.5m0-2L2 6.5M7 4.5l2 2m0-2-2 2"
+                          stroke="currentColor"
+                          strokeWidth="1.3"
+                          strokeLinecap="round"
+                        />
                       </svg>
                       {MERGE_CONFLICT_LABEL}
                     </span>
@@ -1435,13 +1714,25 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                       <div className="flex flex-wrap gap-1 items-center">
                         {conflictChip}
                         {showFailingNames.map((name, i) =>
-                          checkChip(pr.repo, name, "danger", `fail-${i}-${name}`),
+                          checkChip(
+                            pr.repo,
+                            name,
+                            "danger",
+                            `fail-${i}-${name}`,
+                          ),
                         )}
                         {showPendingNames.map((name, i) =>
-                          checkChip(pr.repo, name, "warning", `pend-${i}-${name}`),
+                          checkChip(
+                            pr.repo,
+                            name,
+                            "warning",
+                            `pend-${i}-${name}`,
+                          ),
                         )}
                         {overflow > 0 && (
-                          <span className="text-xs text-muted">+{overflow} more</span>
+                          <span className="text-xs text-muted">
+                            +{overflow} more
+                          </span>
                         )}
                         {hasAwaiting &&
                           awaiting.map(({ name, required }) => (
@@ -1451,13 +1742,35 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                               tone={required ? "warning" : "muted"}
                               ignored={false}
                               description={
-                                required ? `Awaiting required check: ${name}` : `Awaiting: ${name}`
+                                required
+                                  ? `Awaiting required check: ${name}`
+                                  : `Awaiting: ${name}`
                               }
                               onToggleIgnore={() => toggleIgnore(pr.repo, name)}
                               icon={
-                                <svg aria-hidden="true" className="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.3" />
-                                  <path d="M6 3.5v2.75l1.5 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                                <svg
+                                  aria-hidden="true"
+                                  className="shrink-0"
+                                  width="11"
+                                  height="11"
+                                  viewBox="0 0 12 12"
+                                  fill="none"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <circle
+                                    cx="6"
+                                    cy="6"
+                                    r="4.5"
+                                    stroke="currentColor"
+                                    strokeWidth="1.3"
+                                  />
+                                  <path
+                                    d="M6 3.5v2.75l1.5 1.5"
+                                    stroke="currentColor"
+                                    strokeWidth="1.3"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
                                 </svg>
                               }
                             />
@@ -1466,7 +1779,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                       </div>
                     );
                   } else if (pr.blocked) {
-                    detail = noteSpan("Some required checks run on GitHub and aren't shown here.");
+                    detail = noteSpan(
+                      "Some required checks run on GitHub and aren't shown here.",
+                    );
                   } else {
                     detail = `${pr.failingChecks} failing · ${pr.pendingChecks} pending`;
                   }
@@ -1513,10 +1828,13 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   {shownClosed.length > closedVisible && (
                     <button
                       type="button"
-                      onClick={() => setClosedVisible((v) => v + ARCHIVE_PAGE_SIZE)}
+                      onClick={() =>
+                        setClosedVisible((v) => v + ARCHIVE_PAGE_SIZE)
+                      }
                       className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
                     >
-                      Load more (showing {closedVisible} of {shownClosed.length})
+                      Load more (showing {closedVisible} of {shownClosed.length}
+                      )
                     </button>
                   )}
                 </>

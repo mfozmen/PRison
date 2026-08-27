@@ -1,3 +1,4 @@
+import { budgetFrom, budgetHeaders } from "@/lib/github/budget";
 import { upstreamErrorResponse } from "@/lib/github/errors";
 import { ghQuery } from "@/lib/github/client";
 import { STUCK_PRS_QUERY, searchQuery, parseStuckPrs } from "@/lib/github/queries";
@@ -13,7 +14,9 @@ export async function GET(request: Request) {
     const { data, partial } = await ghQuery(token, STUCK_PRS_QUERY, {
       q: searchQuery("author", scoped.scope),
     });
-    return Response.json(parseStuckPrs(data), partial ? { headers: { "X-Partial": "1" } } : undefined);
+    return Response.json(parseStuckPrs(data), {
+      headers: budgetHeaders(budgetFrom(data), partial ? { "X-Partial": "1" } : {}),
+    });
   } catch (e) {
     return upstreamErrorResponse(e);
   }

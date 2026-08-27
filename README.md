@@ -139,6 +139,11 @@ and expand to the latest 15, with **Load more** for the rest.
   restored in the background is not you opening PRison.
 - **Last refreshed indicator.** The filter bar says how long ago the data
   landed, so you always know whether you're looking at something stale.
+- **Shows what a refresh costs.** GitHub prices every query, the allowance is
+  hourly, and it is shared with anything else signed in as you — so how often
+  you refresh is a spending decision. Settings → Auto refresh names the price
+  of the last refresh and what is left of the hour, and the board warns while
+  there is still enough left to act on rather than after the wall.
 - **Says when GitHub's budget is spent.** The API allowance is hourly and
   account-wide, so a busy morning can empty it — and every list then fails at
   once, which looks exactly like the app being broken. PRison tells the two

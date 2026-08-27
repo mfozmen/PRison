@@ -150,3 +150,28 @@ describe("when GitHub's hourly budget is spent", () => {
     expect(res.status).toBe(502);
   });
 });
+
+// A refresh's price was invisible until an hour of failures made it urgent.
+describe("what it cost", () => {
+  it("passes GitHub's own reckoning back to the browser", async () => {
+    readTokenMock.mockResolvedValue("t");
+    queryMock.mockResolvedValue({
+      data: {
+        ...STUCK_RAW,
+        rateLimit: { cost: 17, remaining: 4231, resetAt: "2026-08-27T13:00:00.000Z" },
+      },
+      partial: false,
+    });
+    const res = await GET(req("http://localhost/api/stuck-prs?user=me"));
+    expect(res.headers.get("X-Cost")).toBe("17");
+    expect(res.headers.get("X-Budget-Remaining")).toBe("4231");
+    expect(res.headers.get("X-Budget-Reset")).toBe("2026-08-27T13:00:00.000Z");
+  });
+
+  it("says nothing when GitHub didn't", async () => {
+    readTokenMock.mockResolvedValue("t");
+    queryMock.mockResolvedValue({ data: STUCK_RAW, partial: false });
+    const res = await GET(req("http://localhost/api/stuck-prs?user=me"));
+    expect(res.headers.get("X-Cost")).toBeNull();
+  });
+});

@@ -29,8 +29,14 @@ const REVIEWED_RAW = {
         isDraft: false,
         repository: { nameWithOwner: "acme/e" },
         author: { login: "alice" },
-        reviews: { nodes: [{ state: "CHANGES_REQUESTED", submittedAt: "2026-07-01T00:00:00Z" }] },
-        commits: { nodes: [{ commit: { pushedDate: "2026-07-02T00:00:00Z" } }] },
+        reviews: {
+          nodes: [
+            { state: "CHANGES_REQUESTED", submittedAt: "2026-07-01T00:00:00Z" },
+          ],
+        },
+        commits: {
+          nodes: [{ commit: { pushedDate: "2026-07-02T00:00:00Z" } }],
+        },
       },
     ],
   },
@@ -60,7 +66,9 @@ describe("GET /api/reviewed-prs", () => {
   it("returns 400 when org contains invalid characters", async () => {
     readTokenMock.mockResolvedValue("t");
     readLoginMock.mockResolvedValue("octocat");
-    const res = await GET(req("http://x/api/reviewed-prs?org=acme+repo%3Ax%2Fy"));
+    const res = await GET(
+      req("http://x/api/reviewed-prs?org=acme+repo%3Ax%2Fy"),
+    );
     expect(res.status).toBe(400);
   });
 
@@ -86,7 +94,9 @@ describe("GET /api/reviewed-prs", () => {
     queryMock.mockResolvedValue({ data: REVIEWED_RAW, partial: false });
     const res = await GET(req("http://x/api/reviewed-prs"));
     expect(res.status).toBe(200);
-    expect(queryMock.mock.calls[0][2].q).toBe("is:open is:pr reviewed-by:@me -author:@me sort:updated-desc");
+    expect(queryMock.mock.calls[0][2].q).toBe(
+      "is:open is:pr reviewed-by:@me -author:@me sort:updated-desc",
+    );
   });
 
   it("scopes to a personal account (?user=octocat)", async () => {
@@ -95,7 +105,9 @@ describe("GET /api/reviewed-prs", () => {
     queryMock.mockResolvedValue({ data: REVIEWED_RAW, partial: false });
     const res = await GET(req("http://x/api/reviewed-prs?user=octocat"));
     expect(res.status).toBe(200);
-    expect(queryMock.mock.calls[0][2].q).toBe("is:open is:pr reviewed-by:@me -author:@me user:octocat sort:updated-desc");
+    expect(queryMock.mock.calls[0][2].q).toBe(
+      "is:open is:pr reviewed-by:@me -author:@me user:octocat sort:updated-desc",
+    );
   });
 
   it("returns 400 when user contains invalid characters", async () => {
@@ -136,15 +148,44 @@ describe("GET /api/reviewed-prs", () => {
 describe("when GitHub's hourly budget is spent", () => {
   it("answers 429 with the reset time", async () => {
     readTokenMock.mockResolvedValue("t");
-  readLoginMock.mockResolvedValue("me");
+    readLoginMock.mockResolvedValue("me");
     queryMock.mockRejectedValue(
       Object.assign(new Error("Request failed"), {
         errors: [{ type: "RATE_LIMITED" }],
         headers: { "x-ratelimit-reset": "1787828206" },
       }),
     );
-    const res = await GET(new Request("http://localhost/api/reviewed-prs?user=me"));
+    const res = await GET(
+      new Request("http://localhost/api/reviewed-prs?user=me"),
+    );
     expect(res.status).toBe(429);
-    expect(res.headers.get("X-RateLimit-Reset")).toBe("2026-08-27T10:56:46.000Z");
+    expect(res.headers.get("X-RateLimit-Reset")).toBe(
+      "2026-08-27T10:56:46.000Z",
+    );
+  });
+});
+
+// The price rides on every list, so every list has to be asked whether it
+// carries it — the wiring is per route, and a dropped one is invisible.
+describe("what it cost", () => {
+  it("passes GitHub's own reckoning back to the browser", async () => {
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("me");
+    queryMock.mockResolvedValue({
+      data: {
+        search: { nodes: [] },
+        rateLimit: {
+          cost: 9,
+          remaining: 4100,
+          resetAt: "2026-08-27T13:00:00.000Z",
+        },
+      },
+      partial: false,
+    });
+    const res = await GET(
+      new Request("http://localhost/api/reviewed-prs?user=me"),
+    );
+    expect(res.headers.get("X-Cost")).toBe("9");
+    expect(res.headers.get("X-Budget-Remaining")).toBe("4100");
   });
 });

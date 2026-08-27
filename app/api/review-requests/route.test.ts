@@ -31,7 +31,10 @@ const REVIEW_RAW = {
         author: { login: "alice" },
         timelineItems: {
           nodes: [
-            { createdAt: "2026-06-21T00:00:00Z", requestedReviewer: { login: "me" } },
+            {
+              createdAt: "2026-06-21T00:00:00Z",
+              requestedReviewer: { login: "me" },
+            },
           ],
         },
       },
@@ -62,7 +65,9 @@ describe("GET /api/review-requests", () => {
   it("returns 400 when org contains invalid characters", async () => {
     readTokenMock.mockResolvedValue("t");
     readLoginMock.mockResolvedValue("me");
-    const res = await GET(req("http://x/api/review-requests?org=acme+repo%3Ax%2Fy"));
+    const res = await GET(
+      req("http://x/api/review-requests?org=acme+repo%3Ax%2Fy"),
+    );
     expect(res.status).toBe(400);
   });
 
@@ -114,7 +119,9 @@ describe("GET /api/review-requests", () => {
   it("returns 400 when user contains invalid characters", async () => {
     readTokenMock.mockResolvedValue("t");
     readLoginMock.mockResolvedValue("me");
-    const res = await GET(req("http://x/api/review-requests?user=invalid+char"));
+    const res = await GET(
+      req("http://x/api/review-requests?user=invalid+char"),
+    );
     expect(res.status).toBe(400);
   });
 
@@ -140,7 +147,9 @@ describe("GET /api/review-requests", () => {
     readTokenMock.mockResolvedValue("t");
     readLoginMock.mockResolvedValue("me");
     queryMock.mockResolvedValue({ data: REVIEW_RAW, partial: false });
-    const res = await GET(req("http://x/api/review-requests?org=acme&user=mfozmen"));
+    const res = await GET(
+      req("http://x/api/review-requests?org=acme&user=mfozmen"),
+    );
     expect(res.status).toBe(200);
     expect(queryMock.mock.calls[0][2].q).toContain("user:mfozmen");
     expect(queryMock.mock.calls[0][2].q).not.toContain("org:acme");
@@ -152,15 +161,44 @@ describe("GET /api/review-requests", () => {
 describe("when GitHub's hourly budget is spent", () => {
   it("answers 429 with the reset time", async () => {
     readTokenMock.mockResolvedValue("t");
-  readLoginMock.mockResolvedValue("me");
+    readLoginMock.mockResolvedValue("me");
     queryMock.mockRejectedValue(
       Object.assign(new Error("Request failed"), {
         errors: [{ type: "RATE_LIMITED" }],
         headers: { "x-ratelimit-reset": "1787828206" },
       }),
     );
-    const res = await GET(new Request("http://localhost/api/review-requests?user=me"));
+    const res = await GET(
+      new Request("http://localhost/api/review-requests?user=me"),
+    );
     expect(res.status).toBe(429);
-    expect(res.headers.get("X-RateLimit-Reset")).toBe("2026-08-27T10:56:46.000Z");
+    expect(res.headers.get("X-RateLimit-Reset")).toBe(
+      "2026-08-27T10:56:46.000Z",
+    );
+  });
+});
+
+// The price rides on every list, so every list has to be asked whether it
+// carries it — the wiring is per route, and a dropped one is invisible.
+describe("what it cost", () => {
+  it("passes GitHub's own reckoning back to the browser", async () => {
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("me");
+    queryMock.mockResolvedValue({
+      data: {
+        search: { nodes: [] },
+        rateLimit: {
+          cost: 9,
+          remaining: 4100,
+          resetAt: "2026-08-27T13:00:00.000Z",
+        },
+      },
+      partial: false,
+    });
+    const res = await GET(
+      new Request("http://localhost/api/review-requests?user=me"),
+    );
+    expect(res.headers.get("X-Cost")).toBe("9");
+    expect(res.headers.get("X-Budget-Remaining")).toBe("4100");
   });
 });

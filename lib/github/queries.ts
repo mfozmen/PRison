@@ -46,6 +46,11 @@ export function searchQuery(kind: SearchKind, scope?: string): string {
   return `${state} is:pr ${who}${scopePart}${sort}`;
 }
 
+/** Free to ask, and the only way anyone finds out what a refresh costs: the
+ * allowance is hourly and account-wide, so "why did everything fail at once"
+ * has a number behind it rather than a guess. */
+export const RATE_LIMIT = `rateLimit { cost remaining resetAt }`;
+
 export const VIEWER_QUERY = `query { viewer { login } }`;
 
 export const ORGS_QUERY = `
@@ -79,6 +84,7 @@ export const STUCK_PRS_QUERY = `
         } } }
       } }
     }
+      ${RATE_LIMIT}
   }`;
 
 export const REVIEW_REQUESTS_QUERY = `
@@ -95,6 +101,7 @@ export const REVIEW_REQUESTS_QUERY = `
         }
       } }
     }
+      ${RATE_LIMIT}
   }`;
 
 const FAILING = new Set(["FAILURE", "ERROR", "TIMED_OUT"]);
@@ -373,6 +380,7 @@ export const PR_COMMENTS_QUERY = `
         } }
       } }
     }
+      ${RATE_LIMIT}
   }`;
 
 // The shape every search parser starts from. Array-checked rather than
@@ -527,6 +535,7 @@ export const READY_PRS_QUERY = `
         } } }
       } }
     }
+      ${RATE_LIMIT}
   }`;
 
 export const CLOSED_PRS_QUERY = `
@@ -537,6 +546,7 @@ export const CLOSED_PRS_QUERY = `
         repository { nameWithOwner }
       } }
     }
+      ${RATE_LIMIT}
   }`;
 
 export function parseClosedPrs(raw: any): ClosedPr[] {
@@ -572,6 +582,7 @@ export const REVIEWED_PRS_QUERY = `
         commits(last: 1) { nodes { commit { pushedDate committedDate } } }
       } }
     }
+      ${RATE_LIMIT}
   }`;
 
 // The verdicts a submitted review can carry. Checked rather than trusted: the

@@ -108,8 +108,6 @@ const DRAFT_FILTERS: { value: DraftFilter; label: string }[] = [
   { value: "none", label: "No drafts" },
 ];
 
-/** The clock time a spent budget returns at, in the reader's own timezone —
- * "at 13:56" is the answer; an ISO string in UTC is a second puzzle. */
 /** A header's number, or null when the header wasn't there to read.
  *
  * An empty string counts as absent, because Number("") is 0 and a header
@@ -121,6 +119,8 @@ function number(header: string | null | undefined): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
+/** The clock time a spent budget returns at, in the reader's own timezone —
+ * "at 13:56" is the answer; an ISO string in UTC is a second puzzle. */
 function budgetTime(iso: string): string {
   const at = new Date(iso);
   return Number.isNaN(at.getTime())
@@ -1004,7 +1004,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             >
               ⚠ GitHub&apos;s hourly API budget is nearly spent —{" "}
               {budget.remaining.toLocaleString()} points left, and a refresh
-              costs about {budget.cost}. It comes back at{" "}
+              costs about {budget.cost} points. It comes back at{" "}
               {budgetTime(budget.resetAt)}; refreshing less often, in Settings →
               Auto refresh, is what keeps it from running out.
             </div>

@@ -300,9 +300,13 @@ The Settings menu has six sections:
   ever drawn its chip.
 - **Appearance** — pick one of the four themes, each previewing its own colours
   and typeface.
-- **About** — version, repository, license, and **Check for updates**: asked
-  for, never automatic, and it links straight to the release when there's a
-  newer one.
+- **About** — version, repository, license, and **Check for updates**, asked
+  for on the spot. **Tell me when a newer version is out** turns the same
+  question into a standing one: the version in the header becomes a link to the
+  release notes when your container has fallen behind. Off unless you switch it
+  on — and even then it asks GitHub once a day at most, without your token, so
+  it spends nothing from the hourly budget your refreshes run on. When it
+  can't reach GitHub it says nothing at all.
 
 ### Filter bar
 

@@ -135,6 +135,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // Bots author the large majority of unanswered review threads, so they are
   // hidden by default; the filter is client-side to keep the toggle instant.
   const [showBots, setShowBots] = useState(false);
+  // Off until asked for: this is the one thing in here that reaches the
+  // network for PRison's own sake rather than the user's work.
+  const [updateChecks, setUpdateChecks] = useState(false);
   // Reacting with an emoji is how the user acknowledges a comment without replying,
   // so reacted threads are hidden by default; client-side to keep the toggle instant.
   const [hideReacted, setHideReacted] = useState(true);
@@ -467,6 +470,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     // keeps them hidden across the upgrade; never written again.
     const storedHideDrafts = localStorage.getItem("prison.hideDrafts");
     const storedShowBots = localStorage.getItem("prison.showBots");
+    const storedUpdateChecks = localStorage.getItem("prison.updateChecks");
     const storedHideReacted = localStorage.getItem("prison.hideReacted");
     const storedGroupBy = localStorage.getItem("prison.groupBy");
     const storedAutoRefresh = localStorage.getItem("prison.autoRefresh");
@@ -500,6 +504,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       }
       if (storedShowBots === "true") {
         setShowBots(true);
+      }
+      if (storedUpdateChecks === "true") {
+        setUpdateChecks(true);
       }
       if (storedHideReacted === "false") {
         setHideReacted(false);
@@ -539,6 +546,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     if (!hydrated) return;
     localStorage.setItem("prison.showBots", String(showBots));
   }, [showBots, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.updateChecks", String(updateChecks));
+  }, [updateChecks, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -990,6 +1002,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         activity={activity}
         onOpenActivity={handleOpenActivity}
         onClearActivity={handleClearActivity}
+        checkUpdates={updateChecks}
       />
       {/* A spent budget is the cause of every list failing, and its own notice
           says so. Six "failed to load — Retry" banners under it would each
@@ -1063,6 +1076,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         onTestNotification={handleTestNotification}
         ignored={ignored}
         onIgnoredChange={setIgnored}
+        updateChecks={updateChecks}
+        onUpdateChecksChange={setUpdateChecks}
       />
       <main className="mx-auto w-full max-w-screen-2xl flex-1 space-y-8 px-4 sm:px-6 lg:px-8 py-8">
         {isPending && (

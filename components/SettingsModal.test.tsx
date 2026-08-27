@@ -50,36 +50,37 @@ describe("SettingsModal", () => {
     expect(container.firstChild).toBeNull();
   });
 
-
-
-
-
-
-
-
-
-
-
-
-
   it("lists every stored check with its own name field and mark", () => {
     render(
       <SettingsModal
         {...filterProps}
         owners={["acme"]}
         availableRepos={[]}
-        value={{ orgs: { acme: ["qa/smoke", { name: "nightly-e2e", required: false }] }, repos: {} }}
+        value={{
+          orgs: {
+            acme: ["qa/smoke", { name: "nightly-e2e", required: false }],
+          },
+          repos: {},
+        }}
         onChange={vi.fn()}
         open={true}
         onClose={vi.fn()}
       />,
     );
     selectSection("Tracked checks");
-    expect(screen.getByRole("textbox", { name: "Check 1 for acme" })).toHaveValue("qa/smoke");
-    expect(screen.getByRole("textbox", { name: "Check 2 for acme" })).toHaveValue("nightly-e2e");
-    expect(screen.getByRole("checkbox", { name: "qa/smoke is required for acme" })).toBeChecked();
     expect(
-      screen.getByRole("checkbox", { name: "nightly-e2e is required for acme" }),
+      screen.getByRole("textbox", { name: "Check 1 for acme" }),
+    ).toHaveValue("qa/smoke");
+    expect(
+      screen.getByRole("textbox", { name: "Check 2 for acme" }),
+    ).toHaveValue("nightly-e2e");
+    expect(
+      screen.getByRole("checkbox", { name: "qa/smoke is required for acme" }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", {
+        name: "nightly-e2e is required for acme",
+      }),
     ).not.toBeChecked();
   });
 
@@ -99,10 +100,15 @@ describe("SettingsModal", () => {
     selectSection("Tracked checks");
     // The name is not stored until Add, so nothing is announced per keystroke
     // and the box is answered before the check exists.
-    fireEvent.change(screen.getByRole("textbox", { name: "New check for acme" }), {
-      target: { value: "nightly-e2e" },
-    });
-    fireEvent.click(screen.getByRole("checkbox", { name: "New check is required for acme" }));
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "New check for acme" }),
+      {
+        target: { value: "nightly-e2e" },
+      },
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "New check is required for acme" }),
+    );
     expect(onChange).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Add check to acme" }));
     expect(onChange).toHaveBeenCalledWith({
@@ -125,7 +131,9 @@ describe("SettingsModal", () => {
     );
     selectSection("Tracked checks");
     const field = screen.getByRole("textbox", { name: "New check for acme" });
-    const box = screen.getByRole("checkbox", { name: "New check is required for acme" });
+    const box = screen.getByRole("checkbox", {
+      name: "New check is required for acme",
+    });
     fireEvent.change(field, { target: { value: "lint" } });
     fireEvent.click(box);
     fireEvent.click(screen.getByRole("button", { name: "Add check to acme" }));
@@ -150,7 +158,10 @@ describe("SettingsModal", () => {
     const field = screen.getByRole("textbox", { name: "New check for acme" });
     fireEvent.change(field, { target: { value: "lint" } });
     fireEvent.keyDown(field, { key: "Enter" });
-    expect(onChange).toHaveBeenCalledWith({ orgs: { acme: [required("lint")] }, repos: {} });
+    expect(onChange).toHaveBeenCalledWith({
+      orgs: { acme: [required("lint")] },
+      repos: {},
+    });
   });
 
   it("refuses a blank name and a name already in the list", () => {
@@ -183,18 +194,26 @@ describe("SettingsModal", () => {
         {...filterProps}
         owners={["acme"]}
         availableRepos={[]}
-        value={{ orgs: { acme: [{ name: "nightly-e2e", required: false }, "lint"] }, repos: {} }}
+        value={{
+          orgs: { acme: [{ name: "nightly-e2e", required: false }, "lint"] },
+          repos: {},
+        }}
         onChange={onChange}
         open={true}
         onClose={vi.fn()}
       />,
     );
     selectSection("Tracked checks");
-    fireEvent.change(screen.getByRole("textbox", { name: "Check 1 for acme" }), {
-      target: { value: "nightly-e2e-v2" },
-    });
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Check 1 for acme" }),
+      {
+        target: { value: "nightly-e2e-v2" },
+      },
+    );
     expect(onChange).toHaveBeenLastCalledWith({
-      orgs: { acme: [{ name: "nightly-e2e-v2", required: false }, required("lint")] },
+      orgs: {
+        acme: [{ name: "nightly-e2e-v2", required: false }, required("lint")],
+      },
       repos: {},
     });
   });
@@ -217,10 +236,16 @@ describe("SettingsModal", () => {
     // Clearing the field is how a rename starts; the row has to survive it or
     // the user loses the control they were typing into.
     fireEvent.change(field, { target: { value: "" } });
-    expect(onChange).toHaveBeenLastCalledWith({ orgs: { acme: [] }, repos: {} });
+    expect(onChange).toHaveBeenLastCalledWith({
+      orgs: { acme: [] },
+      repos: {},
+    });
     expect(field).toBeInTheDocument();
     fireEvent.change(field, { target: { value: "ci" } });
-    expect(onChange).toHaveBeenLastCalledWith({ orgs: { acme: [required("ci")] }, repos: {} });
+    expect(onChange).toHaveBeenLastCalledWith({
+      orgs: { acme: [required("ci")] },
+      repos: {},
+    });
   });
 
   it("unticks a stored check without touching the others", () => {
@@ -237,9 +262,15 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Tracked checks");
-    fireEvent.click(screen.getByRole("checkbox", { name: "nightly-e2e is required for acme" }));
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "nightly-e2e is required for acme",
+      }),
+    );
     expect(onChange).toHaveBeenLastCalledWith({
-      orgs: { acme: [required("qa/smoke"), { name: "nightly-e2e", required: false }] },
+      orgs: {
+        acme: [required("qa/smoke"), { name: "nightly-e2e", required: false }],
+      },
       repos: {},
     });
   });
@@ -258,7 +289,9 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Tracked checks");
-    fireEvent.click(screen.getByRole("button", { name: "Remove qa/smoke from acme" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove qa/smoke from acme" }),
+    );
     expect(onChange).toHaveBeenLastCalledWith({
       orgs: { acme: [required("lint")] },
       repos: {},
@@ -283,11 +316,18 @@ describe("SettingsModal", () => {
     selectSection("Tracked checks");
     // One scope shows at a time, but the label still carries it: a bare "lint
     // is required" would say nothing about which list you just changed.
-    expect(screen.getByRole("checkbox", { name: "lint is required for acme" })).toBeChecked();
-    fireEvent.change(screen.getByRole("combobox", { name: "Tracked checks scope" }), {
-      target: { value: "owner:globex" },
-    });
-    expect(screen.getByRole("checkbox", { name: "lint is required for globex" })).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "lint is required for acme" }),
+    ).toBeChecked();
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Tracked checks scope" }),
+      {
+        target: { value: "owner:globex" },
+      },
+    );
+    expect(
+      screen.getByRole("checkbox", { name: "lint is required for globex" }),
+    ).toBeChecked();
   });
 
   it("takes checks for a repo override once a repo is picked", () => {
@@ -306,10 +346,15 @@ describe("SettingsModal", () => {
     fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
     fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "New check for acme/web" }), {
-      target: { value: "Automation Result" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Add check to acme/web" }));
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "New check for acme/web" }),
+      {
+        target: { value: "Automation Result" },
+      },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add check to acme/web" }),
+    );
     expect(onChange).toHaveBeenLastCalledWith({
       orgs: {},
       repos: { "acme/web": [required("Automation Result")] },
@@ -332,7 +377,10 @@ describe("SettingsModal", () => {
     fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
     fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
-    expect(onChange).toHaveBeenLastCalledWith({ orgs: {}, repos: { "acme/web": [] } });
+    expect(onChange).toHaveBeenLastCalledWith({
+      orgs: {},
+      repos: { "acme/web": [] },
+    });
   });
 
   it("stores a renamed check trimmed, and never twice under one name", () => {
@@ -371,21 +419,32 @@ describe("SettingsModal", () => {
       <SettingsModal
         {...filterProps}
         availableRepos={["acme/web", "beta/api"]}
-        value={{ orgs: {}, repos: { "acme/web": ["lint"], "beta/api": ["ci"] } }}
+        value={{
+          orgs: {},
+          repos: { "acme/web": ["lint"], "beta/api": ["ci"] },
+        }}
         onChange={onChange}
         open={true}
         onClose={vi.fn()}
       />,
     );
     selectSection("Tracked checks");
-    fireEvent.change(screen.getByRole("combobox", { name: "Tracked checks scope" }), {
-      target: { value: "repo:beta/api" },
-    });
-    fireEvent.click(screen.getByRole("checkbox", { name: "ci is required for beta/api" }));
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Tracked checks scope" }),
+      {
+        target: { value: "repo:beta/api" },
+      },
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "ci is required for beta/api" }),
+    );
     expect(onChange).toHaveBeenLastCalledWith({
       orgs: {},
       // acme/web was not touched, so it keeps the shape it was stored in.
-      repos: { "acme/web": ["lint"], "beta/api": [{ name: "ci", required: false }] },
+      repos: {
+        "acme/web": ["lint"],
+        "beta/api": [{ name: "ci", required: false }],
+      },
     });
   });
 
@@ -468,8 +527,12 @@ describe("SettingsModal", () => {
     const combobox = screen.getByRole("combobox", { name: "Repository" });
     // Focus opens the suggestion dropdown; empty input shows availableRepos
     fireEvent.focus(combobox);
-    expect(screen.getByRole("option", { name: "acme/web" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "beta/api" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "acme/web" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "beta/api" }),
+    ).toBeInTheDocument();
   });
 
   it("already-configured repo not in availableRepos is shown as the input value", () => {
@@ -490,14 +553,13 @@ describe("SettingsModal", () => {
     selectSection("Tracked checks");
     // A configured repo is a scope whether or not GitHub listed it, so it is
     // on the picker and the panel opens on it.
-    expect(screen.getByRole("option", { name: "legacy/repo (1)" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Check 1 for legacy/repo" })).toHaveValue("ci");
+    expect(
+      screen.getByRole("option", { name: "legacy/repo (1)" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Check 1 for legacy/repo" }),
+    ).toHaveValue("ci");
   });
-
-
-
-
-
 
   it("offers Add repository even when nothing has loaded", () => {
     render(
@@ -513,7 +575,9 @@ describe("SettingsModal", () => {
     selectSection("Tracked checks");
     // The combobox searches GitHub, so a repo can be configured before the
     // board has ever loaded one.
-    expect(screen.getByRole("button", { name: /add repository/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /add repository/i }),
+    ).toBeInTheDocument();
   });
 
   it("shows the Settings title", () => {
@@ -527,13 +591,27 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Settings" }),
+    ).toBeInTheDocument();
   });
 
   it.each([
     ["Show bot comments", "showBots", "onShowBotsChange", false, "Comments"],
-    ["Hide comments I reacted to", "hideReacted", "onHideReactedChange", true, "Comments"],
-    ["Auto refresh", "autoRefresh", "onAutoRefreshChange", false, "Auto refresh"],
+    [
+      "Hide comments I reacted to",
+      "hideReacted",
+      "onHideReactedChange",
+      true,
+      "Comments",
+    ],
+    [
+      "Auto refresh",
+      "autoRefresh",
+      "onAutoRefreshChange",
+      false,
+      "Auto refresh",
+    ],
   ] as const)(
     "%s checkbox reflects its prop and calls its setter",
     (label, propName, setterName, initial, section) => {
@@ -588,7 +666,9 @@ describe("SettingsModal", () => {
 
     it("shows only the selected section", () => {
       renderOpen();
-      expect(screen.getByRole("checkbox", { name: "Show bot comments" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("checkbox", { name: "Show bot comments" }),
+      ).toBeInTheDocument();
       expect(
         screen.queryByRole("combobox", { name: /auto refresh interval/i }),
       ).not.toBeInTheDocument();
@@ -656,7 +736,7 @@ describe("SettingsModal", () => {
     it("reopens on the first section after being closed elsewhere", () => {
       const props = {
         ...filterProps,
-                availableRepos: [],
+        availableRepos: [],
         value: emptyValue,
         onChange: vi.fn(),
         onClose: vi.fn(),
@@ -686,7 +766,9 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Auto refresh");
-    const select = screen.getByRole("combobox", { name: /auto refresh interval/i });
+    const select = screen.getByRole("combobox", {
+      name: /auto refresh interval/i,
+    });
     expect(select).toHaveValue(String(POLL_INTERVAL_OPTIONS[0].ms));
     for (const o of POLL_INTERVAL_OPTIONS) {
       expect(screen.getByRole("option", { name: o.label })).toBeInTheDocument();
@@ -759,8 +841,12 @@ describe("SettingsModal", () => {
     it("offers to ask the browser while the prompt is unanswered", () => {
       const onEnableNotifications = vi.fn();
       renderWithPermission("default", { onEnableNotifications });
-      expect(screen.getByText(/browser hasn't been asked yet/i)).toBeInTheDocument();
-      fireEvent.click(screen.getByRole("button", { name: /enable notifications/i }));
+      expect(
+        screen.getByText(/browser hasn't been asked yet/i),
+      ).toBeInTheDocument();
+      fireEvent.click(
+        screen.getByRole("button", { name: /enable notifications/i }),
+      );
       expect(onEnableNotifications).toHaveBeenCalled();
     });
 
@@ -788,7 +874,9 @@ describe("SettingsModal", () => {
       expect(
         screen.queryByText(/notifications are blocked in your browser/i),
       ).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole("button", { name: /send a test notification/i }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /send a test notification/i }),
+      );
       expect(onTestNotification).toHaveBeenCalled();
     });
 
@@ -819,7 +907,10 @@ describe("SettingsModal", () => {
         // said no — and that is the one with no button and no hint above.
         renderWithPermission(permission);
         const link = screen.getByRole("link", { name: /menu bar/i });
-        expect(link).toHaveAttribute("href", expect.stringContaining("menubar"));
+        expect(link).toHaveAttribute(
+          "href",
+          expect.stringContaining("menubar"),
+        );
       },
     );
 
@@ -834,6 +925,54 @@ describe("SettingsModal", () => {
         screen.queryByRole("button", { name: /send a test notification/i }),
       ).not.toBeInTheDocument();
     });
+  });
+});
+
+// The standing version of the same question. The one-off button above answers
+// it now; this decides whether PRison keeps asking on its own.
+describe("SettingsModal — the standing release check", () => {
+  const box = () =>
+    screen.getByRole("checkbox", { name: /tell me when a newer/i });
+
+  function renderAbout(
+    props: Partial<React.ComponentProps<typeof SettingsModal>> = {},
+  ) {
+    render(
+      <SettingsModal
+        {...filterProps}
+        availableRepos={[]}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open={true}
+        onClose={vi.fn()}
+        {...props}
+      />,
+    );
+    selectSection("About");
+  }
+
+  it("is off unless the setting says otherwise", () => {
+    renderAbout();
+    expect(box()).not.toBeChecked();
+  });
+
+  it("reports the setting it was given", () => {
+    renderAbout({ updateChecks: true });
+    expect(box()).toBeChecked();
+  });
+
+  it("hands the change up rather than keeping it", () => {
+    const onUpdateChecksChange = vi.fn();
+    renderAbout({ onUpdateChecksChange });
+    fireEvent.click(box());
+    expect(onUpdateChecksChange).toHaveBeenCalledWith(true);
+  });
+
+  it("says what switching it on costs, since nothing else will", () => {
+    // "It talks to GitHub" is the part a self-hoster wants in front of them
+    // before they tick the box, not after.
+    renderAbout();
+    expect(screen.getByText(/without your token/i)).toBeInTheDocument();
   });
 });
 
@@ -878,7 +1017,9 @@ describe("SettingsModal — check for updates", () => {
     // they did not ask.
     expect(fetchMock).not.toHaveBeenCalled();
     clickCheck();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/latest-release"));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/latest-release"),
+    );
   });
 
   it("says so when the running build is the latest release", async () => {
@@ -886,7 +1027,9 @@ describe("SettingsModal — check for updates", () => {
     stubRelease("v1.6.0");
     renderAbout();
     clickCheck();
-    expect(await screen.findByText("You're on the latest version.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("You're on the latest version."),
+    ).toBeInTheDocument();
   });
 
   it("links to the release page when a newer one exists", async () => {
@@ -894,7 +1037,9 @@ describe("SettingsModal — check for updates", () => {
     stubRelease("v1.6.0");
     renderAbout();
     clickCheck();
-    const link = await screen.findByRole("link", { name: "v1.6.0 is available" });
+    const link = await screen.findByRole("link", {
+      name: "v1.6.0 is available",
+    });
     expect(link).toHaveAttribute(
       "href",
       "https://github.com/mfozmen/PRison/releases/tag/v1.6.0",
@@ -908,19 +1053,26 @@ describe("SettingsModal — check for updates", () => {
     stubRelease("v1.6.0");
     renderAbout();
     clickCheck();
-    expect(await screen.findByRole("link", { name: "v1.6.0" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("link", { name: "v1.6.0" }),
+    ).toBeInTheDocument();
   });
 
   it("handles a repository with no published release", async () => {
     stubRelease(null);
     renderAbout();
     clickCheck();
-    expect(await screen.findByText("No published release yet.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("No published release yet."),
+    ).toBeInTheDocument();
   });
 
   it("says the check failed rather than claiming the build is current", async () => {
     // The dangerous failure mode is a silent one that reads as "up to date".
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 502 }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 502 }),
+    );
     renderAbout();
     clickCheck();
     expect(
@@ -944,7 +1096,7 @@ describe("SettingsModal — check for updates", () => {
     stubRelease("v1.6.0");
     const props = {
       ...filterProps,
-            availableRepos: [],
+      availableRepos: [],
       value: emptyValue,
       onChange: vi.fn(),
       onClose: vi.fn(),
@@ -952,13 +1104,19 @@ describe("SettingsModal — check for updates", () => {
     const { rerender } = render(<SettingsModal {...props} open={true} />);
     selectSection("About");
     clickCheck();
-    expect(await screen.findByText("You're on the latest version.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("You're on the latest version."),
+    ).toBeInTheDocument();
 
     rerender(<SettingsModal {...props} open={false} />);
     rerender(<SettingsModal {...props} open={true} />);
     selectSection("About");
-    expect(screen.queryByText("You're on the latest version.")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Check for updates" })).toBeInTheDocument();
+    expect(
+      screen.queryByText("You're on the latest version."),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Check for updates" }),
+    ).toBeInTheDocument();
   });
 
   it("announces the answer to a screen reader", async () => {
@@ -968,7 +1126,10 @@ describe("SettingsModal — check for updates", () => {
     clickCheck();
     // The button label doesn't change, so nothing else would announce it.
     const result = await screen.findByText("You're on the latest version.");
-    expect(result.closest("[aria-live]")).toHaveAttribute("aria-live", "polite");
+    expect(result.closest("[aria-live]")).toHaveAttribute(
+      "aria-live",
+      "polite",
+    );
   });
 });
 
@@ -994,16 +1155,23 @@ describe("SettingsModal — owner defaults cover the personal account", () => {
     renderTracked({ owners: ["octocat", "acme"] });
     expect(screen.getByRole("option", { name: "octocat" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "acme" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "New check for octocat" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "New check for octocat" }),
+    ).toBeInTheDocument();
   });
 
   it("stores a personal-account default under that login", () => {
     const onChange = vi.fn();
     renderTracked({ owners: ["octocat"], onChange });
-    fireEvent.change(screen.getByRole("textbox", { name: "New check for octocat" }), {
-      target: { value: "qa/smoke" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Add check to octocat" }));
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "New check for octocat" }),
+      {
+        target: { value: "qa/smoke" },
+      },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add check to octocat" }),
+    );
     // resolveTracked keys on the owner segment of `owner/repo`, so this is the
     // shape that makes octocat/anything pick the default up.
     expect(onChange).toHaveBeenCalledWith({
@@ -1014,7 +1182,9 @@ describe("SettingsModal — owner defaults cover the personal account", () => {
 
   it("says what an owner scope is for", () => {
     renderTracked({ owners: ["octocat"] });
-    expect(screen.getByText(/default for every repo this owner has/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/default for every repo this owner has/i),
+    ).toBeInTheDocument();
   });
 
   it("says there is nothing to configure when no owner has loaded", () => {
@@ -1086,7 +1256,9 @@ describe("SettingsModal — appearance", () => {
   it("renders each swatch under its own family and the current ground", () => {
     document.documentElement.dataset.mode = "dark";
     const { container } = renderAppearance();
-    const swatches = container.querySelectorAll("[aria-hidden='true'][data-theme]");
+    const swatches = container.querySelectorAll(
+      "[aria-hidden='true'][data-theme]",
+    );
     expect(
       Array.from(swatches).map((s) => [
         s.getAttribute("data-theme"),
@@ -1110,7 +1282,9 @@ describe("SettingsModal — appearance", () => {
 });
 
 describe("SettingsModal — ignored checks", () => {
-  const open = (props: Partial<React.ComponentProps<typeof SettingsModal>> = {}) =>
+  const open = (
+    props: Partial<React.ComponentProps<typeof SettingsModal>> = {},
+  ) =>
     render(
       <SettingsModal
         {...filterProps}
@@ -1128,7 +1302,9 @@ describe("SettingsModal — ignored checks", () => {
 
   it("has its own section, apart from tracked checks", () => {
     open();
-    expect(screen.getByRole("tab", { name: "Ignored checks" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: "Ignored checks" }),
+    ).toBeInTheDocument();
   });
 
   // Ignoring starts on the board. The panel is where you find out what you did
@@ -1144,8 +1320,12 @@ describe("SettingsModal — ignored checks", () => {
     selectSection("Ignored checks");
     // The picker names the repo and says how much it ignores; the panel opens
     // on it, because it is the only scope holding anything.
-    expect(screen.getByRole("option", { name: "acme/web (1)" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Ignored check 1 for acme/web")).toHaveValue("flaky-e2e");
+    expect(
+      screen.getByRole("option", { name: "acme/web (1)" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Ignored check 1 for acme/web")).toHaveValue(
+      "flaky-e2e",
+    );
   });
 
   it("stops ignoring a check when its row is removed", () => {
@@ -1155,21 +1335,34 @@ describe("SettingsModal — ignored checks", () => {
       onIgnoredChange,
     });
     selectSection("Ignored checks");
-    fireEvent.click(screen.getByRole("button", { name: "Remove flaky-e2e from acme/web" }));
-    expect(onIgnoredChange).toHaveBeenCalledWith({ orgs: {}, repos: { "acme/web": ["nightly"] } });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove flaky-e2e from acme/web" }),
+    );
+    expect(onIgnoredChange).toHaveBeenCalledWith({
+      orgs: {},
+      repos: { "acme/web": ["nightly"] },
+    });
   });
 
   it("drops the repo entirely once its last ignored check goes", () => {
     const onIgnoredChange = vi.fn();
-    open({ ignored: { orgs: {}, repos: { "acme/web": ["flaky-e2e"] } }, onIgnoredChange });
+    open({
+      ignored: { orgs: {}, repos: { "acme/web": ["flaky-e2e"] } },
+      onIgnoredChange,
+    });
     selectSection("Ignored checks");
-    fireEvent.click(screen.getByRole("button", { name: "Remove flaky-e2e from acme/web" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove flaky-e2e from acme/web" }),
+    );
     expect(onIgnoredChange).toHaveBeenCalledWith({ orgs: {}, repos: {} });
   });
 
   it("renames an ignored check in place", () => {
     const onIgnoredChange = vi.fn();
-    open({ ignored: { orgs: {}, repos: { "acme/web": ["flaky-e2e"] } }, onIgnoredChange });
+    open({
+      ignored: { orgs: {}, repos: { "acme/web": ["flaky-e2e"] } },
+      onIgnoredChange,
+    });
     selectSection("Ignored checks");
     fireEvent.change(screen.getByLabelText("Ignored check 1 for acme/web"), {
       target: { value: "flaky-e2e-v2" },
@@ -1184,7 +1377,10 @@ describe("SettingsModal — ignored checks", () => {
   // is the only place to say it before the board has ever drawn the chip.
   it("leaves the other names alone while one is renamed", () => {
     const onIgnoredChange = vi.fn();
-    open({ ignored: { orgs: {}, repos: { "acme/web": ["flaky", "nightly"] } }, onIgnoredChange });
+    open({
+      ignored: { orgs: {}, repos: { "acme/web": ["flaky", "nightly"] } },
+      onIgnoredChange,
+    });
     selectSection("Ignored checks");
     fireEvent.change(screen.getByLabelText("Ignored check 1 for acme/web"), {
       target: { value: "flaky-v2" },
@@ -1240,13 +1436,21 @@ describe("SettingsModal — ignored checks", () => {
     fireEvent.change(screen.getByLabelText("New ignored check for acme"), {
       target: { value: "nightly-e2e" },
     });
-    fireEvent.keyDown(screen.getByLabelText("New ignored check for acme"), { key: "Enter" });
-    expect(onIgnoredChange).toHaveBeenCalledWith({ orgs: { acme: ["nightly-e2e"] }, repos: {} });
+    fireEvent.keyDown(screen.getByLabelText("New ignored check for acme"), {
+      key: "Enter",
+    });
+    expect(onIgnoredChange).toHaveBeenCalledWith({
+      orgs: { acme: ["nightly-e2e"] },
+      repos: {},
+    });
   });
 
   it("refuses a blank name and one already on the list", () => {
     const onIgnoredChange = vi.fn();
-    open({ ignored: { orgs: { acme: ["nightly"] }, repos: {} }, onIgnoredChange });
+    open({
+      ignored: { orgs: { acme: ["nightly"] }, repos: {} },
+      onIgnoredChange,
+    });
     selectSection("Ignored checks");
     fireEvent.click(screen.getByRole("button", { name: "Ignore for acme" }));
     fireEvent.change(screen.getByLabelText("New ignored check for acme"), {
@@ -1259,15 +1463,26 @@ describe("SettingsModal — ignored checks", () => {
   it("keeps each scope's list to itself", () => {
     const onIgnoredChange = vi.fn();
     open({
-      ignored: { orgs: { acme: ["owner-wide"] }, repos: { "acme/web": ["repo-only"] } },
+      ignored: {
+        orgs: { acme: ["owner-wide"] },
+        repos: { "acme/web": ["repo-only"] },
+      },
       onIgnoredChange,
     });
     selectSection("Ignored checks");
-    fireEvent.change(screen.getByRole("combobox", { name: "Ignored checks scope" }), {
-      target: { value: "repo:acme/web" },
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Ignored checks scope" }),
+      {
+        target: { value: "repo:acme/web" },
+      },
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove repo-only from acme/web" }),
+    );
+    expect(onIgnoredChange).toHaveBeenCalledWith({
+      orgs: { acme: ["owner-wide"] },
+      repos: {},
     });
-    fireEvent.click(screen.getByRole("button", { name: "Remove repo-only from acme/web" }));
-    expect(onIgnoredChange).toHaveBeenCalledWith({ orgs: { acme: ["owner-wide"] }, repos: {} });
   });
 });
 
@@ -1276,7 +1491,9 @@ describe("SettingsModal — ignored checks", () => {
 // height of one list however many scopes there are. Both check panels use it,
 // so learning it once is enough.
 describe("SettingsModal — scope picker", () => {
-  const openTracked = (props: Partial<React.ComponentProps<typeof SettingsModal>> = {}) => {
+  const openTracked = (
+    props: Partial<React.ComponentProps<typeof SettingsModal>> = {},
+  ) => {
     render(
       <SettingsModal
         {...filterProps}
@@ -1293,26 +1510,42 @@ describe("SettingsModal — scope picker", () => {
   };
 
   const pick = (label: string, value: string) =>
-    fireEvent.change(screen.getByRole("combobox", { name: label }), { target: { value } });
+    fireEvent.change(screen.getByRole("combobox", { name: label }), {
+      target: { value },
+    });
 
   it("shows one scope's checks, not every scope's at once", () => {
-    openTracked({ value: { orgs: { acme: ["lint"], beta: ["ci"] }, repos: {} } });
-    expect(screen.getByRole("textbox", { name: "Check 1 for acme" })).toHaveValue("lint");
-    expect(screen.queryByRole("textbox", { name: "Check 1 for beta" })).not.toBeInTheDocument();
+    openTracked({
+      value: { orgs: { acme: ["lint"], beta: ["ci"] }, repos: {} },
+    });
+    expect(
+      screen.getByRole("textbox", { name: "Check 1 for acme" }),
+    ).toHaveValue("lint");
+    expect(
+      screen.queryByRole("textbox", { name: "Check 1 for beta" }),
+    ).not.toBeInTheDocument();
   });
 
   it("swaps the list when another scope is picked", () => {
-    openTracked({ value: { orgs: { acme: ["lint"], beta: ["ci"] }, repos: {} } });
+    openTracked({
+      value: { orgs: { acme: ["lint"], beta: ["ci"] }, repos: {} },
+    });
     pick("Tracked checks scope", "owner:beta");
-    expect(screen.getByRole("textbox", { name: "Check 1 for beta" })).toHaveValue("ci");
-    expect(screen.queryByRole("textbox", { name: "Check 1 for acme" })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Check 1 for beta" }),
+    ).toHaveValue("ci");
+    expect(
+      screen.queryByRole("textbox", { name: "Check 1 for acme" }),
+    ).not.toBeInTheDocument();
   });
 
   // Opening on an empty owner default would hide the one repo the user
   // actually configured behind a picker they haven't noticed yet.
   it("opens on the first scope that has something configured", () => {
     openTracked({ value: { orgs: {}, repos: { "beta/api": ["ci"] } } });
-    expect(screen.getByRole("textbox", { name: "Check 1 for beta/api" })).toHaveValue("ci");
+    expect(
+      screen.getByRole("textbox", { name: "Check 1 for beta/api" }),
+    ).toHaveValue("ci");
   });
 
   it("offers every owner and every configured repo", () => {
@@ -1326,7 +1559,9 @@ describe("SettingsModal — scope picker", () => {
   // The stacked lists said at a glance which scope held something; the picker
   // has to keep saying it, or a configured repo hides behind a name.
   it("says how much each scope holds", () => {
-    openTracked({ value: { orgs: { acme: ["lint", "ci"] }, repos: { "beta/api": ["qa"] } } });
+    openTracked({
+      value: { orgs: { acme: ["lint", "ci"] }, repos: { "beta/api": ["qa"] } },
+    });
     const labels = screen.getAllByRole("option").map((o) => o.textContent);
     expect(labels).toEqual(["acme (2)", "beta", "beta/api (1)"]);
   });
@@ -1337,7 +1572,10 @@ describe("SettingsModal — scope picker", () => {
     fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
     fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
-    expect(onChange).toHaveBeenLastCalledWith({ orgs: {}, repos: { "acme/web": [] } });
+    expect(onChange).toHaveBeenLastCalledWith({
+      orgs: {},
+      repos: { "acme/web": [] },
+    });
     expect(
       screen.getByRole("textbox", { name: "New check for acme/web" }),
     ).toBeInTheDocument();
@@ -1347,7 +1585,10 @@ describe("SettingsModal — scope picker", () => {
   // when it has scrolled out of mind — it must not read as starting over.
   it("keeps a repo's checks when it is picked again", () => {
     const onChange = vi.fn();
-    openTracked({ value: { orgs: {}, repos: { "acme/web": ["lint"] } }, onChange });
+    openTracked({
+      value: { orgs: {}, repos: { "acme/web": ["lint"] } },
+      onChange,
+    });
     fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
     fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
@@ -1362,7 +1603,9 @@ describe("SettingsModal — scope picker", () => {
     const addAcmeWeb = () => {
       fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
       fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
-      fireEvent.mouseDown(screen.getAllByRole("option", { name: "acme/web" }).slice(-1)[0]);
+      fireEvent.mouseDown(
+        screen.getAllByRole("option", { name: "acme/web" }).slice(-1)[0],
+      );
     };
     addAcmeWeb();
     addAcmeWeb();
@@ -1373,7 +1616,9 @@ describe("SettingsModal — scope picker", () => {
     openTracked();
     fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
     fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
-    expect(screen.queryByRole("combobox", { name: "Repository" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("combobox", { name: "Repository" }),
+    ).not.toBeInTheDocument();
   });
 
   it("clears a repo's whole ignore list from its scope", () => {
@@ -1393,7 +1638,9 @@ describe("SettingsModal — scope picker", () => {
     );
     selectSection("Ignored checks");
     fireEvent.click(
-      screen.getByRole("button", { name: "Stop ignoring everything for acme/web" }),
+      screen.getByRole("button", {
+        name: "Stop ignoring everything for acme/web",
+      }),
     );
     expect(onIgnoredChange).toHaveBeenCalledWith({ orgs: {}, repos: {} });
   });
@@ -1422,7 +1669,9 @@ describe("SettingsModal — scope picker", () => {
     fireEvent.change(screen.getByLabelText("New ignored check for acme/web"), {
       target: { value: "nightly-e2e" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Ignore for acme/web" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ignore for acme/web" }),
+    );
     expect(onIgnoredChange).toHaveBeenCalledWith({
       orgs: {},
       repos: { "acme/web": ["nightly-e2e"] },
@@ -1435,9 +1684,9 @@ describe("SettingsModal — scope picker", () => {
     openTracked();
     const groups = (label: string) =>
       Array.from(
-        (screen.getByRole("combobox", { name: label }) as HTMLSelectElement).querySelectorAll(
-          "optgroup",
-        ),
+        (
+          screen.getByRole("combobox", { name: label }) as HTMLSelectElement
+        ).querySelectorAll("optgroup"),
       ).map((g) => g.label);
     expect(groups("Tracked checks scope")).toContain("Owner defaults");
     selectSection("Ignored checks");
@@ -1446,10 +1695,14 @@ describe("SettingsModal — scope picker", () => {
 
   it("puts focus back on the picker after removing a scope", () => {
     openTracked({ value: { orgs: {}, repos: { "acme/web": ["lint"] } } });
-    fireEvent.click(screen.getByRole("button", { name: "Remove acme/web override" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove acme/web override" }),
+    );
     // The button unmounts with the scope it removed; focus has to land
     // somewhere, and the picker is where the work continues.
-    expect(screen.getByRole("combobox", { name: "Tracked checks scope" })).toHaveFocus();
+    expect(
+      screen.getByRole("combobox", { name: "Tracked checks scope" }),
+    ).toHaveFocus();
   });
 
   // Emptying a list row by row is not a request to go somewhere else. The
@@ -1457,7 +1710,10 @@ describe("SettingsModal — scope picker", () => {
   // scope-level Remove — moves the view.
   it("stays on the scope it opened on once its last name is removed", () => {
     const onIgnoredChange = vi.fn();
-    const props = (ignored: { orgs: Record<string, string[]>; repos: Record<string, string[]> }) => (
+    const props = (ignored: {
+      orgs: Record<string, string[]>;
+      repos: Record<string, string[]>;
+    }) => (
       <SettingsModal
         {...filterProps}
         owners={owners}
@@ -1470,11 +1726,17 @@ describe("SettingsModal — scope picker", () => {
         onIgnoredChange={onIgnoredChange}
       />
     );
-    const { rerender } = render(props({ orgs: {}, repos: { "acme/web": ["flaky"] } }));
+    const { rerender } = render(
+      props({ orgs: {}, repos: { "acme/web": ["flaky"] } }),
+    );
     selectSection("Ignored checks");
-    fireEvent.click(screen.getByRole("button", { name: "Remove flaky from acme/web" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove flaky from acme/web" }),
+    );
     rerender(props({ orgs: {}, repos: {} }));
-    expect(screen.getByLabelText("New ignored check for acme/web")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("New ignored check for acme/web"),
+    ).toBeInTheDocument();
   });
 
   it("drops a repo's checks when its scope is removed, and falls back", () => {
@@ -1503,11 +1765,15 @@ describe("SettingsModal — scope picker", () => {
     }
     render(<Harness />);
     selectSection("Tracked checks");
-    fireEvent.click(screen.getByRole("button", { name: "Remove acme/web override" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove acme/web override" }),
+    );
     expect(onChange).toHaveBeenLastCalledWith({ orgs: {}, repos: {} });
     // The scope goes with the checks, so the panel has to land somewhere: the
     // first owner, which is what a repo with no override falls back to anyway.
-    expect(screen.getByRole("textbox", { name: "New check for acme" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "New check for acme" }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("option", { name: /^acme\/web/ }),
     ).not.toBeInTheDocument();
@@ -1515,7 +1781,9 @@ describe("SettingsModal — scope picker", () => {
 
   it("offers no remove button on an owner scope", () => {
     openTracked({ value: { orgs: { acme: ["lint"] }, repos: {} } });
-    expect(screen.queryByRole("button", { name: /remove .* override/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /remove .* override/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("uses the same picker for ignored checks", () => {
@@ -1533,8 +1801,12 @@ describe("SettingsModal — scope picker", () => {
       />,
     );
     selectSection("Ignored checks");
-    expect(screen.getByLabelText("Ignored check 1 for beta")).toHaveValue("nightly");
+    expect(screen.getByLabelText("Ignored check 1 for beta")).toHaveValue(
+      "nightly",
+    );
     pick("Ignored checks scope", "owner:acme");
-    expect(screen.getByLabelText("New ignored check for acme")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("New ignored check for acme"),
+    ).toBeInTheDocument();
   });
 });

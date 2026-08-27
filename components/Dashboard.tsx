@@ -110,6 +110,13 @@ const DRAFT_FILTERS: { value: DraftFilter; label: string }[] = [
 
 /** The clock time a spent budget returns at, in the reader's own timezone —
  * "at 13:56" is the answer; an ISO string in UTC is a second puzzle. */
+/** A header's number, or null when the header wasn't there to read. */
+function number(header: string | null | undefined): number | null {
+  if (header === null || header === undefined) return null;
+  const value = Number(header);
+  return Number.isFinite(value) ? value : null;
+}
+
 function budgetTime(iso: string): string {
   const at = new Date(iso);
   return Number.isNaN(at.getTime())
@@ -235,13 +242,13 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         }) => {
           if (r.status === 429)
             spent = r.headers?.get?.("X-RateLimit-Reset") ?? null;
-          const priced = Number(r.headers?.get?.("X-Cost"));
-          const left = Number(r.headers?.get?.("X-Budget-Remaining"));
-          if (Number.isFinite(priced)) cost += priced;
-          if (
-            Number.isFinite(left) &&
-            r.headers?.get?.("X-Budget-Remaining") !== null
-          ) {
+          // A missing header is not a zero: Number(null) is 0, and a route
+          // that never priced itself would otherwise report a free refresh
+          // and an allowance of nothing.
+          const priced = number(r.headers?.get?.("X-Cost"));
+          const left = number(r.headers?.get?.("X-Budget-Remaining"));
+          if (priced !== null) cost += priced;
+          if (left !== null) {
             remaining = remaining === null ? left : Math.min(remaining, left);
           }
           resetAt = r.headers?.get?.("X-Budget-Reset") ?? resetAt;

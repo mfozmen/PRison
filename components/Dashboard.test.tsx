@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { StrictMode } from "react";
-import { render, screen, waitFor, fireEvent, within, act } from "@testing-library/react";
+import {
+  render,
+  screen,
+  waitFor,
+  fireEvent,
+  within,
+  act,
+} from "@testing-library/react";
 import { Dashboard } from "./Dashboard";
 import { closedPr, stubNotification } from "@/lib/fixtures";
 import { POLL_INTERVAL_OPTIONS, DEFAULT_POLL_INTERVAL_MS } from "@/lib/notify";
@@ -27,7 +34,12 @@ const STUCK_PR = {
   stuckSince: "2026-06-20T00:00:00Z",
 };
 
-const DRAFT_STUCK_PR = { ...STUCK_PR, id: "draft-stuck", title: "draft stuck pr", isDraft: true };
+const DRAFT_STUCK_PR = {
+  ...STUCK_PR,
+  id: "draft-stuck",
+  title: "draft stuck pr",
+  isDraft: true,
+};
 
 const REVIEW_PR = {
   id: "9",
@@ -40,7 +52,12 @@ const REVIEW_PR = {
   requestedAt: "2026-06-22T00:00:00Z",
 };
 
-const DRAFT_REVIEW_PR = { ...REVIEW_PR, id: "draft-review", title: "draft review pr", isDraft: true };
+const DRAFT_REVIEW_PR = {
+  ...REVIEW_PR,
+  id: "draft-review",
+  title: "draft review pr",
+  isDraft: true,
+};
 
 const READY_PR = {
   id: "r1",
@@ -123,14 +140,14 @@ function okFetch() {
           url.includes("reviewed")
             ? []
             : url.includes("closed")
-            ? []
-            : url.includes("pr-comments")
               ? []
-              : url.includes("ready")
-                ? [READY_PR]
-                : url.includes("stuck")
-                  ? [STUCK_PR]
-                  : [REVIEW_PR],
+              : url.includes("pr-comments")
+                ? []
+                : url.includes("ready")
+                  ? [READY_PR]
+                  : url.includes("stuck")
+                    ? [STUCK_PR]
+                    : [REVIEW_PR],
         ),
     }),
   ) as unknown as typeof fetch;
@@ -147,14 +164,14 @@ function fetchWithComments(comments: unknown[]) {
           url.includes("reviewed")
             ? []
             : url.includes("closed")
-            ? []
-            : url.includes("pr-comments")
-              ? comments
-              : url.includes("ready")
-                ? []
-                : url.includes("stuck")
-                  ? [STUCK_PR]
-                  : [],
+              ? []
+              : url.includes("pr-comments")
+                ? comments
+                : url.includes("ready")
+                  ? []
+                  : url.includes("stuck")
+                    ? [STUCK_PR]
+                    : [],
         ),
     }),
   ) as unknown as typeof fetch;
@@ -164,14 +181,21 @@ function partialFetch() {
   return vi.fn((url: string) =>
     Promise.resolve({
       ok: true,
-      headers: { get: (h: string) => (url.includes("stuck") && h === "X-Partial" ? "1" : null) },
+      headers: {
+        get: (h: string) =>
+          url.includes("stuck") && h === "X-Partial" ? "1" : null,
+      },
       json: () =>
         Promise.resolve(
           url.includes("reviewed")
             ? []
             : url.includes("closed")
-            ? []
-            : url.includes("ready") ? [READY_PR] : url.includes("stuck") ? [STUCK_PR] : [REVIEW_PR],
+              ? []
+              : url.includes("ready")
+                ? [READY_PR]
+                : url.includes("stuck")
+                  ? [STUCK_PR]
+                  : [REVIEW_PR],
         ),
     }),
   ) as unknown as typeof fetch;
@@ -204,10 +228,10 @@ function fetchWithClosed(closed: unknown[]) {
           url.includes("reviewed")
             ? []
             : url.includes("closed")
-            ? closed
-            : url.includes("stuck")
-              ? [STUCK_PR]
-              : [],
+              ? closed
+              : url.includes("stuck")
+                ? [STUCK_PR]
+                : [],
         ),
     }),
   ) as unknown as typeof fetch;
@@ -239,7 +263,9 @@ describe("Dashboard", () => {
   it("scopes the fetch and persists when an org is selected", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "beta" } });
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "beta" },
+    });
     await waitFor(() =>
       expect(localStorage.getItem("prison.org")).toBe("beta"),
     );
@@ -254,7 +280,9 @@ describe("Dashboard", () => {
       const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
       expect(calls.some((c) => String(c[0]).includes("org=beta"))).toBe(true);
     });
-    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("beta");
+    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe(
+      "beta",
+    );
   });
 
   // The menu-bar plugin has no browser and so no localStorage. One schedule
@@ -264,9 +292,12 @@ describe("Dashboard", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     openSettings("Auto refresh");
-    fireEvent.change(screen.getByRole("combobox", { name: /auto refresh interval/i }), {
-      target: { value: String(POLL_INTERVAL_OPTIONS[0].ms) },
-    });
+    fireEvent.change(
+      screen.getByRole("combobox", { name: /auto refresh interval/i }),
+      {
+        target: { value: String(POLL_INTERVAL_OPTIONS[0].ms) },
+      },
+    );
     await waitFor(() => {
       const put = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
         (call) =>
@@ -292,12 +323,15 @@ describe("Dashboard", () => {
     );
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     openSettings("Auto refresh");
-    fireEvent.change(screen.getByRole("combobox", { name: /auto refresh interval/i }), {
-      target: { value: String(POLL_INTERVAL_OPTIONS[0].ms) },
-    });
+    fireEvent.change(
+      screen.getByRole("combobox", { name: /auto refresh interval/i }),
+      {
+        target: { value: String(POLL_INTERVAL_OPTIONS[0].ms) },
+      },
+    );
     await waitFor(() => {
-      const puts = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.filter((call) =>
-        String(call[0]).includes("/api/poll-interval"),
+      const puts = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
+        (call) => String(call[0]).includes("/api/poll-interval"),
       );
       expect(puts).toHaveLength(1);
     });
@@ -306,12 +340,15 @@ describe("Dashboard", () => {
   it("does not announce an interval it only just read back from storage", async () => {
     // A page that re-posts its own stored value on every load writes for
     // nothing, and would overwrite a newer choice made in another tab.
-    localStorage.setItem("prison.pollInterval", String(POLL_INTERVAL_OPTIONS[1].ms));
+    localStorage.setItem(
+      "prison.pollInterval",
+      String(POLL_INTERVAL_OPTIONS[1].ms),
+    );
     global.fetch = okFetch();
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    const puts = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) =>
-      String(url).includes("/api/poll-interval"),
+    const puts = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
+      ([url]) => String(url).includes("/api/poll-interval"),
     );
     expect(puts).toHaveLength(0);
   });
@@ -336,12 +373,33 @@ describe("Dashboard", () => {
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText(/nothing ready to merge/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/nothing ready to merge/i),
+    ).toBeInTheDocument();
     openSettings("Auto refresh");
     // Six endpoints at ten points each, and the smallest remaining is the one
     // that saw the account last.
     expect(await screen.findByText(/60 points/i)).toBeInTheDocument();
     expect(screen.getByText(/4,200|4200/)).toBeInTheDocument();
+  });
+
+  it("says nothing about a price it cannot read", async () => {
+    // Header values arrive as text. One that isn't a number is not a cost of
+    // NaN — it is no answer at all, and the panel should stay quiet.
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        headers: { get: (h: string) => (h === "X-Cost" ? "plenty" : null) },
+        json: () => Promise.resolve([]),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(
+      await screen.findByText(/nothing ready to merge/i),
+    ).toBeInTheDocument();
+    openSettings("Auto refresh");
+    expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/points/i)).not.toBeInTheDocument();
   });
 
   it("warns while there is still budget left to save", async () => {
@@ -375,12 +433,17 @@ describe("Dashboard", () => {
       Promise.resolve({
         ok: false,
         status: 429,
-        headers: { get: (h: string) => (h === "X-RateLimit-Reset" ? "2026-08-27T10:56:46.000Z" : null) },
+        headers: {
+          get: (h: string) =>
+            h === "X-RateLimit-Reset" ? "2026-08-27T10:56:46.000Z" : null,
+        },
         json: () => Promise.resolve([]),
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    const banner = await screen.findByText(/github's api budget for this account is spent/i);
+    const banner = await screen.findByText(
+      /github's api budget for this account is spent/i,
+    );
     expect(banner).toBeInTheDocument();
     // The time is the whole point — "try later" is what we already knew.
     // The clock is the reader's own — the shape depends on their locale and
@@ -405,23 +468,36 @@ describe("Dashboard", () => {
         Promise.resolve({
           ok: false,
           status: 429,
-          headers: { get: (h: string) => (h === "X-RateLimit-Reset" ? reset : null) },
+          headers: {
+            get: (h: string) => (h === "X-RateLimit-Reset" ? reset : null),
+          },
           json: () => Promise.resolve([]),
         }),
       ) as unknown as typeof fetch;
       const view = render(<Dashboard orgs={ORGS} login="testuser" />);
-      const banner = await screen.findByText(/github's api budget for this account is spent/i);
-      expect(banner.textContent).toMatch(reset ? /the top of the hour/ : /spent\. Retrying/);
+      const banner = await screen.findByText(
+        /github's api budget for this account is spent/i,
+      );
+      expect(banner.textContent).toMatch(
+        reset ? /the top of the hour/ : /spent\. Retrying/,
+      );
       view.unmount();
     }
   });
 
   it("says nothing about the budget when the failure is anything else", async () => {
     global.fetch = vi.fn(() =>
-      Promise.resolve({ ok: false, status: 500, headers: { get: () => null }, json: () => Promise.resolve([]) }),
+      Promise.resolve({
+        ok: false,
+        status: 500,
+        headers: { get: () => null },
+        json: () => Promise.resolve([]),
+      }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText(/failed to load stuck prs/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/failed to load stuck prs/i),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/api budget/i)).not.toBeInTheDocument();
   });
 
@@ -431,7 +507,10 @@ describe("Dashboard", () => {
         ? Promise.reject(new Error("network error"))
         : url.includes("ready")
           ? Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
-          : Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) }),
+          : Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve([REVIEW_PR]),
+            }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("review pr")).toBeInTheDocument();
@@ -442,13 +521,22 @@ describe("Dashboard", () => {
   it("shows an error banner on a non-ok stuck response", async () => {
     global.fetch = vi.fn((url: string) =>
       url.includes("stuck")
-        ? Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve([]) })
+        ? Promise.resolve({
+            ok: false,
+            status: 500,
+            json: () => Promise.resolve([]),
+          })
         : url.includes("ready")
           ? Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
-          : Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) }),
+          : Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve([REVIEW_PR]),
+            }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText(/failed to load stuck prs/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/failed to load stuck prs/i),
+    ).toBeInTheDocument();
   });
 
   it("shows an error banner when the review fetch fails", async () => {
@@ -457,11 +545,16 @@ describe("Dashboard", () => {
         ? Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
         : url.includes("review")
           ? Promise.reject(new Error("network error"))
-          : Promise.resolve({ ok: true, json: () => Promise.resolve([STUCK_PR]) }),
+          : Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve([STUCK_PR]),
+            }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    expect(screen.getByText(/failed to load review requests/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/failed to load review requests/i),
+    ).toBeInTheDocument();
   });
 
   it("recovers when retry is clicked after an error", async () => {
@@ -473,16 +566,24 @@ describe("Dashboard", () => {
       if (url.includes("stuck")) {
         return fail
           ? Promise.reject(new Error("network error"))
-          : Promise.resolve({ ok: true, json: () => Promise.resolve([STUCK_PR]) });
+          : Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve([STUCK_PR]),
+            });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) });
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([REVIEW_PR]),
+      });
     }) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
     const retry = await screen.findByRole("button", { name: /retry/i });
     fail = false;
     fireEvent.click(retry);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    expect(screen.queryByText(/failed to load stuck prs/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/failed to load stuck prs/i),
+    ).not.toBeInTheDocument();
   });
 
   it("shows the loading indicator while a fetch is in flight", async () => {
@@ -494,7 +595,10 @@ describe("Dashboard", () => {
           })
         : url.includes("ready")
           ? Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
-          : Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) }),
+          : Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve([REVIEW_PR]),
+            }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText(/loading/i)).toBeInTheDocument();
@@ -514,7 +618,9 @@ describe("Dashboard", () => {
             resolve({
               ok: true,
               json: () =>
-                Promise.resolve([{ ...STUCK_PR, id: key, title: `stuck-${key}` }]),
+                Promise.resolve([
+                  { ...STUCK_PR, id: key, title: `stuck-${key}` },
+                ]),
             });
         });
       }
@@ -524,7 +630,9 @@ describe("Dashboard", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     // The "All" stuck fetch is in flight; switch to beta before it resolves.
     await waitFor(() => expect(resolvers["all"]).toBeDefined());
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "beta" } });
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "beta" },
+    });
     await waitFor(() => expect(resolvers["beta"]).toBeDefined());
 
     resolvers["beta"]();
@@ -538,17 +646,21 @@ describe("Dashboard", () => {
   it("selecting the personal option fetches with ?user= and persists", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "testuser" } });
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "testuser" },
+    });
     await waitFor(() =>
       expect(localStorage.getItem("prison.org")).toBe("testuser"),
     );
     const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
     // Some call after the change must use user=testuser
-    expect(calls.some((c) => String(c[0]).includes("user=testuser"))).toBe(true);
+    expect(calls.some((c) => String(c[0]).includes("user=testuser"))).toBe(
+      true,
+    );
     // No call that includes "testuser" should use org= (must use user=)
-    expect(
-      calls.every((c) => !String(c[0]).includes("org=testuser")),
-    ).toBe(true);
+    expect(calls.every((c) => !String(c[0]).includes("org=testuser"))).toBe(
+      true,
+    );
   });
 
   it("hydrates the persisted personal selection", async () => {
@@ -556,15 +668,23 @@ describe("Dashboard", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     await waitFor(() => {
       const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
-      expect(calls.some((c) => String(c[0]).includes("user=testuser"))).toBe(true);
+      expect(calls.some((c) => String(c[0]).includes("user=testuser"))).toBe(
+        true,
+      );
     });
-    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("testuser");
+    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe(
+      "testuser",
+    );
   });
 
   it("encodes the org name in the request URLs", async () => {
-    render(<Dashboard orgs={[{ login: "a b", avatarUrl: "x" }]} login="testuser" />);
+    render(
+      <Dashboard orgs={[{ login: "a b", avatarUrl: "x" }]} login="testuser" />,
+    );
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "a b" } });
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "a b" },
+    });
     await waitFor(() => {
       const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
       expect(calls.some((c) => String(c[0]).includes("org=a%20b"))).toBe(true);
@@ -588,7 +708,11 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("ready") ? [] : url.includes("stuck") ? [PENDING_PR] : [REVIEW_PR],
+            url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [PENDING_PR]
+                : [REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
@@ -608,7 +732,11 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("ready") ? [] : url.includes("stuck") ? [MANY_PR] : [REVIEW_PR],
+            url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [MANY_PR]
+                : [REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
@@ -636,7 +764,11 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("ready") ? [] : url.includes("stuck") ? [FOUR_FAILING_PR] : [REVIEW_PR],
+            url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [FOUR_FAILING_PR]
+                : [REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
@@ -661,7 +793,11 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("ready") ? [] : url.includes("stuck") ? [LOPSIDED_PR] : [REVIEW_PR],
+            url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [LOPSIDED_PR]
+                : [REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
@@ -688,12 +824,18 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("ready") ? [] : url.includes("stuck") ? [NO_NAMES_PR] : [REVIEW_PR],
+            url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [NO_NAMES_PR]
+                : [REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("3 failing · 2 pending")).toBeInTheDocument();
+    expect(
+      await screen.findByText("3 failing · 2 pending"),
+    ).toBeInTheDocument();
   });
 
   it("blocked-no-checks PR shows the inline note detail", async () => {
@@ -712,12 +854,20 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("ready") ? [] : url.includes("stuck") ? [BLOCKED_NO_CHECKS_PR] : [REVIEW_PR],
+            url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [BLOCKED_NO_CHECKS_PR]
+                : [REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("Some required checks run on GitHub and aren't shown here.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "Some required checks run on GitHub and aren't shown here.",
+      ),
+    ).toBeInTheDocument();
     // The blocked PR still appears in the list (its title row is rendered)
     expect(screen.getByText("stuck pr")).toBeInTheDocument();
   });
@@ -741,7 +891,11 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("ready") ? [] : url.includes("stuck") ? [REVIEW_REQUIRED_PR] : [REVIEW_PR],
+            url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [REVIEW_REQUIRED_PR]
+                : [REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
@@ -749,7 +903,9 @@ describe("Dashboard", () => {
     expect(await screen.findByText("Review required")).toBeInTheDocument();
     // The misleading "required checks" note must NOT be shown — the blocker is review, not CI.
     expect(
-      screen.queryByText("Some required checks run on GitHub and aren't shown here."),
+      screen.queryByText(
+        "Some required checks run on GitHub and aren't shown here.",
+      ),
     ).not.toBeInTheDocument();
   });
 
@@ -772,7 +928,11 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("ready") ? [] : url.includes("stuck") ? [CHANGES_REQUESTED_PR] : [REVIEW_PR],
+            url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [CHANGES_REQUESTED_PR]
+                : [REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
@@ -800,7 +960,11 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("ready") ? [] : url.includes("stuck") ? [DIRTY_REVIEW_PR] : [REVIEW_PR],
+            url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [DIRTY_REVIEW_PR]
+                : [REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
@@ -827,14 +991,20 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("ready") ? [] : url.includes("stuck") ? [BLOCKED_WITH_CHECKS_PR] : [REVIEW_PR],
+            url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [BLOCKED_WITH_CHECKS_PR]
+                : [REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("ci")).toBeInTheDocument();
     expect(
-      screen.queryByText("Some required checks run on GitHub and aren't shown here."),
+      screen.queryByText(
+        "Some required checks run on GitHub and aren't shown here.",
+      ),
     ).not.toBeInTheDocument();
   });
 
@@ -857,7 +1027,11 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("ready") ? [] : url.includes("stuck") ? [BEHIND_STUCK_PR] : [REVIEW_PR],
+            url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [BEHIND_STUCK_PR]
+                : [REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
@@ -865,11 +1039,15 @@ describe("Dashboard", () => {
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     // Out-of-date note is gone — BEHIND arm was removed
     expect(
-      screen.queryByText("Out of date with the base branch — update it to merge."),
+      screen.queryByText(
+        "Out of date with the base branch — update it to merge.",
+      ),
     ).not.toBeInTheDocument();
     // Falls through to the blocked note
     expect(
-      screen.getByText("Some required checks run on GitHub and aren't shown here."),
+      screen.getByText(
+        "Some required checks run on GitHub and aren't shown here.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -894,7 +1072,11 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("ready") ? [] : url.includes("stuck") ? [DIRTY_AND_FAILING_PR] : [REVIEW_PR],
+            url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [DIRTY_AND_FAILING_PR]
+                : [REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
@@ -922,17 +1104,25 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("ready") ? [] : url.includes("stuck") ? [DIRTY_PR] : [REVIEW_PR],
+            url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [DIRTY_PR]
+                : [REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("Merge conflict")).toBeInTheDocument();
     expect(
-      screen.queryByText("Out of date with the base branch — update it to merge."),
+      screen.queryByText(
+        "Out of date with the base branch — update it to merge.",
+      ),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByText("Some required checks run on GitHub and aren't shown here."),
+      screen.queryByText(
+        "Some required checks run on GitHub and aren't shown here.",
+      ),
     ).not.toBeInTheDocument();
   });
 
@@ -952,14 +1142,24 @@ describe("Dashboard", () => {
         ok: true,
         json: () =>
           Promise.resolve(
-            url.includes("ready") ? [] : url.includes("stuck") ? [BLOCKED_PR] : [REVIEW_PR],
+            url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [BLOCKED_PR]
+                : [REVIEW_PR],
           ),
       }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("Some required checks run on GitHub and aren't shown here.")).toBeInTheDocument();
     expect(
-      screen.queryByText("Out of date with the base branch — update it to merge."),
+      await screen.findByText(
+        "Some required checks run on GitHub and aren't shown here.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "Out of date with the base branch — update it to merge.",
+      ),
     ).not.toBeInTheDocument();
   });
 
@@ -1030,10 +1230,14 @@ describe("Dashboard", () => {
     // empty in this mode — correctly, but an unexplained blank reads as a bug.
     global.fetch = draftsAndNot();
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("Nothing ready to merge")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Nothing ready to merge"),
+    ).toBeInTheDocument();
 
     fireEvent.click(draftButton(/only drafts/i));
-    expect(await screen.findByText("Drafts are never ready to merge")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Drafts are never ready to merge"),
+    ).toBeInTheDocument();
   });
 
   // The tiles count the same visible lists the sections render, so a filter can
@@ -1125,8 +1329,12 @@ describe("Dashboard", () => {
     it("review list count badge uses warning style when items are present", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("review pr")).toBeInTheDocument();
-      const heading = screen.getByRole("heading", { name: /prs waiting on your review/i });
-      const badge = heading.closest("section")?.querySelector('[data-testid="count-badge"]');
+      const heading = screen.getByRole("heading", {
+        name: /prs waiting on your review/i,
+      });
+      const badge = heading
+        .closest("section")
+        ?.querySelector('[data-testid="count-badge"]');
       expect(badge).toHaveClass("bg-warning");
     });
 
@@ -1186,7 +1394,11 @@ describe("Dashboard", () => {
           ok: true,
           json: () =>
             Promise.resolve(
-              url.includes("ready") ? [] : url.includes("stuck") ? [PR_X, PR_Y] : [],
+              url.includes("ready")
+                ? []
+                : url.includes("stuck")
+                  ? [PR_X, PR_Y]
+                  : [],
             ),
         }),
       ) as unknown as typeof fetch;
@@ -1222,7 +1434,11 @@ describe("Dashboard", () => {
           ok: true,
           json: () =>
             Promise.resolve(
-              url.includes("ready") ? [] : url.includes("stuck") ? [NO_CHECKS_PR] : [],
+              url.includes("ready")
+                ? []
+                : url.includes("stuck")
+                  ? [NO_CHECKS_PR]
+                  : [],
             ),
         }),
       ) as unknown as typeof fetch;
@@ -1249,15 +1465,23 @@ describe("Dashboard", () => {
           ok: true,
           json: () =>
             Promise.resolve(
-              url.includes("ready") ? [] : url.includes("stuck") ? [REVIEW_PR_X] : [],
+              url.includes("ready")
+                ? []
+                : url.includes("stuck")
+                  ? [REVIEW_PR_X]
+                  : [],
             ),
         }),
       ) as unknown as typeof fetch;
       render(<Dashboard orgs={ORGS} login="testuser" />);
       fireEvent.click(screen.getByRole("button", { name: /^by check$/i }));
       expect(await screen.findByTestId("group-header")).toBeInTheDocument();
-      expect(screen.getByTestId("group-header").textContent).toContain("Review required");
-      expect(screen.getByTestId("group-header").textContent).not.toContain("Other");
+      expect(screen.getByTestId("group-header").textContent).toContain(
+        "Review required",
+      );
+      expect(screen.getByTestId("group-header").textContent).not.toContain(
+        "Other",
+      );
     });
 
     it("review list stays flat in By check mode (no group headers in review section)", async () => {
@@ -1289,7 +1513,9 @@ describe("Dashboard", () => {
       await waitFor(() =>
         expect(screen.getAllByTestId("group-header")).toHaveLength(2),
       );
-      const link = screen.getByRole("link", { name: /open acme\/b on github/i });
+      const link = screen.getByRole("link", {
+        name: /open acme\/b on github/i,
+      });
       expect(link).toHaveAttribute("href", "https://github.com/acme/b");
       expect(link).toHaveAttribute("target", "_blank");
       expect(link).toHaveAttribute("rel", "noopener noreferrer");
@@ -1301,7 +1527,11 @@ describe("Dashboard", () => {
           ok: true,
           json: () =>
             Promise.resolve(
-              url.includes("ready") ? [] : url.includes("stuck") ? [STUCK_PR] : [],
+              url.includes("ready")
+                ? []
+                : url.includes("stuck")
+                  ? [STUCK_PR]
+                  : [],
             ),
         }),
       ) as unknown as typeof fetch;
@@ -1319,8 +1549,12 @@ describe("Dashboard", () => {
   it("stuck list count badge uses danger style when items are present", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    const heading = screen.getByRole("heading", { name: /prs stuck on checks/i });
-    const badge = heading.closest("section")?.querySelector('[data-testid="count-badge"]');
+    const heading = screen.getByRole("heading", {
+      name: /prs stuck on checks/i,
+    });
+    const badge = heading
+      .closest("section")
+      ?.querySelector('[data-testid="count-badge"]');
     expect(badge).toHaveClass("bg-danger");
   });
 
@@ -1364,11 +1598,17 @@ describe("Dashboard", () => {
           return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
         }
         if (!url.includes("stuck")) {
-          return Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) });
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve([REVIEW_PR]),
+          });
         }
         stuckPass += 1;
         if (stuckPass === 1) {
-          return Promise.resolve({ ok: true, json: () => Promise.resolve([STUCK_PR]) });
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve([STUCK_PR]),
+          });
         }
         return new Promise((res) => {
           resolveStuck = res;
@@ -1391,8 +1631,12 @@ describe("Dashboard", () => {
     it("renders both Flat and By repo buttons", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /^flat$/i })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /^by repo$/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /^flat$/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /^by repo$/i }),
+      ).toBeInTheDocument();
     });
 
     it('defaults to Flat: "Flat" is pressed, "By repo" is not', async () => {
@@ -1402,20 +1646,18 @@ describe("Dashboard", () => {
         "aria-pressed",
         "true",
       );
-      expect(screen.getByRole("button", { name: /^by repo$/i })).toHaveAttribute(
-        "aria-pressed",
-        "false",
-      );
+      expect(
+        screen.getByRole("button", { name: /^by repo$/i }),
+      ).toHaveAttribute("aria-pressed", "false");
     });
 
     it('clicking "By repo" sets its aria-pressed to true', async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
-      expect(screen.getByRole("button", { name: /^by repo$/i })).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      );
+      expect(
+        screen.getByRole("button", { name: /^by repo$/i }),
+      ).toHaveAttribute("aria-pressed", "true");
       expect(screen.getByRole("button", { name: /^flat$/i })).toHaveAttribute(
         "aria-pressed",
         "false",
@@ -1431,10 +1673,9 @@ describe("Dashboard", () => {
         "aria-pressed",
         "true",
       );
-      expect(screen.getByRole("button", { name: /^by repo$/i })).toHaveAttribute(
-        "aria-pressed",
-        "false",
-      );
+      expect(
+        screen.getByRole("button", { name: /^by repo$/i }),
+      ).toHaveAttribute("aria-pressed", "false");
     });
 
     it('persists "repo" to localStorage when "By repo" is clicked', async () => {
@@ -1460,10 +1701,9 @@ describe("Dashboard", () => {
       localStorage.setItem("prison.groupBy", "repo");
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /^by repo$/i })).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      );
+      expect(
+        screen.getByRole("button", { name: /^by repo$/i }),
+      ).toHaveAttribute("aria-pressed", "true");
       expect(screen.getByRole("button", { name: /^flat$/i })).toHaveAttribute(
         "aria-pressed",
         "false",
@@ -1527,7 +1767,9 @@ describe("Dashboard", () => {
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       // Chip renders the name as text content and carries an accessible label
       expect(screen.getByText("qa/smoke")).toBeInTheDocument();
-      expect(screen.getByLabelText("Awaiting required check: qa/smoke")).toBeInTheDocument();
+      expect(
+        screen.getByLabelText("Awaiting required check: qa/smoke"),
+      ).toBeInTheDocument();
     });
 
     it("does NOT show an awaiting chip when the tracked check is present in checkNames", async () => {
@@ -1559,15 +1801,22 @@ describe("Dashboard", () => {
       );
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-      expect(screen.getByLabelText("Awaiting required check: qa/smoke")).toBeInTheDocument();
-      expect(screen.getByLabelText("Awaiting: nightly-e2e")).toBeInTheDocument();
+      expect(
+        screen.getByLabelText("Awaiting required check: qa/smoke"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByLabelText("Awaiting: nightly-e2e"),
+      ).toBeInTheDocument();
     });
 
     // A check that cannot block the merge must not act like one.
     it("does not hold a PR out of Ready for a check marked not required", async () => {
       localStorage.setItem(
         "prison.trackedChecks",
-        JSON.stringify({ orgs: { acme: [{ name: "nightly-e2e", required: false }] }, repos: {} }),
+        JSON.stringify({
+          orgs: { acme: [{ name: "nightly-e2e", required: false }] },
+          repos: {},
+        }),
       );
       global.fetch = vi.fn((url: string) =>
         Promise.resolve({
@@ -1577,7 +1826,10 @@ describe("Dashboard", () => {
             Promise.resolve(
               url.includes("ready")
                 ? [{ ...READY_PR, viaBlocked: true, checkNames: ["build"] }]
-                : url.includes("stuck") || url.includes("reviewed") || url.includes("closed") || url.includes("pr-comments")
+                : url.includes("stuck") ||
+                    url.includes("reviewed") ||
+                    url.includes("closed") ||
+                    url.includes("pr-comments")
                   ? []
                   : [REVIEW_PR],
             ),
@@ -1594,18 +1846,23 @@ describe("Dashboard", () => {
     it("marks a reported check the user said is not required", async () => {
       localStorage.setItem(
         "prison.trackedChecks",
-        JSON.stringify({ orgs: { acme: [{ name: "build", required: false }] }, repos: {} }),
+        JSON.stringify({
+          orgs: { acme: [{ name: "build", required: false }] },
+          repos: {},
+        }),
       );
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       expect(screen.getByLabelText("build — not required")).toBeInTheDocument();
     });
-
   });
 
   describe("ignored checks", () => {
     const ignore = (repo: string, ...names: string[]) =>
-      localStorage.setItem("prison.ignoredChecks", JSON.stringify({ orgs: {}, repos: { [repo]: names } }));
+      localStorage.setItem(
+        "prison.ignoredChecks",
+        JSON.stringify({ orgs: {}, repos: { [repo]: names } }),
+      );
 
     const sectionOf = (name: RegExp) =>
       screen.getByRole("heading", { name }).closest("section")!;
@@ -1616,7 +1873,9 @@ describe("Dashboard", () => {
       ignore("acme/b", "build");
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "build — ignored" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "build — ignored" }),
+      ).toBeInTheDocument();
     });
 
     // And the point of saying a check is broken: it stops holding the PR.
@@ -1625,7 +1884,9 @@ describe("Dashboard", () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       const pr = await screen.findByText("stuck pr");
       expect(pr.closest("section")?.id).toBe("ready-to-merge");
-      expect(within(sectionOf(/stuck on checks/i)).queryByText("stuck pr")).not.toBeInTheDocument();
+      expect(
+        within(sectionOf(/stuck on checks/i)).queryByText("stuck pr"),
+      ).not.toBeInTheDocument();
     });
 
     it("still names the ignored check on the ready card", async () => {
@@ -1633,7 +1894,9 @@ describe("Dashboard", () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       expect(
-        within(sectionOf(/ready to merge/i)).getByRole("button", { name: "build — ignored" }),
+        within(sectionOf(/ready to merge/i)).getByRole("button", {
+          name: "build — ignored",
+        }),
       ).toBeInTheDocument();
     });
 
@@ -1648,7 +1911,14 @@ describe("Dashboard", () => {
           json: () =>
             Promise.resolve(
               url.includes("stuck")
-                ? [{ ...STUCK_PR, blocked: true, mergeState: "BLOCKED", reviewDecision: "APPROVED" }]
+                ? [
+                    {
+                      ...STUCK_PR,
+                      blocked: true,
+                      mergeState: "BLOCKED",
+                      reviewDecision: "APPROVED",
+                    },
+                  ]
                 : [],
             ),
         }),
@@ -1670,7 +1940,9 @@ describe("Dashboard", () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       const pr = await screen.findByText("stuck pr");
       expect(pr.closest("section")?.id).toBe("stuck-on-checks");
-      expect(screen.getByLabelText("Awaiting required check: qa/smoke")).toBeInTheDocument();
+      expect(
+        screen.getByLabelText("Awaiting required check: qa/smoke"),
+      ).toBeInTheDocument();
     });
 
     it("promotes once the awaited check reports", async () => {
@@ -1701,7 +1973,10 @@ describe("Dashboard", () => {
     it("promotes while awaiting a check marked not required", async () => {
       localStorage.setItem(
         "prison.trackedChecks",
-        JSON.stringify({ orgs: { acme: [{ name: "nightly-e2e", required: false }] }, repos: {} }),
+        JSON.stringify({
+          orgs: { acme: [{ name: "nightly-e2e", required: false }] },
+          repos: {},
+        }),
       );
       ignore("acme/b", "build");
       render(<Dashboard orgs={ORGS} login="testuser" />);
@@ -1720,12 +1995,18 @@ describe("Dashboard", () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "build" }));
-      fireEvent.click(screen.getByRole("menuitem", { name: /ignore this check/i }));
-      expect(JSON.parse(localStorage.getItem("prison.ignoredChecks")!)).toEqual({
-        orgs: {},
-        repos: { "acme/b": ["build"] },
-      });
-      expect(screen.getByText("stuck pr").closest("section")?.id).toBe("ready-to-merge");
+      fireEvent.click(
+        screen.getByRole("menuitem", { name: /ignore this check/i }),
+      );
+      expect(JSON.parse(localStorage.getItem("prison.ignoredChecks")!)).toEqual(
+        {
+          orgs: {},
+          repos: { "acme/b": ["build"] },
+        },
+      );
+      expect(screen.getByText("stuck pr").closest("section")?.id).toBe(
+        "ready-to-merge",
+      );
     });
 
     it("takes it back from the same menu", async () => {
@@ -1734,7 +2015,9 @@ describe("Dashboard", () => {
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "build — ignored" }));
       fireEvent.click(screen.getByRole("menuitem", { name: /stop ignoring/i }));
-      expect(screen.getByText("stuck pr").closest("section")?.id).toBe("stuck-on-checks");
+      expect(screen.getByText("stuck pr").closest("section")?.id).toBe(
+        "stuck-on-checks",
+      );
       expect(screen.getByRole("button", { name: "build" })).toBeInTheDocument();
     });
 
@@ -1749,7 +2032,9 @@ describe("Dashboard", () => {
       const card = within(sectionOf(/ready to merge/i));
       fireEvent.click(card.getByRole("button", { name: "build — ignored" }));
       fireEvent.click(screen.getByRole("menuitem", { name: /stop ignoring/i }));
-      expect(screen.getByText("stuck pr").closest("section")?.id).toBe("stuck-on-checks");
+      expect(screen.getByText("stuck pr").closest("section")?.id).toBe(
+        "stuck-on-checks",
+      );
     });
 
     it("never awaits a tracked check that was ignored", async () => {
@@ -1772,12 +2057,20 @@ describe("Dashboard", () => {
       );
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-      fireEvent.click(screen.getByRole("button", { name: "Awaiting required check: qa/smoke" }));
-      fireEvent.click(screen.getByRole("menuitem", { name: /ignore this check/i }));
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "Awaiting required check: qa/smoke",
+        }),
+      );
+      fireEvent.click(
+        screen.getByRole("menuitem", { name: /ignore this check/i }),
+      );
       expect(screen.queryByText("qa/smoke")).not.toBeInTheDocument();
-      expect(JSON.parse(localStorage.getItem("prison.ignoredChecks")!).repos["acme/b"]).toEqual([
-        "qa/smoke",
-      ]);
+      expect(
+        JSON.parse(localStorage.getItem("prison.ignoredChecks")!).repos[
+          "acme/b"
+        ],
+      ).toEqual(["qa/smoke"]);
     });
 
     // Regression net around promotion: the stuck payload and the ready payload
@@ -1789,7 +2082,8 @@ describe("Dashboard", () => {
         Promise.resolve({
           ok: true,
           headers: { get: () => null },
-          json: () => Promise.resolve(url.includes("stuck") ? [DRAFT_STUCK_PR] : []),
+          json: () =>
+            Promise.resolve(url.includes("stuck") ? [DRAFT_STUCK_PR] : []),
         }),
       ) as unknown as typeof fetch;
       render(<Dashboard orgs={ORGS} login="testuser" />);
@@ -1806,9 +2100,28 @@ describe("Dashboard", () => {
           json: () =>
             Promise.resolve(
               url.includes("ready")
-                ? [{ id: STUCK_PR.id, title: "stuck pr", url: "u", repo: "acme/b", number: 2, readySince: STUCK_PR.stuckSince, needsUpdate: false, checkNames: ["build"], viaBlocked: true }]
+                ? [
+                    {
+                      id: STUCK_PR.id,
+                      title: "stuck pr",
+                      url: "u",
+                      repo: "acme/b",
+                      number: 2,
+                      readySince: STUCK_PR.stuckSince,
+                      needsUpdate: false,
+                      checkNames: ["build"],
+                      viaBlocked: true,
+                    },
+                  ]
                 : url.includes("stuck")
-                  ? [{ ...STUCK_PR, blocked: true, readyViaBlocked: true, reviewDecision: "APPROVED" }]
+                  ? [
+                      {
+                        ...STUCK_PR,
+                        blocked: true,
+                        readyViaBlocked: true,
+                        reviewDecision: "APPROVED",
+                      },
+                    ]
                   : [],
             ),
         }),
@@ -1822,15 +2135,21 @@ describe("Dashboard", () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       // READY_PR plus the promoted one; nothing left stuck.
-      expect(within(sectionOf(/ready to merge/i)).getByTestId("count-badge")).toHaveTextContent("2");
-      expect(within(sectionOf(/stuck on checks/i)).getByTestId("count-badge")).toHaveTextContent("0");
+      expect(
+        within(sectionOf(/ready to merge/i)).getByTestId("count-badge"),
+      ).toHaveTextContent("2");
+      expect(
+        within(sectionOf(/stuck on checks/i)).getByTestId("count-badge"),
+      ).toHaveTextContent("0");
     });
 
     it("keeps a promoted PR findable by the name of the check that was ignored", async () => {
       ignore("acme/b", "build");
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-      fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: "build" } });
+      fireEvent.change(screen.getByPlaceholderText(/search/i), {
+        target: { value: "build" },
+      });
       expect(screen.getByText("stuck pr")).toBeInTheDocument();
     });
 
@@ -1843,7 +2162,16 @@ describe("Dashboard", () => {
           json: () =>
             Promise.resolve(
               url.includes("stuck")
-                ? [{ ...STUCK_PR, failingChecks: 0, pendingChecks: 1, failing: [], pending: ["e2e"], checkNames: ["e2e"] }]
+                ? [
+                    {
+                      ...STUCK_PR,
+                      failingChecks: 0,
+                      pendingChecks: 1,
+                      failing: [],
+                      pending: ["e2e"],
+                      checkNames: ["e2e"],
+                    },
+                  ]
                 : [],
             ),
         }),
@@ -1872,7 +2200,10 @@ describe("Dashboard", () => {
     });
 
     it("survives a hand-edited ignore list", async () => {
-      localStorage.setItem("prison.ignoredChecks", '{"repos":{"acme/b":[7,null,"build"]}}');
+      localStorage.setItem(
+        "prison.ignoredChecks",
+        '{"repos":{"acme/b":[7,null,"build"]}}',
+      );
       render(<Dashboard orgs={ORGS} login="testuser" />);
       const pr = await screen.findByText("stuck pr");
       expect(pr.closest("section")?.id).toBe("ready-to-merge");
@@ -1888,12 +2219,17 @@ describe("Dashboard", () => {
     it("still awaits the tracked checks that were not ignored", async () => {
       localStorage.setItem(
         "prison.trackedChecks",
-        JSON.stringify({ orgs: { acme: ["qa/smoke", "manual-signoff"] }, repos: {} }),
+        JSON.stringify({
+          orgs: { acme: ["qa/smoke", "manual-signoff"] },
+          repos: {},
+        }),
       );
       ignore("acme/b", "qa/smoke");
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-      expect(screen.getByLabelText("Awaiting required check: manual-signoff")).toBeInTheDocument();
+      expect(
+        screen.getByLabelText("Awaiting required check: manual-signoff"),
+      ).toBeInTheDocument();
       expect(screen.queryByText("qa/smoke")).not.toBeInTheDocument();
     });
 
@@ -1915,7 +2251,14 @@ describe("Dashboard", () => {
           json: () =>
             Promise.resolve(
               url.includes("ready")
-                ? [{ ...READY_PR, repo: "acme/b", viaBlocked: true, checkNames: ["build"] }]
+                ? [
+                    {
+                      ...READY_PR,
+                      repo: "acme/b",
+                      viaBlocked: true,
+                      checkNames: ["build"],
+                    },
+                  ]
                 : [],
             ),
         }),
@@ -1929,23 +2272,31 @@ describe("Dashboard", () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "build" }));
-      fireEvent.click(screen.getByRole("menuitem", { name: /ignore this check/i }));
+      fireEvent.click(
+        screen.getByRole("menuitem", { name: /ignore this check/i }),
+      );
       fireEvent.click(screen.getByRole("button", { name: "build — ignored" }));
       fireEvent.click(screen.getByRole("menuitem", { name: /stop ignoring/i }));
-      expect(screen.getByText("stuck pr").closest("section")?.id).toBe("stuck-on-checks");
-      expect(JSON.parse(localStorage.getItem("prison.ignoredChecks")!)).toEqual({
-        orgs: {},
-        repos: {},
-      });
+      expect(screen.getByText("stuck pr").closest("section")?.id).toBe(
+        "stuck-on-checks",
+      );
+      expect(JSON.parse(localStorage.getItem("prison.ignoredChecks")!)).toEqual(
+        {
+          orgs: {},
+          repos: {},
+        },
+      );
     });
 
     it("hydrates the ignored list from localStorage and persists it back", async () => {
       ignore("acme/b", "build");
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-      expect(JSON.parse(localStorage.getItem("prison.ignoredChecks")!).repos["acme/b"]).toEqual([
-        "build",
-      ]);
+      expect(
+        JSON.parse(localStorage.getItem("prison.ignoredChecks")!).repos[
+          "acme/b"
+        ],
+      ).toEqual(["build"]);
     });
   });
 
@@ -1990,9 +2341,15 @@ describe("Dashboard", () => {
       // Focus the combobox; empty input shows availableRepos as suggestions
       const combobox = screen.getByRole("combobox", { name: "Repository" });
       fireEvent.focus(combobox);
-      expect(screen.getByRole("option", { name: "acme/b" })).toBeInTheDocument();
-      expect(screen.getByRole("option", { name: "acme/c" })).toBeInTheDocument();
-      expect(screen.getByRole("option", { name: "acme/d" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("option", { name: "acme/b" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("option", { name: "acme/c" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("option", { name: "acme/d" }),
+      ).toBeInTheDocument();
     });
 
     describe("inline awaiting chips", () => {
@@ -2007,7 +2364,9 @@ describe("Dashboard", () => {
         expect(await screen.findByText("build")).toBeInTheDocument();
         expect(screen.getByText("Automation Result")).toBeInTheDocument();
         expect(
-          screen.queryByText("Some required checks run on GitHub and aren't shown here."),
+          screen.queryByText(
+            "Some required checks run on GitHub and aren't shown here.",
+          ),
         ).not.toBeInTheDocument();
       });
 
@@ -2033,14 +2392,20 @@ describe("Dashboard", () => {
             ok: true,
             json: () =>
               Promise.resolve(
-                url.includes("ready") ? [] : url.includes("stuck") ? [BLOCKED_AWAITING_PR] : [REVIEW_PR],
+                url.includes("ready")
+                  ? []
+                  : url.includes("stuck")
+                    ? [BLOCKED_AWAITING_PR]
+                    : [REVIEW_PR],
               ),
           }),
         ) as unknown as typeof fetch;
         render(<Dashboard orgs={ORGS} login="testuser" />);
         expect(await screen.findByText("ci/required")).toBeInTheDocument();
         expect(
-          screen.queryByText("Some required checks run on GitHub and aren't shown here."),
+          screen.queryByText(
+            "Some required checks run on GitHub and aren't shown here.",
+          ),
         ).not.toBeInTheDocument();
       });
     });
@@ -2052,7 +2417,10 @@ describe("Dashboard", () => {
       it("PR-A (tracked checks present) → ready only; PR-B (checks absent) → stuck only with awaiting chip", async () => {
         localStorage.setItem(
           "prison.trackedChecks",
-          JSON.stringify({ orgs: { acme: ["qa/smoke", "Automation Result"] }, repos: {} }),
+          JSON.stringify({
+            orgs: { acme: ["qa/smoke", "Automation Result"] },
+            repos: {},
+          }),
         );
 
         // PR-A: BLOCKED+approved+green, rollup includes both tracked names → ready
@@ -2077,7 +2445,7 @@ describe("Dashboard", () => {
           number: 102,
           readySince: "2026-06-25T00:00:00Z",
           needsUpdate: true,
-          checkNames: [],  // tracked checks not reported yet
+          checkNames: [], // tracked checks not reported yet
           viaBlocked: true,
         };
         const PR_B_STUCK = {
@@ -2116,23 +2484,39 @@ describe("Dashboard", () => {
         render(<Dashboard orgs={ORGS} login="testuser" />);
 
         // Wait for PR-A to appear in the ready section
-        expect(await screen.findByText("PR A ready-via-blocked")).toBeInTheDocument();
+        expect(
+          await screen.findByText("PR A ready-via-blocked"),
+        ).toBeInTheDocument();
 
         // PR-B should be in the stuck section (awaiting chips visible)
-        expect(screen.getByText("PR B awaiting-via-blocked")).toBeInTheDocument();
+        expect(
+          screen.getByText("PR B awaiting-via-blocked"),
+        ).toBeInTheDocument();
         expect(screen.getByText("qa/smoke")).toBeInTheDocument();
 
         // Verify sections: use section elements wrapping each PrList
-        const readySection = screen.getByRole("heading", { name: /ready to merge/i }).closest("section")!;
-        const stuckSection = screen.getByRole("heading", { name: /PRs stuck on checks/i }).closest("section")!;
+        const readySection = screen
+          .getByRole("heading", { name: /ready to merge/i })
+          .closest("section")!;
+        const stuckSection = screen
+          .getByRole("heading", { name: /PRs stuck on checks/i })
+          .closest("section")!;
 
         // PR-A in ready, NOT in stuck
-        expect(within(readySection).getByText("PR A ready-via-blocked")).toBeInTheDocument();
-        expect(within(stuckSection).queryByText("PR A ready-via-blocked")).not.toBeInTheDocument();
+        expect(
+          within(readySection).getByText("PR A ready-via-blocked"),
+        ).toBeInTheDocument();
+        expect(
+          within(stuckSection).queryByText("PR A ready-via-blocked"),
+        ).not.toBeInTheDocument();
 
         // PR-B in stuck, NOT in ready
-        expect(within(stuckSection).getByText("PR B awaiting-via-blocked")).toBeInTheDocument();
-        expect(within(readySection).queryByText("PR B awaiting-via-blocked")).not.toBeInTheDocument();
+        expect(
+          within(stuckSection).getByText("PR B awaiting-via-blocked"),
+        ).toBeInTheDocument();
+        expect(
+          within(readySection).queryByText("PR B awaiting-via-blocked"),
+        ).not.toBeInTheDocument();
       });
     });
   });
@@ -2143,14 +2527,25 @@ describe("Dashboard", () => {
         Promise.resolve({ ok: false, status: 500 }),
       ) as unknown as typeof fetch;
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      expect(await screen.findByText(/failed to load stuck prs/i)).toBeInTheDocument();
-      expect(screen.getByText(/failed to load review requests/i)).toBeInTheDocument();
-      expect(screen.getByText(/failed to load ready-to-merge prs/i)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/failed to load stuck prs/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/failed to load review requests/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/failed to load ready-to-merge prs/i),
+      ).toBeInTheDocument();
       expect(screen.getByText(/failed to load comments/i)).toBeInTheDocument();
-      expect(screen.getByText(/failed to load closed prs/i)).toBeInTheDocument();
-      expect(screen.getByText(/failed to load reviewed prs/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/failed to load closed prs/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/failed to load reviewed prs/i),
+      ).toBeInTheDocument();
 
-      const before = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
+      const before = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
+        .length;
       const retries = screen.getAllByRole("button", { name: /retry/i });
       expect(retries).toHaveLength(6);
       for (const retry of retries) fireEvent.click(retry);
@@ -2164,7 +2559,9 @@ describe("Dashboard", () => {
     it("the partial-data notice Retry refetches all lists", async () => {
       global.fetch = partialFetch();
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      expect(await screen.findByText(/Some data couldn't be loaded/i)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/Some data couldn't be loaded/i),
+      ).toBeInTheDocument();
       const notice = screen.getByRole("status");
       fireEvent.click(within(notice).getByRole("button", { name: /retry/i }));
       await waitFor(() =>
@@ -2179,17 +2576,23 @@ describe("Dashboard", () => {
     it("shows the partial-data notice when a list responds with X-Partial", async () => {
       global.fetch = partialFetch();
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      expect(await screen.findByText(/Some data couldn't be loaded/i)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/Some data couldn't be loaded/i),
+      ).toBeInTheDocument();
       // Retry button present and clickable
       const notice = screen.getByRole("status");
-      expect(within(notice).getByRole("button", { name: /retry/i })).toBeInTheDocument();
+      expect(
+        within(notice).getByRole("button", { name: /retry/i }),
+      ).toBeInTheDocument();
     });
 
     it("shows no partial-data notice when no list is partial", async () => {
       // okFetch (default from beforeEach) returns X-Partial: null everywhere
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-      expect(screen.queryByText(/Some data couldn't be loaded/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/Some data couldn't be loaded/i),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -2219,7 +2622,9 @@ describe("Dashboard", () => {
         }),
       ) as unknown as typeof fetch;
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      expect(await screen.findByText("Nothing ready to merge")).toBeInTheDocument();
+      expect(
+        await screen.findByText("Nothing ready to merge"),
+      ).toBeInTheDocument();
     });
 
     it("renders the ready list above the two columns", async () => {
@@ -2230,7 +2635,8 @@ describe("Dashboard", () => {
       const ready = document.getElementById("ready-to-merge")!;
       const review = document.getElementById("waiting-on-your-review")!;
       expect(
-        ready.compareDocumentPosition(review) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ready.compareDocumentPosition(review) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
 
@@ -2247,7 +2653,9 @@ describe("Dashboard", () => {
       // + reviewed) = 12 total.
       // Use waitFor so the assertion retries until all async refresh fetches register.
       await waitFor(() =>
-        expect(global.fetch as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(12),
+        expect(global.fetch as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(
+          12,
+        ),
       );
     });
 
@@ -2261,12 +2669,18 @@ describe("Dashboard", () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("ready pr")).toBeInTheDocument();
       const heading = screen.getByRole("heading", { name: /ready to merge/i });
-      const badge = heading.closest("section")?.querySelector('[data-testid="count-badge"]');
+      const badge = heading
+        .closest("section")
+        ?.querySelector('[data-testid="count-badge"]');
       expect(badge).toHaveClass("bg-success");
     });
 
     it("ready PR with needsUpdate shows the 'Needs update' badge", async () => {
-      const BEHIND_READY_PR = { ...READY_PR, id: "r-behind", needsUpdate: true };
+      const BEHIND_READY_PR = {
+        ...READY_PR,
+        id: "r-behind",
+        needsUpdate: true,
+      };
       global.fetch = vi.fn((url: string) =>
         Promise.resolve({
           ok: true,
@@ -2289,12 +2703,22 @@ describe("Dashboard", () => {
         url.includes("ready")
           ? Promise.reject(new Error("network error"))
           : url.includes("stuck")
-            ? Promise.resolve({ ok: true, json: () => Promise.resolve([STUCK_PR]) })
-            : Promise.resolve({ ok: true, json: () => Promise.resolve([REVIEW_PR]) }),
+            ? Promise.resolve({
+                ok: true,
+                json: () => Promise.resolve([STUCK_PR]),
+              })
+            : Promise.resolve({
+                ok: true,
+                json: () => Promise.resolve([REVIEW_PR]),
+              }),
       ) as unknown as typeof fetch;
       render(<Dashboard orgs={ORGS} login="testuser" />);
-      expect(await screen.findByText(/failed to load ready-to-merge/i)).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+      expect(
+        await screen.findByText(/failed to load ready-to-merge/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /retry/i }),
+      ).toBeInTheDocument();
     });
   });
 });
@@ -2309,7 +2733,9 @@ describe("Dashboard — comments awaiting your reply", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     await waitFor(() => {
       const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
-      expect(calls.some((c) => String(c[0]).includes("/api/pr-comments"))).toBe(true);
+      expect(calls.some((c) => String(c[0]).includes("/api/pr-comments"))).toBe(
+        true,
+      );
     });
   });
 
@@ -2339,14 +2765,20 @@ describe("Dashboard — comments awaiting your reply", () => {
     global.fetch = fetchWithComments([ORPHAN_COMMENT]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    expect(screen.queryByText("comment on an invisible pr")).not.toBeInTheDocument();
-    expect(screen.getByText(/no comments awaiting your reply/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText("comment on an invisible pr"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/no comments awaiting your reply/i),
+    ).toBeInTheDocument();
   });
 
   it("says a review-body comment is one, since it carries no file to show instead", async () => {
     global.fetch = fetchWithComments([REVIEW_COMMENT]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("does this handle the empty case?")).toBeInTheDocument();
+    expect(
+      await screen.findByText("does this handle the empty case?"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Review comment")).toBeInTheDocument();
     expect(screen.queryByText("src/app.ts")).not.toBeInTheDocument();
   });
@@ -2354,7 +2786,9 @@ describe("Dashboard — comments awaiting your reply", () => {
   it("labels only the review body when both surfaces are on the board", async () => {
     global.fetch = fetchWithComments([COMMENT, REVIEW_COMMENT]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("please fix the null check")).toBeInTheDocument();
+    expect(
+      await screen.findByText("please fix the null check"),
+    ).toBeInTheDocument();
     expect(screen.getByText("src/app.ts")).toBeInTheDocument();
     expect(screen.getAllByText("Review comment")).toHaveLength(1);
   });
@@ -2362,7 +2796,9 @@ describe("Dashboard — comments awaiting your reply", () => {
   it("hides bot comments by default and reveals them when 'Show bot comments' is checked", async () => {
     global.fetch = fetchWithComments([COMMENT, BOT_COMMENT]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("please fix the null check")).toBeInTheDocument();
+    expect(
+      await screen.findByText("please fix the null check"),
+    ).toBeInTheDocument();
     expect(screen.queryByText("bot says something")).not.toBeInTheDocument();
 
     openSettings();
@@ -2373,7 +2809,9 @@ describe("Dashboard — comments awaiting your reply", () => {
   it("persists the 'Show bot comments' toggle to localStorage", async () => {
     global.fetch = fetchWithComments([BOT_COMMENT]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText(/no comments awaiting your reply/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no comments awaiting your reply/i),
+    ).toBeInTheDocument();
     openSettings();
     fireEvent.click(screen.getByLabelText(/show bot comments/i));
     await waitFor(() =>
@@ -2391,18 +2829,26 @@ describe("Dashboard — comments awaiting your reply", () => {
   it("hides comments I reacted to by default and reveals them when the toggle is unchecked", async () => {
     global.fetch = fetchWithComments([COMMENT, REACTED_COMMENT]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("please fix the null check")).toBeInTheDocument();
-    expect(screen.queryByText("reacted with a thumbs up")).not.toBeInTheDocument();
+    expect(
+      await screen.findByText("please fix the null check"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("reacted with a thumbs up"),
+    ).not.toBeInTheDocument();
 
     openSettings();
     fireEvent.click(screen.getByLabelText(/hide comments i reacted to/i));
-    expect(await screen.findByText("reacted with a thumbs up")).toBeInTheDocument();
+    expect(
+      await screen.findByText("reacted with a thumbs up"),
+    ).toBeInTheDocument();
   });
 
   it("persists unchecking 'Hide comments I reacted to' to localStorage", async () => {
     global.fetch = fetchWithComments([REACTED_COMMENT]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText(/no comments awaiting your reply/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no comments awaiting your reply/i),
+    ).toBeInTheDocument();
     openSettings();
     fireEvent.click(screen.getByLabelText(/hide comments i reacted to/i));
     await waitFor(() =>
@@ -2414,7 +2860,9 @@ describe("Dashboard — comments awaiting your reply", () => {
     localStorage.setItem("prison.hideReacted", "false");
     global.fetch = fetchWithComments([REACTED_COMMENT]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("reacted with a thumbs up")).toBeInTheDocument();
+    expect(
+      await screen.findByText("reacted with a thumbs up"),
+    ).toBeInTheDocument();
   });
 
   it("shows an error banner and retry when the comments fetch fails, without breaking the other lists", async () => {
@@ -2422,18 +2870,25 @@ describe("Dashboard — comments awaiting your reply", () => {
       url.includes("pr-comments")
         ? Promise.reject(new Error("network error"))
         : url.includes("stuck")
-          ? Promise.resolve({ ok: true, json: () => Promise.resolve([STUCK_PR]) })
+          ? Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve([STUCK_PR]),
+            })
           : Promise.resolve({ ok: true, json: () => Promise.resolve([]) }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText(/failed to load comments/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/failed to load comments/i),
+    ).toBeInTheDocument();
     expect(screen.getByText("stuck pr")).toBeInTheDocument();
   });
 
   it("groups comments by repo in the By-repo view", async () => {
     global.fetch = fetchWithComments([COMMENT]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("please fix the null check")).toBeInTheDocument();
+    expect(
+      await screen.findByText("please fix the null check"),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "By repo" }));
     await waitFor(() => {
       const headers = screen.getAllByTestId("group-header");
@@ -2498,11 +2953,21 @@ describe("Dashboard — comments awaiting your reply", () => {
       url.includes("closed")
         ? Promise.reject(new Error("network error"))
         : url.includes("stuck")
-          ? Promise.resolve({ ok: true, headers: { get: () => null }, json: () => Promise.resolve([STUCK_PR]) })
-          : Promise.resolve({ ok: true, headers: { get: () => null }, json: () => Promise.resolve([]) }),
+          ? Promise.resolve({
+              ok: true,
+              headers: { get: () => null },
+              json: () => Promise.resolve([STUCK_PR]),
+            })
+          : Promise.resolve({
+              ok: true,
+              headers: { get: () => null },
+              json: () => Promise.resolve([]),
+            }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText(/failed to load closed PRs/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/failed to load closed PRs/i),
+    ).toBeInTheDocument();
     // Unrelated sections still render.
     expect(screen.getByText("stuck pr")).toBeInTheDocument();
   });
@@ -2511,12 +2976,24 @@ describe("Dashboard — comments awaiting your reply", () => {
     global.fetch = vi.fn((url: string) =>
       Promise.resolve(
         url.includes("closed")
-          ? { ok: false, status: 502, headers: { get: () => null }, json: () => Promise.resolve([]) }
-          : { ok: true, headers: { get: () => null }, json: () => Promise.resolve(url.includes("stuck") ? [STUCK_PR] : []) },
+          ? {
+              ok: false,
+              status: 502,
+              headers: { get: () => null },
+              json: () => Promise.resolve([]),
+            }
+          : {
+              ok: true,
+              headers: { get: () => null },
+              json: () =>
+                Promise.resolve(url.includes("stuck") ? [STUCK_PR] : []),
+            },
       ),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText(/failed to load closed PRs/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/failed to load closed PRs/i),
+    ).toBeInTheDocument();
   });
 });
 
@@ -2629,7 +3106,10 @@ describe("Dashboard — recently reviewed", () => {
   });
 
   it("follows the draft filter in both directions", async () => {
-    global.fetch = fetchWithReviewed([REVIEWED_PR, { ...REVIEWED_PR, id: "rv2", title: "draft reviewed pr", isDraft: true }]);
+    global.fetch = fetchWithReviewed([
+      REVIEWED_PR,
+      { ...REVIEWED_PR, id: "rv2", title: "draft reviewed pr", isDraft: true },
+    ]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
     await waitFor(() =>
       expect(screen.getByTestId("reviewed-count-badge")).toHaveTextContent("2"),
@@ -2651,37 +3131,65 @@ describe("Dashboard — recently reviewed", () => {
     // threads on your OWN PRs, so an answer to a review comment you left on
     // someone else's PR never reached the board.
     // viewerStarted is what the reviewed leg of /api/pr-comments returns.
-    const reply = { ...COMMENT, id: "t9", prId: REVIEWED_PR.id, repo: "acme/e", number: 9, preview: "done, took the fixed delay out", viewerStarted: true };
+    const reply = {
+      ...COMMENT,
+      id: "t9",
+      prId: REVIEWED_PR.id,
+      repo: "acme/e",
+      number: 9,
+      preview: "done, took the fixed delay out",
+      viewerStarted: true,
+    };
     global.fetch = fetchWithReviewed([REVIEWED_PR], [reply]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("done, took the fixed delay out")).toBeInTheDocument();
+    expect(
+      await screen.findByText("done, took the fixed delay out"),
+    ).toBeInTheDocument();
   });
 
   it("keeps that reply when the reviewed list itself fails to load", async () => {
     // The thread is waiting on the viewer whether or not the section that would
     // have listed its PR came back.
-    const reply = { ...COMMENT, id: "t9", prId: REVIEWED_PR.id, repo: "acme/e", number: 9, preview: "done, took the fixed delay out", viewerStarted: true };
+    const reply = {
+      ...COMMENT,
+      id: "t9",
+      prId: REVIEWED_PR.id,
+      repo: "acme/e",
+      number: 9,
+      preview: "done, took the fixed delay out",
+      viewerStarted: true,
+    };
     global.fetch = vi.fn((url: string) =>
       url.includes("reviewed")
         ? Promise.reject(new Error("network error"))
         : Promise.resolve({
             ok: true,
             headers: { get: () => null },
-            json: () => Promise.resolve(url.includes("pr-comments") ? [reply] : []),
+            json: () =>
+              Promise.resolve(url.includes("pr-comments") ? [reply] : []),
           }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("done, took the fixed delay out")).toBeInTheDocument();
+    expect(
+      await screen.findByText("done, took the fixed delay out"),
+    ).toBeInTheDocument();
   });
 
   it("shows an error banner and retry when the reviewed fetch fails", async () => {
     global.fetch = vi.fn((url: string) =>
       url.includes("reviewed")
         ? Promise.reject(new Error("network error"))
-        : Promise.resolve({ ok: true, headers: { get: () => null }, json: () => Promise.resolve(url.includes("stuck") ? [STUCK_PR] : []) }),
+        : Promise.resolve({
+            ok: true,
+            headers: { get: () => null },
+            json: () =>
+              Promise.resolve(url.includes("stuck") ? [STUCK_PR] : []),
+          }),
     ) as unknown as typeof fetch;
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText(/failed to load reviewed PRs/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/failed to load reviewed PRs/i),
+    ).toBeInTheDocument();
     // Unrelated sections still render.
     expect(screen.getByText("stuck pr")).toBeInTheDocument();
   });
@@ -2691,30 +3199,41 @@ describe("Dashboard — recently reviewed", () => {
       ...REVIEWED_PR,
       id: `rv${i}`,
       title: `reviewed pr ${i}`,
-      reviewedAt: new Date(Date.UTC(2026, 5, 25) - i * 86_400_000).toISOString(),
+      reviewedAt: new Date(
+        Date.UTC(2026, 5, 25) - i * 86_400_000,
+      ).toISOString(),
     }));
     global.fetch = fetchWithReviewed(many);
     render(<Dashboard orgs={ORGS} login="testuser" />);
     await waitFor(() =>
-      expect(screen.getByTestId("reviewed-count-badge")).toHaveTextContent("20"),
+      expect(screen.getByTestId("reviewed-count-badge")).toHaveTextContent(
+        "20",
+      ),
     );
     fireEvent.click(screen.getByRole("button", { name: /recently reviewed/i }));
     expect(await screen.findByText("reviewed pr 0")).toBeInTheDocument();
     expect(screen.queryByText("reviewed pr 15")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /load more \(showing 15 of 20\)/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /load more \(showing 15 of 20\)/i }),
+    );
     expect(await screen.findByText("reviewed pr 15")).toBeInTheDocument();
   });
 });
 
 describe("Dashboard — auto refresh", () => {
-  const NEW_STUCK_PR = { ...STUCK_PR, id: "new-stuck", title: "brand new stuck pr" };
+  const NEW_STUCK_PR = {
+    ...STUCK_PR,
+    id: "new-stuck",
+    title: "brand new stuck pr",
+  };
 
   let constructed: Array<{ title: string; options?: NotificationOptions }>;
   let requestPermission: ReturnType<typeof vi.fn>;
   let setPermission: (next: NotificationPermission) => void;
 
   function useNotificationStub(permission: NotificationPermission) {
-    ({ constructed, requestPermission, setPermission } = stubNotification(permission));
+    ({ constructed, requestPermission, setPermission } =
+      stubNotification(permission));
   }
 
   // Serves whatever `stuckList` holds at request time — tests mutate it to
@@ -2812,7 +3331,9 @@ describe("Dashboard — auto refresh", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
 
-    await act(() => vi.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS - 1000));
+    await act(() =>
+      vi.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS - 1000),
+    );
     expect(fetchCalls()).toBe(6);
 
     await act(() => vi.advanceTimersByTimeAsync(1000));
@@ -2881,7 +3402,9 @@ describe("Dashboard — auto refresh", () => {
     // The list is untouched (silent-poll policy) and the label keeps aging from
     // the last fetch that actually landed, instead of claiming fresh data.
     expect(screen.getByText("stuck pr")).toBeInTheDocument();
-    expect(screen.getByText(`Updated ${POLL_MS / 60_000}m ago`)).toBeInTheDocument();
+    expect(
+      screen.getByText(`Updated ${POLL_MS / 60_000}m ago`),
+    ).toBeInTheDocument();
   });
 
   it("keeps the displayed list and raises no error banner when a silent poll fails", async () => {
@@ -2946,7 +3469,9 @@ describe("Dashboard — auto refresh", () => {
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     openSettings("Auto refresh");
 
-    fireEvent.click(screen.getByRole("button", { name: /enable notifications/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /enable notifications/i }),
+    );
     expect(
       await screen.findByRole("button", { name: /send a test notification/i }),
     ).toBeInTheDocument();
@@ -2966,8 +3491,12 @@ describe("Dashboard — auto refresh", () => {
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     openSettings("Auto refresh");
 
-    fireEvent.click(screen.getByRole("button", { name: /enable notifications/i }));
-    expect(await screen.findByText(/notifications are blocked/i)).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: /enable notifications/i }),
+    );
+    expect(
+      await screen.findByText(/notifications are blocked/i),
+    ).toBeInTheDocument();
   });
 
   it("badges the title and notifies when a poll finds new items while unfocused", async () => {
@@ -3004,15 +3533,32 @@ describe("Dashboard — auto refresh", () => {
 
     // Same PR id, now merge-ready: checks went green and it left the stuck list.
     stuckList = [];
-    readyList = [{ ...READY_PR, id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number }];
+    readyList = [
+      {
+        ...READY_PR,
+        id: STUCK_PR.id,
+        repo: STUCK_PR.repo,
+        number: STUCK_PR.number,
+      },
+    ];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
 
     expect(document.title).toBe("(1) PRison");
-    expect(constructed.at(-1)?.options?.body).toBe("acme/b #2 is ready to merge");
+    expect(constructed.at(-1)?.options?.body).toBe(
+      "acme/b #2 is ready to merge",
+    );
   });
 
   it("announces a check going red on a PR that was merely waiting", async () => {
-    stuckList = [{ ...STUCK_PR, failingChecks: 0, pendingChecks: 1, failing: [], pending: ["build"] }];
+    stuckList = [
+      {
+        ...STUCK_PR,
+        failingChecks: 0,
+        pendingChecks: 1,
+        failing: [],
+        pending: ["build"],
+      },
+    ];
     localStorage.setItem("prison.autoRefresh", "true");
     vi.spyOn(document, "hasFocus").mockReturnValue(false);
     render(<Dashboard orgs={ORGS} login="testuser" />);
@@ -3020,7 +3566,9 @@ describe("Dashboard — auto refresh", () => {
 
     stuckList = [STUCK_PR];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
-    expect(constructed.at(-1)?.options?.body).toBe("acme/b #2 — checks failing");
+    expect(constructed.at(-1)?.options?.body).toBe(
+      "acme/b #2 — checks failing",
+    );
   });
 
   it("announces a fresh reply on a thread it already knows about", async () => {
@@ -3030,7 +3578,9 @@ describe("Dashboard — auto refresh", () => {
     localStorage.setItem("prison.autoRefresh", "true");
     vi.spyOn(document, "hasFocus").mockReturnValue(false);
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText(/please fix the null check/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/please fix the null check/),
+    ).toBeInTheDocument();
     constructed.length = 0;
 
     commentList = [{ ...COMMENT, commentedAt: "2026-06-21T00:00:00Z" }];
@@ -3046,7 +3596,11 @@ describe("Dashboard — auto refresh", () => {
 
     stuckList = [];
     closedList = [
-      closedPr({ id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number }),
+      closedPr({
+        id: STUCK_PR.id,
+        repo: STUCK_PR.repo,
+        number: STUCK_PR.number,
+      }),
     ];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(constructed.at(-1)?.options?.body).toBe("acme/b #2 was merged");
@@ -3130,9 +3684,12 @@ describe("Dashboard — auto refresh", () => {
 
     // Switch scope; the new scope already contains an item we never saw.
     stuckList = [STUCK_PR, NEW_STUCK_PR];
-    fireEvent.change(screen.getByRole("combobox", { name: "Filter by organization" }), {
-      target: { value: "acme" },
-    });
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Filter by organization" }),
+      {
+        target: { value: "acme" },
+      },
+    );
     expect(await screen.findByText("brand new stuck pr")).toBeInTheDocument();
     expect(document.title).toBe("PRison");
     expect(constructed).toHaveLength(0);
@@ -3184,7 +3741,9 @@ describe("Dashboard — auto refresh", () => {
     stuckList = [STUCK_PR, NEW_STUCK_PR];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
 
-    fireEvent.click(screen.getByRole("button", { name: /^activity, 1 unseen$/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^activity, 1 unseen$/i }),
+    );
     // Scoped to the panel: the PR is also on the board behind it.
     const feed = within(screen.getByRole("region", { name: "Activity" }));
     expect(feed.getByText("acme/b #2")).toBeInTheDocument();
@@ -3203,7 +3762,9 @@ describe("Dashboard — auto refresh", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     // Reloading is common enough that a session-only feed would mostly be empty.
-    fireEvent.click(screen.getByRole("button", { name: /^activity, 1 unseen$/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^activity, 1 unseen$/i }),
+    );
     const feed = within(screen.getByRole("region", { name: "Activity" }));
     expect(feed.getByText("acme/b #2")).toBeInTheDocument();
   });
@@ -3215,7 +3776,9 @@ describe("Dashboard — auto refresh", () => {
     stuckList = [STUCK_PR, NEW_STUCK_PR];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
 
-    fireEvent.click(screen.getByRole("button", { name: /^activity, 1 unseen$/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^activity, 1 unseen$/i }),
+    );
     fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
     expect(screen.getByText(/nothing yet/i)).toBeInTheDocument();
     expect(localStorage.getItem("prison.activity")).toBe("[]");
@@ -3242,14 +3805,18 @@ describe("Dashboard — auto refresh", () => {
     // it, since re-announcing everything still unseen would repeat older events
     // on every poll. The accumulated history is in the feed.
     expect(document.title).toBe("(2) PRison");
-    expect(constructed.at(-1)?.options?.body).toBe("acme/b #7 — checks failing");
+    expect(constructed.at(-1)?.options?.body).toBe(
+      "acme/b #7 — checks failing",
+    );
   });
 
   it("stores the snapshot so a later mount has something to compare against", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     await waitFor(() =>
-      expect(localStorage.getItem("prison.statusSnapshot")).toContain(STUCK_PR.id),
+      expect(localStorage.getItem("prison.statusSnapshot")).toContain(
+        STUCK_PR.id,
+      ),
     );
   });
 
@@ -3260,7 +3827,9 @@ describe("Dashboard — auto refresh", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     await waitFor(() =>
-      expect(localStorage.getItem("prison.statusSnapshot")).toContain(STUCK_PR.id),
+      expect(localStorage.getItem("prison.statusSnapshot")).toContain(
+        STUCK_PR.id,
+      ),
     );
 
     const writes = vi.spyOn(Storage.prototype, "setItem");
@@ -3278,17 +3847,34 @@ describe("Dashboard — auto refresh", () => {
     localStorage.setItem(
       "prison.statusSnapshot",
       JSON.stringify([
-        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "pending" },
+        {
+          id: STUCK_PR.id,
+          repo: STUCK_PR.repo,
+          number: STUCK_PR.number,
+          url: "u",
+          status: "pending",
+        },
       ]),
     );
     stuckList = [];
-    readyList = [{ ...READY_PR, id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number }];
+    readyList = [
+      {
+        ...READY_PR,
+        id: STUCK_PR.id,
+        repo: STUCK_PR.repo,
+        number: STUCK_PR.number,
+      },
+    ];
 
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("ready pr")).toBeInTheDocument();
 
-    expect(await screen.findByRole("button", { name: /^activity, 1 unseen$/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /^activity, 1 unseen$/i }));
+    expect(
+      await screen.findByRole("button", { name: /^activity, 1 unseen$/i }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: /^activity, 1 unseen$/i }),
+    );
     expect(screen.getByText(/is ready to merge/i)).toBeInTheDocument();
   });
 
@@ -3298,22 +3884,34 @@ describe("Dashboard — auto refresh", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     expect(document.title).toBe("PRison");
-    expect(screen.getByRole("button", { name: /^activity$/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^activity$/i }),
+    ).toBeInTheDocument();
   });
 
   it("reports the catch-up once, not again on the next render", async () => {
     localStorage.setItem(
       "prison.statusSnapshot",
       JSON.stringify([
-        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "pending" },
+        {
+          id: STUCK_PR.id,
+          repo: STUCK_PR.repo,
+          number: STUCK_PR.number,
+          url: "u",
+          status: "pending",
+        },
       ]),
     );
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByRole("button", { name: /^activity, 1 unseen$/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /^activity, 1 unseen$/i }),
+    ).toBeInTheDocument();
 
     // A re-render that carries no fetch — the badge must not climb.
     fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
-    expect(screen.getByRole("button", { name: /^activity, 1 unseen$/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^activity, 1 unseen$/i }),
+    ).toBeInTheDocument();
   });
 
   it("spends the catch-up on the first fetch that landed, even when the board is empty", async () => {
@@ -3325,28 +3923,41 @@ describe("Dashboard — auto refresh", () => {
     localStorage.setItem(
       "prison.statusSnapshot",
       JSON.stringify([
-        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "pending" },
+        {
+          id: STUCK_PR.id,
+          repo: STUCK_PR.repo,
+          number: STUCK_PR.number,
+          url: "u",
+          status: "pending",
+        },
       ]),
     );
     stuckList = [];
 
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText(/no prs stuck on checks/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no prs stuck on checks/i),
+    ).toBeInTheDocument();
 
     // A different scope, whose PR the stored snapshot last saw waiting on
     // checks and which is now failing — a change the catch-up would report if
     // it were still armed.
     stuckList = [STUCK_PR];
-    fireEvent.change(screen.getByRole("combobox", { name: "Filter by organization" }), {
-      target: { value: "acme" },
-    });
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Filter by organization" }),
+      {
+        target: { value: "acme" },
+      },
+    );
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     // The bell only re-renders after the detection effect's own state update
     // lands, so a "nothing was announced" assertion has to let that settle
     // first — reading straight after the row appears passes either way.
     await act(() => vi.advanceTimersByTimeAsync(0));
 
-    expect(screen.getByRole("button", { name: /^activity$/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^activity$/i }),
+    ).toBeInTheDocument();
   });
 
   it("keeps the catch-up armed when every endpoint rejected, and reports it on Retry", async () => {
@@ -3357,20 +3968,32 @@ describe("Dashboard — auto refresh", () => {
     localStorage.setItem(
       "prison.statusSnapshot",
       JSON.stringify([
-        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "pending" },
+        {
+          id: STUCK_PR.id,
+          repo: STUCK_PR.repo,
+          number: STUCK_PR.number,
+          url: "u",
+          status: "pending",
+        },
       ]),
     );
-    const serve = mutableFetch() as unknown as (url: string) => Promise<unknown>;
+    const serve = mutableFetch() as unknown as (
+      url: string,
+    ) => Promise<unknown>;
     let allFail = true;
     global.fetch = vi.fn((url: string) =>
       allFail ? Promise.resolve({ ok: false, status: 500 }) : serve(url),
     ) as unknown as typeof fetch;
 
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText(/failed to load stuck prs/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/failed to load stuck prs/i),
+    ).toBeInTheDocument();
     // Nothing landed, so nothing was reported and the flag is still unspent.
     await act(() => vi.advanceTimersByTimeAsync(0));
-    expect(screen.getByRole("button", { name: /^activity$/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^activity$/i }),
+    ).toBeInTheDocument();
 
     allFail = false;
     fireEvent.click(screen.getAllByRole("button", { name: /^retry$/i })[0]);
@@ -3391,8 +4014,20 @@ describe("Dashboard — auto refresh", () => {
     localStorage.setItem(
       "prison.statusSnapshot",
       JSON.stringify([
-        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "failing" },
-        { id: "gone-1", repo: "acme/b", number: 999, url: "u", status: "failing" },
+        {
+          id: STUCK_PR.id,
+          repo: STUCK_PR.repo,
+          number: STUCK_PR.number,
+          url: "u",
+          status: "failing",
+        },
+        {
+          id: "gone-1",
+          repo: "acme/b",
+          number: 999,
+          url: "u",
+          status: "failing",
+        },
       ]),
     );
     stuckList = [STUCK_PR, NEW_STUCK_PR];
@@ -3401,7 +4036,9 @@ describe("Dashboard — auto refresh", () => {
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
 
     await waitFor(() => {
-      const stored = JSON.parse(localStorage.getItem("prison.statusSnapshot") ?? "[]");
+      const stored = JSON.parse(
+        localStorage.getItem("prison.statusSnapshot") ?? "[]",
+      );
       // "gone-1" is the only id no longer on screen, so it is the only one left
       // at the front — the end of the list is what is still live.
       expect(stored.map((e: { id: string }) => e.id)).toEqual([
@@ -3418,11 +4055,19 @@ describe("Dashboard — auto refresh", () => {
     localStorage.setItem(
       "prison.statusSnapshot",
       JSON.stringify([
-        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "pending" },
+        {
+          id: STUCK_PR.id,
+          repo: STUCK_PR.repo,
+          number: STUCK_PR.number,
+          url: "u",
+          status: "pending",
+        },
       ]),
     );
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByRole("button", { name: /^activity, 1 unseen$/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /^activity, 1 unseen$/i }),
+    ).toBeInTheDocument();
     expect(constructed).toHaveLength(0);
   });
 
@@ -3434,12 +4079,20 @@ describe("Dashboard — auto refresh", () => {
     localStorage.setItem(
       "prison.statusSnapshot",
       JSON.stringify([
-        { id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number, url: "u", status: "pending" },
+        {
+          id: STUCK_PR.id,
+          repo: STUCK_PR.repo,
+          number: STUCK_PR.number,
+          url: "u",
+          status: "pending",
+        },
       ]),
     );
     render(<Dashboard orgs={ORGS} login="testuser" />);
     // The bell still carries it — that is where a catch-up belongs.
-    expect(await screen.findByRole("button", { name: /^activity, 1 unseen$/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /^activity, 1 unseen$/i }),
+    ).toBeInTheDocument();
     expect(constructed).toHaveLength(0);
   });
 
@@ -3448,14 +4101,20 @@ describe("Dashboard — auto refresh", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     openSettings("Auto refresh");
-    fireEvent.click(screen.getByRole("button", { name: /send a test notification/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /send a test notification/i }),
+    );
     expect(constructed).toHaveLength(1);
 
     // Revoked in site settings without a reload: the button would silently do
     // nothing, so the next click swaps it for the blocked hint.
     useNotificationStub("denied");
-    fireEvent.click(screen.getByRole("button", { name: /send a test notification/i }));
-    expect(await screen.findByText(/notifications are blocked/i)).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: /send a test notification/i }),
+    );
+    expect(
+      await screen.findByText(/notifications are blocked/i),
+    ).toBeInTheDocument();
   });
 
   it("re-reads permission when Settings is opened", async () => {
@@ -3485,13 +4144,23 @@ describe("Dashboard — auto refresh", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
 
-    stuckList = [{ ...STUCK_PR, failingChecks: 0, pendingChecks: 1, failing: [], pending: ["build"] }];
+    stuckList = [
+      {
+        ...STUCK_PR,
+        failingChecks: 0,
+        pendingChecks: 1,
+        failing: [],
+        pending: ["build"],
+      },
+    ];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(constructed).toHaveLength(0);
 
     stuckList = [STUCK_PR];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
-    expect(constructed.at(-1)?.options?.body).toBe("acme/b #2 — checks failing");
+    expect(constructed.at(-1)?.options?.body).toBe(
+      "acme/b #2 — checks failing",
+    );
   });
 
   it("counts an item that moves twice while away only once", async () => {
@@ -3500,18 +4169,33 @@ describe("Dashboard — auto refresh", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
 
-    stuckList = [{ ...STUCK_PR, failingChecks: 0, pendingChecks: 1, failing: [], pending: ["build"] }];
+    stuckList = [
+      {
+        ...STUCK_PR,
+        failingChecks: 0,
+        pendingChecks: 1,
+        failing: [],
+        pending: ["build"],
+      },
+    ];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     stuckList = [];
     readyList = [
-      { ...READY_PR, id: STUCK_PR.id, repo: STUCK_PR.repo, number: STUCK_PR.number },
+      {
+        ...READY_PR,
+        id: STUCK_PR.id,
+        repo: STUCK_PR.repo,
+        number: STUCK_PR.number,
+      },
     ];
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
 
     // Same PR, two transitions: the badge is a count of items needing a look,
     // and the notification carries only its latest state.
     expect(document.title).toBe("(1) PRison");
-    expect(constructed.at(-1)?.options?.body).toBe("acme/b #2 is ready to merge");
+    expect(constructed.at(-1)?.options?.body).toBe(
+      "acme/b #2 is ready to merge",
+    );
   });
 
   it("does not re-notify an item that flaps out and back", async () => {
@@ -3563,7 +4247,10 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
       if (commentsIncomplete && url.includes("pr-comments")) {
         return Promise.resolve({
           ok: true,
-          headers: { get: (h: string) => (h === "X-Partial" || h === "X-Incomplete" ? "1" : null) },
+          headers: {
+            get: (h: string) =>
+              h === "X-Partial" || h === "X-Incomplete" ? "1" : null,
+          },
           json: () => Promise.resolve([]),
         });
       }
@@ -3575,14 +4262,14 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
             url.includes("reviewed")
               ? []
               : url.includes("closed")
-              ? makeClosed(1)
-              : url.includes("pr-comments")
-                ? [COMMENT]
-                : url.includes("ready")
-                  ? [READY_PR]
-                  : url.includes("stuck")
-                    ? [STUCK_PR]
-                    : [REVIEW_PR],
+                ? makeClosed(1)
+                : url.includes("pr-comments")
+                  ? [COMMENT]
+                  : url.includes("ready")
+                    ? [READY_PR]
+                    : url.includes("stuck")
+                      ? [STUCK_PR]
+                      : [REVIEW_PR],
           ),
       });
     }) as unknown as typeof fetch;
@@ -3630,55 +4317,70 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
     vi.restoreAllMocks();
   });
 
-  it.each(CASES)("keeps the $list list on screen when its silent poll fails", async ({ path, item }) => {
-    render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText(item)).toBeInTheDocument();
+  it.each(CASES)(
+    "keeps the $list list on screen when its silent poll fails",
+    async ({ path, item }) => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText(item)).toBeInTheDocument();
 
-    failPath = path;
-    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
-    expect(screen.getByText(item)).toBeInTheDocument();
-  });
+      failPath = path;
+      await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+      expect(screen.getByText(item)).toBeInTheDocument();
+    },
+  );
 
-  it.each(CASES)("raises no $list error banner when its silent poll fails", async ({ path, item, banner }) => {
-    render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText(item)).toBeInTheDocument();
+  it.each(CASES)(
+    "raises no $list error banner when its silent poll fails",
+    async ({ path, item, banner }) => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText(item)).toBeInTheDocument();
 
-    failPath = path;
-    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
-    expect(screen.queryByText(banner)).not.toBeInTheDocument();
-  });
+      failPath = path;
+      await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+      expect(screen.queryByText(banner)).not.toBeInTheDocument();
+    },
+  );
 
-  it.each(CASES)("restores the $list list from the next successful poll", async ({ path, item }) => {
-    render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText(item)).toBeInTheDocument();
+  it.each(CASES)(
+    "restores the $list list from the next successful poll",
+    async ({ path, item }) => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText(item)).toBeInTheDocument();
 
-    failPath = path;
-    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
-    failPath = null;
-    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
-    expect(screen.getByText(item)).toBeInTheDocument();
-  });
+      failPath = path;
+      await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+      failPath = null;
+      await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+      expect(screen.getByText(item)).toBeInTheDocument();
+    },
+  );
 
   it("keeps the comments on screen when a silent poll comes back missing a search", async () => {
     // A 200 that dropped one of the two searches is a failure wearing a
     // success's clothes. Replacing the list with it would wipe the threads,
     // and the next poll would then announce them all over again as new.
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("please fix the null check")).toBeInTheDocument();
+    expect(
+      await screen.findByText("please fix the null check"),
+    ).toBeInTheDocument();
 
     commentsIncomplete = true;
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
     expect(screen.getByText("please fix the null check")).toBeInTheDocument();
     // The section stays silent here on purpose, so the global banner is the
     // only thing left to say the list is older than the rest of the page.
-    expect(screen.getByText(/some data couldn't be loaded/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/some data couldn't be loaded/i),
+    ).toBeInTheDocument();
   });
 
   it("still takes a truncated list on a refresh the viewer asked for", async () => {
     // Asked-for is the opposite case: someone is looking, the banner explains
     // the gap, and freezing the list would hide it.
     render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("please fix the null check")).toBeInTheDocument();
+    expect(
+      await screen.findByText("please fix the null check"),
+    ).toBeInTheDocument();
 
     const refreshButton = screen.getByRole("button", { name: /^refresh$/i });
     await waitFor(() => expect(refreshButton).toBeEnabled());
@@ -3686,14 +4388,20 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
     commentsIncomplete = true;
     fireEvent.click(refreshButton);
     await waitFor(() =>
-      expect(screen.queryByText("please fix the null check")).not.toBeInTheDocument(),
+      expect(
+        screen.queryByText("please fix the null check"),
+      ).not.toBeInTheDocument(),
     );
     // And it says so, rather than rendering "No comments awaiting your reply" —
     // a confident claim built on half a list.
-    expect(screen.getByText(/some comment threads couldn't be loaded/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/some comment threads couldn't be loaded/i),
+    ).toBeInTheDocument();
     // Once, not twice: the section's own message replaces the global banner
     // rather than sitting under it with a second Retry button.
-    expect(screen.queryByText(/some data couldn't be loaded/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/some data couldn't be loaded/i),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -3757,19 +4465,22 @@ describe("Dashboard — column pairing", () => {
   it.each([
     ["waiting-on-your-review", "recently-reviewed", "stuck-on-checks"],
     ["stuck-on-checks", "recently-closed", "waiting-on-your-review"],
-  ])("keeps %s and %s in a column that excludes %s", async (queue, history, other) => {
-    render(<Dashboard orgs={ORGS} login="testuser" />);
-    expect(await screen.findByText("ready pr")).toBeInTheDocument();
+  ])(
+    "keeps %s and %s in a column that excludes %s",
+    async (queue, history, other) => {
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await screen.findByText("ready pr")).toBeInTheDocument();
 
-    const column = nearestCommon(
-      document.getElementById(queue)!,
-      document.getElementById(history)!,
-    );
-    expect(column).not.toBeNull();
-    // The column that holds both must not reach across to the other queue —
-    // that containment is what a shared grid row would reintroduce.
-    expect(column!.contains(document.getElementById(other))).toBe(false);
-  });
+      const column = nearestCommon(
+        document.getElementById(queue)!,
+        document.getElementById(history)!,
+      );
+      expect(column).not.toBeNull();
+      // The column that holds both must not reach across to the other queue —
+      // that containment is what a shared grid row would reintroduce.
+      expect(column!.contains(document.getElementById(other))).toBe(false);
+    },
+  );
 });
 
 // One box over six lists. The rows are already on the page, so this filters
@@ -3799,7 +4510,9 @@ describe("Dashboard — searching the board", () => {
   });
 
   const search = async (text: string) => {
-    const box = await screen.findByRole("searchbox", { name: /search the board/i });
+    const box = await screen.findByRole("searchbox", {
+      name: /search the board/i,
+    });
     fireEvent.change(box, { target: { value: text } });
     return box;
   };
@@ -3813,7 +4526,9 @@ describe("Dashboard — searching the board", () => {
     // Rows from the other lists are gone, not merely reordered.
     expect(screen.queryByText("ready pr")).not.toBeInTheDocument();
     expect(screen.queryByText("review pr")).not.toBeInTheDocument();
-    expect(screen.queryByText("please fix the null check")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("please fix the null check"),
+    ).not.toBeInTheDocument();
   });
 
   // The question the board could answer and could not be asked.
@@ -3844,8 +4559,12 @@ describe("Dashboard — searching the board", () => {
     expect(await screen.findByText("review pr")).toBeInTheDocument();
 
     await search("zzz");
-    expect(screen.getAllByText(/nothing here matches “zzz”/i).length).toBeGreaterThan(0);
-    expect(screen.queryByText("No PRs waiting on your review 🎉")).not.toBeInTheDocument();
+    expect(
+      screen.getAllByText(/nothing here matches “zzz”/i).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.queryByText("No PRs waiting on your review 🎉"),
+    ).not.toBeInTheDocument();
   });
 
   it("counts what is on screen, so the tiles and the index agree with it", async () => {

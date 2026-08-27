@@ -353,6 +353,45 @@ describe("Dashboard", () => {
     expect(puts).toHaveLength(0);
   });
 
+  // A container runs the tag it was started with forever. PRison can say when
+  // that has fallen behind — but it is a self-hosted tool reaching the network
+  // on its own, so it does that only once asked.
+  it("never asks about releases unless told to", async () => {
+    global.fetch = okFetch();
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    const asked = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
+      ([url]) => String(url).includes("/api/latest-release"),
+    );
+    expect(asked).toHaveLength(0);
+  });
+
+  it("remembers the release check across reloads", async () => {
+    global.fetch = okFetch();
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    openSettings("About");
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /tell me when a newer/i }),
+    );
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.updateChecks")).toBe("true"),
+    );
+  });
+
+  it("asks about releases when the setting says to", async () => {
+    localStorage.setItem("prison.updateChecks", "true");
+    global.fetch = okFetch();
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(
+        (global.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) =>
+          String(url).includes("/api/latest-release"),
+        ),
+      ).toHaveLength(1),
+    );
+  });
+
   // Until this, nobody could answer "what does a refresh cost?" — including
   // the people who had just spent an hour finding out the hard way.
   it("adds up what the refresh cost and says what is left", async () => {

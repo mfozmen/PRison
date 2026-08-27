@@ -138,9 +138,10 @@ const GITHUB_RESERVED_PATHS = new Set([
 ]);
 
 // …but for THESE routes the identity moves to the SECOND segment:
-// github.com/orgs/<org>/teams, github.com/apps/<slug>, github.com/marketplace/<vendor>.
+// github.com/orgs/<org>/teams, github.com/apps/<slug>, github.com/marketplace/<vendor>,
+// and api.github.com/repos/<owner>/<repo> for the REST API.
 // Skipping the whole match here would wave a real org straight through.
-const IDENTITY_IN_SECOND_SEGMENT = new Set(["orgs", "apps", "marketplace"]);
+const IDENTITY_IN_SECOND_SEGMENT = new Set(["orgs", "apps", "marketplace", "repos"]);
 
 const SKIP_DIRS = new Set(["node_modules", ".next", ".git", "coverage", "dist"]);
 // Lockfiles are machine-generated and full of upstream package metadata

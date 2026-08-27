@@ -16,20 +16,26 @@ describe("scanSource", () => {
   // The guard is only worth having if it actually fires. These pin the two
   // evasions found in review: an unchecked repo half, and a bare owner.
   it("rejects a real-looking owner", () => {
-    expect(scanSource('nameWithOwner: "realcorp/api"')).toEqual(["owner:realcorp"]);
+    expect(scanSource('nameWithOwner: "realcorp/api"')).toEqual([
+      "owner:realcorp",
+    ]);
     expect(scanSource('login: "jdoe"')).toEqual(["owner:jdoe"]);
-    expect(scanSource('owners={["acme", "realcorp"]}')).toEqual(["owner:realcorp"]);
+    expect(scanSource('owners={["acme", "realcorp"]}')).toEqual([
+      "owner:realcorp",
+    ]);
     expect(scanSource('author: "jdoe"')).toEqual(["owner:jdoe"]);
   });
 
   it("rejects a real-looking repository even under an allowlisted owner", () => {
-    expect(scanSource('nameWithOwner: "acme/internal-billing-service"')).toEqual([
-      "repo:internal-billing-service",
-    ]);
-    expect(scanSource('repo: "acme/secret-project"')).toEqual(["repo:secret-project"]);
-    expect(scanSource("https://github.com/acme/secret-project/pull/1")).toEqual([
+    expect(
+      scanSource('nameWithOwner: "acme/internal-billing-service"'),
+    ).toEqual(["repo:internal-billing-service"]);
+    expect(scanSource('repo: "acme/secret-project"')).toEqual([
       "repo:secret-project",
     ]);
+    expect(scanSource("https://github.com/acme/secret-project/pull/1")).toEqual(
+      ["repo:secret-project"],
+    );
   });
 
   it("accepts the placeholders in use", () => {
@@ -47,18 +53,31 @@ describe("scanSource", () => {
   // /orgs/, /apps/ and /marketplace/ move the identity to the SECOND segment.
   // Skipping the whole match on the reserved first segment waved a real org through.
   it("checks the second segment for routes that carry the identity there", () => {
-    expect(scanSource("https://github.com/orgs/realcompany/teams/eng")).toEqual([
-      "owner:realcompany",
-    ]);
+    expect(scanSource("https://github.com/orgs/realcompany/teams/eng")).toEqual(
+      ["owner:realcompany"],
+    );
     expect(scanSource("https://github.com/apps/internal-bot-slug")).toEqual([
       "owner:internal-bot-slug",
     ]);
-    expect(scanSource("https://github.com/orgs/community/discussions/1")).toEqual([]);
+    expect(
+      scanSource("https://github.com/orgs/community/discussions/1"),
+    ).toEqual([]);
+    // The REST API has the same shape: api.github.com/repos/<owner>/<repo>.
+    expect(
+      scanSource(
+        "https://api.github.com/repos/realcompany/secrets/releases/latest",
+      ),
+    ).toEqual(["owner:realcompany"]);
+    expect(
+      scanSource("https://api.github.com/repos/mfozmen/PRison/releases/latest"),
+    ).toEqual([]);
   });
 
   it("treats github.com/<user>.png as an avatar, not a repo path", () => {
     expect(scanSource('src="https://github.com/shadcn.png"')).toEqual([]);
-    expect(scanSource('src="https://github.com/realperson.png"')).toEqual(["owner:realperson"]);
+    expect(scanSource('src="https://github.com/realperson.png"')).toEqual([
+      "owner:realperson",
+    ]);
   });
 
   // Documented scope limit: an allowlist cannot see NAMES in prose. If this ever
@@ -69,17 +88,16 @@ describe("scanSource", () => {
 
   // Ticket references have a shape, not a name, so they ARE caught.
   it("catches a foreign issue/PR reference, glued or spaced", () => {
-    expect(scanSource('it("regression: some-service#90210", () => {})')).toEqual([
-      "ticket:90210",
-    ]);
+    expect(
+      scanSource('it("regression: some-service#90210", () => {})'),
+    ).toEqual(["ticket:90210"]);
     // GitHub's own convention puts a space before the "#".
     expect(scanSource("// Fixes #90210")).toEqual(["ticket:90210"]);
     expect(scanSource("See #90210 for context")).toEqual(["ticket:90210"]);
     // The PR number precedes the "#" here, so "#\d+" alone would miss it.
-    expect(scanSource("// e.g. .../pull/90211#discussion_r9998887776")).toEqual([
-      "ticket:90211",
-      "ticket:discussion_r9998887776",
-    ]);
+    expect(scanSource("// e.g. .../pull/90211#discussion_r9998887776")).toEqual(
+      ["ticket:90211", "ticket:discussion_r9998887776"],
+    );
   });
 
   // release-it reads a bare "#15803D" in a commit body as an issue reference and
@@ -87,7 +105,9 @@ describe("scanSource", () => {
   // was — and the guard has to survive its own release notes.
   it("does not read a hex colour in an issue URL as a ticket", () => {
     expect(
-      scanSource("closes [#15803D](https://github.com/acme/repo/issues/15803D)"),
+      scanSource(
+        "closes [#15803D](https://github.com/acme/repo/issues/15803D)",
+      ),
     ).toEqual([]);
     // Still caught when the digits actually end the number.
     expect(scanSource("https://github.com/acme/repo/issues/15803")).toEqual([
@@ -108,7 +128,9 @@ describe("scanSource", () => {
   // search node, genericized everywhere except its `number:`.
   it("catches a real PR number left in a bare `number:` fixture field", () => {
     expect(scanSource("number: 90210,")).toEqual(["ticket:90210"]);
-    expect(scanSource('{ id: "92", url: "u92", number: 90210 }')).toEqual(["ticket:90210"]);
+    expect(scanSource('{ id: "92", url: "u92", number: 90210 }')).toEqual([
+      "ticket:90210",
+    ]);
     // A pasted GraphQL/REST response has quoted keys.
     expect(scanSource('{"number": 90210}')).toEqual(["ticket:90210"]);
   });
@@ -130,19 +152,27 @@ describe("scanSource", () => {
 
   it("does not trip on ordinary large numbers", () => {
     expect(scanSource("width={1920}")).toEqual([]);
-    expect(scanSource("const PORT = 3000; const TIMEOUT_MS = 86_400_000;")).toEqual([]);
+    expect(
+      scanSource("const PORT = 3000; const TIMEOUT_MS = 86_400_000;"),
+    ).toEqual([]);
     expect(scanSource("zIndex: 1000")).toEqual([]);
   });
 
   // A reference of this shape reached the public repo. Its number was two digits,
   // so the four-digit ticket floor never saw it — but the name was glued to the "#".
   it("catches a cross-repo reference however short its number", () => {
-    expect(scanSource('(e.g. some-service#66 showed "6d")')).toEqual(["ticket:some-service#66"]);
-    expect(scanSource("fixed by other-repo#7")).toEqual(["ticket:other-repo#7"]);
+    expect(scanSource('(e.g. some-service#66 showed "6d")')).toEqual([
+      "ticket:some-service#66",
+    ]);
+    expect(scanSource("fixed by other-repo#7")).toEqual([
+      "ticket:other-repo#7",
+    ]);
   });
 
   it("reports a glued four-digit reference once, not twice", () => {
-    expect(scanSource("regression: some-service#90210")).toEqual(["ticket:90210"]);
+    expect(scanSource("regression: some-service#90210")).toEqual([
+      "ticket:90210",
+    ]);
   });
 
   // This repo is a Next.js app; `next#456` is a public upstream issue link, not a
@@ -150,7 +180,9 @@ describe("scanSource", () => {
   it("lets a reference to a declared dependency through, but not an unknown repo", () => {
     expect(scanSource("workaround for next#456")).toEqual([]);
     expect(scanSource("bump after vitest#42")).toEqual([]);
-    expect(scanSource("see some-service#456")).toEqual(["ticket:some-service#456"]);
+    expect(scanSource("see some-service#456")).toEqual([
+      "ticket:some-service#456",
+    ]);
   });
 
   it("leaves a spaced reference and this repo's own name alone", () => {
@@ -163,15 +195,19 @@ describe("scanSource", () => {
   // The other half of the same escape: the scrub replaced the owner and left the
   // repository name standing.
   it("catches a repo name left under a placeholder owner, in bare prose", () => {
-    expect(scanSource("typing it returned repos instead of acme/some-service.")).toEqual([
-      "repo:some-service",
+    expect(
+      scanSource("typing it returned repos instead of acme/some-service."),
+    ).toEqual(["repo:some-service"]);
+    expect(scanSource("globex/secret-service")).toEqual([
+      "repo:secret-service",
     ]);
-    expect(scanSource("globex/secret-service")).toEqual(["repo:secret-service"]);
   });
 
   it("does not read a branch name or a type union as owner/repo", () => {
     // `mfozmen` is deliberately not a scrub owner: this is how merges name branches.
-    expect(scanSource("Merge pull request #1 from mfozmen/ci/publish-image")).toEqual([]);
+    expect(
+      scanSource("Merge pull request #1 from mfozmen/ci/publish-image"),
+    ).toEqual([]);
     // `org` is deliberately not a scrub owner: this is a TypeScript union.
     expect(scanSource("function f(x: Org/StuckPr) {}")).toEqual([]);
     expect(scanSource("the light/dark toggle")).toEqual([]);
@@ -217,14 +253,20 @@ describe("scanCommitMessages", { timeout: 30_000 }, () => {
     commit(source, "chore: innocent tip");
 
     const shallow = mkdtempSync(join(tmpdir(), "prison-shallow-"));
-    execFileSync("git", ["clone", "--depth", "1", `file://${source}`, shallow], {
-      stdio: "ignore",
-    });
+    execFileSync(
+      "git",
+      ["clone", "--depth", "1", `file://${source}`, shallow],
+      {
+        stdio: "ignore",
+      },
+    );
 
     // Proof the shallow clone would otherwise hide the leak: it holds only the tip.
-    expect(execFileSync("git", ["-C", shallow, "rev-list", "--count", "HEAD"], {
-      encoding: "utf8",
-    }).trim()).toBe("1");
+    expect(
+      execFileSync("git", ["-C", shallow, "rev-list", "--count", "HEAD"], {
+        encoding: "utf8",
+      }).trim(),
+    ).toBe("1");
 
     expect(() => scanCommitMessages(shallow)).toThrow(/shallow clone/);
   });
@@ -232,7 +274,8 @@ describe("scanCommitMessages", { timeout: 30_000 }, () => {
 
 function gitInit(): string {
   const root = mkdtempSync(join(tmpdir(), "prison-git-"));
-  const run = (...args: string[]) => execFileSync("git", ["-C", root, ...args], { stdio: "ignore" });
+  const run = (...args: string[]) =>
+    execFileSync("git", ["-C", root, ...args], { stdio: "ignore" });
   run("init", "--initial-branch=main");
   run("config", "user.email", "test@example.com");
   run("config", "user.name", "Test");
@@ -244,7 +287,9 @@ function gitInit(): string {
 function commit(root: string, message: string): void {
   writeFileSync(join(root, "f.txt"), message);
   execFileSync("git", ["-C", root, "add", "f.txt"], { stdio: "ignore" });
-  execFileSync("git", ["-C", root, "commit", "--no-gpg-sign", "-m", message], { stdio: "ignore" });
+  execFileSync("git", ["-C", root, "commit", "--no-gpg-sign", "-m", message], {
+    stdio: "ignore",
+  });
 }
 
 describe("scanRepo", () => {
@@ -256,7 +301,10 @@ describe("scanRepo", () => {
     const root = mkdtempSync(join(tmpdir(), "prison-guard-"));
     mkdirSync(join(root, "nested"));
     writeFileSync(join(root, "clean.ts"), 'const a = { repo: "acme/api" };');
-    writeFileSync(join(root, "nested", "leaky.ts"), 'const b = { login: "jdoe" };');
+    writeFileSync(
+      join(root, "nested", "leaky.ts"),
+      'const b = { login: "jdoe" };',
+    );
     expect(scanRepo(root)).toEqual(["nested/leaky.ts: owner:jdoe"]);
   });
 
@@ -267,8 +315,14 @@ describe("scanRepo", () => {
   it("exempts ticket shapes in the docs and the guard, but still checks their names", () => {
     const root = mkdtempSync(join(tmpdir(), "prison-guard-"));
     mkdirSync(join(root, "lib"));
-    writeFileSync(join(root, "REVIEW.md"), 'e.g. #90210 — but login: "jdoe" is not ok');
-    writeFileSync(join(root, "lib", "generic-fixtures.ts"), 'e.g. #90210 and login: "jdoe"');
+    writeFileSync(
+      join(root, "REVIEW.md"),
+      'e.g. #90210 — but login: "jdoe" is not ok',
+    );
+    writeFileSync(
+      join(root, "lib", "generic-fixtures.ts"),
+      'e.g. #90210 and login: "jdoe"',
+    );
     expect(scanRepo(root).sort()).toEqual([
       "REVIEW.md: owner:jdoe",
       "lib/generic-fixtures.ts: owner:jdoe",
@@ -300,13 +354,17 @@ describe("walk", () => {
       // The expectation below is the same either way — walk skips symlinks, so
       // link.ts never appears — only the symlink leg goes uncovered there.
     }
-    expect(walk(root).map((f) => f.slice(root.length + 1))).toEqual(["keep.ts"]);
+    expect(walk(root).map((f) => f.slice(root.length + 1))).toEqual([
+      "keep.ts",
+    ]);
   });
 });
 
 describe("resolveGitBin", () => {
   it("returns the first candidate that exists", () => {
-    expect(resolveGitBin(["/a/git", "/b/git"], (p) => p === "/b/git")).toBe("/b/git");
+    expect(resolveGitBin(["/a/git", "/b/git"], (p) => p === "/b/git")).toBe(
+      "/b/git",
+    );
   });
 
   // The bare-name fallback is the only path that would resolve git via $PATH.

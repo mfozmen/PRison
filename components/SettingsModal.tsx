@@ -9,7 +9,11 @@ import {
   type ReactNode,
 } from "react";
 import { normalizeAll } from "@/lib/tracked-checks";
-import type { TrackedChecks, TrackedCheck, StoredCheck } from "@/lib/tracked-checks";
+import type {
+  TrackedChecks,
+  TrackedCheck,
+  StoredCheck,
+} from "@/lib/tracked-checks";
 import { EMPTY_IGNORED, type IgnoredChecks } from "@/lib/ignored-checks";
 import { RepoCombobox } from "./RepoCombobox";
 import { POLL_INTERVAL_OPTIONS } from "@/lib/notify";
@@ -61,6 +65,8 @@ export interface SettingsModalProps {
    * user finds out what they did there, and takes it back. */
   ignored?: IgnoredChecks;
   onIgnoredChange?: (next: IgnoredChecks) => void;
+  updateChecks?: boolean;
+  onUpdateChecksChange?: (v: boolean) => void;
 }
 
 // Comments stays first: it is the section the modal opens on, and the one most
@@ -93,7 +99,9 @@ function CheckList({
   // The rows are held locally so a name can pass through empty on its way to a
   // new one; only named checks are pushed up. The modal unmounts when it
   // closes, so this is re-seeded from props every time it opens.
-  const [items, setItems] = useState<TrackedCheck[]>(() => normalizeAll(checks));
+  const [items, setItems] = useState<TrackedCheck[]>(() =>
+    normalizeAll(checks),
+  );
   const [draft, setDraft] = useState("");
   const [draftRequired, setDraftRequired] = useState(true);
 
@@ -131,7 +139,11 @@ function CheckList({
             aria-label={`Check ${i + 1} for ${scope}`}
             value={check.name}
             onChange={(e) =>
-              commit(items.map((c, j) => (j === i ? { ...c, name: e.target.value } : c)))
+              commit(
+                items.map((c, j) =>
+                  j === i ? { ...c, name: e.target.value } : c,
+                ),
+              )
             }
             className={fieldClass}
           />
@@ -142,7 +154,9 @@ function CheckList({
               aria-label={`${check.name} is required for ${scope}`}
               onChange={(e) =>
                 commit(
-                  items.map((c, j) => (j === i ? { ...c, required: e.target.checked } : c)),
+                  items.map((c, j) =>
+                    j === i ? { ...c, required: e.target.checked } : c,
+                  ),
                 )
               }
               className={boxClass}
@@ -155,7 +169,13 @@ function CheckList({
             onClick={() => commit(items.filter((_, j) => j !== i))}
             className="flex min-h-[44px] min-w-[44px] shrink-0 cursor-pointer items-center justify-center text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <svg
+              aria-hidden="true"
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="none"
+            >
               <path
                 d="M11 3L3 11M3 3l8 8"
                 stroke="currentColor"
@@ -191,7 +211,11 @@ function CheckList({
           />
           Required
         </label>
-        <SettingButton onClick={add} className="shrink-0 py-1.5" ariaLabel={`Add check to ${scope}`}>
+        <SettingButton
+          onClick={add}
+          className="shrink-0 py-1.5"
+          ariaLabel={`Add check to ${scope}`}
+        >
           Add
         </SettingButton>
       </div>
@@ -218,7 +242,11 @@ function NameList({
   // same rules the tracked list edits under, for the same reasons.
   function commit(next: string[]) {
     const seen = new Set<string>();
-    onChange(next.map((n) => n.trim()).filter((n) => n !== "" && !seen.has(n) && seen.add(n)));
+    onChange(
+      next
+        .map((n) => n.trim())
+        .filter((n) => n !== "" && !seen.has(n) && seen.add(n)),
+    );
   }
 
   function add() {
@@ -239,7 +267,9 @@ function NameList({
             type="text"
             aria-label={`Ignored check ${i + 1} for ${scope}`}
             value={name}
-            onChange={(e) => commit(names.map((n, j) => (j === i ? e.target.value : n)))}
+            onChange={(e) =>
+              commit(names.map((n, j) => (j === i ? e.target.value : n)))
+            }
             className={fieldClass}
           />
           <button
@@ -248,8 +278,19 @@ function NameList({
             onClick={() => commit(names.filter((_, j) => j !== i))}
             className="flex min-h-[44px] min-w-[44px] shrink-0 cursor-pointer items-center justify-center text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M11 3L3 11M3 3l8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <svg
+              aria-hidden="true"
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="none"
+            >
+              <path
+                d="M11 3L3 11M3 3l8 8"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
         </div>
@@ -269,7 +310,11 @@ function NameList({
           }}
           className={fieldClass}
         />
-        <SettingButton onClick={add} className="shrink-0 py-1.5" ariaLabel={addLabel}>
+        <SettingButton
+          onClick={add}
+          className="shrink-0 py-1.5"
+          ariaLabel={addLabel}
+        >
           Ignore
         </SettingButton>
       </div>
@@ -332,7 +377,10 @@ function ScopeEditor({
   const repoScopes: Scope[] = Array.from(new Set([...repos, ...picked])).map(
     (key): Scope => ({ kind: "repo", key }),
   );
-  const scopes: Scope[] = [...owners.map((key): Scope => ({ kind: "owner", key })), ...repoScopes];
+  const scopes: Scope[] = [
+    ...owners.map((key): Scope => ({ kind: "owner", key })),
+    ...repoScopes,
+  ];
 
   // Opening on an empty owner default would hide the one scope the user did
   // configure behind a picker they have not noticed yet.
@@ -381,7 +429,10 @@ function ScopeEditor({
             {owners.length > 0 && (
               <optgroup label={ownerGroupLabel}>
                 {owners.map((owner) => (
-                  <option key={owner} value={scopeId({ kind: "owner", key: owner })}>
+                  <option
+                    key={owner}
+                    value={scopeId({ kind: "owner", key: owner })}
+                  >
                     {optionLabel({ kind: "owner", key: owner })}
                   </option>
                 ))}
@@ -399,7 +450,10 @@ function ScopeEditor({
           </select>
         )}
         {!adding && (
-          <SettingButton onClick={() => setAdding(true)} className="shrink-0 py-1.5">
+          <SettingButton
+            onClick={() => setAdding(true)}
+            className="shrink-0 py-1.5"
+          >
             Add repository
           </SettingButton>
         )}
@@ -423,8 +477,16 @@ function ScopeEditor({
 
       {adding && (
         <div className="mb-4 flex items-center gap-2">
-          <RepoCombobox value="" onChange={addRepo} suggestions={availableRepos} owners={owners} />
-          <SettingButton onClick={() => setAdding(false)} className="shrink-0 py-1.5">
+          <RepoCombobox
+            value=""
+            onChange={addRepo}
+            suggestions={availableRepos}
+            owners={owners}
+          />
+          <SettingButton
+            onClick={() => setAdding(false)}
+            className="shrink-0 py-1.5"
+          >
             Cancel
           </SettingButton>
         </div>
@@ -434,7 +496,8 @@ function ScopeEditor({
         children(current)
       ) : (
         <p className="text-xs text-muted">
-          No owners loaded yet &mdash; add a repository by name to configure one.
+          No owners loaded yet &mdash; add a repository by name to configure
+          one.
         </p>
       )}
     </div>
@@ -488,7 +551,13 @@ function SettingButton({
 
 /** What the check found, in one sentence. Every branch that names a release
  * links to it, because the next thing anyone wants is the release notes. */
-function UpdateResult({ latest, version }: { latest: string | null; version?: string }) {
+function UpdateResult({
+  latest,
+  version,
+}: {
+  latest: string | null;
+  version?: string;
+}) {
   if (!latest) return <>No published release yet.</>;
   // releaseUrl builds the tag back from a bare version; tagName arrives with
   // the `v` already on it.
@@ -536,6 +605,8 @@ export function SettingsModal({
   onTestNotification,
   ignored = EMPTY_IGNORED,
   onIgnoredChange = () => {},
+  updateChecks = false,
+  onUpdateChecksChange = () => {},
 }: SettingsModalProps) {
   // Read inside the component, not at module scope, so tests can stub it.
   const version = appVersion();
@@ -553,18 +624,27 @@ export function SettingsModal({
       const res = await fetch("/api/latest-release");
       if (!res.ok) throw new Error(String(res.status));
       const { tagName } = await res.json();
-      setUpdate({ status: "done", latest: typeof tagName === "string" ? tagName : null });
+      setUpdate({
+        status: "done",
+        latest: typeof tagName === "string" ? tagName : null,
+      });
     } catch {
       setUpdate({ status: "error" });
     }
   }
   // The family is set here, the ground in the header. Both live on <html>, so
   // this stays in step with the header button without either owning the state.
-  const theme = useSyncExternalStore(subscribeToTheme, getTheme, getServerTheme);
+  const theme = useSyncExternalStore(
+    subscribeToTheme,
+    getTheme,
+    getServerTheme,
+  );
   const mode = useSyncExternalStore(subscribeToTheme, getMode, getServerMode);
 
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const tabRefs = useRef<Partial<Record<SectionId, HTMLButtonElement | null>>>({});
+  const tabRefs = useRef<Partial<Record<SectionId, HTMLButtonElement | null>>>(
+    {},
+  );
 
   const [section, setSection] = useState<SectionId>(SECTIONS[0].id);
 
@@ -618,7 +698,11 @@ export function SettingsModal({
   // board, not chosen here, so there is no empty row to fill in.
   const ignoredRepos = Object.keys(ignored.repos);
 
-  function setIgnoredIn(bucket: "orgs" | "repos", scope: string, names: string[]) {
+  function setIgnoredIn(
+    bucket: "orgs" | "repos",
+    scope: string,
+    names: string[],
+  ) {
     const next = { ...ignored[bucket] };
     if (names.length > 0) next[scope] = names;
     else delete next[scope];
@@ -652,9 +736,7 @@ export function SettingsModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-16"
-    >
+    <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-16">
       {/* Scrim */}
       <div className="absolute inset-0 bg-black/50" aria-hidden="true" />
 
@@ -667,7 +749,9 @@ export function SettingsModal({
       >
         {/* Header row */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4">
-          <h2 id="settings-title" className="font-semibold text-foreground">Settings</h2>
+          <h2 id="settings-title" className="font-semibold text-foreground">
+            Settings
+          </h2>
           <button
             ref={closeButtonRef}
             type="button"
@@ -741,8 +825,8 @@ export function SettingsModal({
             {section === "appearance" && (
               <fieldset className="m-0 border-0 p-0">
                 <legend className="mb-3 text-sm text-muted">
-                  A theme brings its own colours and typefaces. Each swatch below
-                  is that theme rendering itself on your current ground.
+                  A theme brings its own colours and typefaces. Each swatch
+                  below is that theme rendering itself on your current ground.
                 </legend>
                 <div className="flex flex-col gap-2">
                   {THEMES.map((t) => (
@@ -803,12 +887,19 @@ export function SettingsModal({
             {section === "comments" && (
               <div className="space-y-2">
                 <p className="mb-3 text-sm text-muted">
-                  What shows up in <strong className="font-medium text-foreground">Comments awaiting your reply</strong>.
+                  What shows up in{" "}
+                  <strong className="font-medium text-foreground">
+                    Comments awaiting your reply
+                  </strong>
+                  .
                 </p>
                 <SettingCheckbox checked={showBots} onChange={onShowBotsChange}>
                   Show bot comments
                 </SettingCheckbox>
-                <SettingCheckbox checked={hideReacted} onChange={onHideReactedChange}>
+                <SettingCheckbox
+                  checked={hideReacted}
+                  onChange={onHideReactedChange}
+                >
                   Hide comments I reacted to
                 </SettingCheckbox>
               </div>
@@ -816,14 +907,19 @@ export function SettingsModal({
 
             {section === "auto-refresh" && (
               <div>
-                <SettingCheckbox checked={autoRefresh} onChange={onAutoRefreshChange}>
+                <SettingCheckbox
+                  checked={autoRefresh}
+                  onChange={onAutoRefreshChange}
+                >
                   Auto refresh
                 </SettingCheckbox>
                 <label className="mt-2 flex items-center gap-2 text-sm text-muted">
                   <span>Check</span>
                   <select
                     value={pollInterval}
-                    onChange={(e) => onPollIntervalChange(Number(e.target.value))}
+                    onChange={(e) =>
+                      onPollIntervalChange(Number(e.target.value))
+                    }
                     disabled={!autoRefresh}
                     aria-label="Auto refresh interval"
                     className="min-h-[36px] rounded-md border border-border bg-surface px-2 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
@@ -848,13 +944,16 @@ export function SettingsModal({
                   // It was an invisible one until this line.
                   <p className="mt-2 text-xs text-muted">
                     That refresh cost{" "}
-                    <strong className="font-medium text-foreground">{budget.cost} points</strong> of
-                    GitHub&apos;s hourly allowance;{" "}
+                    <strong className="font-medium text-foreground">
+                      {budget.cost} points
+                    </strong>{" "}
+                    of GitHub&apos;s hourly allowance;{" "}
                     <strong className="font-medium text-foreground">
                       {budget.remaining.toLocaleString()}
                     </strong>{" "}
-                    are left until it returns to full. The allowance is per account, so anything
-                    else signed in as you spends from the same pocket.
+                    are left until it returns to full. The allowance is per
+                    account, so anything else signed in as you spends from the
+                    same pocket.
                   </p>
                 )}
                 {/* All three only apply while auto refresh is on: with it off
@@ -863,8 +962,8 @@ export function SettingsModal({
                 {autoRefresh && notifPermission === "default" && (
                   <div className="mt-3">
                     <p className="mb-2 text-xs text-muted">
-                      Your browser hasn&apos;t been asked yet, so you&apos;ll get
-                      the tab badge but no desktop notification.
+                      Your browser hasn&apos;t been asked yet, so you&apos;ll
+                      get the tab badge but no desktop notification.
                     </p>
                     <SettingButton onClick={onEnableNotifications}>
                       Enable notifications
@@ -873,8 +972,8 @@ export function SettingsModal({
                 )}
                 {autoRefresh && notifPermission === "denied" && (
                   <p className="mt-3 text-xs text-muted">
-                    Notifications are blocked in your browser — you&apos;ll still
-                    get the tab badge.
+                    Notifications are blocked in your browser — you&apos;ll
+                    still get the tab badge.
                   </p>
                 )}
                 {autoRefresh && notifPermission === "granted" && (
@@ -889,8 +988,8 @@ export function SettingsModal({
                         indistinguishable from a broken button. */}
                     <p className="mt-2 text-xs text-muted">
                       Nothing appeared? The browser has permission, so the block
-                      is underneath it: your operating system decides separately,
-                      and it refuses in silence. On macOS that is{" "}
+                      is underneath it: your operating system decides
+                      separately, and it refuses in silence. On macOS that is{" "}
                       <strong className="font-medium text-foreground">
                         System Settings → Notifications
                       </strong>
@@ -916,7 +1015,8 @@ export function SettingsModal({
                     >
                       The menu bar
                     </a>{" "}
-                    shows the same count on macOS without needing permission from anyone.
+                    shows the same count on macOS without needing permission
+                    from anyone.
                   </p>
                 )}
               </div>
@@ -925,12 +1025,15 @@ export function SettingsModal({
             {section === "tracked-checks" && (
               <div>
                 <p className="mb-6 text-sm text-muted">
-                  Name the checks each PR needs (e.g. a manual qa/smoke). We&apos;ll show
-                  them as Awaiting until they report — handy for gates GitHub
-                  doesn&apos;t expose. Tick{" "}
-                  <strong className="font-medium text-foreground">Required</strong> and the
-                  check holds the PR out of Ready to merge; leave it unticked and the
-                  check is shown for information and blocks nothing.
+                  Name the checks each PR needs (e.g. a manual qa/smoke).
+                  We&apos;ll show them as Awaiting until they report — handy for
+                  gates GitHub doesn&apos;t expose. Tick{" "}
+                  <strong className="font-medium text-foreground">
+                    Required
+                  </strong>{" "}
+                  and the check holds the PR out of Ready to merge; leave it
+                  unticked and the check is shown for information and blocks
+                  nothing.
                 </p>
 
                 {/* Owner defaults cover organizations *and* the personal
@@ -942,9 +1045,15 @@ export function SettingsModal({
                   repos={Object.keys(value.repos)}
                   availableRepos={availableRepos}
                   count={(s) =>
-                    normalizeAll(s.kind === "owner" ? value.orgs[s.key] : value.repos[s.key]).length
+                    normalizeAll(
+                      s.kind === "owner"
+                        ? value.orgs[s.key]
+                        : value.repos[s.key],
+                    ).length
                   }
-                  onAddRepo={(repo) => setRepoChecks(repo, normalizeAll(value.repos[repo]))}
+                  onAddRepo={(repo) =>
+                    setRepoChecks(repo, normalizeAll(value.repos[repo]))
+                  }
                   onRemoveRepo={removeRepo}
                   removeLabel={(repo) => `Remove ${repo} override`}
                   ownerGroupLabel="Owner defaults"
@@ -960,7 +1069,9 @@ export function SettingsModal({
                         key={scopeId(scope)}
                         scope={scope.key}
                         checks={
-                          scope.kind === "owner" ? value.orgs[scope.key] : value.repos[scope.key]
+                          scope.kind === "owner"
+                            ? value.orgs[scope.key]
+                            : value.repos[scope.key]
                         }
                         onChange={(checks) =>
                           scope.kind === "owner"
@@ -977,12 +1088,15 @@ export function SettingsModal({
             {section === "ignored-checks" && (
               <div>
                 <p className="mb-6 text-sm text-muted">
-                  A check that is broken rather than failing. An ignored check still
-                  shows on the card &mdash; muted, never red &mdash; but it stops holding
-                  the PR out of{" "}
-                  <strong className="font-medium text-foreground">Ready to merge</strong>,
-                  and it never gets a bucket of its own under By check. Right-click a
-                  check on the board to ignore it; it lands here, under its repo.
+                  A check that is broken rather than failing. An ignored check
+                  still shows on the card &mdash; muted, never red &mdash; but
+                  it stops holding the PR out of{" "}
+                  <strong className="font-medium text-foreground">
+                    Ready to merge
+                  </strong>
+                  , and it never gets a bucket of its own under By check.
+                  Right-click a check on the board to ignore it; it lands here,
+                  under its repo.
                 </p>
 
                 <ScopeEditor
@@ -991,7 +1105,11 @@ export function SettingsModal({
                   repos={ignoredRepos}
                   availableRepos={availableRepos}
                   count={(s) =>
-                    ((s.kind === "owner" ? ignored.orgs[s.key] : ignored.repos[s.key]) ?? []).length
+                    (
+                      (s.kind === "owner"
+                        ? ignored.orgs[s.key]
+                        : ignored.repos[s.key]) ?? []
+                    ).length
                   }
                   onRemoveRepo={(repo) => setIgnoredIn("repos", repo, [])}
                   removeLabel={(repo) => `Stop ignoring everything for ${repo}`}
@@ -1013,7 +1131,11 @@ export function SettingsModal({
                             : ignored.repos[scope.key]) ?? []
                         }
                         onChange={(names) =>
-                          setIgnoredIn(scope.kind === "owner" ? "orgs" : "repos", scope.key, names)
+                          setIgnoredIn(
+                            scope.kind === "owner" ? "orgs" : "repos",
+                            scope.key,
+                            names,
+                          )
                         }
                         addLabel={`Ignore for ${scope.key}`}
                       />
@@ -1045,7 +1167,25 @@ export function SettingsModal({
                   — open source, MIT licensed. Issues and pull requests welcome.
                 </p>
                 <div className="flex flex-col gap-2">
-                  <SettingButton onClick={checkForUpdates} className="self-start">
+                  <SettingCheckbox
+                    checked={updateChecks}
+                    onChange={onUpdateChecksChange}
+                  >
+                    Tell me when a newer version is out
+                  </SettingCheckbox>
+                  <p className="text-xs">
+                    Off unless you say so: this is the one thing in here that
+                    talks to GitHub about PRison rather than about your work. It
+                    asks once a day at most, without your token, so it spends
+                    nothing from the hourly budget your refreshes run on — and
+                    when it cannot reach GitHub it says nothing at all.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <SettingButton
+                    onClick={checkForUpdates}
+                    className="self-start"
+                  >
                     Check for updates
                   </SettingButton>
                   {/* aria-live: the answer arrives after the click, and the
@@ -1054,7 +1194,9 @@ export function SettingsModal({
                     {update.status === "checking" && "Checking…"}
                     {update.status === "error" &&
                       "Couldn't reach GitHub. Try again in a moment."}
-                    {update.status === "done" && <UpdateResult latest={update.latest} version={version} />}
+                    {update.status === "done" && (
+                      <UpdateResult latest={update.latest} version={version} />
+                    )}
                   </p>
                 </div>
               </div>

@@ -383,6 +383,25 @@ describe("Dashboard", () => {
     expect(screen.getByText(/4,200|4200/)).toBeInTheDocument();
   });
 
+  it("treats a header that says nothing as no answer, not as free", async () => {
+    // Number("") is 0, so an empty header would otherwise report a refresh
+    // that cost nothing and an allowance of nothing left.
+    global.fetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        headers: { get: () => "" },
+        json: () => Promise.resolve([]),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(
+      await screen.findByText(/nothing ready to merge/i),
+    ).toBeInTheDocument();
+    openSettings("Auto refresh");
+    expect(screen.queryByText(/points/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/nearly spent/i)).not.toBeInTheDocument();
+  });
+
   it("says nothing about a price it cannot read", async () => {
     // Header values arrive as text. One that isn't a number is not a cost of
     // NaN — it is no answer at all, and the panel should stay quiet.

@@ -110,9 +110,13 @@ const DRAFT_FILTERS: { value: DraftFilter; label: string }[] = [
 
 /** The clock time a spent budget returns at, in the reader's own timezone —
  * "at 13:56" is the answer; an ISO string in UTC is a second puzzle. */
-/** A header's number, or null when the header wasn't there to read. */
+/** A header's number, or null when the header wasn't there to read.
+ *
+ * An empty string counts as absent, because Number("") is 0 and a header
+ * that says nothing would otherwise report a refresh that cost nothing. */
 function number(header: string | null | undefined): number | null {
-  if (header === null || header === undefined) return null;
+  if (header === null || header === undefined || header.trim() === "")
+    return null;
   const value = Number(header);
   return Number.isFinite(value) ? value : null;
 }

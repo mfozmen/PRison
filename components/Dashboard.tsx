@@ -28,6 +28,7 @@ import {
 import { CheckChip } from "./CheckChip";
 import {
   DEFAULT_POLL_INTERVAL_MS,
+  shouldAnnounceInterval,
   parsePollInterval,
   snapshotStatuses,
   diffStatuses,
@@ -448,9 +449,26 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     localStorage.setItem("prison.autoRefresh", String(autoRefresh));
   }, [autoRefresh, hydrated]);
 
+  // Told to the server as well as to localStorage: the menu-bar plugin has no
+  // browser to read this out of, and a plugin on its own schedule is how one
+  // account spends an hourly budget twice over. Skipped on the load that only
+  // read the value back, which would write for nothing — and would overwrite a
+  // newer choice made in another tab.
+  const announcedIntervalRef = useRef<number | null>(null);
   useEffect(() => {
     if (!hydrated) return;
     localStorage.setItem("prison.pollInterval", String(pollInterval));
+    const announce = shouldAnnounceInterval(announcedIntervalRef.current, pollInterval);
+    announcedIntervalRef.current = pollInterval;
+    if (!announce) return;
+    // Nothing on screen depends on the answer: the dashboard keeps its own
+    // copy either way, and a server that refuses this is one the plugin will
+    // simply ask for the old number.
+    fetch("/api/poll-interval", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ms: pollInterval }),
+    }).catch(() => {});
   }, [pollInterval, hydrated]);
 
   useEffect(() => {

@@ -58,11 +58,19 @@ a badge for finished work is worse than no badge.
    and check **System Settings → Notifications** afterwards, since an app whose
    alert style is *None* stays silent while still looking permitted.
 
-The `1m` in the filename is the refresh interval. Rename it (`prison.5m.py`)
-to poll less often.
+The `1m` in the filename is how often SwiftBar *wakes* the plugin — not how
+often it asks GitHub. That is the dashboard's own **Settings → Auto refresh**
+interval, which the plugin reads over loopback each time it wakes; in between
+it redraws what it drew last time, so the count never blinks and nothing is
+spent. One schedule for the account, changed in one place.
+
+A PRison too old to answer that question, or one that is not running, puts the
+plugin on 30 minutes — PRison's own default.
 
 ## Configuration
 
+- The refresh interval is **not** configured here. It is the dashboard's, in
+  Settings → Auto refresh.
 - `PRISON_URL` — where PRison is, default `http://localhost:3000`. Set it in
   SwiftBar's per-plugin settings if you moved the port. (`$SWIFTBAR_*`
   variables exist only while a plugin runs; your own shell does not have them.)
@@ -84,6 +92,7 @@ saying so is noise.
 Wording matches the dashboard's own notifications, so the same event does not
 read as two different things depending on where you saw it.
 
-What was seen last run, and what is still unread, live in
+What was seen last run, what is still unread, when it last fetched, and the
+rows it drew all live in
 `~/Library/Caches/prison-menubar.json`. Delete it to start over — the next run
 seeds itself quietly, as a fresh install does.

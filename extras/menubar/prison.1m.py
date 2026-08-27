@@ -7,6 +7,10 @@ discarded, the site permission, and four macOS switches. The count in the menu
 bar depends on none of that: it is drawn every minute whether or not anything
 is allowed to interrupt you.
 
+It wakes every minute but only asks GitHub when the dashboard's own refresh
+interval says it is due — one schedule for the account, chosen once in
+Settings, instead of two clients quietly spending the same hourly budget.
+
 The count in the bar is what you have not read yet, not what is outstanding:
 a banner shows the moment something arrives and is gone whether or not you
 were looking, so the menu bar is the other half — it holds what you missed
@@ -28,6 +32,7 @@ Install: see extras/menubar/README.md.
 
 import json
 import os
+import time
 import subprocess
 import sys
 import urllib.error
@@ -46,6 +51,7 @@ ICON = (
 )
 STATE = os.path.expanduser("~/Library/Caches/prison-menubar.json")
 PER_BUCKET = 5  # rows per section in the dropdown; the count is always exact
+FALLBACK_INTERVAL_S = 1800  # when PRison cannot be asked: its own default
 MAX_LINES = 3  # notification lines before "+N more", as the dashboard does it
 
 # Each bucket: the endpoint, the heading, how a row reads, and what a
@@ -60,6 +66,22 @@ BUCKETS = [
 # Stuck PRs are yours and you already know about them; they are shown, not
 # announced. The three above are the ones where somebody is waiting on you.
 ANNOUNCED = {"ready-to-merge", "review-requests", "pr-comments"}
+
+
+def due_in_seconds(state):
+    """How long until the next fetch is allowed. Zero means now.
+
+    The interval is the dashboard's, read over loopback — a preference, not
+    anyone's data, so it needs no session and costs no GitHub query. That
+    matters: this runs every minute, and asking "am I due?" has to be cheaper
+    than the answer being no."""
+    try:
+        with urllib.request.urlopen(f"{URL}/api/poll-interval", timeout=10) as res:
+            interval = int(json.load(res)["ms"]) // 1000
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError, KeyError, TypeError):
+        interval = FALLBACK_INTERVAL_S
+    fetched = (state or {}).get("fetchedAt", 0)
+    return max(0, int(fetched) + interval - int(time.time()))
 
 
 def session():
@@ -120,6 +142,41 @@ def bar(text):
     return f"{text} | image={ICON}"
 
 
+def render(state):
+    """The whole menu, from what the last fetch left behind.
+
+    SwiftBar runs the plugin by absolute path, but a hand-run relative one
+    would put a broken callback in the menu, so the path is resolved here.
+
+    One function for both paths: the run that fetched and the runs that only
+    redraw. Marking something read redraws too — the badge has to drop the
+    moment you click, not at the next fetch, which may be half an hour away."""
+    me = os.path.abspath(sys.argv[0])
+    unread = state.get("unread", [])
+    out = [bar(len(unread) if unread else ""), "---"]
+    if unread:
+        out.append(f"Unread ({len(unread)})")
+        for u in unread:
+            # Opening it is reading it, so the click does both and the badge
+            # is never left standing over something you have already seen.
+            out.append(
+                f'-- {u["line"]} | bash="{me}" param1=--read param2={u["id"]} '
+                f'param3=--open param4={u["url"]} terminal=false refresh=true'
+            )
+        out.append(
+            f'Mark all read | bash="{me}" param1=--read param2=all terminal=false refresh=true'
+        )
+        out.append("---")
+    rows = state.get("rows", {})
+    for path, heading, _ in BUCKETS:
+        listed = rows.get(path, [])
+        out.append(f"{heading}: {state.get('counts', {}).get(path, len(listed))} | href={URL}")
+        for row in listed[:PER_BUCKET]:
+            out.append(f"-- {row['label']}  {row['title']} | href={row['url']}")
+    out += ["---", f"Open PRison | href={URL}", "Refresh now | refresh=true"]
+    return "\n".join(out)
+
+
 def read_state():
     try:
         with open(STATE) as f:
@@ -162,6 +219,16 @@ def main():
             subprocess.run(["open", url], check=False)
         return
 
+    # Every wake-up asks whether it is due; only a due one asks GitHub. What
+    # was drawn last time is redrawn meanwhile, so the bar never blinks and the
+    # unread count never disappears between fetches.
+    state = read_state()
+    # Nothing cached to redraw means this run fetches whatever the interval
+    # says, so there is no point asking what the interval is.
+    if state and state.get("rows") and due_in_seconds(state) > 0:
+        print(render(state))
+        return
+
     try:
         cookie = session()
         lists = {path: [i for i in fetch(cookie, path) if keep(path, i)] for path, _, _ in BUCKETS}
@@ -174,7 +241,7 @@ def main():
         print("Refresh now | refresh=true")
         return
 
-    previous = read_state()
+    previous = state
     seen = {path: [i.get("id") for i in lists[path]] for path, _, _ in BUCKETS}
 
     # Unread carries over until it is read, minus anything that has left the
@@ -200,35 +267,27 @@ def main():
                     }
                 )
     unread += arrived
-    write_state({"seen": seen, "unread": unread})
+
+    rows = {
+        path: [
+            {
+                "label": label(item),
+                "title": str(item.get("title") or item.get("preview") or "")
+                .replace("|", "¦")[:70],
+                "url": item.get("url", URL),
+            }
+            for item in lists[path][:PER_BUCKET]
+        ]
+        for path, _, _ in BUCKETS
+    }
+    counts = {path: len(lists[path]) for path, _, _ in BUCKETS}
+    # Kept as data rather than as drawn lines, because a click marks something
+    # read and has to redraw without fetching anything.
+    state = {"seen": seen, "unread": unread, "rows": rows, "counts": counts,
+             "fetchedAt": int(time.time())}
+    write_state(state)
+    print(render(state))
     if arrived:
         notify([a["line"] for a in arrived])
-
-    # SwiftBar runs the plugin by absolute path, but a hand-run relative one
-    # would put a broken callback in the menu.
-    me = os.path.abspath(sys.argv[0])
-    print(bar(len(unread) if unread else ""))
-    print("---")
-    if unread:
-        print(f"Unread ({len(unread)})")
-        for u in unread:
-            # Opening it is reading it, so the click does both and the badge
-            # is never left standing over something you have already seen.
-            print(
-                f'-- {u["line"]} | bash="{me}" param1=--read param2={u["id"]} '
-                f'param3=--open param4={u["url"]} terminal=false refresh=true'
-            )
-        print(f'Mark all read | bash="{me}" param1=--read param2=all terminal=false refresh=true')
-        print("---")
-    for path, heading, _ in BUCKETS:
-        items = lists[path]
-        print(f"{heading}: {len(items)} | href={URL}")
-        for item in items[:PER_BUCKET]:
-            title = str(item.get("title") or item.get("preview") or "").replace("|", "¦")
-            print(f"-- {label(item)}  {title[:70]} | href={item.get('url', URL)}")
-    print("---")
-    print(f"Open PRison | href={URL}")
-    print("Refresh now | refresh=true")
-
 
 main()

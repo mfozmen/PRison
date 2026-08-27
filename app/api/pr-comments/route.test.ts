@@ -315,3 +315,29 @@ describe("GET /api/pr-comments", () => {
     expect(body.filter((c: { id: string }) => c.id === "t1")).toHaveLength(1);
   });
 });
+
+// This route answers for two searches, so it needed its own wiring — and
+// without it a spent budget hitting the heaviest query in the app was the one
+// failure the board could not explain.
+describe("when GitHub's hourly budget is spent", () => {
+  it("answers 429 with the reset time when both searches hit the wall", async () => {
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("me");
+    const spent = Object.assign(new Error("Request failed"), {
+      errors: [{ type: "RATE_LIMITED" }],
+      headers: { "x-ratelimit-reset": "1787828206" },
+    });
+    queryMock.mockRejectedValue(spent);
+    const res = await GET(new Request("http://localhost/api/pr-comments?user=me"));
+    expect(res.status).toBe(429);
+    expect(res.headers.get("X-RateLimit-Reset")).toBe("2026-08-27T10:56:46.000Z");
+  });
+
+  it("still answers 502 when both searches simply failed", async () => {
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("me");
+    queryMock.mockRejectedValue(new Error("network down"));
+    const res = await GET(new Request("http://localhost/api/pr-comments?user=me"));
+    expect(res.status).toBe(502);
+  });
+});

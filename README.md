@@ -139,6 +139,12 @@ and expand to the latest 15, with **Load more** for the rest.
   restored in the background is not you opening PRison.
 - **Last refreshed indicator.** The filter bar says how long ago the data
   landed, so you always know whether you're looking at something stale.
+- **Says when GitHub's budget is spent.** The API allowance is hourly and
+  account-wide, so a busy morning can empty it — and every list then fails at
+  once, which looks exactly like the app being broken. PRison tells the two
+  apart: a spent budget gets its own notice, with the clock time it comes back
+  and the setting that stops it happening again, instead of a retry that is
+  guaranteed to fail.
 - **Partial-data notice.** When GitHub drops part of a response (an org restricts
   the token, a search times out), a banner says so instead of silently showing
   less — with a Retry button, like every failed list.

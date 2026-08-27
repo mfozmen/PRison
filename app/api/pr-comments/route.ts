@@ -1,3 +1,4 @@
+import { upstreamErrorResponse } from "@/lib/github/errors";
 import { ghQuery } from "@/lib/github/client";
 import { PR_COMMENTS_QUERY, searchQuery, parsePrComments } from "@/lib/github/queries";
 import { resolveScope } from "@/lib/github/scope";
@@ -42,9 +43,11 @@ export async function GET(request: Request) {
       withReviews: REVIEWS.reviewed,
     }),
   ]);
-  // Both down is an upstream outage, not partial data.
+  // Both down is an upstream outage, not partial data — and when the outage is
+  // a spent hourly budget, saying so is the difference between a board that
+  // explains itself and one that looks broken.
   if (own.status === "rejected" && reviewed.status === "rejected") {
-    return new Response("Upstream GitHub error", { status: 502 });
+    return upstreamErrorResponse(own.reason, reviewed.reason);
   }
   const comments = [
     ...(own.status === "fulfilled"

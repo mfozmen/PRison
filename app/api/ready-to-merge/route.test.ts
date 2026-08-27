@@ -134,3 +134,20 @@ describe("GET /api/ready-to-merge", () => {
     expect(queryMock.mock.calls[0][2].q).not.toContain("org:acme");
   });
 });
+
+// A spent hourly budget reaches every route, and the board can only name it
+// if every route says so rather than flattening it into a bare 502.
+describe("when GitHub's hourly budget is spent", () => {
+  it("answers 429 with the reset time", async () => {
+    readTokenMock.mockResolvedValue("t");
+    queryMock.mockRejectedValue(
+      Object.assign(new Error("Request failed"), {
+        errors: [{ type: "RATE_LIMITED" }],
+        headers: { "x-ratelimit-reset": "1787828206" },
+      }),
+    );
+    const res = await GET(new Request("http://localhost/api/ready-to-merge?user=me"));
+    expect(res.status).toBe(429);
+    expect(res.headers.get("X-RateLimit-Reset")).toBe("2026-08-27T10:56:46.000Z");
+  });
+});

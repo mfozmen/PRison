@@ -127,3 +127,26 @@ describe("GET /api/stuck-prs", () => {
     expect(queryMock.mock.calls[0][2].q).not.toContain("org:acme");
   });
 });
+
+// A spent hourly budget is not a broken query, and the board can only say so
+// if the route stops flattening both into one 502.
+describe("when GitHub's hourly budget is spent", () => {
+  it("answers 429 and passes the reset time on", async () => {
+    readTokenMock.mockResolvedValue("t");
+    const err = Object.assign(new Error("Request failed"), {
+      errors: [{ type: "RATE_LIMITED", message: "API rate limit exceeded for user ID 1" }],
+      response: { headers: { "x-ratelimit-reset": "1787828206" } },
+    });
+    queryMock.mockRejectedValue(err);
+    const res = await GET(req("http://localhost/api/stuck-prs?user=me"));
+    expect(res.status).toBe(429);
+    expect(res.headers.get("X-RateLimit-Reset")).toBe("2026-08-27T10:56:46.000Z");
+  });
+
+  it("still answers 502 for anything else", async () => {
+    readTokenMock.mockResolvedValue("t");
+    queryMock.mockRejectedValue(new Error("network down"));
+    const res = await GET(req("http://localhost/api/stuck-prs?user=me"));
+    expect(res.status).toBe(502);
+  });
+});

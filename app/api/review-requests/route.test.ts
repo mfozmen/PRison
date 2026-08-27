@@ -164,3 +164,22 @@ describe("when GitHub's hourly budget is spent", () => {
     expect(res.headers.get("X-RateLimit-Reset")).toBe("2026-08-27T10:56:46.000Z");
   });
 });
+
+// The price rides on every list, so every list has to be asked whether it
+// carries it — the wiring is per route, and a dropped one is invisible.
+describe("what it cost", () => {
+  it("passes GitHub's own reckoning back to the browser", async () => {
+    readTokenMock.mockResolvedValue("t");
+  readLoginMock.mockResolvedValue("me");
+    queryMock.mockResolvedValue({
+      data: {
+        search: { nodes: [] },
+        rateLimit: { cost: 9, remaining: 4100, resetAt: "2026-08-27T13:00:00.000Z" },
+      },
+      partial: false,
+    });
+    const res = await GET(new Request("http://localhost/api/review-requests?user=me"));
+    expect(res.headers.get("X-Cost")).toBe("9");
+    expect(res.headers.get("X-Budget-Remaining")).toBe("4100");
+  });
+});

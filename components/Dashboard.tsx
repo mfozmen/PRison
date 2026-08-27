@@ -1,5 +1,6 @@
 "use client";
 
+import type { Budget } from "@/lib/github/budget";
 import { useState, useEffect, useRef, useCallback, useMemo, useTransition } from "react";
 import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr, ReviewedPr } from "@/lib/types";
 import { sortByAgeAsc, sortByAgeDesc, relativeAge } from "@/lib/prioritize";
@@ -108,9 +109,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [budgetSpent, setBudgetSpent] = useState<string | null | undefined>(undefined);
   // What the last refresh cost, and what GitHub said was left after it. Asked
   // for because a budget nobody can see is one nobody can spend deliberately.
-  const [budget, setBudget] = useState<{ cost: number; remaining: number; resetAt: string } | null>(
-    null,
-  );
+  const [budget, setBudget] = useState<Budget | null>(null);
   // Held here rather than read during render: the browser re-renders nothing
   // when the user answers its permission prompt, so the answer has to be
   // captured and pushed down. Seeded after mount — never during SSR.

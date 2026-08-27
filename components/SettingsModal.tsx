@@ -1,5 +1,6 @@
 "use client";
 
+import type { Budget } from "@/lib/github/budget";
 import {
   useState,
   useEffect,
@@ -52,7 +53,7 @@ export interface SettingsModalProps {
   notifPermission: NotificationPermission;
   /** What the last refresh cost and what is left of the hour, as GitHub
    * reported it. Null until a refresh has answered. */
-  budget?: { cost: number; remaining: number; resetAt: string } | null;
+  budget?: Budget | null;
   onEnableNotifications: () => void;
   onTestNotification: () => void;
   /** Check names written off as broken. Mostly filled from the board — the

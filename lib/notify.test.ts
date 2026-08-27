@@ -15,6 +15,7 @@ import {
   MAX_SNAPSHOT_ENTRIES,
   POLL_INTERVAL_OPTIONS,
   DEFAULT_POLL_INTERVAL_MS,
+  shouldAnnounceInterval,
   type StatusEvent,
 } from "./notify";
 import {
@@ -560,5 +561,20 @@ describe("serializeSnapshot / parseSnapshot", () => {
     const raw = JSON.stringify([event, { ...event, id: "PR_2", status: "nonsense" }]);
     const back = parseSnapshot(raw);
     expect([...back.keys()]).toEqual(["PR_1"]);
+  });
+});
+
+describe("shouldAnnounceInterval", () => {
+  it("says nothing on the run that only read the value back", () => {
+    expect(shouldAnnounceInterval(null, 5 * 60_000)).toBe(false);
+  });
+
+  it("says nothing about a number already announced", () => {
+    // React runs an effect twice on mount under development StrictMode.
+    expect(shouldAnnounceInterval(5 * 60_000, 5 * 60_000)).toBe(false);
+  });
+
+  it("announces a change", () => {
+    expect(shouldAnnounceInterval(30 * 60_000, 5 * 60_000)).toBe(true);
   });
 });

@@ -298,7 +298,8 @@ chmod +x ~/SwiftBar/prison.1m.py             # the bit survives cp, not a raw do
 ```
 
 It reads a PRison already running on this machine — no token of its own, no
-configuration. Clicking an unread row opens that PR and marks it read; the
+configuration, and no schedule of its own: it asks GitHub on the same interval
+the dashboard uses, so the two never spend the hourly budget twice. Clicking an unread row opens that PR and marks it read; the
 live totals sit one click below. See
 [extras/menubar/README.md](extras/menubar/README.md).
 

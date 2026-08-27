@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { StrictMode } from "react";
 import { render, screen, waitFor, fireEvent, within, act } from "@testing-library/react";
 import { Dashboard } from "./Dashboard";
 import { closedPr, stubNotification } from "@/lib/fixtures";
@@ -254,6 +255,65 @@ describe("Dashboard", () => {
       expect(calls.some((c) => String(c[0]).includes("org=beta"))).toBe(true);
     });
     expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("beta");
+  });
+
+  // The menu-bar plugin has no browser and so no localStorage. One schedule
+  // for the account means the dashboard has to say out loud what it picked.
+  it("tells the server which interval was picked", async () => {
+    global.fetch = okFetch();
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    openSettings("Auto refresh");
+    fireEvent.change(screen.getByRole("combobox", { name: /auto refresh interval/i }), {
+      target: { value: String(POLL_INTERVAL_OPTIONS[0].ms) },
+    });
+    await waitFor(() => {
+      const put = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
+        (call) =>
+          String(call[0]).includes("/api/poll-interval") &&
+          (call[1] as RequestInit | undefined)?.method === "PUT",
+      );
+      expect(put).toBeTruthy();
+      expect(JSON.parse(String((put![1] as RequestInit).body))).toEqual({
+        ms: POLL_INTERVAL_OPTIONS[0].ms,
+      });
+    });
+  });
+
+  // React runs an effect twice on mount under StrictMode, which Next.js turns
+  // on in development. Without the guard that would announce the same number
+  // twice on every load.
+  it("announces once even when the effect runs twice", async () => {
+    global.fetch = okFetch();
+    render(
+      <StrictMode>
+        <Dashboard orgs={ORGS} login="testuser" />
+      </StrictMode>,
+    );
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    openSettings("Auto refresh");
+    fireEvent.change(screen.getByRole("combobox", { name: /auto refresh interval/i }), {
+      target: { value: String(POLL_INTERVAL_OPTIONS[0].ms) },
+    });
+    await waitFor(() => {
+      const puts = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.filter((call) =>
+        String(call[0]).includes("/api/poll-interval"),
+      );
+      expect(puts).toHaveLength(1);
+    });
+  });
+
+  it("does not announce an interval it only just read back from storage", async () => {
+    // A page that re-posts its own stored value on every load writes for
+    // nothing, and would overwrite a newer choice made in another tab.
+    localStorage.setItem("prison.pollInterval", String(POLL_INTERVAL_OPTIONS[1].ms));
+    global.fetch = okFetch();
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    const puts = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) =>
+      String(url).includes("/api/poll-interval"),
+    );
+    expect(puts).toHaveLength(0);
   });
 
   it("shows an error banner and retry when the stuck fetch fails", async () => {

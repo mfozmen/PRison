@@ -27,6 +27,16 @@ export function parsePollInterval(stored: string | null): number {
     : DEFAULT_POLL_INTERVAL_MS;
 }
 
+/** Whether a newly picked interval is worth telling the server about.
+ *
+ * Two runs say no: the first, which is only the page reading back what it
+ * stored (announcing that would overwrite a newer choice made in another tab),
+ * and a repeat of a number already announced — which is what React's
+ * development StrictMode produces by running every effect twice on mount. */
+export function shouldAnnounceInterval(announced: number | null, picked: number): boolean {
+  return announced !== null && announced !== picked;
+}
+
 /** What a PR (or comment thread) is doing right now, coarse enough that
  * ordinary churn — a new commit, an age tick, a re-ordered list — doesn't
  * read as a change, but every transition worth interrupting someone for does. */

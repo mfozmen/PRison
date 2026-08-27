@@ -37,8 +37,9 @@ jobs:
     # Raised with the turn limit below: a budget of 80 turns the clock cuts
     # off at 15 minutes is just the same ceiling wearing a worse failure —
     # a timeout kills the run mid-sentence, where running out of turns at
-    # least ends it in order.
-    timeout-minutes: 25
+    # least ends it in order. 30 keeps the old 15/40 ratio of about 22
+    # seconds a turn, so the turn budget stays the binding one.
+    timeout-minutes: 30
     permissions:
       contents: read
       pull-requests: write

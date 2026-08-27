@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.23.0](https://github.com/mfozmen/PRison/compare/v1.22.1...v1.23.0) (2026-08-27)
+
+### Features
+
+* one refresh schedule for the account, not one per client ([#92](https://github.com/mfozmen/PRison/issues/92)) ([6364f1a](https://github.com/mfozmen/PRison/commit/6364f1a9549fd0dc86ec9b18dfac825691dabaac))
+* say when GitHub's hourly budget is spent, and when it returns ([#86](https://github.com/mfozmen/PRison/issues/86)) ([02e28f4](https://github.com/mfozmen/PRison/commit/02e28f4cecc0cfab530c61c668eb9531621bce04))
+
 ## [1.22.1](https://github.com/mfozmen/PRison/compare/v1.22.0...v1.22.1) (2026-08-26)
 
 ### Features

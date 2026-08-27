@@ -34,7 +34,11 @@ jobs:
         contains(github.event.comment.body, '@claude') &&
         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) )
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Raised with the turn limit below: a budget of 80 turns the clock cuts
+    # off at 15 minutes is just the same ceiling wearing a worse failure —
+    # a timeout kills the run mid-sentence, where running out of turns at
+    # least ends it in order.
+    timeout-minutes: 25
     permissions:
       contents: read
       pull-requests: write

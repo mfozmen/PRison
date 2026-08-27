@@ -868,11 +868,36 @@ export function SettingsModal({
                         Without this line a swallowed notification is
                         indistinguishable from a broken button. */}
                     <p className="mt-2 text-xs text-muted">
-                      Nothing appeared? Your browser has permission, so check
-                      that your operating system allows notifications from it —
-                      and that Do Not Disturb or a Focus mode isn&apos;t on.
+                      Nothing appeared? The browser has permission, so the block
+                      is underneath it: your operating system decides separately,
+                      and it refuses in silence. On macOS that is{" "}
+                      <strong className="font-medium text-foreground">
+                        System Settings → Notifications
+                      </strong>
+                      , where the browser needs notifications allowed{" "}
+                      <em>and</em> an alert style that isn&apos;t None — a style
+                      of None is permission that shows nothing. A browser
+                      registers more than one entry there, so check each of
+                      them. A Focus mode silences everything regardless.
                     </p>
                   </div>
+                )}
+                {/* Outside all three: the reader who most needs an
+                    alternative is the one whose browser said no, and they get
+                    neither a button nor a hint above. */}
+                {autoRefresh && (
+                  <p className="mt-3 text-xs text-muted">
+                    Rather not depend on notifications at all?{" "}
+                    <a
+                      href={`${PROJECT_URL}/tree/main/extras/menubar`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-accent underline underline-offset-2 hover:brightness-110"
+                    >
+                      The menu bar
+                    </a>{" "}
+                    shows the same count on macOS without needing permission from anyone.
+                  </p>
                 )}
               </div>
             )}

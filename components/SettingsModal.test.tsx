@@ -797,6 +797,32 @@ describe("SettingsModal", () => {
       expect(screen.getByText(/nothing appeared\?/i)).toBeInTheDocument();
     });
 
+    // Learned the hard way on a machine where this hint was already on screen
+    // and still not enough: the browser had permission, the operating system
+    // had switched it off, and "check your operating system" was too vague to
+    // act on. Both traps have to be named.
+    it("names the setting that is off and the trap that looks like it is on", () => {
+      renderWithPermission("granted");
+      const hint = screen.getByText(/nothing appeared\?/i);
+      expect(hint.textContent).toMatch(/notifications/i);
+      // An alert style of None is permission that shows nothing.
+      expect(hint.textContent).toMatch(/style/i);
+      // A browser registers more than one entry, and the one you switched on
+      // may not be the one that delivers.
+      expect(hint.textContent).toMatch(/more than one|several|each/i);
+    });
+
+    it.each(["granted", "denied", "default"] as NotificationPermission[])(
+      "points at the menu bar whatever the browser answered (%s)",
+      (permission) => {
+        // The reader who most needs an alternative is the one whose browser
+        // said no — and that is the one with no button and no hint above.
+        renderWithPermission(permission);
+        const link = screen.getByRole("link", { name: /menu bar/i });
+        expect(link).toHaveAttribute("href", expect.stringContaining("menubar"));
+      },
+    );
+
     it("keeps the OS hint out of sight until there is a button it explains", () => {
       renderWithPermission("denied");
       expect(screen.queryByText(/nothing appeared\?/i)).not.toBeInTheDocument();

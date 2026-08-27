@@ -332,9 +332,15 @@ describe("Dashboard", () => {
     const banner = await screen.findByText(/github's api budget for this account is spent/i);
     expect(banner).toBeInTheDocument();
     // The time is the whole point — "try later" is what we already knew.
-    // The clock is the reader's own, so the shape depends on their locale —
-    // what matters is that a time is there at all.
-    expect(banner.textContent).toMatch(/\b(13:56|1:56|01:56)\b/);
+    // The clock is the reader's own — the shape depends on their locale and
+    // the offset on their timezone, and a test that pins either would pass in
+    // Istanbul and fail on a runner in UTC. What is asserted is that the
+    // instant GitHub named is the instant shown.
+    const shown = new Date("2026-08-27T10:56:46.000Z").toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    expect(banner.textContent).toContain(shown);
   });
 
   it("still says the budget is spent when GitHub gave no usable time", async () => {

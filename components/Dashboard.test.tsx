@@ -341,6 +341,9 @@ describe("Dashboard", () => {
       minute: "2-digit",
     });
     expect(banner.textContent).toContain(shown);
+    // The six per-list banners would each offer a Retry that cannot work, and
+    // bury the one line that explains why.
+    expect(screen.queryAllByText(/failed to load/i)).toHaveLength(0);
   });
 
   it("still says the budget is spent when GitHub gave no usable time", async () => {

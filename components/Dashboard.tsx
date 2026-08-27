@@ -868,7 +868,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         onOpenActivity={handleOpenActivity}
         onClearActivity={handleClearActivity}
       />
-      {budgetSpent !== undefined && (
+      {/* A spent budget is the cause of every list failing, and its own notice
+          says so. Six "failed to load — Retry" banners under it would each
+          offer the one action that cannot work. */}
+            {budgetSpent !== undefined && (
         <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 pt-4">
           <div
             role="status"
@@ -1081,7 +1084,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         />
         {/* Ready-to-merge — full-width section above the two-column review/stuck grid */}
         <div className="flex flex-col gap-4">
-          {readyError && (
+          {budgetSpent === undefined && readyError && (
             <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
               <span>{readyError}</span>
               <button
@@ -1143,7 +1146,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         {/* Comments awaiting your reply — full width: an inbox row needs room for
             the comment preview AND the file path, which a grid column would clip. */}
         <div className="flex flex-col gap-4">
-          {commentsError && (
+          {budgetSpent === undefined && commentsError && (
             <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
               <span>{commentsError}</span>
               <button
@@ -1224,7 +1227,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           {/* Other people's PRs: the review queue, then what you reviewed. */}
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-4">
-              {reviewError && (
+              {budgetSpent === undefined && reviewError && (
                 <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
                   <span>{reviewError}</span>
                   <button
@@ -1299,7 +1302,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               countTestId="reviewed-count-badge"
               open={reviewedOpen}
               onToggle={() => setReviewedOpen((o) => !o)}
-              error={reviewedError}
+              error={budgetSpent === undefined ? reviewedError : null}
               onRetry={() => fetchData(selectedOrg)}
             >
               {shownReviewed.length === 0 ? (
@@ -1331,7 +1334,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           {/* Your own PRs: what is blocked, then what is finished. */}
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-4">
-              {stuckError && (
+              {budgetSpent === undefined && stuckError && (
                 <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
                   <span>{stuckError}</span>
                   <button
@@ -1491,7 +1494,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               countTestId="closed-count-badge"
               open={closedOpen}
               onToggle={() => setClosedOpen((o) => !o)}
-              error={closedError}
+              error={budgetSpent === undefined ? closedError : null}
               onRetry={() => fetchData(selectedOrg)}
             >
               {shownClosed.length === 0 ? (

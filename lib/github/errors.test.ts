@@ -55,6 +55,16 @@ describe("upstreamErrorResponse", () => {
     );
   });
 
+  // Two searches, two walls: one of them may have been told when it comes
+  // down and the other not, and the answer should be the useful one.
+  it("prefers the failure that named a time", () => {
+    const res = upstreamErrorResponse(
+      budgetError("RATE_LIMITED"),
+      budgetError("RATE_LIMIT", { "x-ratelimit-reset": "1787828206" }),
+    );
+    expect(res.headers.get("X-RateLimit-Reset")).toBe("2026-08-27T10:56:46.000Z");
+  });
+
   it("leaves every other failure as the 502 it was", () => {
     expect(upstreamErrorResponse(new Error("network down")).status).toBe(502);
     expect(upstreamErrorResponse(null).status).toBe(502);

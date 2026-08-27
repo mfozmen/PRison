@@ -35,10 +35,12 @@ function budgetResetAt(e: unknown): string | null | undefined {
  * — the board can say when it comes back, rather than showing the same notice
  * it shows for a network blip, which is what left us guessing for an hour. */
 export function upstreamErrorResponse(...failures: unknown[]): Response {
-  // A route that runs two searches has two reasons and one answer to give.
-  // A spent budget is the more specific of the two, so it wins.
-  const resetAt = failures.map(budgetResetAt).find((r) => r !== undefined);
-  if (resetAt === undefined) return new Response("Upstream GitHub error", { status: 502 });
+  // A route that runs two searches has two reasons and one answer to give. A
+  // spent budget is the more specific of the two, so it wins — and between two
+  // spent budgets, the one that named a time, since that is the whole point.
+  const budgets = failures.map(budgetResetAt).filter((r) => r !== undefined);
+  if (budgets.length === 0) return new Response("Upstream GitHub error", { status: 502 });
+  const resetAt = budgets.find((r) => r !== null) ?? null;
   return new Response("GitHub API budget exhausted", {
     status: 429,
     headers: resetAt ? { "X-RateLimit-Reset": resetAt } : undefined,

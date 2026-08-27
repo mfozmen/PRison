@@ -887,7 +887,7 @@ export function SettingsModal({
                     neither a button nor a hint above. */}
                 {autoRefresh && (
                   <p className="mt-3 text-xs text-muted">
-                    Tired of asking permission?{" "}
+                    Rather not depend on notifications at all?{" "}
                     <a
                       href={`${PROJECT_URL}/tree/main/extras/menubar`}
                       target="_blank"

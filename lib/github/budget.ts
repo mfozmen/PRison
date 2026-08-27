@@ -26,12 +26,26 @@ export function budgetFrom(data: unknown): Budget | null {
   return { cost, remaining, resetAt };
 }
 
+/** One price for a route that ran several queries: what they cost together,
+ * and the smallest allowance any of them saw — which is the one after the last
+ * of them landed. Reporting a single leg understates a refresh, and the
+ * heaviest query in the app is exactly the one that runs twice. */
+export function sumBudgets(...datas: unknown[]): Budget | null {
+  const budgets = datas.map(budgetFrom).filter((b): b is Budget => b !== null);
+  if (budgets.length === 0) return null;
+  return {
+    cost: budgets.reduce((total, b) => total + b.cost, 0),
+    remaining: Math.min(...budgets.map((b) => b.remaining)),
+    // One account, one hour: any leg's answer is the same clock.
+    resetAt: budgets[0].resetAt,
+  };
+}
+
 /** The route's own headers, plus the price of what it just did. */
 export function budgetHeaders(
-  data: unknown,
+  budget: Budget | null,
   headers: Record<string, string> = {},
 ): Record<string, string> {
-  const budget = budgetFrom(data);
   if (!budget) return headers;
   return {
     ...headers,

@@ -351,6 +351,23 @@ describe("what it cost", () => {
     partial: false,
   });
 
+  it("charges the refresh for both searches when both answered", async () => {
+    readTokenMock.mockResolvedValue("t");
+    readLoginMock.mockResolvedValue("me");
+    queryMock
+      .mockResolvedValueOnce(priced([]))
+      .mockResolvedValueOnce({
+        data: {
+          search: { nodes: [] },
+          rateLimit: { cost: 12, remaining: 3888, resetAt: "2026-08-27T13:00:00.000Z" },
+        },
+        partial: false,
+      });
+    const res = await GET(new Request("http://localhost/api/pr-comments?user=me"));
+    expect(res.headers.get("X-Cost")).toBe("45");
+    expect(res.headers.get("X-Budget-Remaining")).toBe("3888");
+  });
+
   it("reports the price of the leg that answered, even when the other did not", async () => {
     readTokenMock.mockResolvedValue("t");
     readLoginMock.mockResolvedValue("me");

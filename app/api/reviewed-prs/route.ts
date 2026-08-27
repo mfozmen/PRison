@@ -1,4 +1,4 @@
-import { budgetHeaders } from "@/lib/github/budget";
+import { budgetFrom, budgetHeaders } from "@/lib/github/budget";
 import { upstreamErrorResponse } from "@/lib/github/errors";
 import { ghQuery } from "@/lib/github/client";
 import { REVIEWED_PRS_QUERY, searchQuery, parseReviewedPrs } from "@/lib/github/queries";
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
       login,
     });
     return Response.json(parseReviewedPrs(data), {
-      headers: budgetHeaders(data, partial ? { "X-Partial": "1" } : {}),
+      headers: budgetHeaders(budgetFrom(data), partial ? { "X-Partial": "1" } : {}),
     });
   } catch (e) {
     return upstreamErrorResponse(e);

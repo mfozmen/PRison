@@ -1,4 +1,4 @@
-import { budgetHeaders } from "@/lib/github/budget";
+import { budgetHeaders, sumBudgets } from "@/lib/github/budget";
 import { upstreamErrorResponse } from "@/lib/github/errors";
 import { ghQuery } from "@/lib/github/client";
 import { PR_COMMENTS_QUERY, searchQuery, parsePrComments } from "@/lib/github/queries";
@@ -73,14 +73,13 @@ export async function GET(request: Request) {
     incomplete ||
     (own.status === "fulfilled" && own.value.partial) ||
     (reviewed.status === "fulfilled" && reviewed.value.partial);
-  // Past the check above at least one leg answered, and either one's rateLimit
-  // reports the same remaining — so the price on the response comes from
-  // whichever of them reached GitHub.
+  // Both legs when both answered: this route is two searches, and charging the
+  // refresh for one of them understates the heaviest query in the app.
   const dataOf = (r: PromiseSettledResult<{ data: unknown }>) =>
     r.status === "fulfilled" ? r.value.data : undefined;
-  const answered = dataOf(own) ?? dataOf(reviewed);
+  const spent = sumBudgets(dataOf(own), dataOf(reviewed));
   const headers: Record<string, string> = {};
   if (partial) headers["X-Partial"] = "1";
   if (incomplete) headers["X-Incomplete"] = "1";
-  return Response.json(deduped, { headers: budgetHeaders(answered, headers) });
+  return Response.json(deduped, { headers: budgetHeaders(spent, headers) });
 }

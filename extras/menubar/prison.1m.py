@@ -230,9 +230,6 @@ def main():
                     }
                 )
     unread += arrived
-    write_state({"seen": seen, "unread": unread})
-    if arrived:
-        notify([a["line"] for a in arrived])
 
     # SwiftBar runs the plugin by absolute path, but a hand-run relative one
     # would put a broken callback in the menu.

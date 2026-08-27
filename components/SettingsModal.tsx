@@ -896,7 +896,7 @@ export function SettingsModal({
                     >
                       The menu bar
                     </a>{" "}
-                    shows the same count on macOS without needing any.
+                    shows the same count on macOS without needing permission from anyone.
                   </p>
                 )}
               </div>

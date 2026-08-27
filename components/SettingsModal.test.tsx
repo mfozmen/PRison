@@ -969,10 +969,10 @@ describe("SettingsModal — the standing release check", () => {
   });
 
   it("says what switching it on costs, since nothing else will", () => {
-    // "It talks to GitHub" is the part a self-hoster wants in front of them
-    // before they tick the box, not after.
+    // One line: it goes to GitHub, rarely, and not on your allowance. Anything
+    // longer is a paragraph nobody reads about a request that costs nothing.
     renderAbout();
-    expect(screen.getByText(/without your token/i)).toBeInTheDocument();
+    expect(screen.getByText(/once a day, without your token/i)).toBeInTheDocument();
   });
 });
 

@@ -1174,11 +1174,7 @@ export function SettingsModal({
                     Tell me when a newer version is out
                   </SettingCheckbox>
                   <p className="text-xs">
-                    Off unless you say so: this is the one thing in here that
-                    talks to GitHub about PRison rather than about your work. It
-                    asks once a day at most, without your token, so it spends
-                    nothing from the hourly budget your refreshes run on — and
-                    when it cannot reach GitHub it says nothing at all.
+                    Asks GitHub once a day, without your token.
                   </p>
                 </div>
                 <div className="flex flex-col gap-2">

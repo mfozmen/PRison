@@ -868,9 +868,29 @@ export function SettingsModal({
                         Without this line a swallowed notification is
                         indistinguishable from a broken button. */}
                     <p className="mt-2 text-xs text-muted">
-                      Nothing appeared? Your browser has permission, so check
-                      that your operating system allows notifications from it —
-                      and that Do Not Disturb or a Focus mode isn&apos;t on.
+                      Nothing appeared? The browser has permission, so the block
+                      is underneath it: your operating system decides separately,
+                      and it refuses in silence. On macOS that is{" "}
+                      <strong className="font-medium text-foreground">
+                        System Settings → Notifications
+                      </strong>
+                      , where the browser needs notifications allowed{" "}
+                      <em>and</em> an alert style that isn&apos;t None — a style
+                      of None is permission that shows nothing. A browser
+                      registers more than one entry there, so check each of
+                      them. A Focus mode silences everything regardless.
+                    </p>
+                    <p className="mt-2 text-xs text-muted">
+                      Tired of asking permission?{" "}
+                      <a
+                        href={`${PROJECT_URL}/tree/main/extras/menubar`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-accent underline underline-offset-2 hover:brightness-110"
+                      >
+                        The menu bar
+                      </a>{" "}
+                      shows the same count without needing any.
                     </p>
                   </div>
                 )}

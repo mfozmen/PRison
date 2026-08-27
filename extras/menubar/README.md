@@ -12,20 +12,7 @@ you have **not read yet**: it appears when something lands, and it stays until
 you click it, however long that takes. The live totals — what is outstanding
 right now, which is a different question — sit in the dropdown underneath.
 
-```
-▮▮▮ 2
-  Unread (2)
-    acme/web #58 is ready to merge
-    globex/api #7 needs your review
-    Mark all read
-  ─────────────
-  Ready to merge: 1
-  Waiting on your review: 3
-    acme/web #58   Document the deploy rollback steps
-    …
-  Comments awaiting reply: 0
-  Stuck on checks: 1
-```
+![The macOS menu bar with the PRison plugin clicked open. In the bar, the PRison icon and the number 2. The menu below lists Unread (2) and Mark all read, then the live totals — Ready to merge 2, Waiting on your review 2, Comments awaiting reply 3, Stuck on checks 4 — each opening a submenu of its own PRs, then Open PRison and Refresh now](../../docs/menubar.png)
 
 Clicking an unread row opens the PR and reads it in one go, so the badge is
 never left standing over something you have already looked at. An item that
@@ -56,9 +43,9 @@ a badge for finished work is worse than no badge.
 
 4. macOS will ask to allow notifications the first time one fires. Say yes —
    and check **System Settings → Notifications** afterwards, since an app whose
-   alert style is *None* stays silent while still looking permitted.
+   alert style is _None_ stays silent while still looking permitted.
 
-The `1m` in the filename is how often SwiftBar *wakes* the plugin — not how
+The `1m` in the filename is how often SwiftBar _wakes_ the plugin — not how
 often it asks GitHub. That is the dashboard's own **Settings → Auto refresh**
 interval, which the plugin reads over loopback each time it wakes; in between
 it redraws what it drew last time, so the count never blinks and nothing is
@@ -96,3 +83,20 @@ What was seen last run, what is still unread, when it last fetched, and the
 rows it drew all live in
 `~/Library/Caches/prison-menubar.json`. Delete it to start over — the next run
 seeds itself quietly, as a fresh install does.
+
+## The picture above
+
+It is a real screenshot: macOS draws that menu, submenus and all, and nothing
+that redraws it from the plugin's text gets the shape right. What it is _not_
+is a photograph of a working machine — a real menu bar carries real repository
+names, and this repository is public. So the plugin is pointed at a stub first:
+
+```sh
+node scripts/menubar-screenshot/stub-prison.mjs
+```
+
+That serves the same synthetic board `docs/screenshot.png` uses, over loopback,
+with no GitHub anywhere in it — and it holds two PRs back on the first fetch so
+they arrive on the second and the badge has something to count. The four steps
+for retaking the shot are in the header comment of that file, including putting
+your own `~/Library/Caches/prison-menubar.json` back afterwards.

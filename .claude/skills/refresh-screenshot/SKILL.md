@@ -86,6 +86,28 @@ URL you passed. If it fails on `AUTH_SECRET`, run `npm run dev` once so
   files and commit messages, so it catches a name that reached the demo board
   itself, though it cannot read the pixels.
 
+## The other published picture: docs/menubar.png
+
+`extras/menubar/prison.1m.py` has a shot of its own, on the same rule and from
+the same synthetic board. It is a **real screenshot** — macOS draws that menu,
+submenus and all, and no mock of it is honest — so it is taken by hand against
+a stub rather than captured by a script:
+
+```bash
+node scripts/menubar-screenshot/stub-prison.mjs
+```
+
+The header comment in that file has the four steps: point the installed plugin
+at the stub, move your own `~/Library/Caches/prison-menubar.json` aside,
+refresh twice with a Mark all read in between until the badge reads 2, then
+screenshot the open menu — and put your plugin and your state file back
+afterwards.
+
+The rule is the same and matters more here, because this one really is a
+photograph of your machine: nothing but the menu and the PRison icon in the
+frame, and every name in it from the demo board. Update the alt text in
+`README.md` and `extras/menubar/README.md` if the menu's composition changed.
+
 ## Changing what the board shows
 
 Edit `scripts/screenshot/demo-board.mjs`. It is plain data in the shapes

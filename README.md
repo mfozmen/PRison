@@ -12,7 +12,7 @@ access. Four lists, oldest first, plus two history sections:
 - **Ready to merge** — PRs GitHub reports as mergeable now. An out-of-date branch
   still counts, with a **"Needs update"** hint (a bot/manual update handles it) —
   but only once its checks are green; while one is red or still running it
-  belongs under *Stuck on checks*, and no PR is ever in both lists.
+  belongs under _Stuck on checks_, and no PR is ever in both lists.
 - **Comments awaiting your reply** — review comments where the last word isn't
   yours: every unresolved inline thread on your own PRs, the threads you raised
   on PRs you reviewed, and questions left in the body of a review rather than on
@@ -24,7 +24,7 @@ access. Four lists, oldest first, plus two history sections:
   you left (**Dismissed**, struck through, when the author has cleared it), and
   flagged **"Updated since"** when the author has pushed after it.
   A PR that comes back for another review leaves this list and returns to
-  *Waiting on your review*.
+  _Waiting on your review_.
 - **Recently merged / closed** — your own PRs that were merged or closed, newest
   first, so finished work confirms itself.
 
@@ -40,9 +40,9 @@ and expand to the latest 15, with **Load more** for the rest.
 ### Features
 
 - **Unanswered review comments.** An inline thread is waiting on you when it is
-  unresolved *and* its most recent comment isn't yours — replying adds a comment,
+  unresolved _and_ its most recent comment isn't yours — replying adds a comment,
   so your own last word means the ball is back in the reviewer's court. A review
-  *body* has neither replies nor a resolve bit, so it waits until you say
+  _body_ has neither replies nor a resolve bit, so it waits until you say
   something on the PR after it; a reaction dismisses one, the same emoji that
   dismisses a thread. Rows say which surface they came from, because the two are
   answered in different places. The age counts from the comment, so you can see
@@ -55,7 +55,7 @@ and expand to the latest 15, with **Load more** for the rest.
   type-to-search repo picker — and PRison shows them as **"⏳ Awaiting: &lt;name&gt;"**
   on a blocked PR until they report. Each check is added with a **Required** box
   answered up front, and the board stops guessing: a required one is drawn solid and
-  holds the PR out of *Ready to merge*; an unticked one is shown for information,
+  holds the PR out of _Ready to merge_; an unticked one is shown for information,
   drawn dashed, and blocks nothing — including when GitHub does report it, so a
   red job that cannot hold the merge up stops reading like one that can. A check
   you never named keeps the dashed chip, which is what "PRison doesn't know"
@@ -63,13 +63,13 @@ and expand to the latest 15, with **Load more** for the rest.
 - **Ignored checks.** Some checks are broken rather than failing — the flaky
   one, the one somebody else's team owns. Right-click (or click) its chip on the
   board and choose **Ignore this check**. It stays on the card, muted instead of
-  red, but its result stops counting: the PR is no longer held out of *Ready to
-  merge* over it, it gets no bucket of its own under *By check*, and it is never
+  red, but its result stops counting: the PR is no longer held out of _Ready to
+  merge_ over it, it gets no bucket of its own under _By check_, and it is never
   awaited. Everything ignored is listed in **Settings → Ignored checks**, under
   the repo it was ignored on, where it can be renamed, widened to the whole
   owner, or taken back. A conflict or a review gate still holds the PR —
   ignoring a check says its result means nothing, never "merge it anyway" — but
-  GitHub's own *blocked* state doesn't, since a red **required** check is
+  GitHub's own _blocked_ state doesn't, since a red **required** check is
   exactly what puts a PR there.
 - **History you can walk back into.** Merged and closed-without-merging PRs, each
   badged **Merged** or **Closed** with how long ago it ended — and next to them
@@ -81,7 +81,7 @@ and expand to the latest 15, with **Load more** for the rest.
   it belongs to. The two where someone else is held up by you are coloured; the
   rest stay quiet. They count the lists as filtered, so a
   tile never disagrees with the list beneath it, and they cost no extra API
-  calls — it is all data already on the page. *Ready to merge* has no tile: it
+  calls — it is all data already on the page. _Ready to merge_ has no tile: it
   is the one queue you want to be long.
 - **A section index** under the tiles: every section, in page order, with its
   count — so nothing is more than a click from the top however long the board
@@ -104,7 +104,7 @@ and expand to the latest 15, with **Load more** for the rest.
   refresh considers new, and it is forgotten when you close the tab.
 - **Auto refresh (opt-in).** Turn it on in Settings and pick how often to check
   — every 5, 15, or 30 minutes, or hourly (30 minutes by default). PRison then
-  tells you what *moved*, not just what's new: a PR of yours that was approved
+  tells you what _moved_, not just what's new: a PR of yours that was approved
   — you hear that as soon as it happens, not when CI eventually catches up and
   the PR turns mergeable — a PR that became ready to merge, one that fell into
   a merge conflict because somebody else merged first, checks that went
@@ -185,7 +185,7 @@ and expand to the latest 15, with **Load more** for the rest.
 PRison runs on **your own machine** — no third-party app to approve. The easiest
 way is Docker (one command); or run it locally with Node.
 
-**Sign Out** ends *your session* — it clears the encrypted cookie. It cannot revoke
+**Sign Out** ends _your session_ — it clears the encrypted cookie. It cannot revoke
 the host's credentials: on a `GITHUB_TOKEN`-configured instance, one click signs you
 back in, and anyone who can reach the instance can do the same. That is what the
 warning below is about.
@@ -228,6 +228,8 @@ your screen, and it is gone in seconds whether or not you were looking.
 `extras/menubar/prison.1m.py` is a [SwiftBar](https://swiftbar.app) (or xbar)
 plugin that puts an **unread count** up there instead: it appears when
 something lands and stays until you click it.
+
+![The macOS menu bar with the PRison plugin clicked open. In the bar, the PRison icon and the number 2. The menu below lists Unread (2) and Mark all read, then the live totals — Ready to merge 2, Waiting on your review 2, Comments awaiting reply 3, Stuck on checks 4 — each opening a submenu of its own PRs, then Open PRison and Refresh now](docs/menubar.png)
 
 ```sh
 brew install --cask swiftbar
@@ -274,13 +276,13 @@ Sign in with the GitHub CLI or paste a token.
 
 Top-right, left to right:
 
-| Control | What it does |
-| --- | --- |
-| **Switcher** | Scopes the board to All / your personal account / a single org. |
-| **Bell** | Opens the **activity feed** and marks it read. |
-| **Sliders icon** | Opens **Settings** (below). |
-| **Sun/moon** | Switches between the current theme's two grounds, and names them — it reads "Switch to Aurora Night" rather than "Switch to dark theme". |
-| **Sign Out** | Clears the stored token. |
+| Control          | What it does                                                                                                                             |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Switcher**     | Scopes the board to All / your personal account / a single org.                                                                          |
+| **Bell**         | Opens the **activity feed** and marks it read.                                                                                           |
+| **Sliders icon** | Opens **Settings** (below).                                                                                                              |
+| **Sun/moon**     | Switches between the current theme's two grounds, and names them — it reads "Switch to Aurora Night" rather than "Switch to dark theme". |
+| **Sign Out**     | Clears the stored token.                                                                                                                 |
 
 The Settings menu has six sections:
 
@@ -304,13 +306,13 @@ The Settings menu has six sections:
 
 ### Filter bar
 
-| Control | What it does |
-| --- | --- |
-| **Flat / By repo / By check** | Groups the lists. Group headers fold and unfold, and under **By repo** the ↗ beside one opens that repository on GitHub. |
-| **All / Only drafts / No drafts** | Filters by draft state. |
-| **Search** | Narrows every list to the rows matching all your terms; Esc clears it. |
-| **Refresh** | Re-fetches without reloading the page. |
-| **Updated Xm ago** | How fresh the data is, next to Refresh. |
+| Control                           | What it does                                                                                                             |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Flat / By repo / By check**     | Groups the lists. Group headers fold and unfold, and under **By repo** the ↗ beside one opens that repository on GitHub. |
+| **All / Only drafts / No drafts** | Filters by draft state.                                                                                                  |
+| **Search**                        | Narrows every list to the rows matching all your terms; Esc clears it.                                                   |
+| **Refresh**                       | Re-fetches without reloading the page.                                                                                   |
+| **Updated Xm ago**                | How fresh the data is, next to Refresh.                                                                                  |
 
 Click a **PR title** (or a suggested-action link) to jump to GitHub — a comment
 row lands on that exact thread. On a Mac, the same counts are in

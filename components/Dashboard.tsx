@@ -871,7 +871,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       {/* A spent budget is the cause of every list failing, and its own notice
           says so. Six "failed to load — Retry" banners under it would each
           offer the one action that cannot work. */}
-            {budgetSpent !== undefined && (
+      {budgetSpent !== undefined && (
         <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 pt-4">
           <div
             role="status"

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.24.0](https://github.com/mfozmen/PRison/compare/v1.23.0...v1.24.0) (2026-08-27)
+
+### Features
+
+* name the switch that swallows notifications, and move the fallback up ([#94](https://github.com/mfozmen/PRison/issues/94)) ([2ea7148](https://github.com/mfozmen/PRison/commit/2ea7148cef76539d103c99d9d172c9b9f04e5459)), closes [#88](https://github.com/mfozmen/PRison/issues/88)
+* show what a refresh costs, and warn before the budget is gone ([#95](https://github.com/mfozmen/PRison/issues/95)) ([c4ac8a6](https://github.com/mfozmen/PRison/commit/c4ac8a6de5989cdc2b2dae04970638b1d599a761))
+
 ## [1.23.0](https://github.com/mfozmen/PRison/compare/v1.22.1...v1.23.0) (2026-08-27)
 
 ### Features

@@ -8,14 +8,22 @@ import {
   Inconsolata,
   Barlow,
   JetBrains_Mono,
+  Outfit,
+  Spline_Sans_Mono,
+  Sora,
+  Azeret_Mono,
+  Archivo,
+  Martian_Mono,
+  Familjen_Grotesk,
+  Chivo_Mono,
 } from "next/font/google";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 // One sans and one mono per theme family; globals.css picks the pair that
-// matches data-theme. Only the default family is preloaded — the other three
-// are declared so their @font-face rules exist, and the browser fetches a file
-// only once text is actually set in it.
+// matches data-theme. Only the default family is preloaded — the other seven are
+// declared so their @font-face rules exist, and the browser fetches a file only
+// once text is actually set in it.
 const firaSans = Fira_Sans({
   variable: "--font-fira-sans",
   subsets: ["latin"],
@@ -75,6 +83,64 @@ const jetbrainsMono = JetBrains_Mono({
   preload: false,
 });
 
+// The nature families. All six are variable fonts, so no weight list: asking
+// for static cuts would fetch more files than the single variable one.
+const outfit = Outfit({
+  variable: "--font-outfit",
+  subsets: ["latin"],
+  display: "swap",
+  preload: false,
+});
+
+const splineSansMono = Spline_Sans_Mono({
+  variable: "--font-spline-sans-mono",
+  subsets: ["latin"],
+  display: "swap",
+  preload: false,
+});
+
+const sora = Sora({
+  variable: "--font-sora",
+  subsets: ["latin"],
+  display: "swap",
+  preload: false,
+});
+
+const azeretMono = Azeret_Mono({
+  variable: "--font-azeret-mono",
+  subsets: ["latin"],
+  display: "swap",
+  preload: false,
+});
+
+const archivo = Archivo({
+  variable: "--font-archivo",
+  subsets: ["latin"],
+  display: "swap",
+  preload: false,
+});
+
+const martianMono = Martian_Mono({
+  variable: "--font-martian-mono",
+  subsets: ["latin"],
+  display: "swap",
+  preload: false,
+});
+
+const familjenGrotesk = Familjen_Grotesk({
+  variable: "--font-familjen-grotesk",
+  subsets: ["latin"],
+  display: "swap",
+  preload: false,
+});
+
+const chivoMono = Chivo_Mono({
+  variable: "--font-chivo-mono",
+  subsets: ["latin"],
+  display: "swap",
+  preload: false,
+});
+
 const fontVariables = [
   firaSans.variable,
   firaCode.variable,
@@ -84,6 +150,14 @@ const fontVariables = [
   inconsolata.variable,
   barlow.variable,
   jetbrainsMono.variable,
+  outfit.variable,
+  splineSansMono.variable,
+  sora.variable,
+  azeretMono.variable,
+  archivo.variable,
+  martianMono.variable,
+  familjenGrotesk.variable,
+  chivoMono.variable,
 ].join(" ");
 
 export const metadata: Metadata = {

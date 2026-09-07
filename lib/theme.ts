@@ -5,7 +5,7 @@
  * border. Flipping the mode should read as the light changing, not the theme.
  *
  * Both axes are named, because "Switch to Aurora Night" tells the user more
- * than "Switch to dark theme" — and with four families there is no single
+ * than "Switch to dark theme" — and with eight families there is no single
  * "dark theme" left to name.
  */
 
@@ -14,6 +14,15 @@ export const THEMES = [
   { id: "aurora", label: "Aurora", light: "Dawn", dark: "Night" },
   { id: "iznik", label: "İznik", light: "Glaze", dark: "Cobalt" },
   { id: "cyanotype", label: "Cyanotype", light: "Negative", dark: "Print" },
+  { id: "coral", label: "Coral", light: "Shallow", dark: "Deep" },
+  { id: "saffron", label: "Saffron", light: "Bloom", dark: "Harvest" },
+  {
+    id: "reflectivity",
+    label: "Reflectivity",
+    light: "Clear",
+    dark: "Storm",
+  },
+  { id: "lichen", label: "Lichen", light: "Dry", dark: "Wet" },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]["id"];

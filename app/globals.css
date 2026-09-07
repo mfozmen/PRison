@@ -190,6 +190,161 @@
   --hover-brightness: 1.1;
 }
 
+/* --- Coral. A reef and the algae that leave it. A healthy coral's colour is
+ * not its own: it belongs to the zooxanthellae living inside, and bleaching is
+ * what is left when they go. The two grounds are a depth, not a mood — at 30 m
+ * seawater has absorbed the red end of the spectrum, so Deep is literally the
+ * same reef under light that has lost a third of its range. --- */
+[data-theme="coral"] {
+  --fsans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --fmono: var(--font-spline-sans-mono), ui-monospace, monospace;
+}
+
+[data-theme="coral"][data-mode="light"] {
+  color-scheme: light;
+  --bg: #e8efee;
+  --surface: #f7fbfa;
+  --fg: #10201e;
+  --muted: #47605c;
+  --brd: #d1dedb;
+  --accent: #0c6f6b;
+  --danger: #b03123;
+  --warning: #7d5a0d;
+  --success: #27704a;
+  --hover-brightness: 0.95;
+}
+
+[data-theme="coral"][data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #071a20;
+  --surface: #0f2831;
+  --fg: #dceaee;
+  --muted: #8dabb3;
+  --brd: #173944;
+  --accent: #4fd3c9;
+  --danger: #ff8f7c;
+  --warning: #e8b14d;
+  --success: #5cd08f;
+  --hover-brightness: 1.1;
+}
+
+/* --- Saffron. Four parts of one flower, and they look nothing alike: the
+ * purple petal of Crocus sativus, the blood-red stigma that is the spice, the
+ * orange style below it, the green leaf. The reason saffron costs what it does
+ * is that the red has to be pulled from the purple by hand.
+ * Stated plainly: Bloom and Harvest are two times of year, not two lights.
+ * That is the same latitude Cyanotype takes with Negative and Print. --- */
+[data-theme="saffron"] {
+  --fsans: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
+  --fmono: var(--font-azeret-mono), ui-monospace, monospace;
+}
+
+[data-theme="saffron"][data-mode="light"] {
+  color-scheme: light;
+  --bg: #f0ecf2;
+  --surface: #fbf9fc;
+  --fg: #1c1720;
+  --muted: #59505f;
+  --brd: #ded6e2;
+  --accent: #6b3fa0;
+  --danger: #a8202e;
+  --warning: #8f4f11;
+  --success: #35692a;
+  --hover-brightness: 0.95;
+}
+
+[data-theme="saffron"][data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #16121a;
+  --surface: #211a26;
+  --fg: #ece6f0;
+  --muted: #a094a8;
+  --brd: #342b3c;
+  --accent: #b79bf0;
+  --danger: #f0757f;
+  --warning: #e2a052;
+  --success: #82c46a;
+  --hover-brightness: 1.1;
+}
+
+/* --- Reflectivity. The dBZ scale a weather radar paints: 20 light rain, 35
+ * moderate, 50 severe, 65 hail. Every colour is a returned-power measurement.
+ * Stated plainly: this is a ramp, one axis of increasing intensity, so the
+ * accent is taken from its top end rather than being an identity of its own.
+ * It earns its place anyway — the other six families all accent in blue or
+ * green, and magenta is the one hue none of them claim. --- */
+[data-theme="reflectivity"] {
+  --fsans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --fmono: var(--font-martian-mono), ui-monospace, monospace;
+}
+
+[data-theme="reflectivity"][data-mode="light"] {
+  color-scheme: light;
+  --bg: #eaeef1;
+  --surface: #f8fafb;
+  --fg: #101519;
+  --muted: #47525b;
+  --brd: #d3dae0;
+  --accent: #91257c;
+  --danger: #ab2317;
+  --warning: #7e5f00;
+  --success: #196f38;
+  --hover-brightness: 0.95;
+}
+
+[data-theme="reflectivity"][data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #0a0e12;
+  --surface: #131a21;
+  --fg: #e3ebf2;
+  --muted: #8496a4;
+  --brd: #22303b;
+  --accent: #e07ac8;
+  --danger: #f2705f;
+  --warning: #e8c94a;
+  --success: #4fd06a;
+  --hover-brightness: 1.1;
+}
+
+/* --- Lichen. Four species off one rock face: the chartreuse crust of map
+ * lichen (Rhizocarpon geographicum), the scarlet caps of British soldiers
+ * (Cladonia cristatella), the orange of Xanthoria parietina, the sage of
+ * Flavoparmelia. The two grounds are the same rock wet and dry — a lichen
+ * rehydrates within seconds of rain and visibly darkens and greens, which is
+ * as close to "the light changed" as a living thing gets. --- */
+[data-theme="lichen"] {
+  --fsans: var(--font-familjen-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --fmono: var(--font-chivo-mono), ui-monospace, monospace;
+}
+
+[data-theme="lichen"][data-mode="light"] {
+  color-scheme: light;
+  --bg: #eceee6;
+  --surface: #f8faf3;
+  --fg: #191c14;
+  --muted: #525749;
+  --brd: #d8dccd;
+  --accent: #556411;
+  --danger: #b32d1e;
+  --warning: #8a4d0a;
+  --success: #2d6b4d;
+  --hover-brightness: 0.95;
+}
+
+[data-theme="lichen"][data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #10130d;
+  --surface: #1a1f16;
+  --fg: #e4e9dc;
+  --muted: #98a48c;
+  --brd: #2b3325;
+  --accent: #b8cc3f;
+  --danger: #ff8a78;
+  --warning: #e0a94e;
+  --success: #63c98e;
+  --hover-brightness: 1.1;
+}
+
 /* Map the Tailwind theme keys onto the runtime values, so utilities like
  * bg-background, text-danger and font-mono re-resolve the moment data-theme or
  * data-mode changes on <html>. */

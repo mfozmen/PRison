@@ -249,32 +249,20 @@ describe("palette contrast", () => {
     }
   });
 
-  it("defines a complete palette for all eight family/ground pairs", () => {
-    const found = Object.keys(palettes()).sort();
-    expect(found).toEqual(
-      [
-        "default/light", "default/dark",
-        "aurora/light", "aurora/dark",
-        "iznik/light", "iznik/dark",
-        "cyanotype/light", "cyanotype/dark",
-      ].sort(),
-    );
+  // Derived from THEMES rather than listed, so adding a family to the registry
+  // without giving it a palette fails here instead of shipping a theme that
+  // silently renders as the default one.
+  const GROUNDS = THEMES.flatMap((t) => [`${t.id}/light`, `${t.id}/dark`]);
+
+  it("defines a complete palette for every family/ground pair", () => {
+    expect(Object.keys(palettes()).sort()).toEqual([...GROUNDS].sort());
   });
 
-  // All eight, with nothing exempt. default/light used to be: it predates the
-  // theme system and missed AA on seven pairs, and was left alone so that
+  // Every ground, with nothing exempt. default/light used to be: it predates
+  // the theme system and missed AA on seven pairs, and was left alone so that
   // adding themes changed nobody's colours. #40 corrected it, which is what
   // let this list stop having an exception to explain.
-  it.each([
-    "default/light",
-    "default/dark",
-    "aurora/light",
-    "aurora/dark",
-    "iznik/light",
-    "iznik/dark",
-    "cyanotype/light",
-    "cyanotype/dark",
-  ])("%s clears WCAG AA on every text pair", (name) => {
+  it.each(GROUNDS)("%s clears WCAG AA on every text pair", (name) => {
     const vars = palettes()[name];
     expect(vars, `${name} has no palette block`).toBeDefined();
 

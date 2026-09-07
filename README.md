@@ -164,16 +164,21 @@ and expand to the latest 15, with **Load more** for the rest.
   Retry yourself. When GitHub asks for longer than a refresh should take — or
   doesn't say at all — PRison steps aside and shows the banner rather than
   guessing, since coming back early only extends the block.
-- **Four themes, each with a light and a dark ground.** A theme owns its accent,
+- **Eight themes, each with a light and a dark ground.** A theme owns its accent,
   its three status colours and its typefaces; the ground underneath is a separate
   choice, so switching it reads as the light changing rather than the theme
   changing. **Default** is the original pair; **Aurora** is built from four
   atmospheric emission wavelengths, **İznik** from the metal oxides the 16th
   century tile workshops fired, and **Cyanotype** from the 1842 blueprint
-  reaction and its negative. All eight palettes are measured against WCAG AA by
-  a test, with nothing exempt. Pick one in Settings, where each row previews itself
-  — the swatch is stamped with that theme, so it renders in the real palette
-  rather than a copy that can drift.
+  reaction and its negative. **Coral** takes a reef and the algae that colour
+  it, its two grounds a depth rather than a mood — at 30 m the sea has absorbed
+  the red end of the spectrum. **Saffron** takes four parts of one crocus,
+  **Lichen** four species off one rock face, wet and dry. **Reflectivity** is a
+  weather radar's dBZ scale, and the one accent here that isn't blue or green.
+  All sixteen palettes are measured against WCAG AA by a test, with nothing
+  exempt. Pick one in Settings, where each row previews itself — the swatch is
+  stamped with that theme, so it renders in the real palette rather than a copy
+  that can drift.
 - Responsive two-column layout, minute-level ages, colour-coded lists, and a
   Refresh button.
 - **Personal account + per-org filter** in the top-right switcher.
@@ -298,7 +303,7 @@ The Settings menu has six sections:
   it was ignored on, plus an owner scope for a check that is broken everywhere.
   A repo can also be picked here, to write a check off before the board has
   ever drawn its chip.
-- **Appearance** — pick one of the four themes, each previewing its own colours
+- **Appearance** — pick one of the eight themes, each previewing its own colours
   and typeface.
 - **About** — version, repository, license, and **Check for updates**, asked
   for on the spot. **Tell me when a newer version is out** turns it into a

@@ -3,6 +3,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { SettingsModal } from "./SettingsModal";
 import type { TrackedChecks } from "@/lib/tracked-checks";
+import { THEMES } from "@/lib/theme";
 
 // Every name typed into the required field carries that mark into storage.
 const required = (name: string) => ({ name, required: true });
@@ -1223,7 +1224,7 @@ describe("SettingsModal — appearance", () => {
     renderAppearance();
     expect(
       screen.getAllByRole("radio").map((r) => (r as HTMLInputElement).value),
-    ).toEqual(["default", "aurora", "iznik", "cyanotype"]);
+    ).toEqual(THEMES.map((t) => t.id));
   });
 
   it("stamps the chosen family on <html> and stores it", () => {
@@ -1264,12 +1265,7 @@ describe("SettingsModal — appearance", () => {
         s.getAttribute("data-theme"),
         s.getAttribute("data-mode"),
       ]),
-    ).toEqual([
-      ["default", "dark"],
-      ["aurora", "dark"],
-      ["iznik", "dark"],
-      ["cyanotype", "dark"],
-    ]);
+    ).toEqual(THEMES.map((t) => [t.id, "dark"]));
   });
 
   it("leaves the ground alone when the family changes", () => {

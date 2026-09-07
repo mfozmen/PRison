@@ -419,7 +419,12 @@ describe("Dashboard", () => {
     // Six endpoints at ten points each, and the smallest remaining is the one
     // that saw the account last.
     expect(await screen.findByText(/60 points/i)).toBeInTheDocument();
-    expect(screen.getByText(/4,200|4200/)).toBeInTheDocument();
+    // Formatted the way the component formats it. Hard-coding "4,200" asserted
+    // the group separator of whoever ran the suite: on a machine that resolves
+    // to tr-TR the panel says "4.200" and only this line failed.
+    expect(
+      screen.getByText((4200).toLocaleString(), { exact: false }),
+    ).toBeInTheDocument();
   });
 
   it("treats a header that says nothing as no answer, not as free", async () => {

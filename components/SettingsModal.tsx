@@ -745,7 +745,7 @@ export function SettingsModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className="relative z-10 flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border border-border bg-background shadow-xl"
+        className="relative z-10 flex max-h-[85vh] w-full max-w-4xl flex-col rounded-xl border border-border bg-background shadow-xl"
       >
         {/* Header row */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4">
@@ -828,7 +828,21 @@ export function SettingsModal({
                   A theme brings its own colours and typefaces. Each swatch
                   below is that theme rendering itself on your current ground.
                 </legend>
-                <div className="flex flex-col gap-2">
+                {/* auto-fit rather than a column count: the grid takes as many
+                    17rem cards as the panel is wide, so it is two here, one on
+                    a phone, and nothing to revisit the next time a family is
+                    added. A Tailwind class can't carry this — the column count
+                    isn't in the source.
+                    17rem, not less: the longest ground line a card can hold is
+                    the selected one's ("Shallow · Deep — on Deep"), and below
+                    this width it wraps to a third line and leaves the card
+                    taller than the one beside it. */}
+                <div
+                  className="grid gap-2"
+                  style={{
+                    gridTemplateColumns: "repeat(auto-fit, minmax(17rem, 1fr))",
+                  }}
+                >
                   {THEMES.map((t) => (
                     <label
                       key={t.id}

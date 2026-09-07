@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.26.0](https://github.com/mfozmen/PRison/compare/v1.25.1...v1.26.0) (2026-09-07)
+
+### Features
+
+* four more theme families, and a list that fits them ([#101](https://github.com/mfozmen/PRison/issues/101)) ([057dc99](https://github.com/mfozmen/PRison/commit/057dc99ee044d8ad077b3c969f9e2717f2a1016e))
+
 ## [1.25.1](https://github.com/mfozmen/PRison/compare/v1.25.0...v1.25.1) (2026-08-27)
 
 ## [1.25.0](https://github.com/mfozmen/PRison/compare/v1.24.0...v1.25.0) (2026-08-27)

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.26.1](https://github.com/mfozmen/PRison/compare/v1.26.0...v1.26.1) (2026-09-08)
+
+### Bug Fixes
+
+* name the open conversations holding a PR, instead of blaming checks ([#102](https://github.com/mfozmen/PRison/issues/102)) ([c72cf2f](https://github.com/mfozmen/PRison/commit/c72cf2f4944289109c1ec5619b9d4992f84e89c1))
+
 ## [1.26.0](https://github.com/mfozmen/PRison/compare/v1.25.1...v1.26.0) (2026-09-07)
 
 ### Features

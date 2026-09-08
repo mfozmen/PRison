@@ -38,6 +38,7 @@ export function stuckPr(overrides: Partial<StuckPr> = {}): StuckPr {
     readyViaBlocked: false,
     reviewDecision: "",
     mergeState: "",
+    unresolvedThreads: 0,
     stuckSince: "2026-06-20T00:00:00Z",
     ...overrides,
   };

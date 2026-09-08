@@ -20,6 +20,14 @@ export function reviewDecisionLabel(reviewDecision: string): string {
 // The card chip and the By-check group key must read the same, for the same
 // reason reviewDecisionLabel exists: two copies is how they stop agreeing.
 export const MERGE_CONFLICT_LABEL = "Merge conflict";
+export const UNRESOLVED_LABEL = "Unresolved conversations";
+
+// How many open conversations read on a card. Singular matters here: "1
+// unresolved conversations" is the kind of thing that makes a board look
+// generated.
+export function unresolvedLabel(n: number): string {
+  return `${n} unresolved conversation${n === 1 ? "" : "s"}`;
+}
 
 export function suggestStuck(pr: StuckPr): Suggestion {
   const href = `${pr.url}/checks`;
@@ -33,6 +41,11 @@ export function suggestStuck(pr: StuckPr): Suggestion {
   // Checks are green and mergeable — the blocker is a review gate.
   if (pr.reviewDecision === "REVIEW_REQUIRED") return { text: "Request code owner review", href: pr.url };
   if (pr.reviewDecision === "CHANGES_REQUESTED") return { text: "Address review feedback", href: `${pr.url}/files` };
+  // Ranked below the review decision on purpose: if a reviewer is still owed an
+  // answer, replying to them is the same act as resolving the thread, and the
+  // review gate is the one that names who is waiting. /files is where the
+  // threads are; the PR conversation tab only shows a summary of them.
+  if (pr.unresolvedThreads > 0) return { text: "Resolve conversations", href: `${pr.url}/files` };
   return { text: "See required checks", href };
 }
 
@@ -64,6 +77,9 @@ export function stuckGroupKeys(
   // which is the bucket for blockers the board cannot name — and it can name
   // this one.
   if (pr.mergeState === "DIRTY") keys.push(MERGE_CONFLICT_LABEL);
+  // Same reason as the conflict above: this is a blocker the board can now
+  // name, so it gets its own bucket instead of falling to "Other".
+  if (pr.unresolvedThreads > 0) keys.push(UNRESOLVED_LABEL);
   // A check the user threw out is not a reason a PR is stuck, so it gets no
   // bucket — a PR left with nothing else against it falls to "Other" like any
   // other blocker the board cannot name.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { suggestStuck, suggestReview, suggestReady, suggestComment, stuckGroupKeys, reviewDecisionLabel } from "./suggest";
+import { suggestStuck, suggestReview, suggestReady, suggestComment, stuckGroupKeys, reviewDecisionLabel, unresolvedLabel } from "./suggest";
 import { EMPTY_TRACKED } from "./tracked-checks";
 import { stuckPr, reviewRequest, readyPr } from "./fixtures";
 import type { StuckPr, PrComment } from "./types";
@@ -24,6 +24,29 @@ describe("suggestStuck", () => {
       href: "https://github.com/acme/b/pull/2/checks",
     });
   });
+  it("sends a PR held by open conversations to the files tab, where the threads are", () => {
+    const target = pr({ blocked: true, mergeState: "BLOCKED", unresolvedThreads: 2 });
+    expect(suggestStuck(target)).toEqual({
+      text: "Resolve conversations",
+      href: "https://github.com/acme/b/pull/2/files",
+    });
+  });
+
+  // Replying to the reviewer and resolving the thread are the same act, and
+  // only the review decision names who is waiting.
+  it("prefers the review decision over the conversation count", () => {
+    const target = pr({
+      blocked: true, mergeState: "BLOCKED",
+      reviewDecision: "CHANGES_REQUESTED", unresolvedThreads: 3,
+    });
+    expect(suggestStuck(target).text).toBe("Address review feedback");
+  });
+
+  it("still falls back to the checks link when nothing else explains the block", () => {
+    const target = pr({ blocked: true, mergeState: "BLOCKED", unresolvedThreads: 0 });
+    expect(suggestStuck(target).text).toBe("See required checks");
+  });
+
   it("blocked (BLOCKED) with no visible checks → 'See required checks'", () => {
     const target = pr({ blocked: true, mergeState: "BLOCKED" });
     expect(suggestStuck(target)).toEqual({
@@ -199,5 +222,19 @@ describe("stuckGroupKeys with ignored checks", () => {
   it("drops an awaited tracked check the user later ignored", () => {
     const tracked = { orgs: {}, repos: { "acme/b": ["flaky", "qa/smoke"] } };
     expect(stuckGroupKeys(s({ checkNames: [] }), tracked, ignored)).toEqual(["qa/smoke"]);
+  });
+});
+
+describe("unresolvedLabel", () => {
+  it("does not say '1 conversations'", () => {
+    expect(unresolvedLabel(1)).toBe("1 unresolved conversation");
+    expect(unresolvedLabel(2)).toBe("2 unresolved conversations");
+  });
+});
+
+describe("stuckGroupKeys — unresolved conversations", () => {
+  it("names the bucket instead of dropping the PR into Other", () => {
+    const target = pr({ blocked: true, mergeState: "BLOCKED", unresolvedThreads: 1 });
+    expect(stuckGroupKeys(target, EMPTY_TRACKED)).toEqual(["Unresolved conversations"]);
   });
 });

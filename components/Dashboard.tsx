@@ -22,6 +22,7 @@ import { sortByAgeAsc, sortByAgeDesc, relativeAge } from "@/lib/prioritize";
 import { parseTerms, matches } from "@/lib/search";
 import {
   suggestStuck,
+  unresolvedLabel,
   suggestReview,
   suggestReady,
   suggestComment,
@@ -1792,6 +1793,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                           ))}
                         {reviewChip}
                       </div>
+                    );
+                  } else if (pr.blocked && pr.unresolvedThreads > 0) {
+                    // Named rather than guessed at: a repo with "require
+                    // conversation resolution" reports this as BLOCKED with
+                    // every check green, which is indistinguishable from a
+                    // hidden required check unless the threads are counted.
+                    detail = noteSpan(
+                      `${unresolvedLabel(pr.unresolvedThreads)} — GitHub won't merge until they're resolved.`,
                     );
                   } else if (pr.blocked) {
                     detail = noteSpan(

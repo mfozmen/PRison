@@ -935,6 +935,48 @@ describe("Dashboard", () => {
     expect(screen.getByText("stuck pr")).toBeInTheDocument();
   });
 
+  // The generic note is the board admitting it does not know why GitHub refuses
+  // the merge. When the reason is open conversations it does know, and saying
+  // "required checks" instead sends the reader to a checks tab where everything
+  // is green.
+  it("blocked by open conversations says so, instead of blaming hidden checks", async () => {
+    const CONVERSATIONS_PR = {
+      ...STUCK_PR,
+      id: "threads-open",
+      failingChecks: 0,
+      pendingChecks: 0,
+      failing: [],
+      pending: [],
+      blocked: true,
+      mergeState: "BLOCKED",
+      unresolvedThreads: 2,
+    };
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            url.includes("ready")
+              ? []
+              : url.includes("stuck")
+                ? [CONVERSATIONS_PR]
+                : [],
+          ),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(
+      await screen.findByText(
+        "2 unresolved conversations — GitHub won't merge until they're resolved.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "Some required checks run on GitHub and aren't shown here.",
+      ),
+    ).not.toBeInTheDocument();
+  });
+
   it("review-required PR shows a 'Review required' chip instead of the generic note", async () => {
     const REVIEW_REQUIRED_PR = {
       ...STUCK_PR,

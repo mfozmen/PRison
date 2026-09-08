@@ -764,6 +764,70 @@ describe("parseStuckPrs", () => {
     expect(prs[0].pendingChecks).toBe(0);
   });
 
+  // The case that made the board lie: a PR approved, every required check
+  // green, and BLOCKED purely because two conversations were still open under
+  // "require conversation resolution". Without counting the threads the only
+  // story left was "a required check we cannot see", which was wrong and sent
+  // the reader to a checks tab where everything passed.
+  it("BLOCKED + SUCCESS + APPROVED but conversations open → not ready, and counted", () => {
+    const raw = {
+      search: { nodes: [
+        { id: "85", title: "threads-open", url: "u85", number: 85,
+          mergeStateStatus: "BLOCKED",
+          reviewDecision: "APPROVED",
+          repository: { nameWithOwner: "acme/b" },
+          reviewThreads: { nodes: [{ isResolved: false }, { isResolved: true }, { isResolved: false }] },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { state: "SUCCESS", contexts: { nodes: [] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(raw);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].unresolvedThreads).toBe(2);
+    expect(prs[0].readyViaBlocked).toBe(false);
+    expect(prs[0].blocked).toBe(true);
+  });
+
+  it("every thread resolved leaves the PR ready, and the count at zero", () => {
+    const raw = {
+      search: { nodes: [
+        { id: "86", title: "threads-closed", url: "u86", number: 86,
+          mergeStateStatus: "BLOCKED",
+          reviewDecision: "APPROVED",
+          repository: { nameWithOwner: "acme/b" },
+          reviewThreads: { nodes: [{ isResolved: true }] },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { state: "SUCCESS", contexts: { nodes: [] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(raw);
+    expect(prs[0].unresolvedThreads).toBe(0);
+    expect(prs[0].readyViaBlocked).toBe(true);
+  });
+
+  // A PR from before this field existed, or one GitHub answers without it.
+  it("treats a missing reviewThreads connection as no open conversations", () => {
+    const raw = {
+      search: { nodes: [
+        { id: "87", title: "no-threads-field", url: "u87", number: 87,
+          mergeStateStatus: "BLOCKED",
+          reviewDecision: "APPROVED",
+          repository: { nameWithOwner: "acme/b" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { state: "SUCCESS", contexts: { nodes: [] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(raw);
+    expect(prs[0].unresolvedThreads).toBe(0);
+    expect(prs[0].readyViaBlocked).toBe(true);
+  });
+
   it("BLOCKED + FAILURE rollupState + APPROVED → in stuck (failing check)", () => {
     const rawBlockedFail = {
       search: { nodes: [

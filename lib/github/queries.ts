@@ -68,6 +68,16 @@ const CHECK_ROLLUP = `statusCheckRollup { state contexts(first: 100) { nodes {
             ... on StatusContext { context state }
           } } }`;
 
+// Unresolved conversations are a merge gate of their own: a repo with "require
+// conversation resolution" refuses a PR while any thread is open, and GitHub
+// reports that as BLOCKED with a SUCCESS rollup — the same shape as a required
+// check the search cannot see, which is what the board used to guess it was.
+// There is no server-side filter for unresolved, so the threads are counted
+// here. 20 is a ceiling, not a promise: past it the count saturates, which is
+// still enough to say the PR is held by conversations rather than by CI.
+// This is a connection per PR, so it costs query points the other fields don't.
+const REVIEW_THREADS = `reviewThreads(first: 20) { nodes { isResolved } }`;
+
 export const STUCK_PRS_QUERY = `
   query($q: String!) {
     search(query: $q, type: ISSUE, first: 50) {
@@ -78,6 +88,7 @@ export const STUCK_PRS_QUERY = `
         # is what the PR page's own reviewer list shows, and what reviewDecision
         # ignores. See supersededDecision.
         latestReviews(first: 20) { nodes { state } }
+        ${REVIEW_THREADS}
         commits(last: 1) { nodes { commit {
           pushedDate committedDate
           ${CHECK_ROLLUP}
@@ -208,6 +219,13 @@ function computeCheckRollup(ctxs: any[]): {
   };
 }
 
+/** Open review conversations on a PR node, saturating at what the query asked
+ * for. Threads GitHub marks outdated still count: they hold the merge until
+ * somebody resolves them, which is the only thing this number is used for. */
+function countUnresolvedThreads(node: any): number {
+  return (node?.reviewThreads?.nodes ?? []).filter((t: any) => t && !t.isResolved).length;
+}
+
 /**
  * Returns true when a BLOCKED PR is blocked only by out-of-date/push-auth
  * (bot-handled merge), not by a missing check or review: BLOCKED, APPROVED, and
@@ -226,6 +244,11 @@ function isReadyViaBlocked(node: any): boolean {
   if (node.mergeStateStatus !== "BLOCKED" || node.reviewDecision !== "APPROVED") {
     return false;
   }
+  // An open conversation is a merge gate under "require conversation
+  // resolution", and it looks exactly like the harmless BLOCKED this function
+  // is here to forgive: approved, every check green. Without this line such a
+  // PR is announced as ready to merge and cannot be merged.
+  if (countUnresolvedThreads(node) > 0) return false;
   const rollup = node.commits?.nodes?.[0]?.commit?.statusCheckRollup;
   if (rollup?.state === "SUCCESS") return true;
   const ctxs = rollup?.contexts?.nodes ?? [];
@@ -302,6 +325,7 @@ export function parseStuckPrs(raw: any): StuckPr[] {
         readyViaBlocked,
         reviewDecision: supersededDecision(n),
         mergeState,
+        unresolvedThreads: countUnresolvedThreads(n),
         stuckSince: commit.pushedDate ?? commit.committedDate ?? "",
       } as StuckPr;
     })
@@ -529,6 +553,7 @@ export const READY_PRS_QUERY = `
         id title url number isDraft updatedAt
         mergeStateStatus reviewDecision
         repository { nameWithOwner }
+        ${REVIEW_THREADS}
         commits(last: 1) { nodes { commit {
           pushedDate committedDate
           ${CHECK_ROLLUP}

@@ -515,6 +515,15 @@ describe("Header — repository filter", () => {
     );
   });
 
+  // The org switcher beside it already names the owner; repeating it in the
+  // filter only costs width.
+  it("shows the repo name without its owner, and keeps the owner on hover", () => {
+    renderWith({ selectedRepo: "acme/api" });
+    const box = screen.getByRole("combobox", { name: "Filter by repository" });
+    expect(box).toHaveValue("api");
+    expect(box).toHaveAttribute("title", "acme/api");
+  });
+
   // The combobox only reports a repo picked from its list, so without this the
   // filter is a one-way door.
   it("clears the filter, and offers no way to clear an empty one", () => {

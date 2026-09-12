@@ -125,6 +125,7 @@ export function Header({
             owners={selectedOrg ? [selectedOrg] : repoOwners}
             placeholder="All repositories"
             ariaLabel="Filter by repository"
+            showOwner={false}
           />
           {/* The combobox only reports a repo the user picked from its list, so
               emptying the box cannot clear the filter. In Settings that is

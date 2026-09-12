@@ -9,6 +9,18 @@ export interface RepoComboboxProps {
   /** Owner logins (your orgs + personal account) to scope the search to. */
   owners?: string[];
   id?: string;
+  /** Both default to the settings wording. The header filter overrides them,
+   * because there "Repository" names the control and not what it does, and
+   * "All repositories" is the state an empty box actually means there. */
+  placeholder?: string;
+  ariaLabel?: string;
+  /** Whether a chosen repo shows as "owner/name" or just "name". Off in the
+   * header, where the owner is already on screen in the org switcher beside it
+   * and repeating it only costs width. The value passed up is the full
+   * "owner/name" either way; only the text in the box is shortened, and the
+   * options keep their owners so two repos sharing a name stay distinguishable
+   * while choosing. */
+  showOwner?: boolean;
 }
 
 export function RepoCombobox({
@@ -17,8 +29,15 @@ export function RepoCombobox({
   suggestions = [],
   owners = [],
   id,
+  placeholder = "Search repositories…",
+  ariaLabel = "Repository",
+  showOwner = true,
 }: RepoComboboxProps) {
-  const [inputText, setInputText] = useState(value);
+  // Applied everywhere the box is filled from a repo rather than from typing,
+  // so the displayed text and the value never disagree about which is which.
+  const display = (repo: string) =>
+    showOwner ? repo : (repo.split("/").pop() ?? repo);
+  const [inputText, setInputText] = useState(() => display(value));
   const [items, setItems] = useState<string[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -34,7 +53,7 @@ export function RepoCombobox({
   const [prevValue, setPrevValue] = useState(value);
   if (value !== prevValue) {
     setPrevValue(value);
-    setInputText(value);
+    setInputText(display(value));
   }
 
   // Click-outside to close
@@ -115,7 +134,7 @@ export function RepoCombobox({
   }
 
   function select(repo: string) {
-    setInputText(repo);
+    setInputText(display(repo));
     onChange(repo);
     setIsOpen(false);
     setHighlightedIndex(-1);
@@ -136,7 +155,7 @@ export function RepoCombobox({
         id={id}
         type="text"
         role="combobox"
-        aria-label="Repository"
+        aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={listboxId}
@@ -144,12 +163,14 @@ export function RepoCombobox({
           highlightedIndex >= 0 ? optionId(highlightedIndex) : undefined
         }
         value={inputText}
+        // The owner is still worth reading on hover when it is not shown.
+        title={showOwner ? undefined : value || undefined}
         onChange={(e) => handleInputChange(e.target.value)}
         onFocus={() => {
           setIsOpen(true);
         }}
         onKeyDown={handleKeyDown}
-        placeholder="Search repositories…"
+        placeholder={placeholder}
         className="w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
       />
       {isOpen && (

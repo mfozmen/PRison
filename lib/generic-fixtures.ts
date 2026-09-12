@@ -107,6 +107,12 @@ export const ALLOWED_REPOS = new Set([
   "app",
   "backend",
   "frontend",
+  // Punctuation carriers. A repository name may hold dots, underscores and a
+  // leading hyphen where a login may not, and isValidRepo has to be tested on
+  // names that prove it — with invented ones, not a real project's.
+  "api.js",
+  "api_v2",
+  "-api",
 ]);
 
 /**

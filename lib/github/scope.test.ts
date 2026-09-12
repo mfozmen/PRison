@@ -22,6 +22,22 @@ describe("resolveScope", () => {
     });
   });
 
+  it("builds a repo scope", () => {
+    expect(resolveScope(req("?repo=acme%2Fapi"))).toEqual({ scope: "repo:acme/api" });
+  });
+
+  // repo:owner/name already names its owner, so the narrower one wins rather
+  // than the answer depending on which param the caller remembered to clear.
+  it("prefers repo over both org and user", () => {
+    expect(resolveScope(req("?org=acme&user=mfozmen&repo=beta%2Fweb"))).toEqual({
+      scope: "repo:beta/web",
+    });
+  });
+
+  it("rejects an invalid repo", () => {
+    expect(resolveScope(req("?repo=acme"))).toEqual({ error: "invalid repo" });
+  });
+
   it("rejects an invalid org", () => {
     expect(resolveScope(req("?org=bad%20name"))).toEqual({ error: "invalid org" });
   });

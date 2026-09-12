@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { Org } from "@/lib/types";
+import { RepoCombobox } from "./RepoCombobox";
 import { OrgSwitcher } from "./OrgSwitcher";
 import { ActivityBell } from "./ActivityBell";
 import { releaseUrl, appVersion, isNewerVersion } from "@/lib/project";
@@ -26,6 +27,11 @@ export interface HeaderProps {
   orgs: Org[];
   selectedOrg: string;
   onOrgChange: (login: string) => void;
+  /** "" means every repo in the current org scope. */
+  selectedRepo: string;
+  onRepoChange: (repo: string) => void;
+  /** Owner logins the repo search may look inside. */
+  repoOwners: string[];
   login: string;
   onOpenSettings: () => void;
   activity: readonly ActivityEntry[];
@@ -40,6 +46,9 @@ export function Header({
   orgs,
   selectedOrg,
   onOrgChange,
+  selectedRepo,
+  onRepoChange,
+  repoOwners,
   login,
   onOpenSettings,
   activity,
@@ -105,6 +114,36 @@ export function Header({
           onChange={onOrgChange}
           login={login}
         />
+        {/* Narrower than the org beside it, and scoped by it: under a selected
+            org the search only offers that org's repos, so the two controls
+            can never describe different owners. Hidden on small screens, where
+            the org switcher alone already fills the row. */}
+        <div className="relative hidden w-56 items-center md:flex">
+          <RepoCombobox
+            value={selectedRepo}
+            onChange={onRepoChange}
+            owners={selectedOrg ? [selectedOrg] : repoOwners}
+            placeholder="All repositories"
+            ariaLabel="Filter by repository"
+            showOwner={false}
+          />
+          {/* The combobox only reports a repo the user picked from its list, so
+              emptying the box cannot clear the filter. In Settings that is
+              right — a half-typed override should not delete the row. Here the
+              filter has to have a way back to "all", and this is it. */}
+          {selectedRepo && (
+            <button
+              type="button"
+              aria-label="Clear repository filter"
+              onClick={() => onRepoChange("")}
+              className="absolute right-1 cursor-pointer rounded px-1.5 text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M9 3L3 9M3 3l6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
+        </div>
         <span className="hidden text-sm text-muted sm:inline">
           {login || "there"}
         </span>

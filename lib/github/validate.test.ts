@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isValidLogin } from "./validate";
+import { isValidLogin, isValidRepo } from "./validate";
 
 describe("isValidLogin", () => {
   it.each([
@@ -26,5 +26,42 @@ describe("isValidLogin", () => {
     ["acme+org", false, "plus sign"],
   ])("returns false for invalid login %s (%s)", (login, expected) => {
     expect(isValidLogin(login)).toBe(expected);
+  });
+});
+
+describe("isValidRepo", () => {
+  it("accepts owner/name", () => {
+    expect(isValidRepo("acme/api")).toBe(true);
+  });
+
+  // The reason this is not two isValidLogin calls: dots and underscores are
+  // legal in a repository name and illegal in a login.
+  it("accepts the punctuation a repo name allows and a login does not", () => {
+    expect(isValidRepo("acme/api.js")).toBe(true);
+    expect(isValidRepo("acme/api_v2")).toBe(true);
+    expect(isValidRepo("acme/-api")).toBe(true);
+  });
+
+  it("rejects anything that is not exactly two halves", () => {
+    expect(isValidRepo("acme")).toBe(false);
+    expect(isValidRepo("acme/api/extra")).toBe(false);
+    expect(isValidRepo("/api")).toBe(false);
+    expect(isValidRepo("acme/")).toBe(false);
+  });
+
+  it("rejects an owner that is not a login", () => {
+    expect(isValidRepo("-acme/api")).toBe(false);
+    expect(isValidRepo("ac me/api")).toBe(false);
+    expect(isValidRepo("acme.co/api")).toBe(false);
+  });
+
+  it("rejects a name that only walks the path", () => {
+    expect(isValidRepo("acme/.")).toBe(false);
+    expect(isValidRepo("acme/..")).toBe(false);
+  });
+
+  it("rejects a name past the length cap", () => {
+    expect(isValidRepo(`acme/${"a".repeat(100)}`)).toBe(true);
+    expect(isValidRepo(`acme/${"a".repeat(101)}`)).toBe(false);
   });
 });

@@ -6,10 +6,16 @@ import { activityEntry } from "@/lib/fixtures";
 
 // The activity feed has its own test file; the Header only has to pass it
 // through, so every case here supplies an empty one.
-const activityProps = {
+// The props every case passes and none of them is about. Renamed from
+// activityProps when the repo filter arrived and it stopped being only about
+// activity.
+const baseProps = {
   activity: [],
   onOpenActivity: () => {},
   onClearActivity: () => {},
+  selectedRepo: "",
+  onRepoChange: () => {},
+  repoOwners: ["octocat", "acme", "beta"],
 };
 
 const orgs = [
@@ -42,7 +48,7 @@ describe("Header", () => {
         onOrgChange={() => {}}
         login="octocat"
         onOpenSettings={() => {}}
-        {...activityProps}
+        {...baseProps}
       />,
     );
     expect(screen.getByText("PRison")).toBeInTheDocument();
@@ -59,7 +65,7 @@ describe("Header", () => {
         onOrgChange={() => {}}
         login="octocat"
         onOpenSettings={() => {}}
-        {...activityProps}
+        {...baseProps}
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /sign out/i }));
@@ -78,10 +84,13 @@ describe("Header", () => {
         onOrgChange={() => {}}
         login="octocat"
         onOpenSettings={() => {}}
-        {...activityProps}
+        {...baseProps}
       />,
     );
-    expect(screen.getByRole("combobox")).toBeInTheDocument();
+    // Named, because the repo filter beside it is a combobox too.
+    expect(
+      screen.getByRole("combobox", { name: "Filter by organization" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("All organizations")).toBeInTheDocument();
     expect(screen.getByText("acme")).toBeInTheDocument();
     expect(screen.getByText("beta")).toBeInTheDocument();
@@ -95,7 +104,7 @@ describe("Header", () => {
         onOrgChange={() => {}}
         login="octocat"
         onOpenSettings={() => {}}
-        {...activityProps}
+        {...baseProps}
       />,
     );
     const personalOption = screen.getByText("octocat (you)");
@@ -111,7 +120,7 @@ describe("Header", () => {
         onOrgChange={() => {}}
         login=""
         onOpenSettings={() => {}}
-        {...activityProps}
+        {...baseProps}
       />,
     );
     expect(screen.getByText("there")).toBeInTheDocument();
@@ -126,7 +135,7 @@ describe("Header", () => {
         onOrgChange={() => {}}
         login="octocat"
         onOpenSettings={onOpenSettings}
-        {...activityProps}
+        {...baseProps}
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
@@ -146,7 +155,7 @@ describe("Header ground toggle", () => {
         onOrgChange={() => {}}
         login="testuser"
         onOpenSettings={() => {}}
-        {...activityProps}
+        {...baseProps}
       />,
     );
   }
@@ -230,7 +239,7 @@ describe("Header ground toggle", () => {
         onOrgChange={() => {}}
         login="testuser"
         onOpenSettings={() => {}}
-        {...activityProps}
+        {...baseProps}
       />,
     );
     expect(html).toContain("Switch to Default Dark");
@@ -249,7 +258,7 @@ describe("Header — app version", () => {
         onOrgChange={vi.fn()}
         login="octocat"
         onOpenSettings={vi.fn()}
-        {...activityProps}
+        {...baseProps}
       />,
     );
 
@@ -271,7 +280,7 @@ describe("Header — app version", () => {
         onOrgChange={vi.fn()}
         login="octocat"
         onOpenSettings={vi.fn()}
-        {...activityProps}
+        {...baseProps}
       />,
     );
 
@@ -301,7 +310,7 @@ describe("Header — a newer release", () => {
         login="octocat"
         onOpenSettings={vi.fn()}
         checkUpdates
-        {...activityProps}
+        {...baseProps}
         {...props}
       />,
     );
@@ -399,7 +408,7 @@ describe("Header — a newer release", () => {
         login="someone-else"
         onOpenSettings={vi.fn()}
         checkUpdates
-        {...activityProps}
+        {...baseProps}
       />,
     );
     expect((global.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(
@@ -422,7 +431,7 @@ describe("Header — activity bell", () => {
         onOrgChange={() => {}}
         login="octocat"
         onOpenSettings={() => {}}
-        {...activityProps}
+        {...baseProps}
         {...props}
       />,
     );
@@ -450,5 +459,85 @@ describe("Header — activity bell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Activity, 1 unseen" }));
     fireEvent.click(screen.getByRole("button", { name: "Clear all" }));
     expect(onClearActivity).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Header — repository filter", () => {
+  const renderWith = (props: Partial<React.ComponentProps<typeof Header>>) =>
+    render(
+      <Header
+        orgs={orgs}
+        selectedOrg=""
+        onOrgChange={() => {}}
+        login="octocat"
+        onOpenSettings={() => {}}
+        {...baseProps}
+        {...props}
+      />,
+    );
+
+  it("offers the filter beside the org switcher", () => {
+    renderWith({});
+    expect(
+      screen.getByRole("combobox", { name: "Filter by repository" }),
+    ).toHaveAttribute("placeholder", "All repositories");
+  });
+
+  // The two controls must never describe different owners: under a selected
+  // org the search may only look inside it.
+  it("scopes the search to the selected org, and to every owner under All", async () => {
+    const calls: string[] = [];
+    global.fetch = vi.fn((url: string) => {
+      calls.push(String(url));
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    }) as unknown as typeof fetch;
+
+    const { unmount } = renderWith({ selectedOrg: "acme" });
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Filter by repository" }),
+      { target: { value: "api" } },
+    );
+    await waitFor(() =>
+      expect(calls.some((u) => u.includes("owners=acme"))).toBe(true),
+    );
+    unmount();
+
+    calls.length = 0;
+    renderWith({ selectedOrg: "" });
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Filter by repository" }),
+      { target: { value: "api" } },
+    );
+    await waitFor(() =>
+      expect(
+        calls.some((u) => u.includes(encodeURIComponent("octocat,acme,beta"))),
+      ).toBe(true),
+    );
+  });
+
+  // The org switcher beside it already names the owner; repeating it in the
+  // filter only costs width.
+  it("shows the repo name without its owner, and keeps the owner on hover", () => {
+    renderWith({ selectedRepo: "acme/api" });
+    const box = screen.getByRole("combobox", { name: "Filter by repository" });
+    expect(box).toHaveValue("api");
+    expect(box).toHaveAttribute("title", "acme/api");
+  });
+
+  // The combobox only reports a repo picked from its list, so without this the
+  // filter is a one-way door.
+  it("clears the filter, and offers no way to clear an empty one", () => {
+    const onRepoChange = vi.fn();
+    const { unmount } = renderWith({ selectedRepo: "acme/api", onRepoChange });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Clear repository filter" }),
+    );
+    expect(onRepoChange).toHaveBeenCalledWith("");
+    unmount();
+
+    renderWith({ selectedRepo: "" });
+    expect(
+      screen.queryByRole("button", { name: "Clear repository filter" }),
+    ).not.toBeInTheDocument();
   });
 });

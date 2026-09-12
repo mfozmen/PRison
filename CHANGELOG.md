@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.27.0](https://github.com/mfozmen/PRison/compare/v1.26.1...v1.27.0) (2026-09-12)
+
+### Features
+
+* filter the board to a single repository ([#103](https://github.com/mfozmen/PRison/issues/103)) ([bcfa89f](https://github.com/mfozmen/PRison/commit/bcfa89faf9ba84cf49cbf021634560ffd2d377aa))
+
 ## [1.26.1](https://github.com/mfozmen/PRison/compare/v1.26.0...v1.26.1) (2026-09-08)
 
 ### Bug Fixes

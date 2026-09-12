@@ -242,6 +242,33 @@ beforeEach(() => {
   global.fetch = okFetch();
 });
 
+/** okFetch plus an answer for the header repo search, so the filter has
+ * something to offer. */
+function repoAwareFetch() {
+  const lists = okFetch();
+  return vi.fn((url: string, init?: RequestInit) =>
+    url.includes("/api/repos")
+      ? Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(["acme/api", "acme/web"]),
+        })
+      : (lists as unknown as typeof fetch)(url, init),
+  ) as unknown as typeof fetch;
+}
+
+/** The combobox only reports a repo the user picked from its list, so a test
+ * has to type enough to search (2 chars), wait out the 300ms debounce, and
+ * click the option. */
+async function pickRepo(repo: string) {
+  fireEvent.change(
+    screen.getByRole("combobox", { name: "Filter by repository" }),
+    { target: { value: repo } },
+  );
+  // mouseDown, not click: the option commits on mouse-down so the input's
+  // blur can't close the list before the selection lands.
+  fireEvent.mouseDown(await screen.findByRole("option", { name: repo }));
+}
+
 /** Comment filters, auto refresh, and tracked checks live in the Settings
  * modal; open it first, then pick the section under test. */
 function openSettings(section?: string) {
@@ -263,7 +290,7 @@ describe("Dashboard", () => {
   it("scopes the fetch and persists when an org is selected", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("combobox"), {
+    fireEvent.change(screen.getByRole("combobox", { name: "Filter by organization" }), {
       target: { value: "beta" },
     });
     await waitFor(() =>
@@ -280,7 +307,7 @@ describe("Dashboard", () => {
       const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
       expect(calls.some((c) => String(c[0]).includes("org=beta"))).toBe(true);
     });
-    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe(
+    expect((screen.getByRole("combobox", { name: "Filter by organization" }) as HTMLSelectElement).value).toBe(
       "beta",
     );
   });
@@ -693,7 +720,7 @@ describe("Dashboard", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     // The "All" stuck fetch is in flight; switch to beta before it resolves.
     await waitFor(() => expect(resolvers["all"]).toBeDefined());
-    fireEvent.change(screen.getByRole("combobox"), {
+    fireEvent.change(screen.getByRole("combobox", { name: "Filter by organization" }), {
       target: { value: "beta" },
     });
     await waitFor(() => expect(resolvers["beta"]).toBeDefined());
@@ -706,10 +733,99 @@ describe("Dashboard", () => {
     expect(screen.queryByText("stuck-all")).not.toBeInTheDocument();
   });
 
+  // Picking a repo has to reach GitHub, not just hide rows: the search window
+  // is first:50, so a repo outside it would otherwise look empty.
+  it("selecting a repo re-fetches scoped to it and persists the choice", async () => {
+    global.fetch = repoAwareFetch();
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+
+    await pickRepo("acme/api");
+
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.repo")).toBe("acme/api"),
+    );
+    const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
+    expect(
+      calls.some((c) => String(c[0]).includes("repo=acme%2Fapi")),
+    ).toBe(true);
+  });
+
+  // The org select is the one control on the page that must never be able to
+  // lie: leaving acme/api selected under "beta" would show acme's board.
+  it("changing the org clears the repo and re-fetches without it", async () => {
+    global.fetch = repoAwareFetch();
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("stuck pr")).toBeInTheDocument();
+    await pickRepo("acme/api");
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.repo")).toBe("acme/api"),
+    );
+
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Filter by organization" }),
+      { target: { value: "beta" } },
+    );
+
+    await waitFor(() => expect(localStorage.getItem("prison.repo")).toBe(""));
+    const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.map((c) =>
+      String(c[0]),
+    );
+    const lastStuck = calls.filter((u) => u.includes("stuck")).at(-1)!;
+    expect(lastStuck).toContain("org=beta");
+    expect(lastStuck).not.toContain("repo=");
+  });
+
+  // The stale guard used to key on the org alone. Changing repo inside one org
+  // leaves that half untouched, so the previous repo's slow answer would be
+  // accepted as current.
+  it("discards a stale response for a superseded repo within the same org", async () => {
+    const resolvers: Record<string, () => void> = {};
+    global.fetch = vi.fn((url: string) => {
+      if (url.includes("/api/repos")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(["acme/api", "acme/web"]),
+        });
+      }
+      const key =
+        new URL(url, "http://x").searchParams.get("repo") ?? "none";
+      if (url.includes("stuck")) {
+        return new Promise((resolve) => {
+          resolvers[key] = () =>
+            resolve({
+              ok: true,
+              json: () =>
+                Promise.resolve([
+                  { ...STUCK_PR, id: key, title: `stuck-${key}` },
+                ]),
+            });
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    }) as unknown as typeof fetch;
+
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() => expect(resolvers["none"]).toBeDefined());
+    await pickRepo("acme/api");
+    await waitFor(() => expect(resolvers["acme/api"]).toBeDefined());
+    await pickRepo("acme/web");
+    await waitFor(() => expect(resolvers["acme/web"]).toBeDefined());
+
+    resolvers["acme/web"]();
+    expect(await screen.findByText("stuck-acme/web")).toBeInTheDocument();
+    // Both superseded answers now land and must be ignored.
+    resolvers["acme/api"]();
+    resolvers["none"]();
+    expect(await screen.findByText("stuck-acme/web")).toBeInTheDocument();
+    expect(screen.queryByText("stuck-acme/api")).not.toBeInTheDocument();
+    expect(screen.queryByText("stuck-none")).not.toBeInTheDocument();
+  });
+
   it("selecting the personal option fetches with ?user= and persists", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("combobox"), {
+    fireEvent.change(screen.getByRole("combobox", { name: "Filter by organization" }), {
       target: { value: "testuser" },
     });
     await waitFor(() =>
@@ -735,7 +851,7 @@ describe("Dashboard", () => {
         true,
       );
     });
-    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe(
+    expect((screen.getByRole("combobox", { name: "Filter by organization" }) as HTMLSelectElement).value).toBe(
       "testuser",
     );
   });
@@ -745,7 +861,7 @@ describe("Dashboard", () => {
       <Dashboard orgs={[{ login: "a b", avatarUrl: "x" }]} login="testuser" />,
     );
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("combobox"), {
+    fireEvent.change(screen.getByRole("combobox", { name: "Filter by organization" }), {
       target: { value: "a b" },
     });
     await waitFor(() => {

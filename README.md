@@ -181,7 +181,10 @@ and expand to the latest 15, with **Load more** for the rest.
   that can drift.
 - Responsive two-column layout, minute-level ages, colour-coded lists, and a
   Refresh button.
-- **Personal account + per-org filter** in the top-right switcher.
+- **Personal account + per-org filter** in the top-right switcher, and a
+  **single-repo filter** beside it for the days spent inside one repository.
+  Both narrow the GitHub search itself rather than the rows already on screen,
+  so the 50-result window is spent on what you are looking at.
 - **Your own access** — sign in with the GitHub CLI or a token; no third-party
   app to approve. Every row deep-links to GitHub; PRison never writes anything.
 

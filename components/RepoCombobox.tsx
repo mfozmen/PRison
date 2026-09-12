@@ -9,6 +9,11 @@ export interface RepoComboboxProps {
   /** Owner logins (your orgs + personal account) to scope the search to. */
   owners?: string[];
   id?: string;
+  /** Both default to the settings wording. The header filter overrides them,
+   * because there "Repository" names the control and not what it does, and
+   * "All repositories" is the state an empty box actually means there. */
+  placeholder?: string;
+  ariaLabel?: string;
 }
 
 export function RepoCombobox({
@@ -17,6 +22,8 @@ export function RepoCombobox({
   suggestions = [],
   owners = [],
   id,
+  placeholder = "Search repositories…",
+  ariaLabel = "Repository",
 }: RepoComboboxProps) {
   const [inputText, setInputText] = useState(value);
   const [items, setItems] = useState<string[]>([]);
@@ -136,7 +143,7 @@ export function RepoCombobox({
         id={id}
         type="text"
         role="combobox"
-        aria-label="Repository"
+        aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={listboxId}
@@ -149,7 +156,7 @@ export function RepoCombobox({
           setIsOpen(true);
         }}
         onKeyDown={handleKeyDown}
-        placeholder="Search repositories…"
+        placeholder={placeholder}
         className="w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
       />
       {isOpen && (

@@ -19,6 +19,7 @@ import type {
   ReviewedPr,
 } from "@/lib/types";
 import { sortByAgeAsc, sortByAgeDesc, relativeAge } from "@/lib/prioritize";
+import { isValidRepo } from "@/lib/github/validate";
 import { parseTerms, matches } from "@/lib/search";
 import {
   suggestStuck,
@@ -131,6 +132,11 @@ function budgetTime(iso: string): string {
 
 export function Dashboard({ orgs, login }: DashboardProps) {
   const [selectedOrg, setSelectedOrg] = useState<string>(ALL);
+  // "" means every repo in the current org scope. A repo narrows the search
+  // itself rather than the rendered rows: the window is first:50, so filtering
+  // client-side would leave a busy account's focused repo outside it entirely
+  // and show an empty board that looks like a repo with nothing open.
+  const [selectedRepo, setSelectedRepo] = useState<string>("");
   const [hydrated, setHydrated] = useState(false);
   const [draftFilter, setDraftFilter] = useState<DraftFilter>("all");
   // Bots author the large majority of unanswered review threads, so they are
@@ -195,9 +201,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [partial, setPartial] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  // Tracks the most recently requested org so stale in-flight responses are
-  // discarded instead of overwriting the current view.
-  const latestOrgRef = useRef<string>(ALL);
+  // Tracks the most recently requested scope so stale in-flight responses are
+  // discarded instead of overwriting the current view. It holds "org|repo", not
+  // the org alone: switching repo inside one org leaves the org half unchanged,
+  // and a slow answer for the previous repo would be accepted as current.
+  const latestScopeRef = useRef<string>(`${ALL}|`);
   // What every item was doing the last time the user had it on screen. Merged
   // in whenever something changes, so a new scope's initial items are marked
   // seen by their first (non-silent) fetch and only genuine transitions after
@@ -227,10 +235,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const unseen = unseenCount(activity);
 
   const fetchData = useCallback(
-    (org: string, silent = false) => {
-      latestOrgRef.current = org;
-      const qs =
-        org === login
+    (org: string, repo = "", silent = false) => {
+      latestScopeRef.current = `${org}|${repo}`;
+      // Same precedence the server applies in resolveScope: repo:owner/name
+      // already names its owner, so sending an org beside it could only agree
+      // or contradict.
+      const qs = repo
+        ? `?repo=${encodeURIComponent(repo)}`
+        : org === login
           ? `?user=${encodeURIComponent(login)}`
           : org
             ? `?org=${encodeURIComponent(org)}`
@@ -317,7 +329,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           }),
         ]);
 
-        if (latestOrgRef.current !== org) return;
+        if (latestScopeRef.current !== `${org}|${repo}`) return;
 
         setBudgetSpent(spent);
         if (remaining !== null && resetAt !== null)
@@ -466,6 +478,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // hydration mismatch on the controlled filter.
   useEffect(() => {
     const stored = localStorage.getItem("prison.org");
+    const storedRepo = localStorage.getItem("prison.repo");
     const storedDraftFilter = localStorage.getItem("prison.draftFilter");
     // The old two-state key. Read as a fallback so anyone who had drafts hidden
     // keeps them hidden across the upgrade; never written again.
@@ -497,6 +510,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         (stored && orgs.some((o) => o.login === stored))
       ) {
         setSelectedOrg(stored);
+      }
+      // Shape-checked rather than matched against a list: the repos a user can
+      // reach are not known here, and a stored value the server rejects is a
+      // 400 on the next refresh rather than something to guess at.
+      if (storedRepo && isValidRepo(storedRepo)) {
+        setSelectedRepo(storedRepo);
       }
       if (DRAFT_FILTERS.some((f) => f.value === storedDraftFilter)) {
         setDraftFilter(storedDraftFilter as DraftFilter);
@@ -535,8 +554,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   useEffect(() => {
     if (!hydrated) return;
     localStorage.setItem("prison.org", selectedOrg);
-    fetchData(selectedOrg);
-  }, [selectedOrg, hydrated, fetchData]);
+    localStorage.setItem("prison.repo", selectedRepo);
+    fetchData(selectedOrg, selectedRepo);
+  }, [selectedOrg, selectedRepo, hydrated, fetchData]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -623,9 +643,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // immediate fire, so it never double-fetches with the org effect above.
   useEffect(() => {
     if (!hydrated || !autoRefresh) return;
-    const id = setInterval(() => fetchData(selectedOrg, true), pollInterval);
+    const id = setInterval(() => fetchData(selectedOrg, selectedRepo, true), pollInterval);
     return () => clearInterval(id);
-  }, [hydrated, autoRefresh, pollInterval, selectedOrg, fetchData]);
+  }, [hydrated, autoRefresh, pollInterval, selectedOrg, selectedRepo, fetchData]);
 
   // Age the "Updated Xm ago" label without a fetch. Only runs once there is
   // something to age.
@@ -703,6 +723,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // Owner logins (personal + orgs) used to scope the repo search to repos the
   // user can access.
   const repoOwners = [login, ...orgs.map((o) => o.login)];
+
+  // An org switch drops the repo. Keeping it would leave the board showing one
+  // owner's repo under a control naming another, and the org select is the one
+  // thing on the page that must never be able to lie about what is shown.
+  const handleOrgChange = (org: string) => {
+    setSelectedOrg(org);
+    setSelectedRepo("");
+  };
 
   const sortedStuck = sortByAgeAsc(stuckPrs, (pr) => pr.stuckSince);
   const sortedReviews = sortByAgeAsc(reviewReqs, (req) => req.requestedAt);
@@ -997,7 +1025,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       <Header
         orgs={orgs}
         selectedOrg={selectedOrg}
-        onOrgChange={setSelectedOrg}
+        onOrgChange={handleOrgChange}
+        selectedRepo={selectedRepo}
+        onRepoChange={setSelectedRepo}
+        repoOwners={repoOwners}
         login={login}
         onOpenSettings={handleOpenSettings}
         activity={activity}
@@ -1048,7 +1079,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             <span>⚠ Some data couldn&apos;t be loaded — Retry</span>
             <button
               type="button"
-              onClick={() => fetchData(selectedOrg)}
+              onClick={() => fetchData(selectedOrg, selectedRepo)}
               className="ml-4 cursor-pointer rounded bg-warning/20 px-3 py-1 text-xs font-medium text-warning transition-colors hover:bg-warning/30"
             >
               Retry
@@ -1180,7 +1211,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           )}
           <button
             type="button"
-            onClick={() => fetchData(selectedOrg)}
+            onClick={() => fetchData(selectedOrg, selectedRepo)}
             disabled={isPending}
             className={`flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${lastRefreshedAt ? "" : "ml-auto"}`}
           >
@@ -1273,7 +1304,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
               <span>{readyError}</span>
               <button
-                onClick={() => fetchData(selectedOrg)}
+                onClick={() => fetchData(selectedOrg, selectedRepo)}
                 className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
               >
                 Retry
@@ -1335,7 +1366,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
               <span>{commentsError}</span>
               <button
-                onClick={() => fetchData(selectedOrg)}
+                onClick={() => fetchData(selectedOrg, selectedRepo)}
                 className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
               >
                 Retry
@@ -1453,7 +1484,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
                   <span>{reviewError}</span>
                   <button
-                    onClick={() => fetchData(selectedOrg)}
+                    onClick={() => fetchData(selectedOrg, selectedRepo)}
                     className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
                   >
                     Retry
@@ -1531,7 +1562,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               open={reviewedOpen}
               onToggle={() => setReviewedOpen((o) => !o)}
               error={budgetSpent === undefined ? reviewedError : null}
-              onRetry={() => fetchData(selectedOrg)}
+              onRetry={() => fetchData(selectedOrg, selectedRepo)}
             >
               {shownReviewed.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">
@@ -1569,7 +1600,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
                   <span>{stuckError}</span>
                   <button
-                    onClick={() => fetchData(selectedOrg)}
+                    onClick={() => fetchData(selectedOrg, selectedRepo)}
                     className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
                   >
                     Retry
@@ -1834,7 +1865,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               open={closedOpen}
               onToggle={() => setClosedOpen((o) => !o)}
               error={budgetSpent === undefined ? closedError : null}
-              onRetry={() => fetchData(selectedOrg)}
+              onRetry={() => fetchData(selectedOrg, selectedRepo)}
             >
               {shownClosed.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">

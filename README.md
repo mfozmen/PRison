@@ -211,15 +211,16 @@ Zero-config — `AUTH_SECRET` is auto-generated and persisted in a volume (nothi
 From the published image, no clone needed:
 
 ```sh
-docker run -p 3000:3000 -v prison-data:/data \
-  -e GITHUB_TOKEN="$(gh auth token)" mfozmen/prison   # http://localhost:3000
+docker run -p 3000:3000 -v prison-data:/data -e GITHUB_TOKEN="$(gh auth token)" mfozmen/prison
 ```
 
 Or build it yourself from a checkout:
 
 ```sh
-GITHUB_TOKEN="$(gh auth token)" docker compose up --build   # http://localhost:3000
+GITHUB_TOKEN="$(gh auth token)" docker compose up --build
 ```
+
+Either way, open http://localhost:3000.
 
 The `prison-data` volume holds the generated `AUTH_SECRET`, so your session
 survives a restart. Images are published for `linux/amd64` and `linux/arm64`.
@@ -240,11 +241,11 @@ something lands and stays until you click it.
 ![The macOS menu bar with the PRison plugin clicked open. In the bar, the PRison icon and the number 2. The menu below lists Unread (2) and Mark all read, then the live totals — Ready to merge 2, Waiting on your review 2, Comments awaiting reply 3, Stuck on checks 4 — each opening a submenu of its own PRs, then Open PRison and Refresh now](docs/menubar.png)
 
 ```sh
-brew install --cask swiftbar
-mkdir -p ~/SwiftBar                          # the folder SwiftBar asks for on first launch
-cp extras/menubar/prison.1m.py ~/SwiftBar/
-chmod +x ~/SwiftBar/prison.1m.py             # the bit survives cp, not a raw download
+brew install --cask swiftbar && mkdir -p ~/SwiftBar && cp extras/menubar/prison.1m.py ~/SwiftBar/ && chmod +x ~/SwiftBar/prison.1m.py
 ```
+
+`~/SwiftBar` is the folder SwiftBar asks for on first launch; `chmod +x` matters
+because the executable bit survives `cp`, not a raw download.
 
 It reads the PRison you just started — no token of its own, no configuration,
 and no schedule of its own: it asks GitHub on the same interval the dashboard
@@ -255,9 +256,10 @@ opens that PR and marks it read; the live totals sit one click below. See
 ### Run locally (development)
 
 ```sh
-npm install
-npm run dev        # http://localhost:3000
+npm install && npm run dev
 ```
+
+Then open http://localhost:3000.
 
 `npm run dev` generates `AUTH_SECRET` into `.env.local` on first run (it encrypts
 the session cookie) — nothing to configure. Open the app and click **Sign in with

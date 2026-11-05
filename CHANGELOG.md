@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.27.1](https://github.com/mfozmen/PRison/compare/v1.27.0...v1.27.1) (2026-11-05)
+
+### Bug Fixes
+
+* move the default port from 3000 to 7747 ([#105](https://github.com/mfozmen/PRison/issues/105)) ([761975c](https://github.com/mfozmen/PRison/commit/761975ca6b87386f792a45ef2c672f0aac6b5e5e))
+
 ## [1.27.0](https://github.com/mfozmen/PRison/compare/v1.26.1...v1.27.0) (2026-09-12)
 
 ### Features

@@ -211,7 +211,7 @@ Zero-config — `AUTH_SECRET` is auto-generated and persisted in a volume (nothi
 From the published image, no clone needed:
 
 ```sh
-docker run -p 3000:3000 -v prison-data:/data -e GITHUB_TOKEN="$(gh auth token)" mfozmen/prison
+docker run -p 7747:7747 -v prison-data:/data -e GITHUB_TOKEN="$(gh auth token)" mfozmen/prison
 ```
 
 Or build it yourself from a checkout:
@@ -220,7 +220,7 @@ Or build it yourself from a checkout:
 GITHUB_TOKEN="$(gh auth token)" docker compose up --build
 ```
 
-Either way, open http://localhost:3000.
+Either way, open http://localhost:7747.
 
 The `prison-data` volume holds the generated `AUTH_SECRET`, so your session
 survives a restart. Images are published for `linux/amd64` and `linux/arm64`.
@@ -259,7 +259,11 @@ opens that PR and marks it read; the live totals sit one click below. See
 npm install && npm run dev
 ```
 
-Then open http://localhost:3000.
+Then open http://localhost:7747.
+
+7747 is taken? Pick another port with `npm run dev -- -p 8000` (or
+`docker run -p 8000:7747 …`), and set the menu bar plugin's `PRISON_URL` to
+`http://localhost:8000` so the two keep reading the same PRison.
 
 `npm run dev` generates `AUTH_SECRET` into `.env.local` on first run (it encrypts
 the session cookie) — nothing to configure. Open the app and click **Sign in with

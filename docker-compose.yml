@@ -2,7 +2,7 @@ services:
   prison:
     build: .
     ports:
-      - "3000:3000"
+      - "7747:7747"
     environment:
       # AUTH_SECRET is auto-generated on first start and persisted to the
       # prison-data volume. Optionally override by setting AUTH_SECRET in your

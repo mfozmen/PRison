@@ -58,7 +58,7 @@ plugin on 30 minutes — PRison's own default.
 
 - The refresh interval is **not** configured here. It is the dashboard's, in
   Settings → Auto refresh.
-- `PRISON_URL` — where PRison is, default `http://localhost:3000`. Set it in
+- `PRISON_URL` — where PRison is, default `http://localhost:7747`. Set it in
   SwiftBar's per-plugin settings if you moved the port. (`$SWIFTBAR_*`
   variables exist only while a plugin runs; your own shell does not have them.)
 - `PER_BUCKET` at the top of the file — how many PRs each section lists. The

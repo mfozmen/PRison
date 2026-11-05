@@ -5,10 +5,10 @@
   "scripts": {
     "preinstall": "node scripts/check-registry.mjs",
     "predev": "node scripts/ensure-env.mjs",
-    "dev": "next dev",
+    "dev": "next dev -p 7747",
     "prebuild": "node scripts/ensure-env.mjs",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 7747",
     "lint": "eslint",
     "test": "vitest run",
     "test:cov": "vitest run --coverage",

@@ -38,7 +38,7 @@ import sys
 import urllib.error
 import urllib.request
 
-URL = os.environ.get("PRISON_URL", "http://localhost:3000").rstrip("/")
+URL = os.environ.get("PRISON_URL", "http://localhost:7747").rstrip("/")
 # PRison's own icon (app/icon.svg), rasterized at 36x36 for a 2x menu bar.
 # Not a template image: this one has a colour, and stamping a green mark flat
 # in one tone is a worse likeness than no likeness. It sits at 20px of the

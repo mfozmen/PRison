@@ -2,7 +2,7 @@
 // Capture docs/screenshot.png from the synthetic board, headlessly.
 //
 //   npm run dev                          # in another shell
-//   node scripts/screenshot/capture.mjs  # reads PRISON_URL, default http://localhost:3000
+//   node scripts/screenshot/capture.mjs  # reads PRISON_URL, default http://localhost:7747
 //
 // Drives headless Chrome over the DevTools Protocol. No browser extension, no
 // Playwright, no dependency at all: Node has had a global WebSocket since 22,
@@ -31,7 +31,7 @@ import { pageSnippet } from "./demo-board.mjs";
 // fileURLToPath, not .pathname: on Windows the latter yields "/C:/…", which
 // resolves against the drive root instead of the repo.
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const APP = process.env.PRISON_URL ?? "http://localhost:3000";
+const APP = process.env.PRISON_URL ?? "http://localhost:7747";
 const OUT = join(ROOT, "docs", "screenshot.png");
 const CHROME = process.env.CHROME_PATH
   ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";

@@ -187,7 +187,7 @@ jobs:
           esac
           {
             printf '%s' "$BODY"
-            printf '\n\n---\n\n### Docker\n\n```sh\ndocker run -p 3000:3000 -v prison-data:/data \\\n  -e GITHUB_TOKEN="$(gh auth token)" mfozmen/prison:%s\n```\n\n' "$VERSION"
+            printf '\n\n---\n\n### Docker\n\n```sh\ndocker run -p 7747:7747 -v prison-data:/data \\\n  -e GITHUB_TOKEN="$(gh auth token)" mfozmen/prison:%s\n```\n\n' "$VERSION"
             printf '[`mfozmen/prison:%s` on Docker Hub](https://hub.docker.com/r/mfozmen/prison/tags?name=%s) — linux/amd64 and linux/arm64.\n' "$VERSION" "$VERSION"
           } > body.md
           gh release edit "$TAG" --notes-file body.md

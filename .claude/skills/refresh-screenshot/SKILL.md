@@ -51,15 +51,16 @@ npm run dev
 ```
 
 `docs/screenshot.png` is not reachable from a production build without a real
-token, which is the thing this must not use. Note the port it actually picked:
-if the Docker container is on `:3000` — and it holds **real** data — `next dev`
-falls back to `:3001` and you must point the capture at that one.
+token, which is the thing this must not use. If the Docker container is on
+`:7747` — and it holds **real** data — `npm run dev` fails to bind (the port is
+pinned, so it does not fall back); run it on another port with
+`npm run dev -- -p 7748` and point the capture at that one.
 
 ### 2. Capture
 
 ```bash
-node scripts/screenshot/capture.mjs                        # localhost:3000
-PRISON_URL=http://localhost:3001 node scripts/screenshot/capture.mjs
+node scripts/screenshot/capture.mjs                        # localhost:7747
+PRISON_URL=http://localhost:7748 node scripts/screenshot/capture.mjs
 ```
 
 It writes `docs/screenshot.png` directly, at 1280 CSS px and 2x, dark theme,

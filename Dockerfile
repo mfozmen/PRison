@@ -21,7 +21,7 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
+ENV PORT=7747
 ENV HOSTNAME=0.0.0.0
 
 # Run as a non-root user.
@@ -37,7 +37,7 @@ COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
 USER nextjs
-EXPOSE 3000
+EXPOSE 7747
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "server.js"]

@@ -637,6 +637,25 @@ describe("parseStuckPrs", () => {
     expect(prs).toHaveLength(0);
   });
 
+  it("a green CLEAN draft is kept — the ready list drops drafts, so nothing else would show it", () => {
+    const rawCleanDraft = {
+      search: { nodes: [
+        { id: "63", title: "clean-draft", url: "u63", number: 63, isDraft: true,
+          mergeStateStatus: "CLEAN",
+          repository: { nameWithOwner: "acme/b" },
+          commits: { nodes: [{ commit: {
+            pushedDate: "2026-06-25T00:00:00Z",
+            statusCheckRollup: { contexts: { nodes: [
+              { conclusion: "SUCCESS" },
+            ] } },
+          } }] } },
+      ] },
+    };
+    const prs = parseStuckPrs(rawCleanDraft);
+    expect(prs.map((p) => p.id)).toEqual(["63"]);
+    expect(prs[0].isDraft).toBe(true);
+  });
+
   it("BEHIND mergeStateStatus with no failing/pending → NOT in stuck (BEHIND moved to ready)", () => {
     const rawBehind = {
       search: { nodes: [

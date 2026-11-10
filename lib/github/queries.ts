@@ -329,7 +329,9 @@ export function parseStuckPrs(raw: any): StuckPr[] {
         stuckSince: commit.pushedDate ?? commit.committedDate ?? "",
       } as StuckPr;
     })
-    .filter((p: StuckPr) => p.failingChecks > 0 || p.pendingChecks > 0 || p.blocked);
+    // Drafts stay even when green: parseReadyPrs drops every draft, so this list
+    // is the only place a draft can appear.
+    .filter((p: StuckPr) => p.failingChecks > 0 || p.pendingChecks > 0 || p.blocked || p.isDraft);
 }
 
 export function parseReviewRequests(raw: any, viewerLogin: string): ReviewRequest[] {

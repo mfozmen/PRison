@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.27.2](https://github.com/mfozmen/prison/compare/v1.27.1...v1.27.2) (2026-11-10)
+
+### Bug Fixes
+
+* show drafts whose checks are green ([#106](https://github.com/mfozmen/prison/issues/106)) ([5973751](https://github.com/mfozmen/prison/commit/59737515586baaf6b2064140625f5cea16aff59c))
+
 ## [1.27.1](https://github.com/mfozmen/PRison/compare/v1.27.0...v1.27.1) (2026-11-05)
 
 ### Bug Fixes

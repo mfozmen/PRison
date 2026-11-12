@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.27.3](https://github.com/mfozmen/prison/compare/v1.27.2...v1.27.3) (2026-11-12)
+
+### Bug Fixes
+
+* surface conversation comments left on your own PRs ([#107](https://github.com/mfozmen/prison/issues/107)) ([b6ac0a7](https://github.com/mfozmen/prison/commit/b6ac0a736c421b4952e091d4781cf4fe8843f0b2))
+
 ## [1.27.2](https://github.com/mfozmen/prison/compare/v1.27.1...v1.27.2) (2026-11-10)
 
 ### Bug Fixes

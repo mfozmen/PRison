@@ -1433,6 +1433,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                         Review comment
                       </span>
                     )}
+                    {c.source === "conversation" && (
+                      <span className="inline-flex items-center rounded bg-surface px-1.5 py-0.5 text-xs font-medium text-muted ring-1 ring-inset ring-border">
+                        Conversation
+                      </span>
+                    )}
                     {c.path && (
                       <span className="inline-flex items-center gap-1 rounded bg-surface px-1.5 py-0.5 font-mono text-xs text-muted ring-1 ring-inset ring-border">
                         <svg

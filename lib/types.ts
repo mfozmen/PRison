@@ -61,7 +61,7 @@ export type PrComment = {
   // Which surface it came from. The row shows it, because the two are answered
   // in different places and a body with no file badge otherwise reads as a
   // thread whose path failed to load.
-  source: "thread" | "review";
+  source: "thread" | "review" | "conversation";
   prId: string;        // PR node id — the Dashboard shows only comments on PRs visible in the stuck/ready lists
   url: string;         // direct anchor to the comment, e.g. .../pull/42#discussion_r1
   repo: string;

@@ -1752,6 +1752,31 @@ describe("parsePrComments", () => {
       ]);
     });
 
+    it("surfaces a conversation comment left after the viewer last spoke", () => {
+      const said = (login: string, createdAt: string, over: Record<string, unknown> = {}) => ({
+        id: `IC_${login}_${createdAt}`,
+        url: `https://gh/acme/b/pull/2#issuecomment-${createdAt}`,
+        bodyText: "Every push redeploys every service?",
+        createdAt,
+        author: { login, __typename: "User" },
+        ...over,
+      });
+      const rows = parsePrComments(
+        withReviews([], [
+          said("alice", "2026-07-01T00:00:00Z"),
+          said("mfozmen", "2026-07-02T00:00:00Z"),
+          said("alice", "2026-07-03T00:00:00Z"),
+          said("github-actions", "2026-07-04T00:00:00Z", { author: { login: "github-actions", __typename: "Bot" } }),
+          said("bob", "2026-07-05T00:00:00Z", { bodyText: " " }),
+        ]),
+        "mfozmen",
+      );
+      expect(rows.map((r) => [r.source, r.author, r.isBot, r.commentedAt])).toEqual([
+        ["conversation", "alice", false, "2026-07-03T00:00:00Z"],
+        ["conversation", "github-actions", true, "2026-07-04T00:00:00Z"],
+      ]);
+    });
+
     it("drops an approval that carries no text", () => {
       expect(parsePrComments(withReviews([review({ bodyText: "" })]), "mfozmen")).toEqual([]);
       expect(parsePrComments(withReviews([review({ bodyText: "  \n " })]), "mfozmen")).toEqual([]);

@@ -387,8 +387,13 @@ export const PR_COMMENTS_QUERY = `
         # forgiving failure this heuristic already accepts — a handled row costs
         # a glance, where the other direction hides an unanswered question — so
         # it stays a window rather than growing the heaviest query in the app.
+        #
+        # Also the third surface: a plain conversation comment from someone else
+        # after the viewer last spoke is a row of its own.
         comments(last: 20) @include(if: $withReviews) { nodes {
-          author { login } createdAt
+          id url bodyText createdAt
+          author { login __typename }
+          reactionGroups { viewerHasReacted }
         } }
         reviewThreads(first: 50) { nodes {
           id isResolved path
@@ -457,7 +462,11 @@ export function parsePrComments(
 ): PrComment[] {
   return searchNodes(raw)
     .filter((pr: any) => pr?.id)
-    .flatMap((pr: any) => [...reviewBodiesOf(pr, viewerLogin), ...threadsOf(pr, viewerLogin, viewerStartedOnly)]);
+    .flatMap((pr: any) => [
+      ...reviewBodiesOf(pr, viewerLogin),
+      ...conversationOf(pr, viewerLogin),
+      ...threadsOf(pr, viewerLogin, viewerStartedOnly),
+    ]);
 }
 
 /**
@@ -484,9 +493,7 @@ function reviewBodiesOf(pr: any, viewerLogin: string): PrComment[] {
   if (!Array.isArray(reviews)) return [];
   // "" sorts before every ISO timestamp, so a viewer who has not spoken on this
   // PR leaves every review body pending without a second code path.
-  const viewerSpokeAt = (pr.comments?.nodes ?? [])
-    .filter((c: any) => c?.author?.login === viewerLogin)
-    .reduce((latest: string, c: any) => (c.createdAt > latest ? c.createdAt : latest), "");
+  const viewerSpokeAt = viewerSpokeAtOf(pr, viewerLogin);
   return reviews
     .filter((r: any) => r?.id && r.submittedAt > viewerSpokeAt)
     .filter((r: any) => r.author?.login && r.author.login !== viewerLogin)
@@ -509,6 +516,41 @@ function reviewBodiesOf(pr: any, viewerLogin: string): PrComment[] {
       // compare greater than "", so a review without one is already gone.
       commentedAt: r.submittedAt,
       viewerReacted: (r.reactionGroups ?? []).some((g: any) => g?.viewerHasReacted === true),
+      viewerStarted: false,
+    } as PrComment));
+}
+
+function viewerSpokeAtOf(pr: any, viewerLogin: string): string {
+  return (pr.comments?.nodes ?? [])
+    .filter((c: any) => c?.author?.login === viewerLogin)
+    .reduce((latest: string, c: any) => (c.createdAt > latest ? c.createdAt : latest), "");
+}
+
+/**
+ * Conversation comments still waiting on the viewer — same turn rule as review
+ * bodies: someone else wrote it after the viewer last said anything on the PR.
+ */
+function conversationOf(pr: any, viewerLogin: string): PrComment[] {
+  // Absent on the reviewed leg, which does not request them.
+  if (!Array.isArray(pr.comments?.nodes)) return [];
+  const viewerSpokeAt = viewerSpokeAtOf(pr, viewerLogin);
+  return pr.comments.nodes
+    .filter((c: any) => c?.id && c.createdAt > viewerSpokeAt)
+    .filter((c: any) => c.author?.login && c.author.login !== viewerLogin)
+    .filter((c: any) => (c.bodyText ?? "").trim() !== "")
+    .map((c: any) => ({
+      id: c.id,
+      prId: pr.id,
+      url: c.url ?? pr.url,
+      repo: pr.repository?.nameWithOwner ?? "",
+      number: pr.number,
+      author: c.author.login,
+      isBot: c.author.__typename === "Bot",
+      path: "",
+      source: "conversation",
+      preview: previewOf(c.bodyText),
+      commentedAt: c.createdAt,
+      viewerReacted: (c.reactionGroups ?? []).some((g: any) => g?.viewerHasReacted === true),
       viewerStarted: false,
     } as PrComment));
 }

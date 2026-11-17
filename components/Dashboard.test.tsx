@@ -3108,7 +3108,7 @@ describe("Dashboard — comments awaiting your reply", () => {
     expect(
       await screen.findByText("please fix the null check"),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Seen ✓ — undo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Unmark as seen" }));
     await waitFor(() =>
       expect(localStorage.getItem("prison.seenComments")).toBe("{}"),
     );

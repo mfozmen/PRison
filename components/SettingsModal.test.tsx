@@ -607,6 +607,13 @@ describe("SettingsModal", () => {
       "Comments",
     ],
     [
+      "Hide comments I marked as seen",
+      "hideSeen",
+      "onHideSeenChange",
+      true,
+      "Comments",
+    ],
+    [
       "Auto refresh",
       "autoRefresh",
       "onAutoRefreshChange",

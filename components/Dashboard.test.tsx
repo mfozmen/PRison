@@ -3124,6 +3124,10 @@ describe("Dashboard — comments awaiting your reply", () => {
     expect(
       await screen.findByText("please fix the null check"),
     ).toBeInTheDocument();
+    // The stale mark is ignored, not merely outvoted by a disabled filter.
+    expect(
+      screen.getByRole("button", { name: "Mark as seen" }),
+    ).toBeInTheDocument();
   });
 
   it("shows an error banner and retry when the comments fetch fails, without breaking the other lists", async () => {

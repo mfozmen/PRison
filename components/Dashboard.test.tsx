@@ -3086,6 +3086,50 @@ describe("Dashboard — comments awaiting your reply", () => {
     ).toBeInTheDocument();
   });
 
+  it("hides a comment marked as seen, keeps the mark, and reveals it for undo when the toggle is unchecked", async () => {
+    global.fetch = fetchWithComments([COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(
+      await screen.findByText("please fix the null check"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark as seen" }));
+    expect(
+      await screen.findByText(/no comments awaiting your reply/i),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        JSON.parse(localStorage.getItem("prison.seenComments") ?? "{}"),
+      ).toEqual({ t1: COMMENT.commentedAt }),
+    );
+
+    openSettings();
+    fireEvent.click(screen.getByLabelText(/hide comments i marked as seen/i));
+    expect(
+      await screen.findByText("please fix the null check"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Seen ✓ — undo" }));
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.seenComments")).toBe("{}"),
+    );
+  });
+
+  it("brings a seen comment back once a newer reply lands on the thread", async () => {
+    localStorage.setItem(
+      "prison.seenComments",
+      JSON.stringify({ t1: "2026-06-01T00:00:00Z" }),
+    );
+    global.fetch = fetchWithComments([COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(
+      await screen.findByText("please fix the null check"),
+    ).toBeInTheDocument();
+    // The stale mark is ignored, not merely outvoted by a disabled filter.
+    expect(
+      screen.getByRole("button", { name: "Mark as seen" }),
+    ).toBeInTheDocument();
+  });
+
   it("shows an error banner and retry when the comments fetch fails, without breaking the other lists", async () => {
     global.fetch = vi.fn((url: string) =>
       url.includes("pr-comments")

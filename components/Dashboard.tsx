@@ -58,6 +58,7 @@ import {
   readyDespiteIgnored,
   readyFromStuck,
 } from "@/lib/ignored-checks";
+import { isSeen, parseSeen, type SeenComments } from "@/lib/seen-comments";
 import { CheckChip } from "./CheckChip";
 import {
   DEFAULT_POLL_INTERVAL_MS,
@@ -148,6 +149,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // Reacting with an emoji is how the user acknowledges a comment without replying,
   // so reacted threads are hidden by default; client-side to keep the toggle instant.
   const [hideReacted, setHideReacted] = useState(true);
+  // The same acknowledgement without leaving a trace on GitHub: marked on the
+  // board, kept in this browser. Hidden by default, like reacted threads.
+  const [seen, setSeen] = useState<SeenComments>({});
+  const [hideSeen, setHideSeen] = useState(true);
   const [groupBy, setGroupBy] = useState<"flat" | "repo" | "check">("flat");
   // Component state, never persisted — the rule the section folds follow: a
   // query that outlived the sitting would hide work tomorrow morning with no
@@ -486,6 +491,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     const storedShowBots = localStorage.getItem("prison.showBots");
     const storedUpdateChecks = localStorage.getItem("prison.updateChecks");
     const storedHideReacted = localStorage.getItem("prison.hideReacted");
+    const storedSeen = localStorage.getItem("prison.seenComments");
+    const storedHideSeen = localStorage.getItem("prison.hideSeen");
     const storedGroupBy = localStorage.getItem("prison.groupBy");
     const storedAutoRefresh = localStorage.getItem("prison.autoRefresh");
     const storedPollInterval = localStorage.getItem("prison.pollInterval");
@@ -531,6 +538,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       if (storedHideReacted === "false") {
         setHideReacted(false);
       }
+      if (storedHideSeen === "false") {
+        setHideSeen(false);
+      }
+      setSeen(parseSeen(storedSeen));
       if (storedGroupBy === "repo" || storedGroupBy === "check") {
         setGroupBy(storedGroupBy);
       }
@@ -577,6 +588,16 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     if (!hydrated) return;
     localStorage.setItem("prison.hideReacted", String(hideReacted));
   }, [hideReacted, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.hideSeen", String(hideSeen));
+  }, [hideSeen, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.seenComments", JSON.stringify(seen));
+  }, [seen, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -883,7 +904,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         // filtered the PR out.
         (c.viewerStarted || visiblePrIds.has(c.prId)) &&
         (showBots || !c.isBot) &&
-        !(hideReacted && c.viewerReacted),
+        !(hideReacted && c.viewerReacted) &&
+        !(hideSeen && isSeen(c, seen)),
     ),
     (c) => c.commentedAt,
   );
@@ -1098,6 +1120,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         onShowBotsChange={setShowBots}
         hideReacted={hideReacted}
         onHideReactedChange={setHideReacted}
+        hideSeen={hideSeen}
+        onHideSeenChange={setHideSeen}
         autoRefresh={autoRefresh}
         onAutoRefreshChange={handleAutoRefreshChange}
         pollInterval={pollInterval}
@@ -1465,6 +1489,20 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                         {c.path}
                       </span>
                     )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSeen((prev) => {
+                          const next = { ...prev };
+                          if (isSeen(c, prev)) delete next[c.id];
+                          else next[c.id] = c.commentedAt;
+                          return next;
+                        })
+                      }
+                      className="ml-auto inline-flex min-h-[24px] cursor-pointer items-center rounded px-1.5 py-0.5 text-xs font-medium text-muted ring-1 ring-inset ring-border transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      {isSeen(c, seen) ? "Seen ✓ — undo" : "Mark as seen"}
+                    </button>
                   </span>
                 }
               />

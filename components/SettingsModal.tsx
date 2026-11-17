@@ -48,6 +48,8 @@ export interface SettingsModalProps {
   onShowBotsChange: (v: boolean) => void;
   hideReacted: boolean;
   onHideReactedChange: (v: boolean) => void;
+  hideSeen: boolean;
+  onHideSeenChange: (v: boolean) => void;
   autoRefresh: boolean;
   onAutoRefreshChange: (v: boolean) => void;
   pollInterval: number;
@@ -595,6 +597,8 @@ export function SettingsModal({
   onShowBotsChange,
   hideReacted,
   onHideReactedChange,
+  hideSeen,
+  onHideSeenChange,
   autoRefresh,
   onAutoRefreshChange,
   pollInterval,
@@ -915,6 +919,12 @@ export function SettingsModal({
                   onChange={onHideReactedChange}
                 >
                   Hide comments I reacted to
+                </SettingCheckbox>
+                <SettingCheckbox
+                  checked={hideSeen}
+                  onChange={onHideSeenChange}
+                >
+                  Hide comments I marked as seen
                 </SettingCheckbox>
               </div>
             )}

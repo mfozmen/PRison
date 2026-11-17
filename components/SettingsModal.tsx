@@ -48,8 +48,8 @@ export interface SettingsModalProps {
   onShowBotsChange: (v: boolean) => void;
   hideReacted: boolean;
   onHideReactedChange: (v: boolean) => void;
-  hideSeen?: boolean;
-  onHideSeenChange?: (v: boolean) => void;
+  hideSeen: boolean;
+  onHideSeenChange: (v: boolean) => void;
   autoRefresh: boolean;
   onAutoRefreshChange: (v: boolean) => void;
   pollInterval: number;
@@ -597,8 +597,8 @@ export function SettingsModal({
   onShowBotsChange,
   hideReacted,
   onHideReactedChange,
-  hideSeen = true,
-  onHideSeenChange = () => {},
+  hideSeen,
+  onHideSeenChange,
   autoRefresh,
   onAutoRefreshChange,
   pollInterval,

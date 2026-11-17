@@ -16,6 +16,8 @@ const filterProps = {
   onShowBotsChange: vi.fn(),
   hideReacted: true,
   onHideReactedChange: vi.fn(),
+  hideSeen: true,
+  onHideSeenChange: vi.fn(),
   autoRefresh: false,
   onAutoRefreshChange: vi.fn(),
   pollInterval: DEFAULT_POLL_INTERVAL_MS,

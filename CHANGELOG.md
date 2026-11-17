@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.29.0](https://github.com/mfozmen/prison/compare/v1.28.0...v1.29.0) (2026-11-17)
+
+### Features
+
+* make the seen toggle an icon button ([#109](https://github.com/mfozmen/prison/issues/109)) ([6db6940](https://github.com/mfozmen/prison/commit/6db69408fe50054018f73a62ae8bfa59d4e17c0f))
+
 ## [1.28.0](https://github.com/mfozmen/prison/compare/v1.27.3...v1.28.0) (2026-11-17)
 
 ### Features

@@ -1491,7 +1491,6 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     )}
                     <button
                       type="button"
-                      aria-pressed={isSeen(c, seen)}
                       onClick={() =>
                         setSeen((prev) => {
                           const next = { ...prev };

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.28.0](https://github.com/mfozmen/prison/compare/v1.27.3...v1.28.0) (2026-11-17)
+
+### Features
+
+* mark a comment awaiting your reply as seen ([#108](https://github.com/mfozmen/prison/issues/108)) ([397e624](https://github.com/mfozmen/prison/commit/397e6244c7a57c076cffc9dd8ea982a0ea493ea9))
+
 ## [1.27.3](https://github.com/mfozmen/prison/compare/v1.27.2...v1.27.3) (2026-11-12)
 
 ### Bug Fixes

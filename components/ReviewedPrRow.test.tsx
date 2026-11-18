@@ -30,13 +30,13 @@ describe("ReviewedPrRow", () => {
   it("shows the repo, number, author and how long ago the review was left", () => {
     render(<ReviewedPrRow pr={approved} now={now} />);
     expect(screen.getByText("acme/web #42 · alice")).toBeInTheDocument();
-    expect(screen.getByText(/reviewed 2d ago/)).toBeInTheDocument();
+    expect(screen.getByText("2d ago")).toBeInTheDocument();
   });
 
   it.each([
-    ["APPROVED", "Approved"],
-    ["CHANGES_REQUESTED", "Changes requested"],
-    ["COMMENTED", "Commented"],
+    ["APPROVED", "You approved"],
+    ["CHANGES_REQUESTED", "You requested changes"],
+    ["COMMENTED", "You commented"],
     ["DISMISSED", "Dismissed"],
   ] as const)("badges a %s review as %s", (state, label) => {
     render(<ReviewedPrRow pr={{ ...approved, state }} now={now} />);
@@ -51,5 +51,6 @@ describe("ReviewedPrRow", () => {
   it("stays quiet when nothing has happened since the review", () => {
     render(<ReviewedPrRow pr={approved} now={now} />);
     expect(screen.queryByText("Updated since")).not.toBeInTheDocument();
+    expect(screen.getByText("No changes since")).toBeInTheDocument();
   });
 });

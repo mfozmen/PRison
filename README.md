@@ -7,13 +7,15 @@
 
 A read-only GitHub dashboard that shows which pull requests need your attention,
 and for how long — across your personal account and every organization you can
-access. Four lists, oldest first, plus two history sections:
+access. Four queues, oldest first, side by side as columns (stuck on checks,
+waiting on your review, awaiting your reply, ready to merge), plus two history
+sections:
 
 - **Ready to merge** — PRs GitHub reports as mergeable now. An out-of-date branch
   still counts, with a **"Needs update"** hint (a bot/manual update handles it) —
   but only once its checks are green; while one is red or still running it
   belongs under _Stuck on checks_, and no PR is ever in both lists.
-- **Comments awaiting your reply** — review comments where the last word isn't
+- **Awaiting your reply** — review comments where the last word isn't
   yours: every unresolved inline thread on your own PRs, the threads you raised
   on PRs you reviewed, and questions left in the body of a review rather than on
   a line of the diff. Each row opens the comment itself, not the top of the PR.
@@ -28,14 +30,14 @@ access. Four lists, oldest first, plus two history sections:
 - **Recently merged / closed** — your own PRs that were merged or closed, newest
   first, so finished work confirms itself.
 
-The lower half of the board is two columns paired by subject: other people's PRs
-on the left — the ones waiting on your review, then the ones you have already
-reviewed — and your own on the right, blocked above finished. Each history sits
-under the queue it is the history of, and the columns grow independently, so
-expanding one never moves the other. Both histories start collapsed with a count
-and expand to the latest 15, with **Load more** for the rest.
+The four work queues sit side by side as columns, most urgent kind first:
+stuck on checks, waiting on your review, awaiting your reply, ready to merge.
+Each column grows on its own, so a long queue never pushes another down. Above
+them, a **Next move** strip names the one thing to do first. The two histories
+sit underneath as quieter panels; both start collapsed with a count and expand
+to the latest 15, with **Load more** for the rest.
 
-![The PRison dashboard in dark mode. The filter bar's grouping and draft filters and a search box sit at the top; under them three summary tiles (waiting on you, awaiting your reply, stuck on checks), each showing a count and its oldest wait, then a row of links to all six sections with their counts. Ready to merge and Comments awaiting your reply run full width; below them two columns pair each queue with its history — PRs waiting on your review above Recently reviewed on the left, PRs stuck on checks above Recently merged / closed on the right. One stuck PR is tagged both Merge conflict and a failing check](docs/screenshot.png)
+![The PRison dashboard in dark mode. A Next move strip on top points at the oldest item, a PR stuck on lint and typecheck for 4 days, with a Re-run failed checks button and Skip. Under it, the heading 12 things want you sits beside pill toggles for grouping and drafts, a search box and Refresh. Four columns follow, each with a big count and its oldest wait: Stuck on checks (highlighted, 4), Waiting on your review (3), Awaiting your reply (3) and Ready to merge (2). Every row has a status icon, its repo and age, and its next action. At the foot, a History section holds the folded Recently reviewed and Recently merged / closed panels](docs/screenshot.png)
 
 ### Features
 
@@ -71,29 +73,32 @@ and expand to the latest 15, with **Load more** for the rest.
   ignoring a check says its result means nothing, never "merge it anyway" — but
   GitHub's own _blocked_ state doesn't, since a red **required** check is
   exactly what puts a PR there.
-- **History you can walk back into.** Merged and closed-without-merging PRs, each
-  badged **Merged** or **Closed** with how long ago it ended — and next to them
-  the PRs you reviewed, so a discussion you left open is one click away instead
-  of lost in GitHub's notification list.
-- **Summary tiles** above the lists: how many PRs wait on your review, how many
-  comments wait on your reply, how many of yours are stuck on checks — each with
-  how long that queue's oldest one has been sitting, so every age says which list
-  it belongs to. The two where someone else is held up by you are coloured; the
-  rest stay quiet. They count the lists as filtered, so a
-  tile never disagrees with the list beneath it, and they cost no extra API
-  calls — it is all data already on the page. _Ready to merge_ has no tile: it
-  is the one queue you want to be long.
-- **A section index** under the tiles: every section, in page order, with its
-  count — so nothing is more than a click from the top however long the board
-  gets, including the two histories at the foot of it. They are plain links, so
-  the Back button is the way back and keyboard focus travels with the view.
+- **History you can walk back into.** Merged and closed-without-merging PRs on a
+  short timeline, each marked **Merged** or **Closed without merge** with how long
+  ago it ended. Beside them are the PRs you reviewed, worded as what you did
+  (**You requested changes**, **You approved**). When the author has pushed since,
+  the row shows **Updated since** and a **See new commits** link, so a discussion
+  you left open is one click away instead of lost in GitHub's notification list.
+- **Next move.** A strip above the columns points at the longest wait across all
+  four queues, says why (the red checks, the conflict, who is blocked), and puts
+  its one action a click away. **Skip** steps to the next oldest and wraps after
+  the last. The column that holds it is tinted and the row is marked
+  **↑ next move**, so the strip is a pointer, never a fifth list.
+- **A big count on every column.** Each queue shows how many items it holds and
+  how long its oldest one has been sitting, with a one-line description of what
+  the queue is. The heading above says how many things want you in total. The
+  counts follow the filters and the search, so a column never disagrees with
+  its own rows, and they cost no extra API calls: it is all data already on the
+  page. Every row carries a status icon (✕ failing, clock pending, eye review,
+  speech bubble reply, ✓ ready), so colour is never the only signal.
 - **Everything folds by its header.** Each of the four lists, each repo/check
   group inside them, and both history sections collapse to a single line that
   keeps its title and count — so a section you are not working in today stops
   taking up the screen without ever hiding how much is in it. Folds last the
   sitting, not forever: a board that quietly omitted your review queue tomorrow
   morning would be worse than a long one.
-- **Grouping** — flat, by repository, or by check. Next to it in the filter
+- **Grouping** — by queue, by repository, or by check, applied inside each
+  column so a PR never changes queue with the view. Next to it in the filter
   bar, a **draft filter**: **All**, **Only drafts** to see just what you have in
   progress, or **No drafts** to get them out of the way.
 - **One search box over the whole board.** Type a word and every list narrows at
@@ -164,7 +169,7 @@ and expand to the latest 15, with **Load more** for the rest.
   Retry yourself. When GitHub asks for longer than a refresh should take — or
   doesn't say at all — PRison steps aside and shows the banner rather than
   guessing, since coming back early only extends the block.
-- **Eight themes, each with a light and a dark ground.** A theme owns its accent,
+- **Fourteen themes, each with a light and a dark ground.** A theme owns its accent,
   its three status colours and its typefaces; the ground underneath is a separate
   choice, so switching it reads as the light changing rather than the theme
   changing. **Default** is the original pair; **Aurora** is built from four
@@ -174,13 +179,22 @@ and expand to the latest 15, with **Load more** for the rest.
   it, its two grounds a depth rather than a mood — at 30 m the sea has absorbed
   the red end of the spectrum. **Saffron** takes four parts of one crocus,
   **Lichen** four species off one rock face, wet and dry. **Reflectivity** is a
-  weather radar's dBZ scale, and the one accent here that isn't blue or green.
-  All sixteen palettes are measured against WCAG AA by a test, with nothing
+  weather radar's dBZ scale. Six more start from palettes on colorpalettes.net
+  and let them colour the ground as well as the accent: **Lilac** (violet night),
+  **Olive** (olive and mustard on linen), **Acid Pop** (cobalt, acid green and
+  hot pink — the loud one), **Terracotta** (peach plaster and fired clay),
+  **Moss & Rose** (blue-green moss with a blush accent) and **Bordeaux** (wine and mustard, the one red ground).
+  All twenty-eight palettes are measured against WCAG AA by a test, with nothing
   exempt. Pick one in Settings, where each row previews itself — the swatch is
   stamped with that theme, so it renders in the real palette rather than a copy
   that can drift.
-- Responsive two-column layout, minute-level ages, colour-coded lists, and a
-  Refresh button.
+- **A tier board.** A Next move strip on top points at the longest wait across
+  every queue, with its one action and a Skip. Below it, four columns side by
+  side: stuck on checks, waiting on your review, awaiting your reply, ready to
+  merge. Each has a big count, its oldest age, and status icons, so colour is
+  never the only signal. The two histories, recently reviewed and recently
+  merged/closed, sit underneath, quieter on purpose. The columns stack on a
+  narrow screen.
 - **Personal account + per-org filter** in the top-right switcher, and a
   **single-repo filter** beside it for the days spent inside one repository.
   Both narrow the GitHub search itself rather than the rows already on screen,
@@ -312,7 +326,7 @@ The Settings menu has six sections:
   it was ignored on, plus an owner scope for a check that is broken everywhere.
   A repo can also be picked here, to write a check off before the board has
   ever drawn its chip.
-- **Appearance** — pick one of the eight themes, each previewing its own colours
+- **Appearance** — pick one of the fourteen themes, each previewing its own colours
   and typeface.
 - **About** — version, repository, license, and **Check for updates**, asked
   for on the spot. **Tell me when a newer version is out** turns it into a
@@ -324,11 +338,12 @@ The Settings menu has six sections:
 
 | Control                           | What it does                                                                                                             |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **Flat / By repo / By check**     | Groups the lists. Group headers fold and unfold, and under **By repo** the ↗ beside one opens that repository on GitHub. |
+| **By queue / By repo / By check** | Groups the rows inside each column. Group headers fold and unfold, and under **By repo** the ↗ beside one opens that repository on GitHub. |
 | **All / Only drafts / No drafts** | Filters by draft state.                                                                                                  |
 | **Search**                        | Narrows every list to the rows matching all your terms; Esc clears it.                                                   |
 | **Refresh**                       | Re-fetches without reloading the page.                                                                                   |
 | **Updated Xm ago**                | How fresh the data is, next to Refresh.                                                                                  |
+| **Next move → Skip**              | Steps the strip above the columns to the next oldest item; it wraps after the last.                                      |
 
 Click a **PR title** (or a suggested-action link) to jump to GitHub — a comment
 row lands on that exact thread. On a Mac, the same counts are in

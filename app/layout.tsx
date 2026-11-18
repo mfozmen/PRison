@@ -16,12 +16,24 @@ import {
   Martian_Mono,
   Familjen_Grotesk,
   Chivo_Mono,
+  Lexend,
+  DM_Mono,
+  Work_Sans,
+  Courier_Prime,
+  Bricolage_Grotesque,
+  Space_Mono,
+  Nunito_Sans,
+  Overpass_Mono,
+  Figtree,
+  Red_Hat_Mono,
+  Instrument_Sans,
+  Geist_Mono,
 } from "next/font/google";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 // One sans and one mono per theme family; globals.css picks the pair that
-// matches data-theme. Only the default family is preloaded — the other seven are
+// matches data-theme. Only the default family is preloaded — the others are
 // declared so their @font-face rules exist, and the browser fetches a file only
 // once text is actually set in it.
 const firaSans = Fira_Sans({
@@ -141,6 +153,21 @@ const chivoMono = Chivo_Mono({
   preload: false,
 });
 
+// The palette families (Lilac, Olive, Acid Pop, Terracotta, Moss & Rose, Bordeaux). DM
+// Mono, Courier Prime and Space Mono ship only static cuts, so they name theirs.
+const lexend = Lexend({ variable: "--font-lexend", subsets: ["latin"], display: "swap", preload: false });
+const dmMono = DM_Mono({ variable: "--font-dm-mono", subsets: ["latin"], weight: ["400", "500"], display: "swap", preload: false });
+const workSans = Work_Sans({ variable: "--font-work-sans", subsets: ["latin"], display: "swap", preload: false });
+const courierPrime = Courier_Prime({ variable: "--font-courier-prime", subsets: ["latin"], weight: ["400", "700"], display: "swap", preload: false });
+const bricolage = Bricolage_Grotesque({ variable: "--font-bricolage", subsets: ["latin"], display: "swap", preload: false });
+const spaceMono = Space_Mono({ variable: "--font-space-mono", subsets: ["latin"], weight: ["400", "700"], display: "swap", preload: false });
+const nunitoSans = Nunito_Sans({ variable: "--font-nunito-sans", subsets: ["latin"], display: "swap", preload: false });
+const overpassMono = Overpass_Mono({ variable: "--font-overpass-mono", subsets: ["latin"], display: "swap", preload: false });
+const figtree = Figtree({ variable: "--font-figtree", subsets: ["latin"], display: "swap", preload: false });
+const redHatMono = Red_Hat_Mono({ variable: "--font-red-hat-mono", subsets: ["latin"], display: "swap", preload: false });
+const instrumentSans = Instrument_Sans({ variable: "--font-instrument-sans", subsets: ["latin"], display: "swap", preload: false });
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], display: "swap", preload: false });
+
 const fontVariables = [
   firaSans.variable,
   firaCode.variable,
@@ -158,6 +185,18 @@ const fontVariables = [
   martianMono.variable,
   familjenGrotesk.variable,
   chivoMono.variable,
+  lexend.variable,
+  dmMono.variable,
+  workSans.variable,
+  courierPrime.variable,
+  bricolage.variable,
+  spaceMono.variable,
+  nunitoSans.variable,
+  overpassMono.variable,
+  figtree.variable,
+  redHatMono.variable,
+  instrumentSans.variable,
+  geistMono.variable,
 ].join(" ");
 
 export const metadata: Metadata = {

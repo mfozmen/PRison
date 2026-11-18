@@ -95,19 +95,22 @@ export function Header({
   const nextMode = isDark ? "light" : "dark";
 
   return (
-    <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/80 px-6 py-3 backdrop-blur">
-      <div className="flex items-center gap-2">
+    <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
+      {/* Same column as the board under it, so the logo and the first card
+          share a left edge. The controls wrap rather than run off a phone. */}
+      <div className="mx-auto flex max-w-[1424px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-6 lg:px-8">
+      <div className="flex items-center gap-2.5">
         <span
           aria-hidden="true"
-          className="flex h-6 w-6 items-center justify-center rounded bg-accent font-mono text-sm font-bold text-background"
+          className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-[15px] font-bold text-background"
         >
           P
         </span>
-        <span className="text-lg font-bold tracking-tight text-foreground">
+        <span className="text-[17px] font-semibold tracking-[-0.01em] text-foreground">
           PRison
         </span>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
         <OrgSwitcher
           orgs={orgs}
           value={selectedOrg}
@@ -144,7 +147,15 @@ export function Header({
             </button>
           )}
         </div>
-        <span className="hidden text-sm text-muted sm:inline">
+        <span className="hidden items-center gap-2 border-l border-border pl-2 text-sm text-muted sm:flex">
+          {login && (
+            <span
+              aria-hidden="true"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-border text-[13px] font-semibold text-foreground"
+            >
+              {login.slice(0, 2).toLowerCase()}
+            </span>
+          )}
           {login || "there"}
         </span>
         <ActivityBell
@@ -156,12 +167,12 @@ export function Header({
           type="button"
           aria-label="Settings"
           onClick={onOpenSettings}
-          className="cursor-pointer rounded-md border border-border bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="cursor-pointer rounded-[10px] border border-border bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <svg
             aria-hidden="true"
-            width="16"
-            height="16"
+            width="18"
+            height="18"
             viewBox="0 0 24 24"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
@@ -169,7 +180,7 @@ export function Header({
             <path
               d="M4 6h10M18 6h2"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
@@ -178,14 +189,14 @@ export function Header({
               cy="6"
               r="2"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
             <path
               d="M4 12h2M10 12h10"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
@@ -194,14 +205,14 @@ export function Header({
               cy="12"
               r="2"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
             <path
               d="M4 18h10M18 18h2"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
@@ -210,7 +221,7 @@ export function Header({
               cy="18"
               r="2"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
@@ -220,13 +231,13 @@ export function Header({
           type="button"
           aria-label={`Switch to ${themeLabel(theme)} ${modeLabel(theme, nextMode)}`}
           onClick={() => applyMode(nextMode)}
-          className="cursor-pointer rounded-md border border-border bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="cursor-pointer rounded-[10px] border border-border bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           {isDark ? (
             <svg
               aria-hidden="true"
-              width="16"
-              height="16"
+              width="18"
+              height="18"
               viewBox="0 0 16 16"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
@@ -236,20 +247,20 @@ export function Header({
                 cy="8"
                 r="3"
                 stroke="currentColor"
-                strokeWidth="1.5"
+                strokeWidth="2"
               />
               <path
                 d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"
                 stroke="currentColor"
-                strokeWidth="1.5"
+                strokeWidth="2"
                 strokeLinecap="round"
               />
             </svg>
           ) : (
             <svg
               aria-hidden="true"
-              width="16"
-              height="16"
+              width="18"
+              height="18"
               viewBox="0 0 16 16"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
@@ -257,7 +268,7 @@ export function Header({
               <path
                 d="M14 10A6 6 0 0 1 6 2a6 6 0 1 0 8 8z"
                 stroke="currentColor"
-                strokeWidth="1.5"
+                strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
@@ -286,10 +297,11 @@ export function Header({
           ))}
         <button
           onClick={() => signOut()}
-          className="cursor-pointer rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="cursor-pointer rounded-[10px] border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           Sign Out
         </button>
+      </div>
       </div>
     </header>
   );

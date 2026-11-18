@@ -59,7 +59,13 @@ describe("PrRow", () => {
     expect(screen.queryByRole("link", { name: /^open pr$/i })).toBeNull();
   });
 
-  it("renders success left accent border when accent='success'", () => {
+  it.each([
+    ["ready", "text-success"],
+    ["reply", "text-warning"],
+    ["review", "text-accent"],
+    ["fail", "text-danger"],
+    ["pending", "text-warning"],
+  ] as const)("marks a %s row with an icon in %s, never colour alone", (kind, cls) => {
     const { container } = render(
       <PrRow
         title="Fix the thing"
@@ -69,14 +75,14 @@ describe("PrRow", () => {
         since="2026-06-25T00:00:00Z"
         now={now}
         suggestion={suggestion}
-        accent="success"
+        kind={kind}
       />,
     );
-    expect(container.firstChild).toHaveClass("border-l-success");
-    expect(container.firstChild).toHaveClass("hover:border-l-success");
+    expect(container.querySelector("svg[aria-hidden]")).toHaveClass(cls);
+    expect(container.firstChild).toHaveAttribute("data-kind", kind);
   });
 
-  it("renders warning left accent border when accent='warning'", () => {
+  it("draws no status icon without a kind", () => {
     const { container } = render(
       <PrRow
         title="Fix the thing"
@@ -86,15 +92,13 @@ describe("PrRow", () => {
         since="2026-06-25T00:00:00Z"
         now={now}
         suggestion={suggestion}
-        accent="warning"
       />,
     );
-    expect(container.firstChild).toHaveClass("border-l-warning");
-    expect(container.firstChild).toHaveClass("hover:border-l-warning");
+    expect(container.firstChild).not.toHaveAttribute("data-kind");
   });
 
-  it("renders danger left accent border when accent='danger'", () => {
-    const { container } = render(
+  it("says when it is the row the Next move strip points at", () => {
+    render(
       <PrRow
         title="Fix the thing"
         repo="org/repo"
@@ -103,28 +107,11 @@ describe("PrRow", () => {
         since="2026-06-25T00:00:00Z"
         now={now}
         suggestion={suggestion}
-        accent="danger"
+        kind="fail"
+        marked
       />,
     );
-    expect(container.firstChild).toHaveClass("border-l-danger");
-    expect(container.firstChild).toHaveClass("hover:border-l-danger");
-  });
-
-  it("no accent border class when accent is not provided", () => {
-    const { container } = render(
-      <PrRow
-        title="Fix the thing"
-        repo="org/repo"
-        number={42}
-        url="https://github.com/org/repo/pull/42"
-        since="2026-06-25T00:00:00Z"
-        now={now}
-        suggestion={suggestion}
-      />,
-    );
-    expect(container.firstChild).not.toHaveClass("border-l-success");
-    expect(container.firstChild).not.toHaveClass("border-l-warning");
-    expect(container.firstChild).not.toHaveClass("border-l-danger");
+    expect(screen.getByText(/next move/i)).toHaveClass("text-danger");
   });
 
   it("renders suggestion text and href", () => {

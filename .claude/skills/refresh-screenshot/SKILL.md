@@ -130,6 +130,14 @@ Ages are written as `ago(hours)` and resolve at run time, so the badges read
 `capture.mjs` is a small CDP client — `send(method, params)` returns the result.
 The knobs worth knowing:
 
+- Env overrides, all optional: `SHOT_OUT` (path), `SHOT_WIDTH`, `SHOT_SCALE`,
+  `SHOT_THEME` / `SHOT_MODE` (any family in `lib/theme.ts`, `light`/`dark`),
+  `SHOT_EVAL` (a JS expression whose JSON result is printed before capture).
+  `CHROME_PATH` defaults to the standard macOS or Windows install.
+- `--ref <file.html>` screenshots a static page instead of the app, and
+  `--diff a.png b.png` writes a diff image. The `pixel-reviewer` agent uses both
+  to compare the app with `docs/design/`. Never point `SHOT_OUT` at
+  `docs/screenshot.png` while experimenting with those.
 - `WIDTH` / `SCALE` at the top.
 - The `Page.addScriptToEvaluateOnNewDocument` source seeds `localStorage`
   (theme, draft filter), installs the fetch patch, and hides the `nextjs-portal`

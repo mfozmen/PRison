@@ -260,78 +260,44 @@ describe("PrList groupBy", () => {
   });
 });
 
-describe("PrList countAccent", () => {
-  it("count badge has warning style when countAccent='warning' and items are present", () => {
-    render(
-      <PrList
-        title="Blocking"
-        items={["a"]}
-        emptyMessage="None."
-        renderRow={(item) => <div>{item}</div>}
-        countAccent="warning"
-      />,
-    );
-    const badge = screen.getByTestId("count-badge");
-    expect(badge).toHaveClass("bg-warning");
-  });
-
-  it("count badge has neutral style when countAccent is not provided (default)", () => {
-    render(
-      <PrList
-        title="Blocking"
-        items={["a"]}
-        emptyMessage="None."
-        renderRow={(item) => <div>{item}</div>}
-      />,
-    );
-    const badge = screen.getByTestId("count-badge");
-    expect(badge).toHaveClass("bg-border");
-    expect(badge).toHaveClass("text-foreground");
-    expect(badge).not.toHaveClass("text-muted");
-    expect(badge).not.toHaveClass("bg-warning");
-  });
-
-  it("count badge has neutral style when items is empty even with countAccent='warning'", () => {
-    render(
-      <PrList
-        title="Blocking"
-        items={[]}
-        emptyMessage="None."
-        renderRow={(item: string) => <div>{item}</div>}
-        countAccent="warning"
-      />,
-    );
-    const badge = screen.getByTestId("count-badge");
-    expect(badge).toHaveClass("bg-border");
-    expect(badge).not.toHaveClass("bg-warning");
-  });
-
-  it("count badge has success style when countAccent='success' and items are present", () => {
-    render(
-      <PrList
-        title="Ready"
-        items={["a"]}
-        emptyMessage="None."
-        renderRow={(item) => <div>{item}</div>}
-        countAccent="success"
-      />,
-    );
-    const badge = screen.getByTestId("count-badge");
-    expect(badge).toHaveClass("bg-success");
-  });
-
-  it("count badge has danger style when countAccent='danger' and items are present", () => {
+describe("PrList as a tier column", () => {
+  it("shows the count as the column's big number, with its caption and description", () => {
     render(
       <PrList
         title="Stuck"
-        items={["a"]}
+        items={["a", "b"]}
         emptyMessage="None."
         renderRow={(item) => <div>{item}</div>}
-        countAccent="danger"
+        tone="danger"
+        caption="PRs · oldest 4d"
+        description="Your PRs that CI is holding back."
       />,
     );
-    const badge = screen.getByTestId("count-badge");
-    expect(badge).toHaveClass("bg-danger");
+    expect(screen.getByTestId("count-badge")).toHaveTextContent("2");
+    expect(screen.getByText("PRs · oldest 4d")).toBeInTheDocument();
+    expect(screen.getByText("Your PRs that CI is holding back.")).toBeInTheDocument();
+  });
+
+  it("tints its border with its tone only when it holds the Next move", () => {
+    const { container, rerender } = render(
+      <PrList title="Stuck" items={["a"]} emptyMessage="None." renderRow={(i) => <div>{i}</div>} tone="danger" />,
+    );
+    const section = container.querySelector("section")!;
+    expect(section).toHaveClass("border-border");
+    rerender(
+      <PrList title="Stuck" items={["a"]} emptyMessage="None." renderRow={(i) => <div>{i}</div>} tone="danger" highlighted />,
+    );
+    expect(section).toHaveClass("border-danger/40");
+    expect(section).toHaveAttribute("data-highlighted", "true");
+  });
+
+  it("keeps the count visible while the column is folded", () => {
+    render(
+      <PrList title="Stuck" items={["a", "b", "c"]} emptyMessage="None." renderRow={(i) => <div>{i}</div>} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /stuck/i }));
+    expect(screen.queryByText("a")).toBeNull();
+    expect(screen.getByTestId("count-badge")).toHaveTextContent("3");
   });
 });
 

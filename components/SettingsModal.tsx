@@ -625,7 +625,8 @@ export function SettingsModal({
   async function checkForUpdates() {
     setUpdate({ status: "checking" });
     try {
-      const res = await fetch("/api/latest-release");
+      // fresh=1: a click is a question asked now, not the background check (#112).
+      const res = await fetch("/api/latest-release?fresh=1");
       if (!res.ok) throw new Error(String(res.status));
       const { tagName } = await res.json();
       setUpdate({

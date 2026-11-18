@@ -1,7 +1,13 @@
 import type { ReactNode } from "react";
-import { relativeAge } from "@/lib/prioritize";
+import { ageBucket, relativeAge } from "@/lib/prioritize";
 import type { Suggestion } from "@/lib/suggest";
 import type { Tone } from "./PrList";
+
+export interface NextMoveReason {
+  label: string;
+  /** Check names are set in mono like everywhere else; prose reasons are not. */
+  mono?: boolean;
+}
 
 export interface NextMoveItem {
   /** Stable id, so Skip can step past it. */
@@ -13,101 +19,126 @@ export interface NextMoveItem {
   since: string;
   suggestion: Suggestion;
   tone: Tone;
-  /** Why it is stuck, in a few words: failing checks, a conflict, a verdict. */
-  reasons?: string[];
+  /** Why it is waiting, in a few words: failing checks, a conflict, a verdict. */
+  reasons?: NextMoveReason[];
 }
 
-const RING: Record<Tone, string> = {
-  danger: "border-danger shadow-[0_0_0_4px_color-mix(in_srgb,var(--danger)_10%,transparent),0_24px_64px_-20px_color-mix(in_srgb,var(--danger)_35%,transparent)]",
-  warning: "border-warning shadow-[0_0_0_4px_color-mix(in_srgb,var(--warning)_10%,transparent),0_24px_64px_-20px_color-mix(in_srgb,var(--warning)_35%,transparent)]",
-  success: "border-success shadow-[0_0_0_4px_color-mix(in_srgb,var(--success)_10%,transparent),0_24px_64px_-20px_color-mix(in_srgb,var(--success)_35%,transparent)]",
-  accent: "border-accent shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_10%,transparent),0_24px_64px_-20px_color-mix(in_srgb,var(--accent)_35%,transparent)]",
+// Which queue the item belongs to: the card's edge, label, chips and button.
+const QUEUE: Record<Tone, string> = {
+  danger: "Stuck on checks",
+  accent: "Waiting on your review",
+  warning: "Awaiting your reply",
+  success: "Ready to merge",
 };
-// A breath of the item's own colour in the strip, the same mix the column it
-// points at uses for its highlight.
-const GROUND: Record<Tone, string> = {
-  danger: "bg-[color-mix(in_srgb,var(--danger)_4%,var(--surface))]",
-  warning: "bg-[color-mix(in_srgb,var(--warning)_4%,var(--surface))]",
-  success: "bg-[color-mix(in_srgb,var(--success)_4%,var(--surface))]",
-  accent: "bg-[color-mix(in_srgb,var(--accent)_4%,var(--surface))]",
-};
-const BADGE: Record<Tone, string> = {
-  danger: "bg-danger",
-  warning: "bg-warning",
-  success: "bg-success",
-  accent: "bg-accent",
-};
-const TEXT: Record<Tone, string> = {
-  danger: "text-danger",
-  warning: "text-warning",
-  success: "text-success",
-  accent: "text-accent",
-};
+
+// How long it has been waiting: the time block's colour, word and meter, on
+// the same thresholds as every row's age.
+const PACE = {
+  fresh: { cls: "nm-pace-moving", word: "moving", steps: 1 },
+  warning: { cls: "nm-pace-slowing", word: "slowing", steps: 2 },
+  urgent: { cls: "nm-pace-stalled", word: "stalled", steps: 3 },
+} as const;
 
 // The single thing to do first: the longest wait across the four queues. It is
 // a pointer into the columns below, not a fifth list — the same item still sits
 // in its column, marked, so nothing disappears from where it belongs.
+//
+// It says two things in two places. Queue colour on the edge, label, chips and
+// button: what kind of work this is. Pace colour on the time block: how far it
+// has stalled, with a word and a three-step meter so colour is never the only
+// signal. The surface (spot ground, aurora field, edge, glow) is in globals.css.
 export function NextMove({
   item,
   now,
+  position,
+  total,
   onSkip,
   canSkip,
 }: {
   item: NextMoveItem;
   now: Date;
+  /** 1-based place of this item in the oldest-first round Skip walks. */
+  position: number;
+  total: number;
   onSkip: () => void;
   canSkip: boolean;
 }): ReactNode {
-  const tone = TEXT[item.tone];
+  const pace = PACE[ageBucket(item.since, now)];
   return (
     <section
       aria-label="Next move"
-      className={`flex flex-wrap items-center gap-5 rounded-[20px] border px-6 py-5 ${GROUND[item.tone]} ${RING[item.tone]}`}
+      data-pace={pace.word}
+      className={`nm-card nm-tone-${item.tone} ${pace.cls} flex flex-wrap overflow-hidden rounded-[20px]`}
     >
-      <span className={`rounded-full px-2.5 py-[5px] text-[11px] font-bold leading-[normal] tracking-[0.1em] text-background ${BADGE[item.tone]}`}>
-        NEXT MOVE
-      </span>
-      <div className="min-w-0 flex-[999_1_420px]">
-        <a
-          href={item.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-lg font-semibold leading-tight tracking-[-0.01em] text-foreground transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
-        >
-          {item.title}
-        </a>
-        <div className="mt-1.5 flex flex-wrap items-center gap-2 font-mono text-xs text-muted">
-          <span>
-            {item.repo} #{item.number} · waited{" "}
-            <span className={`font-medium ${tone}`}>{relativeAge(item.since, now)}</span>
-            {item.reasons?.length ? " ·" : ""}
-          </span>
-          {/* Check names stay mono like everywhere else; prose reasons do not. */}
-          {item.reasons?.map((r) => (
-            <span key={r} className={`${tone} ${r.startsWith("✗") ? "" : "font-sans"}`}>
-              {r}
-            </span>
+      <div className="nm-paceblock flex flex-[0_0_258px] flex-col gap-1.5 px-6 py-[22px]">
+        <span className="text-[11px] font-bold leading-[normal] tracking-[0.1em]">NEXT MOVE</span>
+        <span className="text-[60px] font-extrabold leading-none tracking-[-0.04em]">
+          {relativeAge(item.since, now)}
+        </span>
+        <span className="text-xs font-bold leading-[normal]">
+          {pace.word} · {position} of {total}
+        </span>
+        <span className="mt-1 flex gap-1" role="img" aria-label={`Pace: ${pace.word}`}>
+          {[1, 2, 3].map((step) => (
+            <span
+              key={step}
+              className={`h-1 w-[18px] rounded-sm ${
+                step <= pace.steps ? "bg-background" : "bg-background/30"
+              }`}
+            />
           ))}
-        </div>
+        </span>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <a
-          href={item.suggestion.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex min-h-[44px] items-center rounded-xl bg-foreground px-[18px] text-sm font-semibold text-background transition hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        >
-          {item.suggestion.text}
-        </a>
-        {canSkip && (
-          <button
-            type="button"
-            onClick={onSkip}
-            className="min-h-[44px] cursor-pointer rounded-xl px-4 text-sm font-medium text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      <div className="flex min-w-0 flex-[1_1_472px] flex-wrap items-center gap-5 px-[26px] py-[22px]">
+        <div className="min-w-0 flex-[999_1_320px]">
+          <div className="text-xs font-semibold leading-[normal] tracking-[0.08em] text-[var(--tone-ink)]">
+            ● {QUEUE[item.tone].toUpperCase()} ·{" "}
+            <span className="font-mono tracking-normal">
+              {item.repo} #{item.number}
+            </span>
+          </div>
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1.5 block rounded-sm text-[21px] font-bold leading-tight tracking-[-0.01em] text-foreground transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            Skip →
-          </button>
-        )}
+            {item.title}
+          </a>
+          {item.reasons?.length ? (
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {item.reasons.map((r, i) => (
+                <span
+                  // Labels can repeat (two checks of one name, an author
+                  // whose name is also a path), so the index keeps keys unique.
+                  key={`${i}-${r.label}`}
+                  className={`nm-chip rounded-md px-2 py-0.5 text-xs font-medium leading-[normal] text-[var(--tone-ink)] ${r.mono ? "font-mono" : ""}`}
+                >
+                  {r.label}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={item.suggestion.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="nm-cta flex min-h-[44px] items-center rounded-xl px-[18px] text-sm font-semibold transition hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            {item.suggestion.text}
+          </a>
+          {canSkip && (
+            <button
+              type="button"
+              onClick={onSkip}
+              className="min-h-[44px] cursor-pointer rounded-xl px-4 text-sm font-medium text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              Skip →
+            </button>
+          )}
+        </div>
       </div>
     </section>
   );

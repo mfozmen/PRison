@@ -35,7 +35,7 @@ all look alike.
 
 | Region | What it is |
 |---|---|
-| Next move | One strip on top showing the oldest item across the four queues, its CTA, and Skip |
+| Next move | The oldest item across the four queues as one card: a pace block (big age, moving/slowing/stalled, "N of M", meter) and the work (queue label, title, reason chips, CTA, Skip). Ground is the family's `spot` under an aurora field, with an aurora edge and a glow. Reference: `docs/design/next-move.html` |
 | Toolbar | "N things want you", pill toggles (group by, drafts), search, Refresh |
 | Tier columns | Stuck · Review · Reply · Ready. Each card has a dot label, a big count, "oldest X", a one-line description, and compact rows |
 | History | Recently reviewed + Recently merged/closed side by side. No urgency colour, no CTA |
@@ -51,6 +51,13 @@ left border stripe. Status is shown by an icon, so colour is never the only sign
 | `warning` | Reply column, pending checks, "Needs update" |
 | `success` | Ready column, approved verdicts |
 | `accent` | Review column, "Updated since" (`bg` on `accent`), merged icon |
+| `spot` | Next move ground only: a colour the board never uses, at the ground's lightness |
+
+The Next move card carries two meanings in two places. Its **queue** colour
+(`nm-tone-*`) goes on the edge, label, chips and button. Its **pace** colour
+(`nm-pace-*`: success under 1 day, warning up to 3, danger after, same as
+`ageBucket`) goes on the time block and sets the glow's strength. A word and a
+meter always repeat the pace.
 
 So within one palette, **accent, success, warning and danger must be four
 distinguishable colours**, different in hue *and* lightness. An accent equal to
@@ -68,6 +75,10 @@ success makes the Review and Ready dots identical.
   say so in the comment ("ready moves to teal so it does not blur into the olive").
 - Keep the hues in both modes; only lightness moves (see the spec).
 - Pick a font pair no other family uses, loaded via `next/font` with `preload: false`.
+- Give it a `--spot` in both modes, taken from the palette or story: a colour
+  none of its other tokens use, on the same side of light as its `bg`. The
+  contrast test checks fg, muted and all four tones on it. Light spots usually
+  need to sit very close to white to pass.
 
 ## Common mistakes
 
@@ -78,6 +89,18 @@ success makes the Review and Ready dots identical.
   it. Keep comments above the block.
 - A new text-on-colour pair in the UI (e.g. `bg` on `danger` for a badge) without
   adding it to `PAIRS` in `lib/theme.test.ts`.
+- Measuring text only against a flat ground when a coloured light or gradient
+  sits under it. Tone-coloured text over that tone's own light loses contrast
+  (Next move's label dropped to about 3.6:1 on light themes). Measure the lit
+  point, as the "under its own light" test does, and deepen the ink
+  (`--tone-ink`) rather than dimming the light.
+- `color: var(--x)` in a plain globals.css rule, where `--x` is a color-mix:
+  the CSS build swaps it for the no-color-mix fallback and never restores it.
+  Set such colours with a utility (`text-[var(--x)]`), and check the served CSS
+  (`curl` the `/_next/static/*.css`), not just the source.
+- Drawing with `padding` on a fixed-width flex item: the Design canvas is
+  content-box and the app is border-box, so the same numbers render 48px
+  apart. Match the drawing's rendered width.
 - Repeating an item's title elsewhere on the board (as Next move does) breaks
   `getByText(title)` in tests. Scope queries with `within(section)`, or stub the
   repeating component in tests that are about something else.

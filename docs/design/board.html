@@ -15,6 +15,7 @@
      9. Stuck rows also show their review state as a chip ("Changes requested",
         "Review required"), next to the check chips of item 2.
 -->
+<!-- The Next move card is the decided v1.31 design; docs/design/next-move.html shows its pace states and light mode. -->
 <!-- Approved reference for the v2 "tiers" board (demo-board data, Default dark).
      Frozen from the Design canvas; the pixel-reviewer agent compares the app to it.
      Static on purpose: no runtime, no script. Do not edit to match the app — edit
@@ -28,6 +29,19 @@
 <style>
 body{margin:0;background:#0f172a}
 a{color:#f1f5f9;text-decoration:none}a:hover{color:#ffffff;text-decoration:underline}
+</style>
+<style>
+.nm-tone-danger{--tone:var(--danger);--tone2:var(--warning)}
+.nm-tone-accent{--tone:var(--accent);--tone2:var(--success)}
+.nm-pace-moving{--pace:var(--success);--glow:22%}
+.nm-pace-slowing{--pace:var(--warning);--glow:38%}
+.nm-pace-stalled{--pace:var(--danger);--glow:62%}
+.nm-card{--tone-ink:color-mix(in srgb,var(--tone) 70%,var(--fg));border:2px solid transparent;color:var(--fg);background:radial-gradient(110% 150% at 0% 0%,color-mix(in srgb,var(--tone) 22%,transparent),transparent 55%) padding-box,radial-gradient(90% 140% at 100% 100%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 60%) padding-box,radial-gradient(70% 120% at 60% 0%,color-mix(in srgb,var(--tone2) 12%,transparent),transparent 60%) padding-box,linear-gradient(var(--spot),var(--spot)) padding-box,linear-gradient(100deg,var(--tone),var(--tone2) 45%,var(--accent) 85%,var(--tone)) border-box;box-shadow:0 0 40px -10px color-mix(in srgb,var(--pace) var(--glow),transparent),0 0 70px -24px color-mix(in srgb,var(--tone2) 40%,transparent)}
+.nm-paceblock{color:var(--bg);background:linear-gradient(160deg,var(--pace),color-mix(in srgb,var(--pace) 80%,var(--fg)))}
+.nm-chip{color:var(--tone-ink);background:color-mix(in srgb,var(--tone) 14%,transparent);border-radius:6px;padding:2px 8px;font-size:12px;font-weight:500}
+.nm-cta{color:var(--bg);background:linear-gradient(90deg,var(--tone),var(--tone2))}
+.dark{--bg:#0f172a;--surface:#1e293b;--fg:#f1f5f9;--muted:#94a3b8;--brd:#334155;--accent:#60a5fa;--danger:#f87171;--warning:#fbbf24;--success:#4ade80;--spot:#1e1b4b}
+.light{--bg:#eef2f7;--surface:#fafbfe;--fg:#0f172a;--muted:#475569;--brd:#dce3ec;--accent:#1d4ed8;--danger:#d52222;--warning:#b25209;--success:#117e39;--spot:#f2f5ff}
 </style>
 </head>
 <body>
@@ -57,17 +71,27 @@ a{color:#f1f5f9;text-decoration:none}a:hover{color:#ffffff;text-decoration:under
 
 <main style="max-width: 1360px; margin: 0 auto; padding: 32px 32px 56px; display: flex; flex-direction: column; gap: 28px;">
 
-<section aria-label="Next move" style="background: color-mix(in srgb, #f87171 4%, #1e293b); border: 1px solid #f87171; border-radius: 20px; padding: 20px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 20px; box-shadow: 0 0 0 4px rgba(248,113,113,0.10), 0 24px 64px -20px rgba(248,113,113,0.35);">
-<span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #0f172a; background: #f87171; border-radius: 999px; padding: 5px 10px;">NEXT MOVE</span>
-<div style="flex: 999 1 420px; min-width: 0;">
-<a href="#" style="font-size: 18px; font-weight: 600; letter-spacing: -0.01em;">Fix the timezone drift in scheduled reports</a>
-<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; font: 12px 'Fira Code', monospace; color: #94a3b8;">initech/worker #13 · waited <span style="color: #f87171; font-weight: 500;">4d</span> · <span style="color: #f87171;">✗ lint</span><span style="color: #f87171;">✗ typecheck</span><span style="font-family: 'Fira Sans', sans-serif; color: #f87171;">Changes requested</span></div>
+<div class="dark">
+<section aria-label="Next move" data-pace="stalled" class="nm-card nm-tone-danger nm-pace-stalled" style="display: flex; flex-wrap: wrap; overflow: hidden; border-radius: 20px;">
+<div class="nm-paceblock" style="flex: 0 0 210px; display: flex; flex-direction: column; gap: 6px; padding: 22px 24px;">
+<span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em;">NEXT MOVE</span>
+<span style="font-size: 60px; font-weight: 800; line-height: 1; letter-spacing: -0.04em;">4d</span>
+<span style="font-size: 12px; font-weight: 700;">stalled · 1 of 12</span>
+<span style="display: flex; gap: 4px; margin-top: 4px;"><span style="height: 4px; width: 18px; border-radius: 2px; background: var(--bg);"></span><span style="height: 4px; width: 18px; border-radius: 2px; background: var(--bg);"></span><span style="height: 4px; width: 18px; border-radius: 2px; background: var(--bg);"></span></span>
 </div>
-<div style="display: flex; flex-wrap: wrap; gap: 8px;">
-<button style="height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: #f1f5f9; color: #0f172a; font: 600 14px 'Fira Sans', sans-serif; cursor: pointer;">Re-run failed checks</button>
-<button style="height: 44px; padding: 0 16px; border-radius: 12px; border: 0; background: transparent; color: #94a3b8; font: 500 14px 'Fira Sans', sans-serif; cursor: pointer;">Skip →</button>
+<div style="flex: 1 1 420px; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 20px; padding: 22px 26px;">
+<div style="flex: 999 1 320px; min-width: 0;">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: var(--tone-ink);">● STUCK ON CHECKS · <span style="font-family: 'Fira Code', monospace; letter-spacing: 0;">initech/worker #13</span></div>
+<a href="#" style="display: block; margin-top: 6px; font-size: 21px; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; color: var(--fg); text-decoration: none;">Fix the timezone drift in scheduled reports</a>
+<div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px;"><span class="nm-chip" style="font-family: 'Fira Code', monospace;">lint</span><span class="nm-chip" style="font-family: 'Fira Code', monospace;">typecheck</span><span class="nm-chip">Changes requested</span></div>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+<span class="nm-cta" style="display: flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 12px; font-size: 14px; font-weight: 600;">Re-run failed checks</span>
+<span style="display: flex; align-items: center; min-height: 44px; padding: 0 16px; font-size: 14px; font-weight: 500; color: var(--muted);">Skip →</span>
+</div>
 </div>
 </section>
+</div>
 
 <section style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
 <h1 style="margin: 0 12px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em;">12 things want you</h1>

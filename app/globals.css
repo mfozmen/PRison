@@ -30,6 +30,12 @@
  * The default accent is blue in both modes, not the green it used to share
  * with success: the tier board paints the Review column with accent and the
  * Ready column with success, and two identical dots read as one queue.
+ *
+ * --spot is the Next move card's ground: one colour per family and mode that
+ * the board itself never uses, taken from the family's palette or story, at
+ * the ground's own lightness (a dark theme's spot is dark, a light theme's
+ * light). Every text and status colour the card sets on it clears 4.5:1, and
+ * lib/theme.test.ts measures that too.
  * (Comments stay outside the palette blocks: lib/theme.test.ts parses them.) --- */
 :root,
 [data-theme="default"][data-mode="light"] {
@@ -43,6 +49,7 @@
   --danger: #d52222;
   --warning: #b25209;
   --success: #117e39;
+  --spot: #f2f5ff;
   --hover-brightness: 0.95;
   --fsans: var(--font-fira-sans), ui-sans-serif, system-ui, sans-serif;
   --fmono: var(--font-fira-code), ui-monospace, monospace;
@@ -68,6 +75,7 @@
   --danger: #f87171;
   --warning: #fbbf24;
   --success: #4ade80;
+  --spot: #1e1b4b;
   --hover-brightness: 1.1;
 }
 
@@ -97,6 +105,7 @@
   --danger: #c4341f;
   --warning: #8f640b;
   --success: #117c54;
+  --spot: #e1f3ea;
   --hover-brightness: 0.95;
 }
 
@@ -111,6 +120,7 @@
   --danger: #ff6b5e;
   --warning: #f2c64b;
   --success: #5fde9b;
+  --spot: #0b2421;
   --hover-brightness: 1.1;
 }
 
@@ -137,6 +147,7 @@
   --danger: #b03a26;
   --warning: #926524;
   --success: #227a77;
+  --spot: #e8f5f2;
   --hover-brightness: 0.95;
 }
 
@@ -151,6 +162,7 @@
   --danger: #ea7b67;
   --warning: #d9a64b;
   --success: #4fc4bf;
+  --spot: #0e3337;
   --hover-brightness: 1.1;
 }
 
@@ -178,6 +190,7 @@
   --danger: #a8402f;
   --warning: #875c19;
   --success: #2b714f;
+  --spot: #dfe9f0;
   --hover-brightness: 0.95;
 }
 
@@ -192,6 +205,7 @@
   --danger: #e3938c;
   --warning: #d9a441;
   --success: #6fbf8b;
+  --spot: #2a2117;
   --hover-brightness: 1.1;
 }
 
@@ -216,6 +230,7 @@
   --danger: #b03123;
   --warning: #7d5a0d;
   --success: #27704a;
+  --spot: #fbe3da;
   --hover-brightness: 0.95;
 }
 
@@ -230,6 +245,7 @@
   --danger: #ff8f7c;
   --warning: #e8b14d;
   --success: #5cd08f;
+  --spot: #2a1417;
   --hover-brightness: 1.1;
 }
 
@@ -255,6 +271,7 @@
   --danger: #a8202e;
   --warning: #8f4f11;
   --success: #35692a;
+  --spot: #fbe6d6;
   --hover-brightness: 0.95;
 }
 
@@ -269,6 +286,7 @@
   --danger: #f0757f;
   --warning: #e2a052;
   --success: #82c46a;
+  --spot: #2a1509;
   --hover-brightness: 1.1;
 }
 
@@ -294,6 +312,7 @@
   --danger: #ab2317;
   --warning: #7e5f00;
   --success: #196f38;
+  --spot: #e2f1e3;
   --hover-brightness: 0.95;
 }
 
@@ -308,6 +327,7 @@
   --danger: #f2705f;
   --warning: #e8c94a;
   --success: #4fd06a;
+  --spot: #0e2215;
   --hover-brightness: 1.1;
 }
 
@@ -333,6 +353,7 @@
   --danger: #b32d1e;
   --warning: #8a4d0a;
   --success: #2d6b4d;
+  --spot: #f7e5cb;
   --hover-brightness: 0.95;
 }
 
@@ -347,6 +368,7 @@
   --danger: #ff8a78;
   --warning: #e0a94e;
   --success: #63c98e;
+  --spot: #291a09;
   --hover-brightness: 1.1;
 }
 
@@ -375,6 +397,7 @@
   --danger: #b0234f;
   --warning: #8a5200;
   --success: #1e7a5a;
+  --spot: #fbf0f9;
   --hover-brightness: 0.95;
 }
 
@@ -389,6 +412,7 @@
   --danger: #ff7a9c;
   --warning: #f2c46d;
   --success: #7fd9b0;
+  --spot: #2a1838;
   --hover-brightness: 1.1;
 }
 
@@ -411,6 +435,7 @@
   --danger: #a3361c;
   --warning: #855409;
   --success: #1c6760;
+  --spot: #f5e6c4;
   --hover-brightness: 0.95;
 }
 
@@ -425,6 +450,7 @@
   --danger: #ff7f5c;
   --warning: #e19d29;
   --success: #6fcbb8;
+  --spot: #2b1f06;
   --hover-brightness: 1.1;
 }
 
@@ -447,6 +473,7 @@
   --danger: #c4153a;
   --warning: #855800;
   --success: #2a7000;
+  --spot: #dde8fb;
   --hover-brightness: 0.95;
 }
 
@@ -461,6 +488,7 @@
   --danger: #ff6b4a;
   --warning: #ffd23f;
   --success: #68ef00;
+  --spot: #2b0a2e;
   --hover-brightness: 1.1;
 }
 
@@ -483,6 +511,7 @@
   --danger: #7a1f3d;
   --warning: #7d5e10;
   --success: #3a6440;
+  --spot: #fbe1d2;
   --hover-brightness: 0.95;
 }
 
@@ -497,6 +526,7 @@
   --danger: #ff6f91;
   --warning: #e8c15a;
   --success: #8cc69a;
+  --spot: #2e1810;
   --hover-brightness: 1.1;
 }
 
@@ -518,6 +548,7 @@
   --danger: #b3361a;
   --warning: #805a0f;
   --success: #2c6e5a;
+  --spot: #fae3e2;
   --hover-brightness: 0.95;
 }
 
@@ -542,6 +573,7 @@
   --danger: #a3222b;
   --warning: #7d5a12;
   --success: #3b6a3f;
+  --spot: #e2e5ec;
   --hover-brightness: 0.95;
 }
 
@@ -556,6 +588,7 @@
   --danger: #ff8a80;
   --warning: #e0b04f;
   --success: #9cc58a;
+  --spot: #1c1f2b;
   --hover-brightness: 1.1;
 }
 
@@ -570,6 +603,7 @@
   --danger: #ff8166;
   --warning: #e8c46a;
   --success: #7fd3b0;
+  --spot: #2e1a1f;
   --hover-brightness: 1.1;
 }
 
@@ -586,6 +620,7 @@
   --color-danger: var(--danger);
   --color-warning: var(--warning);
   --color-success: var(--success);
+  --color-spot: var(--spot);
   --font-sans: var(--fsans);
   --font-mono: var(--fmono);
 }
@@ -605,6 +640,62 @@ html {
 body {
   color: var(--fg);
   font-family: var(--fsans);
+}
+
+/* --- The Next move card (components/NextMove.tsx). Layered gradients do not
+ * fit in utility classes, so the card's surface lives here, all of it built
+ * from the active theme's tokens:
+ *   --tone / --tone2  the item's queue colour and its neighbour: edge, label,
+ *                     chips, button, and the first two lights of the field
+ *   --pace / --glow   the time block's colour and the glow's strength, from how
+ *                     long the item has waited (same thresholds as row ages)
+ * Ground: the family's --spot under a soft aurora field (tone from the top
+ * left, tone2 from above, accent from the bottom right); edge: a 2px aurora
+ * gradient; glow: pace plus tone2. --- */
+.nm-tone-danger { --tone: var(--danger); --tone2: var(--warning); }
+.nm-tone-accent { --tone: var(--accent); --tone2: var(--success); }
+.nm-tone-warning { --tone: var(--warning); --tone2: var(--danger); }
+.nm-tone-success { --tone: var(--success); --tone2: var(--accent); }
+
+.nm-pace-moving { --pace: var(--success); --glow: 22%; }
+.nm-pace-slowing { --pace: var(--warning); --glow: 38%; }
+.nm-pace-stalled { --pace: var(--danger); --glow: 62%; }
+
+/* --tone-ink: the queue label and chips sit right under the tone's own light,
+ * so their text is the tone pushed 30% toward fg (deeper on light grounds,
+ * brighter on dark). lib/theme.test.ts measures it over the lit spot. */
+.nm-card {
+  --tone-ink: color-mix(in srgb, var(--tone) 70%, var(--fg));
+  border: 2px solid transparent;
+  color: var(--fg);
+  background:
+    radial-gradient(110% 150% at 0% 0%, color-mix(in srgb, var(--tone) 22%, transparent), transparent 55%) padding-box,
+    radial-gradient(90% 140% at 100% 100%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 60%) padding-box,
+    radial-gradient(70% 120% at 60% 0%, color-mix(in srgb, var(--tone2) 12%, transparent), transparent 60%) padding-box,
+    linear-gradient(var(--spot), var(--spot)) padding-box,
+    linear-gradient(100deg, var(--tone), var(--tone2) 45%, var(--accent) 85%, var(--tone)) border-box;
+  box-shadow:
+    0 0 40px -10px color-mix(in srgb, var(--pace) var(--glow), transparent),
+    0 0 70px -24px color-mix(in srgb, var(--tone2) 40%, transparent);
+}
+
+/* Mixed toward fg, not bg: that lightens it on a dark theme and darkens it on
+ * a light one, so the bg-coloured text on it only gains contrast. */
+.nm-paceblock {
+  color: var(--bg);
+  background: linear-gradient(160deg, var(--pace), color-mix(in srgb, var(--pace) 80%, var(--fg)));
+}
+
+/* Text colour comes from the component (text-[var(--tone-ink)]), not from here:
+ * the CSS build rewrites `color: var(--tone-ink)` in a plain rule to its
+ * no-color-mix fallback, var(--tone), and never restores it. */
+.nm-chip {
+  background: color-mix(in srgb, var(--tone) 14%, transparent);
+}
+
+.nm-cta {
+  color: var(--bg);
+  background: linear-gradient(90deg, var(--tone), var(--tone2));
 }
 
 @media (prefers-reduced-motion: reduce) {

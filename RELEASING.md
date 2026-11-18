@@ -31,6 +31,11 @@ npx release-it 1.0.0
 
 Add `--dry-run` to see every step without touching anything.
 
+Keep `#<number>` out of squash-commit bodies unless it really is an issue or a
+PR. The changelog preset reads any `#1234` as an issue it closes. v1.30.0
+shipped "closes #4748" because a body quoted a colorpalettes.net palette
+number. Write such references as "palette 4748".
+
 ## What it does, in order
 
 1. Runs `npm test`, `npm run typecheck`, and `npm run lint` (`hooks.before:init`)

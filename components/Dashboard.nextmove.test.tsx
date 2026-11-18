@@ -56,6 +56,14 @@ function fetchLists(stuck: unknown[], reviews: unknown[]) {
   ) as unknown as typeof fetch;
 }
 
+// Refresh is disabled while a load is in flight, and a click on it then is a
+// no-op, so wait for it to be live first.
+async function refresh() {
+  const button = screen.getByRole("button", { name: /^refresh$/i });
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+}
+
 const strip = () => screen.getByRole("region", { name: "Next move" });
 
 beforeEach(() => {
@@ -104,12 +112,12 @@ describe("Dashboard — Next move", () => {
 
     // The review is answered elsewhere and drops off the board…
     global.fetch = fetchLists([STUCK_PR], []);
-    fireEvent.click(screen.getByRole("button", { name: /^refresh$/i }));
+    await refresh();
     await waitFor(() => expect(document.getElementById("waiting-on-your-review")!.querySelector('[data-testid="count-badge"]')).toHaveTextContent("0"));
 
     // …then is requested again: it is the oldest, and nobody skipped it this time.
     global.fetch = fetchLists([STUCK_PR], [REVIEW_PR]);
-    fireEvent.click(screen.getByRole("button", { name: /^refresh$/i }));
+    await refresh();
     expect(await within(strip()).findByText("review pr")).toBeInTheDocument();
   });
 

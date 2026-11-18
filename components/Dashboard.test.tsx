@@ -4825,6 +4825,15 @@ describe("Dashboard — searching the board", () => {
     expect(other).toHaveFocus();
   });
 
+  it("leaves focus alone on / while the Settings dialog is open", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    const box = await screen.findByRole("searchbox", { name: /search the board/i });
+    fireEvent.click(screen.getByRole("button", { name: /settings/i }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.keyDown(dialog, { key: "/" });
+    expect(box).not.toHaveFocus();
+  });
+
   it("brings everything back on Escape", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("ready pr")).toBeInTheDocument();

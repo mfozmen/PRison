@@ -15,25 +15,25 @@ export function ClosedPrRow({ pr, now, last }: ClosedPrRowProps) {
   return (
     <div className="flex gap-3.5">
       <div className="flex w-7 shrink-0 flex-col items-center self-start">
-      <div
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
-          pr.merged ? "bg-accent/15 text-accent" : "bg-border text-muted"
-        }`}
-      >
-        {pr.merged ? (
-          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-            <circle cx="6" cy="6" r="2.5" />
-            <circle cx="6" cy="18" r="2.5" />
-            <circle cx="18" cy="12" r="2.5" />
-            <path d="M6 8.5v7M8.3 7.2C12 9 15 10 15.6 11" />
-          </svg>
-        ) : (
-          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
-        )}
-      </div>
-      {!last && <span aria-hidden="true" className="mt-1.5 h-[9px] w-px bg-border" />}
+        <div
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+            pr.merged ? "bg-accent/15 text-accent" : "bg-border text-muted"
+          }`}
+        >
+          {pr.merged ? (
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <circle cx="6" cy="6" r="2.5" />
+              <circle cx="6" cy="18" r="2.5" />
+              <circle cx="18" cy="12" r="2.5" />
+              <path d="M6 8.5v7M8.3 7.2C12 9 15 10 15.6 11" />
+            </svg>
+          ) : (
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          )}
+        </div>
+        {!last && <span aria-hidden="true" className="mt-1.5 h-[9px] w-px bg-border" />}
       </div>
       <div className={`min-w-0 flex-1 pt-[3px] ${last ? "pb-1" : "pb-4"}`}>
         <div className="flex justify-between gap-3">

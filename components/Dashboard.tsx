@@ -178,6 +178,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      // A dialog or panel on top owns the keyboard; never pull focus out from under it.
+      if (document.querySelector('dialog[open], [role="dialog"], [aria-modal="true"], [role="region"][aria-label="Activity"]')) return;
       e.preventDefault();
       searchRef.current?.focus();
     };

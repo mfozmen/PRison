@@ -11,14 +11,16 @@ export interface ArchiveSectionProps {
   onToggle: () => void;
   error: string | null;
   onRetry: () => void;
+  /** One line at the far end of the header, e.g. "1 updated since". */
+  summary?: ReactNode;
   children: ReactNode;
 }
 
-// The disclosure chrome shared by the two history sections at the foot of the
-// board. Not a PrList: a PrList's badge counts what is rendered, while these
-// headers count what was fetched — the sections reveal their rows a page at a
-// time, and the number in the header is the answer to "how much is back there",
-// not "how much is on screen".
+// One of the two history panels at the foot of the board. Not a PrList: a
+// PrList's count is what is rendered, while these headers count what was
+// fetched — the panels reveal their rows a page at a time, and the number in
+// the header is the answer to "how much is back there", not "how much is on
+// screen". Quieter than a tier column on purpose: history, not work.
 export function ArchiveSection({
   title,
   id,
@@ -28,6 +30,7 @@ export function ArchiveSection({
   onToggle,
   error,
   onRetry,
+  summary,
   children,
 }: ArchiveSectionProps) {
   return (
@@ -37,25 +40,29 @@ export function ArchiveSection({
     <section
       id={id}
       tabIndex={-1}
-      className="flex scroll-mt-4 flex-col gap-4 focus:outline-none"
+      className="flex scroll-mt-4 flex-col rounded-[20px] border border-border bg-[color-mix(in_srgb,var(--surface)_45%,var(--bg))] focus:outline-none"
     >
-      <DisclosureHeader
-        open={open}
-        onToggle={onToggle}
-        title={title}
-        badge={
-          <span
-            data-testid={countTestId}
-            className="rounded-full bg-border px-2 py-0.5 font-mono text-xs tabular-nums text-foreground ring-1 ring-inset ring-border"
-          >
-            {count}
-          </span>
-        }
-      />
+      <div className={`px-6 py-1.5 ${open ? "border-b border-border" : ""}`}>
+        <DisclosureHeader
+          variant="panel"
+          open={open}
+          onToggle={onToggle}
+          title={title}
+          trailing={summary}
+          badge={
+            <span
+              data-testid={countTestId}
+              className="rounded-full bg-border px-2 py-px text-xs font-medium leading-normal tabular-nums text-muted"
+            >
+              {count}
+            </span>
+          }
+        />
+      </div>
       {/* Outside the open/closed branch on purpose: a section that failed to
           load says so whether or not it is expanded, the same as every list. */}
       {error && (
-        <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+        <div className="mx-6 my-3 flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
           <span>{error}</span>
           <button
             onClick={onRetry}
@@ -65,7 +72,7 @@ export function ArchiveSection({
           </button>
         </div>
       )}
-      {open && children}
+      {open && <div className="px-6 pb-2 pt-1">{children}</div>}
     </section>
   );
 }

@@ -33,8 +33,7 @@ import {
   MERGE_CONFLICT_LABEL,
 } from "@/lib/suggest";
 import { PrList } from "./PrList";
-import { SummaryTiles } from "./SummaryTiles";
-import { SectionIndex } from "./SectionIndex";
+import { NextMove, type NextMoveItem } from "./NextMove";
 import { PrRow } from "./PrRow";
 import { ClosedPrRow } from "./ClosedPrRow";
 import { ReviewedPrRow } from "./ReviewedPrRow";
@@ -110,6 +109,19 @@ const DRAFT_FILTERS: { value: DraftFilter; label: string }[] = [
   { value: "only", label: "Only drafts" },
   { value: "none", label: "No drafts" },
 ];
+
+// "flat" keeps its name for the stored preference; on the tier board it means
+// each queue's column as-is, so that is what the button says.
+const GROUP_BYS: { value: "flat" | "repo" | "check"; label: string }[] = [
+  { value: "flat", label: "By queue" },
+  { value: "repo", label: "By repo" },
+  { value: "check", label: "By check" },
+];
+
+/** "3 PRs · oldest 2d" under a column's count; just the unit when it is empty. */
+function caption(count: number, unit: string, oldest: string | undefined): string {
+  return oldest && count > 0 ? `${unit} · oldest ${relativeAge(oldest, new Date())}` : unit;
+}
 
 /** A header's number, or null when the header wasn't there to read.
  *
@@ -198,6 +210,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // Closed PRs are history, not a work queue, so the section starts collapsed;
   // closedVisible drives the client-side "Load more" (15 at a time).
   const [closedOpen, setClosedOpen] = useState(false);
+  // Next move ids the user stepped past this sitting. Not persisted: Skip is
+  // "not this one right now", and tomorrow it may well be the right one.
+  const [skipped, setSkipped] = useState<string[]>([]);
   const [closedVisible, setClosedVisible] = useState(ARCHIVE_PAGE_SIZE);
   // Same shape as the closed history: a look-back list, so it starts collapsed
   // and reveals a page at a time.
@@ -950,6 +965,43 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const emptyText = (base: string) =>
     terms.length > 0 ? `Nothing here matches “${query.trim()}”` : base;
 
+  // Everything on the four queues, oldest wait first: the Next move strip
+  // points at the head of this, Skip steps along it. Built from the shown
+  // lists, so a search or the draft filter moves it too.
+  const owed =
+    shownStuck.length + shownReviews.length + shownComments.length + shownReady.length;
+  const nextMoves: NextMoveItem[] = sortByAgeAsc(
+    [
+      ...shownStuck.map((pr): NextMoveItem => ({
+        id: pr.id, title: pr.title, repo: pr.repo, number: pr.number, url: pr.url,
+        since: pr.stuckSince, suggestion: suggestStuck(pr), tone: "danger",
+        reasons: [
+          ...(pr.mergeState === "DIRTY" ? [`✗ ${MERGE_CONFLICT_LABEL.toLowerCase()}`] : []),
+          ...pr.failing.map((name) => `✗ ${name}`),
+          ...(pr.reviewDecision === "CHANGES_REQUESTED" ? ["Changes requested"] : []),
+        ],
+      })),
+      ...shownReviews.map((req): NextMoveItem => ({
+        id: req.id, title: req.title, repo: req.repo, number: req.number, url: req.url,
+        since: req.requestedAt, suggestion: suggestReview(req), tone: "accent",
+        reasons: [`blocking @${req.author}`],
+      })),
+      ...shownComments.map((c): NextMoveItem => ({
+        id: c.id, title: c.preview, repo: c.repo, number: c.number, url: c.url,
+        since: c.commentedAt, suggestion: suggestComment(c), tone: "warning",
+        reasons: [`from ${c.author}`],
+      })),
+      ...shownReady.map((pr): NextMoveItem => ({
+        id: pr.id, title: pr.title, repo: pr.repo, number: pr.number, url: pr.url,
+        since: pr.readySince, suggestion: suggestReady(pr), tone: "success",
+      })),
+    ],
+    (item) => item.since,
+  );
+  const nextMove = nextMoves.find((m) => !skipped.includes(m.id)) ?? nextMoves[0];
+  const updatedSinceCount = shownReviewed.filter((pr) => pr.updatedSince).length;
+  const mergedCount = shownClosed.filter((pr) => pr.merged).length;
+
   // Change detection, against the visible (filtered) lists — a hidden bot
   // comment, a reacted thread, or a filtered draft must never announce itself.
   // The closed list is passed whole rather than as its rendered slice: the
@@ -1064,7 +1116,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       {budgetSpent === undefined &&
         budget !== null &&
         budget.remaining <= budget.cost * 2 && (
-          <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="mx-auto w-full max-w-[1424px] px-4 sm:px-6 lg:px-8 pt-4">
             <div
               role="status"
               className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning"
@@ -1078,7 +1130,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           </div>
         )}
       {budgetSpent !== undefined && (
-        <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 pt-4">
+        <div className="mx-auto w-full max-w-[1424px] px-4 sm:px-6 lg:px-8 pt-4">
           <div
             role="status"
             className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning"
@@ -1093,7 +1145,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         </div>
       )}
       {partial && (
-        <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 pt-4">
+        <div className="mx-auto w-full max-w-[1424px] px-4 sm:px-6 lg:px-8 pt-4">
           <div
             role="status"
             className="flex items-center justify-between rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning"
@@ -1135,7 +1187,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         updateChecks={updateChecks}
         onUpdateChecksChange={setUpdateChecks}
       />
-      <main className="mx-auto w-full max-w-screen-2xl flex-1 space-y-8 px-4 sm:px-6 lg:px-8 py-8">
+      <main className="mx-auto flex w-full max-w-[1424px] flex-1 flex-col gap-7 px-4 py-8 sm:px-6 lg:px-8">
         {isPending && (
           <p
             className="flex items-center gap-2 text-sm text-muted"
@@ -1145,63 +1197,63 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             Loading&hellip;
           </p>
         )}
-        <div className="flex flex-wrap items-center gap-4">
-          <div role="group" aria-label="Group by" className="flex rounded-md">
-            <button
-              type="button"
-              aria-pressed={groupBy === "flat"}
-              onClick={() => setGroupBy("flat")}
-              className={`min-h-[44px] rounded-l-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
-                groupBy === "flat"
-                  ? "bg-accent text-background"
-                  : "bg-surface text-foreground"
-              }`}
-            >
-              Flat
-            </button>
-            <button
-              type="button"
-              aria-pressed={groupBy === "repo"}
-              onClick={() => setGroupBy("repo")}
-              className={`min-h-[44px] px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
-                groupBy === "repo"
-                  ? "bg-accent text-background"
-                  : "bg-surface text-foreground"
-              }`}
-            >
-              By repo
-            </button>
-            <button
-              type="button"
-              aria-pressed={groupBy === "check"}
-              onClick={() => setGroupBy("check")}
-              className={`min-h-[44px] rounded-r-md px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
-                groupBy === "check"
-                  ? "bg-accent text-background"
-                  : "bg-surface text-foreground"
-              }`}
-            >
-              By check
-            </button>
+        {nextMove && (
+          <NextMove
+            item={nextMove}
+            now={new Date()}
+            canSkip={nextMoves.length > 1}
+            onSkip={() =>
+              setSkipped((prev) =>
+                // Skipping the last one starts the round again rather than
+                // leaving the strip with nothing to point at.
+                prev.length + 1 >= nextMoves.length ? [] : [...prev, nextMove.id],
+              )
+            }
+          />
+        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Not before the first load lands: "Nothing wants you" over a board
+              that simply hasn't arrived yet is the one wrong thing to say. */}
+          {(owed > 0 || lastRefreshedAt) && (
+            <h1 className="mr-3 text-[22px] font-bold leading-tight tracking-[-0.02em] text-foreground">
+              {owed === 0
+                ? "Nothing wants you"
+                : `${owed} ${owed === 1 ? "thing wants" : "things want"} you`}
+            </h1>
+          )}
+          <div role="group" aria-label="Group by" className="flex rounded-full border border-border bg-surface p-1">
+            {GROUP_BYS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={groupBy === value}
+                onClick={() => setGroupBy(value)}
+                className={`min-h-[36px] cursor-pointer rounded-full px-4 text-sm focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
+                  groupBy === value
+                    ? "bg-foreground font-semibold text-background"
+                    : "font-medium text-muted hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
           {/* Drafts get filtered constantly — often enough that burying this in
               Settings cost two clicks every time. It lives here, in the same
               visual language as the group-by buttons, and as three buttons
               rather than a cycling one so every state is a single click and a
               screen reader can read the whole set at once. */}
-          <div role="group" aria-label="Drafts" className="flex rounded-md">
-            {DRAFT_FILTERS.map(({ value, label }, i) => (
+          <div role="group" aria-label="Drafts" className="flex rounded-full border border-border bg-surface p-1">
+            {DRAFT_FILTERS.map(({ value, label }) => (
               <button
                 key={value}
                 type="button"
                 aria-pressed={draftFilter === value}
                 onClick={() => setDraftFilter(value)}
-                className={`min-h-[44px] cursor-pointer px-4 text-sm font-medium focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
-                  i === 0 ? "rounded-l-md" : ""
-                } ${i === DRAFT_FILTERS.length - 1 ? "rounded-r-md" : ""} ${
+                className={`min-h-[36px] cursor-pointer rounded-full px-4 text-sm focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
                   draftFilter === value
-                    ? "bg-accent text-background"
-                    : "bg-surface text-foreground"
+                    ? "bg-foreground font-semibold text-background"
+                    : "font-medium text-muted hover:text-foreground"
                 }`}
               >
                 {label}
@@ -1220,14 +1272,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             }}
             aria-label="Search the board"
             placeholder="Search title, repo, author, check…"
-            className="min-h-[44px] w-full rounded-md bg-surface px-4 text-sm text-foreground placeholder:text-muted focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none sm:w-64"
+            className="min-h-[44px] w-full min-w-0 flex-1 rounded-full border border-border bg-surface px-4 text-sm text-foreground placeholder:text-muted focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none sm:min-w-48 sm:max-w-64"
           />
           {/* Deliberately not a live region: the label re-renders every minute
               as it ages, and announcing "Updated 4m ago" on a loop would talk
               over everything else for as long as the tab is open. */}
           {lastRefreshedAt && (
             <p
-              className="ml-auto text-sm text-muted"
+              className="ml-auto text-[13px] text-muted"
               title={new Date(lastRefreshedAt).toLocaleString()}
             >
               {lastRefreshedLabel}
@@ -1237,382 +1289,429 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             type="button"
             onClick={() => fetchData(selectedOrg, selectedRepo)}
             disabled={isPending}
-            className={`flex min-h-[44px] cursor-pointer items-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${lastRefreshedAt ? "" : "ml-auto"}`}
+            className={`flex min-h-[40px] cursor-pointer items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 ${lastRefreshedAt ? "" : "ml-auto"}`}
           >
             <svg
               aria-hidden="true"
               className={`shrink-0 ${isPending ? "animate-spin" : ""}`}
-              width="14"
-              height="14"
-              viewBox="0 0 14 14"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
               fill="none"
-              xmlns="http://www.w3.org/2000/svg"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <path
-                d="M12 7a5 5 0 1 1-1.46-3.54"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-              <path
-                d="M12 1.5V4H9.5"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+              <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+              <path d="M21 3v5h-5" />
             </svg>
             Refresh
           </button>
         </div>
-        {/* Counts of the visible lists, so a tile can never disagree with the
-            list under it. Each list is sorted oldest-first, so its head is its
-            own longest wait — no scan, and no age without a queue to own it. */}
-        <SummaryTiles
-          waiting={{
-            count: shownReviews.length,
-            oldest: shownReviews[0]?.requestedAt,
-          }}
-          stuck={{
-            count: shownStuck.length,
-            oldest: shownStuck[0]?.stuckSince,
-          }}
-          replies={{
-            count: shownComments.length,
-            oldest: shownComments[0]?.commentedAt,
-          }}
-          now={new Date()}
-        />
-        {/* Where everything is, in the order it appears — including the two
-            histories at the foot of the board, which is the whole point: they
-            are the sections nothing above could reach. Counts match each
-            section's own header, so the visible lists for the work queues and
-            the fetched totals for the archives, exactly as the headers do. */}
-        <SectionIndex
-          sections={[
-            {
-              id: "ready-to-merge",
-              label: "Ready to merge",
-              count: shownReady.length,
-            },
-            {
-              id: "comments-awaiting-reply",
-              label: "Comments awaiting your reply",
-              count: shownComments.length,
-            },
-            {
-              id: "waiting-on-your-review",
-              label: "PRs waiting on your review",
-              count: shownReviews.length,
-            },
-            {
-              id: "stuck-on-checks",
-              label: "PRs stuck on checks",
-              count: shownStuck.length,
-            },
-            {
-              id: "recently-reviewed",
-              label: "Recently reviewed",
-              count: shownReviewed.length,
-            },
-            {
-              id: "recently-closed",
-              label: "Recently merged / closed",
-              count: shownClosed.length,
-            },
-          ]}
-        />
-        {/* Ready-to-merge — full-width section above the two-column review/stuck grid */}
-        <div className="flex flex-col gap-4">
-          {budgetSpent === undefined && readyError && (
-            <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-              <span>{readyError}</span>
-              <button
-                onClick={() => fetchData(selectedOrg, selectedRepo)}
-                className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-          <PrList
-            title="Ready to merge"
-            id="ready-to-merge"
-            items={shownReady}
-            emptyMessage={emptyText(
-              draftFilter === "only"
-                ? "Drafts are never ready to merge"
-                : "Nothing ready to merge",
+        {/* The four work queues side by side, most urgent kind first. Columns,
+            not rows: a row is as tall as its tallest cell, and each queue
+            grows on its own. Grouping by repo or check happens inside each
+            column, so the queue a PR belongs to never changes with the view. */}
+        <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="flex flex-col gap-3">
+            {budgetSpent === undefined && stuckError && (
+              <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+                <span>{stuckError}</span>
+                <button
+                  onClick={() => fetchData(selectedOrg, selectedRepo)}
+                  className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+                >
+                  Retry
+                </button>
+              </div>
             )}
-            keyExtractor={(pr) => pr.id}
-            countAccent="success"
-            renderRow={(pr) => (
-              <PrRow
-                title={pr.title}
-                repo={pr.repo}
-                number={pr.number}
-                url={pr.url}
-                since={pr.readySince}
-                now={new Date()}
-                suggestion={suggestReady(pr)}
-                accent="success"
-                // A PR promoted here over a red check still says so — muted,
-                // because the user already answered for it, but said: a card
-                // with nothing on it would read as spotlessly green.
-                detail={
-                  pr.needsUpdate || pr.ignoredChecks?.length ? (
-                    <div className="flex flex-wrap items-center gap-1">
-                      {pr.needsUpdate && (
-                        <span className="bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium">
-                          Needs update
+            <PrList
+              title="Stuck on checks"
+              id="stuck-on-checks"
+              items={shownStuck}
+              emptyMessage={emptyText("No PRs stuck on checks 🎉")}
+              keyExtractor={(pr) => pr.id}
+              tone="danger"
+              caption={caption(shownStuck.length, "PRs", shownStuck[0]?.stuckSince)}
+              description="Your PRs that CI or reviewers are holding back."
+              highlighted={nextMove?.tone === "danger"}
+              groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
+              groupKeys={
+                groupBy === "check"
+                  ? (pr) => stuckGroupKeys(pr, tracked, ignored)
+                  : undefined
+              }
+              groupHref={
+                groupBy === "repo"
+                  ? (repo) => `https://github.com/${repo}`
+                  : undefined
+              }
+              renderRow={(pr) => {
+                const hasNames =
+                  pr.failing.length > 0 || pr.pending.length > 0;
+                const totalNames = pr.failing.length + pr.pending.length;
+                // Only truncate when there are more than 4 names total; otherwise
+                // show every name. The "+N more" count is derived from what is
+                // actually rendered so lopsided check lists never hide a chip
+                // without an indicator.
+                const truncate = totalNames > 4;
+                const showFailingNames = truncate
+                  ? pr.failing.slice(0, 2)
+                  : pr.failing;
+                const showPendingNames = truncate
+                  ? pr.pending.slice(0, 2)
+                  : pr.pending;
+                const overflow =
+                  totalNames -
+                  (showFailingNames.length + showPendingNames.length);
+                const awaiting = awaitingOn(pr.repo, pr.checkNames);
+                const hasAwaiting = awaiting.length > 0;
+                // A green PR can still be BLOCKED waiting on a code-owner review;
+                // surface that instead of mislabeling it as pending CI. Colour it
+                // with the repo's status vocabulary: CHANGES_REQUESTED is a negative
+                // signal (danger/red), REVIEW_REQUIRED is merely waiting (warning/amber).
+                const reviewNeeded = needsReview(pr.reviewDecision);
+                const changesRequested =
+                  pr.reviewDecision === "CHANGES_REQUESTED";
+                const reviewChip = reviewNeeded ? (
+                  <span
+                    key="review"
+                    className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
+                      changesRequested
+                        ? "bg-danger/10 text-danger"
+                        : "bg-warning/10 text-warning"
+                    }`}
+                  >
+                    {reviewDecisionLabel(pr.reviewDecision)}
+                  </span>
+                ) : null;
+                const noteSpan = (text: string) => (
+                  <span className="text-sm text-muted">{text}</span>
+                );
+                // Conflicts used to be an either/or with the check chips — a
+                // muted sentence shown only when the PR had no check names at
+                // all. One red check was enough to hide the fact that the branch
+                // will not merge, which is the harder blocker of the two: a
+                // check can go green on its own, a conflict cannot. So it is a
+                // chip like the others, first in the row, in danger's colours.
+                const conflicted = pr.mergeState === "DIRTY";
+                const conflictChip = conflicted ? (
+                  <span
+                    key="conflict"
+                    className="inline-flex items-center gap-1 rounded-md bg-danger/[0.12] px-2 py-0.5 text-xs font-medium text-danger"
+                  >
+                    {MERGE_CONFLICT_LABEL}
+                  </span>
+                ) : null;
+                let detail: React.ReactNode;
+                if (conflicted || hasNames || hasAwaiting || reviewNeeded) {
+                  detail = (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {conflictChip}
+                      {showFailingNames.map((name, i) =>
+                        checkChip(
+                          pr.repo,
+                          name,
+                          "danger",
+                          `fail-${i}-${name}`,
+                        ),
+                      )}
+                      {showPendingNames.map((name, i) =>
+                        checkChip(
+                          pr.repo,
+                          name,
+                          "warning",
+                          `pend-${i}-${name}`,
+                        ),
+                      )}
+                      {overflow > 0 && (
+                        <span className="text-xs text-muted">
+                          +{overflow} more
                         </span>
                       )}
-                      {pr.ignoredChecks?.map((name) => (
-                        <CheckChip
-                          key={`ignored-${name}`}
-                          name={name}
-                          tone="muted"
-                          ignored
-                          onToggleIgnore={() => toggleIgnore(pr.repo, name)}
-                        />
-                      ))}
+                      {hasAwaiting &&
+                        awaiting.map(({ name, required }) => (
+                          <CheckChip
+                            key={`await-${name}`}
+                            name={name}
+                            tone={required ? "warning" : "muted"}
+                            ignored={false}
+                            description={
+                              required
+                                ? `Awaiting required check: ${name}`
+                                : `Awaiting: ${name}`
+                            }
+                            onToggleIgnore={() => toggleIgnore(pr.repo, name)}
+                          />
+                        ))}
+                      {reviewChip}
                     </div>
-                  ) : undefined
+                  );
+                } else if (pr.blocked && pr.unresolvedThreads > 0) {
+                  // Named rather than guessed at: a repo with "require
+                  // conversation resolution" reports this as BLOCKED with
+                  // every check green, which is indistinguishable from a
+                  // hidden required check unless the threads are counted.
+                  detail = noteSpan(
+                    `${unresolvedLabel(pr.unresolvedThreads)} — GitHub won't merge until they're resolved.`,
+                  );
+                } else if (pr.blocked) {
+                  detail = noteSpan(
+                    "Some required checks run on GitHub and aren't shown here.",
+                  );
+                } else {
+                  // Nothing to say about a PR with no checks at all (a fresh draft):
+                  // "0 failing · 0 pending" is a line of noise.
+                  detail = pr.failingChecks || pr.pendingChecks
+                    ? `${pr.failingChecks} failing · ${pr.pendingChecks} pending`
+                    : undefined;
                 }
-              />
-            )}
-          />
-        </div>
-        {/* Comments awaiting your reply — full width: an inbox row needs room for
-            the comment preview AND the file path, which a grid column would clip. */}
-        <div className="flex flex-col gap-4">
-          {budgetSpent === undefined && commentsError && (
-            <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-              <span>{commentsError}</span>
-              <button
-                onClick={() => fetchData(selectedOrg, selectedRepo)}
-                className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-          <PrList
-            title="Comments awaiting your reply"
-            id="comments-awaiting-reply"
-            items={shownComments}
-            emptyMessage={emptyText("No comments awaiting your reply 🎉")}
-            keyExtractor={(c) => c.id}
-            countAccent="warning"
-            groupBy={groupBy === "repo" ? (c) => c.repo : undefined}
-            groupHref={
-              groupBy === "repo"
-                ? (repo) => `https://github.com/${repo}`
-                : undefined
-            }
-            renderRow={(c) => (
-              <PrRow
-                title={c.preview}
-                repo={c.repo}
-                number={c.number}
-                url={c.url}
-                since={c.commentedAt}
-                now={new Date()}
-                suggestion={suggestComment(c)}
-                accent="warning"
-                clampTitle
-                detail={
-                  <span className="flex flex-wrap items-center gap-1.5">
-                    <span className="inline-flex items-center gap-1 rounded bg-surface px-1.5 py-0.5 text-xs font-medium text-foreground ring-1 ring-inset ring-border">
-                      <svg
-                        aria-hidden="true"
-                        className="shrink-0"
-                        width="11"
-                        height="11"
-                        viewBox="0 0 12 12"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <circle
-                          cx="5"
-                          cy="3.5"
-                          r="2"
-                          stroke="currentColor"
-                          strokeWidth="1.3"
-                        />
-                        <path
-                          d="M1 10c0-2.21 1.79-4 4-4s4 1.79 4 4"
-                          stroke="currentColor"
-                          strokeWidth="1.3"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                      {c.author}
-                    </span>
-                    {/* A review body has no file, so without this it would read
-                        as an inline thread whose path failed to load — and the
-                        two are answered in different places. */}
-                    {c.source === "review" && (
-                      <span className="inline-flex items-center rounded bg-surface px-1.5 py-0.5 text-xs font-medium text-muted ring-1 ring-inset ring-border">
-                        Review comment
-                      </span>
-                    )}
-                    {c.source === "conversation" && (
-                      <span className="inline-flex items-center rounded bg-surface px-1.5 py-0.5 text-xs font-medium text-muted ring-1 ring-inset ring-border">
-                        Conversation
-                      </span>
-                    )}
-                    {c.path && (
-                      <span className="inline-flex items-center gap-1 rounded bg-surface px-1.5 py-0.5 font-mono text-xs text-muted ring-1 ring-inset ring-border">
-                        <svg
-                          aria-hidden="true"
-                          className="shrink-0"
-                          width="11"
-                          height="11"
-                          viewBox="0 0 12 12"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            d="M6.5 1H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.5L6.5 1Z"
-                            stroke="currentColor"
-                            strokeWidth="1.2"
-                            strokeLinejoin="round"
-                          />
-                          <path
-                            d="M6.5 1v3.5H10"
-                            stroke="currentColor"
-                            strokeWidth="1.2"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                        {c.path}
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSeen((prev) => {
-                          const next = { ...prev };
-                          if (isSeen(c, prev)) delete next[c.id];
-                          else next[c.id] = c.commentedAt;
-                          return next;
-                        })
-                      }
-                      aria-label={isSeen(c, seen) ? "Unmark as seen" : "Mark as seen"}
-                      title={isSeen(c, seen) ? "Seen — click to bring it back" : "Mark as seen — hides it until a new reply"}
-                      className={`ml-auto inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md border transition-all hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                        isSeen(c, seen)
-                          ? "border-success/40 bg-success/15 text-success hover:bg-success/25"
-                          : "border-border bg-surface text-muted hover:border-accent hover:bg-accent/10 hover:text-accent"
-                      }`}
-                    >
-                      {isSeen(c, seen) ? (
-                        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="9" />
-                          <path d="m8 12.5 2.5 2.5L16 9.5" />
-                        </svg>
-                      ) : (
-                        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                      )}
-                    </button>
-                  </span>
-                }
-              />
-            )}
-          />
-        </div>
-        {/* Two columns, paired by subject rather than stacked as rows: other
-            people's PRs on the left (the ones you owe a review, then the ones
-            you have already reviewed), your own on the right (blocked, then
-            finished). It is the split the queries already make —
-            review-requested/reviewed-by against author — so each history sits
-            directly under the queue it is the history of.
-
-            It is also why they are columns and not a second grid row: a row is
-            as tall as its tallest cell, so expanding one list used to push the
-            unrelated section on the other side down with it.  */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          {/* Other people's PRs: the review queue, then what you reviewed. */}
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-4">
-              {budgetSpent === undefined && reviewError && (
-                <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-                  <span>{reviewError}</span>
-                  <button
-                    onClick={() => fetchData(selectedOrg, selectedRepo)}
-                    className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-              <PrList
-                title="PRs waiting on your review"
-                id="waiting-on-your-review"
-                items={shownReviews}
-                emptyMessage={emptyText("No PRs waiting on your review 🎉")}
-                keyExtractor={(req) => req.id}
-                groupBy={groupBy === "repo" ? (req) => req.repo : undefined}
-                groupHref={
-                  groupBy === "repo"
-                    ? (repo) => `https://github.com/${repo}`
-                    : undefined
-                }
-                countAccent="warning"
-                renderRow={(req) => (
+                return (
                   <PrRow
-                    title={req.title}
-                    repo={req.repo}
-                    number={req.number}
-                    url={req.url}
-                    since={req.requestedAt}
+                    title={pr.title}
+                    repo={pr.repo}
+                    number={pr.number}
+                    url={pr.url}
+                    since={pr.stuckSince}
                     now={new Date()}
-                    draft={req.isDraft}
-                    accent="warning"
-                    detail={
-                      <span className="flex items-center gap-1 text-warning">
-                        <svg
-                          aria-hidden="true"
-                          className="shrink-0"
-                          width="12"
-                          height="12"
-                          viewBox="0 0 12 12"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <circle
-                            cx="5"
-                            cy="3.5"
-                            r="2"
-                            stroke="currentColor"
-                            strokeWidth="1.5"
-                          />
-                          <path
-                            d="M1 10c0-2.21 1.79-4 4-4s4 1.79 4 4"
-                            stroke="currentColor"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                          />
-                          <path
-                            d="M9 6l2 2-2 2"
-                            stroke="currentColor"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                        <span>Blocking @{req.author}</span>
-                      </span>
+                    draft={pr.isDraft}
+                    kind={
+                      conflicted || pr.failing.length > 0 || changesRequested
+                        ? "fail"
+                        : pr.pending.length > 0 || hasAwaiting || reviewNeeded
+                          ? "pending"
+                          : "idle"
                     }
-                    suggestion={suggestReview(req)}
+                    marked={nextMove?.id === pr.id}
+                    detail={detail}
+                    suggestion={suggestStuck(pr)}
                   />
-                )}
-              />
-            </div>
+                );
+              }}
+            />
+          </div>
+          <div className="flex flex-col gap-3">
+            {budgetSpent === undefined && reviewError && (
+              <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+                <span>{reviewError}</span>
+                <button
+                  onClick={() => fetchData(selectedOrg, selectedRepo)}
+                  className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            <PrList
+              title="Waiting on your review"
+              id="waiting-on-your-review"
+              items={shownReviews}
+              emptyMessage={emptyText("No PRs waiting on your review 🎉")}
+              keyExtractor={(req) => req.id}
+              tone="accent"
+              caption={caption(shownReviews.length, "PRs", shownReviews[0]?.requestedAt)}
+              description="Teammates blocked until you review."
+              highlighted={nextMove?.tone === "accent"}
+              groupBy={groupBy === "repo" ? (req) => req.repo : undefined}
+              groupHref={
+                groupBy === "repo"
+                  ? (repo) => `https://github.com/${repo}`
+                  : undefined
+              }
+              renderRow={(req) => (
+                <PrRow
+                  title={req.title}
+                  repo={req.repo}
+                  number={req.number}
+                  url={req.url}
+                  since={req.requestedAt}
+                  now={new Date()}
+                  draft={req.isDraft}
+                  kind="review"
+                  byline={`@${req.author}`}
+                  marked={nextMove?.id === req.id}
+                  suggestion={suggestReview(req)}
+                />
+              )}
+            />
+          </div>
+          <div className="flex flex-col gap-3">
+            {budgetSpent === undefined && commentsError && (
+              <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+                <span>{commentsError}</span>
+                <button
+                  onClick={() => fetchData(selectedOrg, selectedRepo)}
+                  className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            <PrList
+              title="Awaiting your reply"
+              id="comments-awaiting-reply"
+              items={shownComments}
+              emptyMessage={emptyText("No comments awaiting your reply 🎉")}
+              keyExtractor={(c) => c.id}
+              tone="warning"
+              caption={caption(shownComments.length, "threads", shownComments[0]?.commentedAt)}
+              description="Someone asked you something. Answer or mark seen."
+              highlighted={nextMove?.tone === "warning"}
+              groupBy={groupBy === "repo" ? (c) => c.repo : undefined}
+              groupHref={
+                groupBy === "repo"
+                  ? (repo) => `https://github.com/${repo}`
+                  : undefined
+              }
+              renderRow={(c) => (
+                <PrRow
+                  title={c.preview}
+                  repo={c.repo}
+                  number={c.number}
+                  url={c.url}
+                  since={c.commentedAt}
+                  now={new Date()}
+                  suggestion={suggestComment(c)}
+                  kind="reply"
+                  byline={c.author}
+                  aside={
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSeen((prev) => {
+                      const next = { ...prev };
+                      if (isSeen(c, prev)) delete next[c.id];
+                      else next[c.id] = c.commentedAt;
+                      return next;
+                    })
+                  }
+                  aria-label={isSeen(c, seen) ? "Unmark as seen" : "Mark as seen"}
+                  title={isSeen(c, seen) ? "Seen — click to bring it back" : "Mark as seen — hides it until a new reply"}
+                  className={`inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                    isSeen(c, seen)
+                      ? "border-success/40 bg-success/15 text-success hover:bg-success/25"
+                      : "border-border bg-transparent text-muted hover:border-accent hover:text-accent"
+                  }`}
+                >
+                  {isSeen(c, seen) ? (
+                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="m8 12.5 2.5 2.5L16 9.5" />
+                    </svg>
+                  ) : (
+                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+                  }
+                  marked={nextMove?.id === c.id}
+                  clampTitle
+                  detail={
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      {/* A review body has no file, so without this it would read
+                          as an inline thread whose path failed to load — and the
+                          two are answered in different places. */}
+                      {c.source === "review" && (
+                        <span className="rounded-md bg-border px-1.5 py-0.5 text-xs font-medium text-muted">
+                          Review comment
+                        </span>
+                      )}
+                      {c.source === "conversation" && (
+                        <span className="rounded-md bg-border px-1.5 py-0.5 text-xs font-medium text-muted">
+                          Conversation
+                        </span>
+                      )}
+                      {c.path && (
+                        <span className="min-w-0 truncate font-mono text-xs text-muted">
+                          {c.path}
+                        </span>
+                      )}
+
+                    </span>
+                  }
+                />
+              )}
+            />
+          </div>
+          <div className="flex flex-col gap-3">
+            {budgetSpent === undefined && readyError && (
+              <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+                <span>{readyError}</span>
+                <button
+                  onClick={() => fetchData(selectedOrg, selectedRepo)}
+                  className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            <PrList
+              title="Ready to merge"
+              id="ready-to-merge"
+              items={shownReady}
+              emptyMessage={emptyText(
+                draftFilter === "only"
+                  ? "Drafts are never ready to merge"
+                  : "Nothing ready to merge",
+              )}
+              keyExtractor={(pr) => pr.id}
+              tone="success"
+              caption={caption(shownReady.length, "PRs", shownReady[0]?.readySince)}
+              description="Approved, green, mergeable. One click each."
+              highlighted={nextMove?.tone === "success"}
+              renderRow={(pr) => (
+                <PrRow
+                  title={pr.title}
+                  repo={pr.repo}
+                  number={pr.number}
+                  url={pr.url}
+                  since={pr.readySince}
+                  now={new Date()}
+                  suggestion={suggestReady(pr)}
+                  kind="ready"
+                  marked={nextMove?.id === pr.id}
+                  // A PR promoted here over a red check still says so — muted,
+                  // because the user already answered for it, but said: a card
+                  // with nothing on it would read as spotlessly green.
+                  detail={
+                    pr.needsUpdate || pr.ignoredChecks?.length ? (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {pr.needsUpdate && (
+                          <span className="rounded-md bg-warning/10 px-2 py-0.5 text-xs font-medium leading-normal text-warning">
+                            Needs update
+                          </span>
+                        )}
+                        {pr.ignoredChecks?.map((name) => (
+                          <CheckChip
+                            key={`ignored-${name}`}
+                            name={name}
+                            tone="muted"
+                            ignored
+                            onToggleIgnore={() => toggleIgnore(pr.repo, name)}
+                          />
+                        ))}
+                      </div>
+                    ) : undefined
+                  }
+                />
+              )}
+            />
+          </div>
+        </div>
+        {/* History: looking back, not work to do. Your review verdicts beside
+            your finished PRs, quieter than the columns above on purpose. */}
+        <section aria-labelledby="history-heading" className="flex flex-col gap-4 pt-3">
+          <div className="flex items-center gap-3">
+            <h2 id="history-heading" className="text-xs font-semibold tracking-[0.1em] text-muted">
+              HISTORY
+            </h2>
+            <span aria-hidden="true" className="h-px flex-1 bg-border" />
+            <span className="text-[13px] text-muted">Looking back, not work to do</span>
+          </div>
+          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
             <ArchiveSection
               title="Recently reviewed"
               id="recently-reviewed"
@@ -1622,14 +1721,21 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               onToggle={() => setReviewedOpen((o) => !o)}
               error={budgetSpent === undefined ? reviewedError : null}
               onRetry={() => fetchData(selectedOrg, selectedRepo)}
+              summary={
+                updatedSinceCount > 0 && (
+                  <span className="font-semibold text-accent">
+                    {updatedSinceCount} updated since
+                  </span>
+                )
+              }
             >
               {shownReviewed.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">
+                <p className="my-2 rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted">
                   {emptyText("No PRs you have reviewed are still open")}
                 </p>
               ) : (
                 <>
-                  <ul className="flex flex-col gap-2">
+                  <ul className="flex flex-col divide-y divide-border">
                     {shownReviewed.slice(0, reviewedVisible).map((pr) => (
                       <li key={pr.id}>
                         <ReviewedPrRow pr={pr} now={new Date()} />
@@ -1642,7 +1748,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                       onClick={() =>
                         setReviewedVisible((v) => v + ARCHIVE_PAGE_SIZE)
                       }
-                      className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                      className="mb-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-border px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
                     >
                       Load more (showing {reviewedVisible} of{" "}
                       {shownReviewed.length})
@@ -1651,271 +1757,6 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 </>
               )}
             </ArchiveSection>
-          </div>
-          {/* Your own PRs: what is blocked, then what is finished. */}
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-4">
-              {budgetSpent === undefined && stuckError && (
-                <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-                  <span>{stuckError}</span>
-                  <button
-                    onClick={() => fetchData(selectedOrg, selectedRepo)}
-                    className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-              <PrList
-                title="PRs stuck on checks"
-                id="stuck-on-checks"
-                items={shownStuck}
-                emptyMessage={emptyText("No PRs stuck on checks 🎉")}
-                keyExtractor={(pr) => pr.id}
-                countAccent="danger"
-                groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
-                groupKeys={
-                  groupBy === "check"
-                    ? (pr) => stuckGroupKeys(pr, tracked, ignored)
-                    : undefined
-                }
-                groupHref={
-                  groupBy === "repo"
-                    ? (repo) => `https://github.com/${repo}`
-                    : undefined
-                }
-                renderRow={(pr) => {
-                  const hasNames =
-                    pr.failing.length > 0 || pr.pending.length > 0;
-                  const totalNames = pr.failing.length + pr.pending.length;
-                  // Only truncate when there are more than 4 names total; otherwise
-                  // show every name. The "+N more" count is derived from what is
-                  // actually rendered so lopsided check lists never hide a chip
-                  // without an indicator.
-                  const truncate = totalNames > 4;
-                  const showFailingNames = truncate
-                    ? pr.failing.slice(0, 2)
-                    : pr.failing;
-                  const showPendingNames = truncate
-                    ? pr.pending.slice(0, 2)
-                    : pr.pending;
-                  const overflow =
-                    totalNames -
-                    (showFailingNames.length + showPendingNames.length);
-                  const awaiting = awaitingOn(pr.repo, pr.checkNames);
-                  const hasAwaiting = awaiting.length > 0;
-                  // A green PR can still be BLOCKED waiting on a code-owner review;
-                  // surface that instead of mislabeling it as pending CI. Colour it
-                  // with the repo's status vocabulary: CHANGES_REQUESTED is a negative
-                  // signal (danger/red), REVIEW_REQUIRED is merely waiting (warning/amber).
-                  const reviewNeeded = needsReview(pr.reviewDecision);
-                  const changesRequested =
-                    pr.reviewDecision === "CHANGES_REQUESTED";
-                  const reviewChip = reviewNeeded ? (
-                    <span
-                      key="review"
-                      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
-                        changesRequested
-                          ? "bg-danger/10 text-danger ring-danger/30"
-                          : "bg-warning/10 text-warning ring-warning/30"
-                      }`}
-                    >
-                      <svg
-                        aria-hidden="true"
-                        className="shrink-0"
-                        width="11"
-                        height="11"
-                        viewBox="0 0 12 12"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <circle
-                          cx="5"
-                          cy="3.5"
-                          r="2"
-                          stroke="currentColor"
-                          strokeWidth="1.3"
-                        />
-                        <path
-                          d="M1 10c0-2.21 1.79-4 4-4s4 1.79 4 4"
-                          stroke="currentColor"
-                          strokeWidth="1.3"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                      {reviewDecisionLabel(pr.reviewDecision)}
-                    </span>
-                  ) : null;
-                  const noteIcon = (
-                    <svg
-                      aria-hidden="true"
-                      className="shrink-0"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 14 14"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <circle
-                        cx="7"
-                        cy="7"
-                        r="5.5"
-                        stroke="currentColor"
-                        strokeWidth="1.3"
-                      />
-                      <path
-                        d="M7 6v4M7 4.5v.5"
-                        stroke="currentColor"
-                        strokeWidth="1.3"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  );
-                  const noteSpan = (text: string) => (
-                    <span className="flex items-center gap-1.5 text-muted text-sm">
-                      {noteIcon}
-                      {text}
-                    </span>
-                  );
-                  // Conflicts used to be an either/or with the check chips — a
-                  // muted sentence shown only when the PR had no check names at
-                  // all. One red check was enough to hide the fact that the branch
-                  // will not merge, which is the harder blocker of the two: a
-                  // check can go green on its own, a conflict cannot. So it is a
-                  // chip like the others, first in the row, in danger's colours.
-                  const conflicted = pr.mergeState === "DIRTY";
-                  const conflictChip = conflicted ? (
-                    <span
-                      key="conflict"
-                      className="inline-flex items-center gap-1 rounded bg-danger/10 px-1.5 py-0.5 text-xs font-medium text-danger ring-1 ring-inset ring-danger/30"
-                    >
-                      <svg
-                        aria-hidden="true"
-                        className="shrink-0"
-                        width="11"
-                        height="11"
-                        viewBox="0 0 12 12"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M3.5 2.5v7M8.5 2.5v7"
-                          stroke="currentColor"
-                          strokeWidth="1.3"
-                          strokeLinecap="round"
-                        />
-                        <path
-                          d="M2 4.5 4 6.5m0-2L2 6.5M7 4.5l2 2m0-2-2 2"
-                          stroke="currentColor"
-                          strokeWidth="1.3"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                      {MERGE_CONFLICT_LABEL}
-                    </span>
-                  ) : null;
-                  let detail: React.ReactNode;
-                  if (conflicted || hasNames || hasAwaiting || reviewNeeded) {
-                    detail = (
-                      <div className="flex flex-wrap gap-1 items-center">
-                        {conflictChip}
-                        {showFailingNames.map((name, i) =>
-                          checkChip(
-                            pr.repo,
-                            name,
-                            "danger",
-                            `fail-${i}-${name}`,
-                          ),
-                        )}
-                        {showPendingNames.map((name, i) =>
-                          checkChip(
-                            pr.repo,
-                            name,
-                            "warning",
-                            `pend-${i}-${name}`,
-                          ),
-                        )}
-                        {overflow > 0 && (
-                          <span className="text-xs text-muted">
-                            +{overflow} more
-                          </span>
-                        )}
-                        {hasAwaiting &&
-                          awaiting.map(({ name, required }) => (
-                            <CheckChip
-                              key={`await-${name}`}
-                              name={name}
-                              tone={required ? "warning" : "muted"}
-                              ignored={false}
-                              description={
-                                required
-                                  ? `Awaiting required check: ${name}`
-                                  : `Awaiting: ${name}`
-                              }
-                              onToggleIgnore={() => toggleIgnore(pr.repo, name)}
-                              icon={
-                                <svg
-                                  aria-hidden="true"
-                                  className="shrink-0"
-                                  width="11"
-                                  height="11"
-                                  viewBox="0 0 12 12"
-                                  fill="none"
-                                  xmlns="http://www.w3.org/2000/svg"
-                                >
-                                  <circle
-                                    cx="6"
-                                    cy="6"
-                                    r="4.5"
-                                    stroke="currentColor"
-                                    strokeWidth="1.3"
-                                  />
-                                  <path
-                                    d="M6 3.5v2.75l1.5 1.5"
-                                    stroke="currentColor"
-                                    strokeWidth="1.3"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  />
-                                </svg>
-                              }
-                            />
-                          ))}
-                        {reviewChip}
-                      </div>
-                    );
-                  } else if (pr.blocked && pr.unresolvedThreads > 0) {
-                    // Named rather than guessed at: a repo with "require
-                    // conversation resolution" reports this as BLOCKED with
-                    // every check green, which is indistinguishable from a
-                    // hidden required check unless the threads are counted.
-                    detail = noteSpan(
-                      `${unresolvedLabel(pr.unresolvedThreads)} — GitHub won't merge until they're resolved.`,
-                    );
-                  } else if (pr.blocked) {
-                    detail = noteSpan(
-                      "Some required checks run on GitHub and aren't shown here.",
-                    );
-                  } else {
-                    detail = `${pr.failingChecks} failing · ${pr.pendingChecks} pending`;
-                  }
-                  return (
-                    <PrRow
-                      title={pr.title}
-                      repo={pr.repo}
-                      number={pr.number}
-                      url={pr.url}
-                      since={pr.stuckSince}
-                      now={new Date()}
-                      draft={pr.isDraft}
-                      accent="danger"
-                      detail={detail}
-                      suggestion={suggestStuck(pr)}
-                    />
-                  );
-                }}
-              />
-            </div>
             <ArchiveSection
               title="Recently merged / closed"
               id="recently-closed"
@@ -1925,27 +1766,31 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               onToggle={() => setClosedOpen((o) => !o)}
               error={budgetSpent === undefined ? closedError : null}
               onRetry={() => fetchData(selectedOrg, selectedRepo)}
+              summary={
+                shownClosed.length > 0 &&
+                `${mergedCount} merged · ${shownClosed.length - mergedCount} closed`
+              }
             >
               {shownClosed.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">
+                <p className="my-2 rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted">
                   {emptyText("No closed PRs")}
                 </p>
               ) : (
                 <>
-                  <ul className="flex flex-col gap-2">
-                    {shownClosed.slice(0, closedVisible).map((pr) => (
+                  <ol className="flex flex-col pt-2">
+                    {shownClosed.slice(0, closedVisible).map((pr, i, shown) => (
                       <li key={pr.id}>
-                        <ClosedPrRow pr={pr} now={new Date()} />
+                        <ClosedPrRow pr={pr} now={new Date()} last={i === shown.length - 1} />
                       </li>
                     ))}
-                  </ul>
+                  </ol>
                   {shownClosed.length > closedVisible && (
                     <button
                       type="button"
                       onClick={() =>
                         setClosedVisible((v) => v + ARCHIVE_PAGE_SIZE)
                       }
-                      className="flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-surface px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                      className="mb-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-border px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
                     >
                       Load more (showing {closedVisible} of {shownClosed.length}
                       )
@@ -1955,7 +1800,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               )}
             </ArchiveSection>
           </div>
-        </div>
+        </section>
       </main>
     </div>
   );

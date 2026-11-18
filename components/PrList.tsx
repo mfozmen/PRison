@@ -10,17 +10,42 @@ export interface PrListProps<T> {
   groupBy?: (item: T) => string;
   groupKeys?: (item: T) => string[];
   groupHref?: (key: string) => string | undefined;
-  countAccent?: "success" | "warning" | "danger";
+  /** The column's status colour: its dot, and its border when highlighted. */
+  tone?: Tone;
+  /** One line under the count saying what the queue is. */
+  description?: string;
+  /** What the count counts ("PRs", "threads") and the head's age, e.g. "oldest 4d". */
+  caption?: string;
+  /** The column that holds the Next move item. */
+  highlighted?: boolean;
   /** Anchor target for the jump links above. */
   id?: string;
 }
 
-const countAccentClasses: Record<"success" | "warning" | "danger", string> = {
-  success: "rounded-full bg-success px-2 py-0.5 font-mono text-xs tabular-nums text-background ring-1 ring-inset ring-success font-semibold",
-  warning: "rounded-full bg-warning px-2 py-0.5 font-mono text-xs tabular-nums text-background ring-1 ring-inset ring-warning font-semibold",
-  danger:  "rounded-full bg-danger  px-2 py-0.5 font-mono text-xs tabular-nums text-background ring-1 ring-inset ring-danger  font-semibold",
+export type Tone = "success" | "warning" | "danger" | "accent";
+
+// Spelled out rather than built from the tone, because Tailwind only ships the
+// classes it can find written down.
+const DOT: Record<Tone, string> = {
+  success: "bg-success",
+  warning: "bg-warning",
+  danger: "bg-danger",
+  accent: "bg-accent",
 };
-const neutralBadge = "rounded-full bg-border px-2 py-0.5 font-mono text-xs tabular-nums text-foreground ring-1 ring-inset ring-border";
+// The highlighted column: its tone in the border, a breath of it in the card,
+// and in the label, so it reads as "this one" before any title is read.
+const HIGHLIGHT: Record<Tone, string> = {
+  success: "border-success/40 bg-[color-mix(in_srgb,var(--success)_4%,var(--surface))]",
+  warning: "border-warning/40 bg-[color-mix(in_srgb,var(--warning)_4%,var(--surface))]",
+  danger: "border-danger/40 bg-[color-mix(in_srgb,var(--danger)_4%,var(--surface))]",
+  accent: "border-accent/40 bg-[color-mix(in_srgb,var(--accent)_4%,var(--surface))]",
+};
+const LABEL: Record<Tone, string> = {
+  success: "text-success",
+  warning: "text-warning",
+  danger: "text-danger",
+  accent: "text-accent",
+};
 
 export function PrList<T>({
   title,
@@ -31,7 +56,10 @@ export function PrList<T>({
   groupBy,
   groupKeys,
   groupHref,
-  countAccent,
+  tone,
+  description,
+  caption,
+  highlighted,
   id,
 }: PrListProps<T>) {
   // Open, and component state only — never localStorage.
@@ -92,27 +120,36 @@ export function PrList<T>({
     // link into a real one: the browser moves the caret here too, so the next
     // Tab continues inside the section instead of back at the top of the page.
     // scroll-mt keeps the header off the very edge of the viewport.
-    <section id={id} tabIndex={-1} className="flex scroll-mt-4 flex-col gap-3 focus:outline-none">
+    <section
+      id={id}
+      tabIndex={-1}
+      data-highlighted={highlighted || undefined}
+      className={`flex scroll-mt-4 flex-col gap-4 rounded-[20px] border p-6 focus:outline-none ${
+        highlighted && tone ? HIGHLIGHT[tone] : "border-border bg-surface"
+      }`}
+    >
       <DisclosureHeader
         open={open}
         onToggle={() => setOpen((v) => !v)}
         title={title}
         controls={bodyId}
-        badge={
-          <span
-            data-testid="count-badge"
-            className={
-              countAccent && items.length > 0 ? countAccentClasses[countAccent] : neutralBadge
-            }
-          >
-            {items.length}
-          </span>
-        }
+        titleClassName={highlighted && tone ? LABEL[tone] : undefined}
+        leading={tone && <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${DOT[tone]}`} />}
       />
+      <div className="-mt-2 flex items-baseline gap-2">
+        <span
+          data-testid="count-badge"
+          className="text-[56px] font-bold leading-none tracking-[-0.04em] tabular-nums text-foreground"
+        >
+          {items.length}
+        </span>
+        {caption && <span className="text-sm text-muted">{caption}</span>}
+      </div>
+      {description && <p className="text-sm leading-normal text-muted">{description}</p>}
       {open && (
-        <div id={bodyId} className="flex flex-col gap-3">
+        <div id={bodyId} className="flex flex-col">
           {items.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted">
+            <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted">
               {emptyMessage}
             </p>
           ) : (groupBy || groupKeys) ? (
@@ -131,7 +168,7 @@ export function PrList<T>({
               ))}
             </div>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col divide-y divide-border border-t border-border">
               {items.map((item, i) => (
                 <li key={keyExtractor(item, i)}>{renderRow(item)}</li>
               ))}
@@ -238,7 +275,7 @@ function PrGroup({
           would keep them reachable by find-in-page and by every count
           that walks the DOM. */}
       {open && (
-        <ul id={panelId} className="flex flex-col gap-2">
+        <ul id={panelId} className="flex flex-col divide-y divide-border border-t border-border">
           {children}
         </ul>
       )}

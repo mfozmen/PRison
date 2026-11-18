@@ -35,7 +35,7 @@ under the queue it is the history of, and the columns grow independently, so
 expanding one never moves the other. Both histories start collapsed with a count
 and expand to the latest 15, with **Load more** for the rest.
 
-![The PRison dashboard in dark mode. The filter bar's grouping and draft filters and a search box sit at the top; under them three summary tiles (waiting on you, awaiting your reply, stuck on checks), each showing a count and its oldest wait, then a row of links to all six sections with their counts. Ready to merge and Comments awaiting your reply run full width; below them two columns pair each queue with its history — PRs waiting on your review above Recently reviewed on the left, PRs stuck on checks above Recently merged / closed on the right. One stuck PR is tagged both Merge conflict and a failing check](docs/screenshot.png)
+![The PRison dashboard in dark mode. A Next move strip on top points at the oldest item, a PR stuck on lint and typecheck for 4 days, with a Re-run failed checks button and Skip. Under it, the heading 12 things want you sits beside pill toggles for grouping and drafts, a search box and Refresh. Four columns follow, each with a big count and its oldest wait: Stuck on checks (highlighted, 4), Waiting on your review (3), Awaiting your reply (3) and Ready to merge (2). Every row has a status icon, its repo and age, and its next action. At the foot, a History section holds the folded Recently reviewed and Recently merged / closed panels](docs/screenshot.png)
 
 ### Features
 
@@ -164,7 +164,7 @@ and expand to the latest 15, with **Load more** for the rest.
   Retry yourself. When GitHub asks for longer than a refresh should take — or
   doesn't say at all — PRison steps aside and shows the banner rather than
   guessing, since coming back early only extends the block.
-- **Eight themes, each with a light and a dark ground.** A theme owns its accent,
+- **Thirteen themes, each with a light and a dark ground.** A theme owns its accent,
   its three status colours and its typefaces; the ground underneath is a separate
   choice, so switching it reads as the light changing rather than the theme
   changing. **Default** is the original pair; **Aurora** is built from four
@@ -174,13 +174,22 @@ and expand to the latest 15, with **Load more** for the rest.
   it, its two grounds a depth rather than a mood — at 30 m the sea has absorbed
   the red end of the spectrum. **Saffron** takes four parts of one crocus,
   **Lichen** four species off one rock face, wet and dry. **Reflectivity** is a
-  weather radar's dBZ scale, and the one accent here that isn't blue or green.
-  All sixteen palettes are measured against WCAG AA by a test, with nothing
+  weather radar's dBZ scale. Five more start from palettes on colorpalettes.net
+  and let them colour the ground as well as the accent: **Lilac** (violet night),
+  **Olive** (olive and mustard on linen), **Acid Pop** (cobalt, acid green and
+  hot pink — the loud one), **Terracotta** (peach plaster and fired clay) and
+  **Moss & Rose** (blue-green moss with a blush accent).
+  All twenty-six palettes are measured against WCAG AA by a test, with nothing
   exempt. Pick one in Settings, where each row previews itself — the swatch is
   stamped with that theme, so it renders in the real palette rather than a copy
   that can drift.
-- Responsive two-column layout, minute-level ages, colour-coded lists, and a
-  Refresh button.
+- **A tier board.** A Next move strip on top points at the longest wait across
+  every queue, with its one action and a Skip. Below it, four columns side by
+  side: stuck on checks, waiting on your review, awaiting your reply, ready to
+  merge. Each has a big count, its oldest age, and status icons, so colour is
+  never the only signal. The two histories, recently reviewed and recently
+  merged/closed, sit underneath, quieter on purpose. The columns stack on a
+  narrow screen.
 - **Personal account + per-org filter** in the top-right switcher, and a
   **single-repo filter** beside it for the days spent inside one repository.
   Both narrow the GitHub search itself rather than the rows already on screen,
@@ -312,7 +321,7 @@ The Settings menu has six sections:
   it was ignored on, plus an owner scope for a check that is broken everywhere.
   A repo can also be picked here, to write a check off before the board has
   ever drawn its chip.
-- **Appearance** — pick one of the eight themes, each previewing its own colours
+- **Appearance** — pick one of the thirteen themes, each previewing its own colours
   and typeface.
 - **About** — version, repository, license, and **Check for updates**, asked
   for on the spot. **Tell me when a newer version is out** turns it into a

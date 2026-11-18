@@ -9,6 +9,11 @@ import {
   act,
 } from "@testing-library/react";
 import { Dashboard } from "./Dashboard";
+
+// The Next move strip repeats the oldest item's title, so every getByText(title)
+// below would find two. These tests are about the lists; the strip has its own
+// in Dashboard.nextmove.test.tsx.
+vi.mock("./NextMove", () => ({ NextMove: () => null }));
 import { closedPr, stubNotification } from "@/lib/fixtures";
 import { POLL_INTERVAL_OPTIONS, DEFAULT_POLL_INTERVAL_MS } from "@/lib/notify";
 
@@ -1469,18 +1474,15 @@ describe("Dashboard", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("draft stuck pr")).toBeInTheDocument();
 
-    // The section index repeats these names, so find the tile among the tiles
-    // rather than by a page-wide text match.
-    const tile = (label: string) =>
-      screen
-        .getAllByTestId("summary-tile")
-        .find((t) => t.textContent?.includes(label)) as HTMLElement;
-    expect(tile("Stuck on checks")).toHaveTextContent("2");
-    expect(tile("Waiting on you")).toHaveTextContent("2");
+    // Each column's big number is the count of the list right under it.
+    const count = (id: string) =>
+      document.getElementById(id)!.querySelector('[data-testid="count-badge"]')!;
+    expect(count("stuck-on-checks")).toHaveTextContent("2");
+    expect(count("waiting-on-your-review")).toHaveTextContent("2");
 
     fireEvent.click(draftButton(/no drafts/i));
-    await waitFor(() => expect(tile("Stuck on checks")).toHaveTextContent("1"));
-    expect(tile("Waiting on you")).toHaveTextContent("1");
+    await waitFor(() => expect(count("stuck-on-checks")).toHaveTextContent("1"));
+    expect(count("waiting-on-your-review")).toHaveTextContent("1");
   });
 
   it("persists the draft filter to localStorage", async () => {
@@ -1538,31 +1540,32 @@ describe("Dashboard", () => {
   });
 
   describe("prioritize-blocking", () => {
-    it("review list renders before the stuck list in the DOM", async () => {
+    it("puts the stuck column first: your own blocked work leads", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-      const html = document.body.innerHTML;
-      expect(html.indexOf("PRs waiting on your review")).toBeLessThan(
-        html.indexOf("PRs stuck on checks"),
-      );
+      const stuck = document.getElementById("stuck-on-checks")!;
+      const review = document.getElementById("waiting-on-your-review")!;
+      expect(
+        stuck.compareDocumentPosition(review) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
     });
 
-    it("review list count badge uses warning style when items are present", async () => {
+    it("marks the column with its accent dot", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("review pr")).toBeInTheDocument();
       const heading = screen.getByRole("heading", {
-        name: /prs waiting on your review/i,
+        name: /waiting on your review/i,
       });
-      const badge = heading
-        .closest("section")
-        ?.querySelector('[data-testid="count-badge"]');
-      expect(badge).toHaveClass("bg-warning");
+      const dot = heading.closest("section")?.querySelector(".bg-accent");
+      expect(dot).not.toBeNull();
     });
 
-    it("review row shows 'Blocking @author' with amber styling", async () => {
+    it("review row leads its meta line with the author it is blocking", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("review pr")).toBeInTheDocument();
-      expect(screen.getByText(/Blocking @alice/)).toBeInTheDocument();
+      const review = document.getElementById("waiting-on-your-review")!;
+      expect(within(review).getByText("@alice")).toBeInTheDocument();
+      expect(within(review).getByText("Teammates blocked until you review.")).toBeInTheDocument();
       expect(screen.queryByText(/Requested by/)).not.toBeInTheDocument();
     });
 
@@ -1767,16 +1770,14 @@ describe("Dashboard", () => {
     });
   });
 
-  it("stuck list count badge uses danger style when items are present", async () => {
+  it("marks the column with its danger dot", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     const heading = screen.getByRole("heading", {
-      name: /prs stuck on checks/i,
+      name: /stuck on checks/i,
     });
-    const badge = heading
-      .closest("section")
-      ?.querySelector('[data-testid="count-badge"]');
-    expect(badge).toHaveClass("bg-danger");
+    const dot = heading.closest("section")?.querySelector(".bg-danger");
+    expect(dot).not.toBeNull();
   });
 
   describe("refresh button", () => {
@@ -1853,7 +1854,7 @@ describe("Dashboard", () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       expect(
-        screen.getByRole("button", { name: /^flat$/i }),
+        screen.getByRole("button", { name: /^by queue$/i }),
       ).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /^by repo$/i }),
@@ -1863,7 +1864,7 @@ describe("Dashboard", () => {
     it('defaults to Flat: "Flat" is pressed, "By repo" is not', async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /^flat$/i })).toHaveAttribute(
+      expect(screen.getByRole("button", { name: /^by queue$/i })).toHaveAttribute(
         "aria-pressed",
         "true",
       );
@@ -1879,7 +1880,7 @@ describe("Dashboard", () => {
       expect(
         screen.getByRole("button", { name: /^by repo$/i }),
       ).toHaveAttribute("aria-pressed", "true");
-      expect(screen.getByRole("button", { name: /^flat$/i })).toHaveAttribute(
+      expect(screen.getByRole("button", { name: /^by queue$/i })).toHaveAttribute(
         "aria-pressed",
         "false",
       );
@@ -1889,8 +1890,8 @@ describe("Dashboard", () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
-      fireEvent.click(screen.getByRole("button", { name: /^flat$/i }));
-      expect(screen.getByRole("button", { name: /^flat$/i })).toHaveAttribute(
+      fireEvent.click(screen.getByRole("button", { name: /^by queue$/i }));
+      expect(screen.getByRole("button", { name: /^by queue$/i })).toHaveAttribute(
         "aria-pressed",
         "true",
       );
@@ -1912,7 +1913,7 @@ describe("Dashboard", () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
-      fireEvent.click(screen.getByRole("button", { name: /^flat$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^by queue$/i }));
       await waitFor(() =>
         expect(localStorage.getItem("prison.groupBy")).toBe("flat"),
       );
@@ -1925,7 +1926,7 @@ describe("Dashboard", () => {
       expect(
         screen.getByRole("button", { name: /^by repo$/i }),
       ).toHaveAttribute("aria-pressed", "true");
-      expect(screen.getByRole("button", { name: /^flat$/i })).toHaveAttribute(
+      expect(screen.getByRole("button", { name: /^by queue$/i })).toHaveAttribute(
         "aria-pressed",
         "false",
       );
@@ -1934,7 +1935,7 @@ describe("Dashboard", () => {
     it('defaults to "Flat" when no localStorage key is present', async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /^flat$/i })).toHaveAttribute(
+      expect(screen.getByRole("button", { name: /^by queue$/i })).toHaveAttribute(
         "aria-pressed",
         "true",
       );
@@ -2720,7 +2721,7 @@ describe("Dashboard", () => {
           .getByRole("heading", { name: /ready to merge/i })
           .closest("section")!;
         const stuckSection = screen
-          .getByRole("heading", { name: /PRs stuck on checks/i })
+          .getByRole("heading", { name: /Stuck on checks/i })
           .closest("section")!;
 
         // PR-A in ready, NOT in stuck
@@ -2848,7 +2849,7 @@ describe("Dashboard", () => {
       ).toBeInTheDocument();
     });
 
-    it("renders the ready list above the two columns", async () => {
+    it("puts the ready column after the review column", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("ready pr")).toBeInTheDocument();
       // Compare the sections themselves: the index above names them both, so a
@@ -2856,7 +2857,7 @@ describe("Dashboard", () => {
       const ready = document.getElementById("ready-to-merge")!;
       const review = document.getElementById("waiting-on-your-review")!;
       expect(
-        ready.compareDocumentPosition(review) &
+        review.compareDocumentPosition(ready) &
           Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
@@ -2886,14 +2887,12 @@ describe("Dashboard", () => {
       expect(await screen.findByText("Merge on GitHub")).toBeInTheDocument();
     });
 
-    it("ready list count badge uses success style when items are present", async () => {
+    it("marks the column with its success dot", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("ready pr")).toBeInTheDocument();
       const heading = screen.getByRole("heading", { name: /ready to merge/i });
-      const badge = heading
-        .closest("section")
-        ?.querySelector('[data-testid="count-badge"]');
-      expect(badge).toHaveClass("bg-success");
+      const dot = heading.closest("section")?.querySelector(".bg-success");
+      expect(dot).not.toBeNull();
     });
 
     it("ready PR with needsUpdate shows the 'Needs update' badge", async () => {
@@ -2944,7 +2943,7 @@ describe("Dashboard", () => {
   });
 });
 
-describe("Dashboard — comments awaiting your reply", () => {
+describe("Dashboard — awaiting your reply", () => {
   beforeEach(() => {
     localStorage.clear();
     global.fetch = okFetch();
@@ -3314,7 +3313,7 @@ describe("Dashboard — recently reviewed", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /recently reviewed/i }));
     expect(await screen.findByText("add retry backoff")).toBeInTheDocument();
-    expect(screen.getByText("Changes requested")).toBeInTheDocument();
+    expect(screen.getByText("You requested changes")).toBeInTheDocument();
   });
 
   it("persists the reviewed-section open state to localStorage", async () => {
@@ -4670,82 +4669,51 @@ describe("Dashboard — silent poll failure on the non-stuck lists", () => {
   });
 });
 
-// The section index is the whole of the answer to a board that no longer fits
-// on a screen. Plain anchors, so nothing but a matching id makes them work —
-// and an id lives in a different file from every href that names it.
-describe("Dashboard — jumping to a section", () => {
+// The tier board: four work columns side by side, most urgent kind first,
+// then the two histories below them. A column must never contain another
+// queue — a grid row would make one queue's growth push its neighbours down.
+describe("Dashboard — tier layout", () => {
   beforeEach(() => {
     global.fetch = okFetch();
   });
 
-  it("gives every in-page link a target that exists", async () => {
+  const SECTIONS = [
+    "stuck-on-checks",
+    "waiting-on-your-review",
+    "comments-awaiting-reply",
+    "ready-to-merge",
+    "recently-reviewed",
+    "recently-closed",
+  ];
+
+  it("orders the columns stuck, review, reply, ready, then the histories", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("ready pr")).toBeInTheDocument();
-
-    const hashLinks = Array.from(
-      document.querySelectorAll<HTMLAnchorElement>('a[href^="#"]'),
-    );
-    // Guard against the list going quietly empty and the loop below passing on
-    // nothing: one entry per section, and every section is in the index.
-    expect(hashLinks).toHaveLength(6);
-    // Every section, not most of them: the arrangement this replaced reached
-    // four of six, and the two it missed were the ones at the foot of the page.
-    expect(hashLinks.map((a) => a.getAttribute("href"))).toEqual([
-      "#ready-to-merge",
-      "#comments-awaiting-reply",
-      "#waiting-on-your-review",
-      "#stuck-on-checks",
-      "#recently-reviewed",
-      "#recently-closed",
-    ]);
-    for (const link of hashLinks) {
-      const id = link.getAttribute("href")!.slice(1);
-      const target = document.getElementById(id);
-      expect(target, `no element with id "${id}"`).not.toBeNull();
-      // -1 rather than absent: an anchor is only half a jump if the caret stays
-      // at the top of the page, and only a focusable target moves it.
-      expect(target).toHaveAttribute("tabindex", "-1");
+    const els = SECTIONS.map((id) => document.getElementById(id)!);
+    for (let i = 1; i < els.length; i++) {
+      expect(
+        els[i - 1].compareDocumentPosition(els[i]) & Node.DOCUMENT_POSITION_FOLLOWING,
+        `${SECTIONS[i - 1]} before ${SECTIONS[i]}`,
+      ).toBeTruthy();
     }
   });
-});
 
-// The board used to be rows: review beside stuck, then the two histories beside
-// each other. A grid row is as tall as its tallest cell, so expanding the stuck
-// list pushed "Recently reviewed" — a different set of PRs entirely — down with
-// it. Columns paired by subject remove the coupling; that they are also the
-// pairing the queries make (others' PRs vs your own) is what makes it right
-// rather than merely convenient.
-describe("Dashboard — column pairing", () => {
-  beforeEach(() => {
-    global.fetch = okFetch();
+  it("keeps every section focusable as a jump target", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("ready pr")).toBeInTheDocument();
+    for (const id of SECTIONS) {
+      expect(document.getElementById(id)).toHaveAttribute("tabindex", "-1");
+    }
   });
 
-  const nearestCommon = (a: HTMLElement, b: HTMLElement) => {
-    for (let n = a.parentElement; n; n = n.parentElement) {
-      if (n.contains(b)) return n;
+  it("never nests one queue inside another", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("ready pr")).toBeInTheDocument();
+    const queues = SECTIONS.slice(0, 4).map((id) => document.getElementById(id)!);
+    for (const a of queues) {
+      for (const b of queues) if (a !== b) expect(a.contains(b)).toBe(false);
     }
-    return null;
-  };
-
-  it.each([
-    ["waiting-on-your-review", "recently-reviewed", "stuck-on-checks"],
-    ["stuck-on-checks", "recently-closed", "waiting-on-your-review"],
-  ])(
-    "keeps %s and %s in a column that excludes %s",
-    async (queue, history, other) => {
-      render(<Dashboard orgs={ORGS} login="testuser" />);
-      expect(await screen.findByText("ready pr")).toBeInTheDocument();
-
-      const column = nearestCommon(
-        document.getElementById(queue)!,
-        document.getElementById(history)!,
-      );
-      expect(column).not.toBeNull();
-      // The column that holds both must not reach across to the other queue —
-      // that containment is what a shared grid row would reintroduce.
-      expect(column!.contains(document.getElementById(other))).toBe(false);
-    },
-  );
+  });
 });
 
 // One box over six lists. The rows are already on the page, so this filters
@@ -4832,18 +4800,16 @@ describe("Dashboard — searching the board", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("counts what is on screen, so the tiles and the index agree with it", async () => {
+  it("counts what is on screen, so each column agrees with its rows", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
 
     await search("stuck");
-    const tile = screen
-      .getAllByTestId("summary-tile")
-      .find((t) => t.textContent?.includes("Waiting on you")) as HTMLElement;
-    expect(tile).toHaveTextContent("0");
-    expect(
-      screen.getByRole("link", { name: /PRs waiting on your review/i }),
-    ).toHaveTextContent("0");
+    const count = (id: string) =>
+      document.getElementById(id)!.querySelector('[data-testid="count-badge"]')!;
+    expect(count("waiting-on-your-review")).toHaveTextContent("0");
+    expect(count("stuck-on-checks")).toHaveTextContent("1");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("1 thing wants you");
   });
 
   it("brings everything back on Escape", async () => {

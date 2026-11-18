@@ -95,19 +95,22 @@ export function Header({
   const nextMode = isDark ? "light" : "dark";
 
   return (
-    <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/80 px-6 py-3 backdrop-blur">
-      <div className="flex items-center gap-2">
+    <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
+      {/* Same column as the board under it, so the logo and the first card
+          share a left edge. The controls wrap rather than run off a phone. */}
+      <div className="mx-auto flex max-w-[1424px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-6 lg:px-8">
+      <div className="flex items-center gap-2.5">
         <span
           aria-hidden="true"
-          className="flex h-6 w-6 items-center justify-center rounded bg-accent font-mono text-sm font-bold text-background"
+          className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-[15px] font-bold text-background"
         >
           P
         </span>
-        <span className="text-lg font-bold tracking-tight text-foreground">
+        <span className="text-[17px] font-semibold tracking-[-0.01em] text-foreground">
           PRison
         </span>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
         <OrgSwitcher
           orgs={orgs}
           value={selectedOrg}
@@ -156,7 +159,7 @@ export function Header({
           type="button"
           aria-label="Settings"
           onClick={onOpenSettings}
-          className="cursor-pointer rounded-md border border-border bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="cursor-pointer rounded-[10px] border border-border bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <svg
             aria-hidden="true"
@@ -220,7 +223,7 @@ export function Header({
           type="button"
           aria-label={`Switch to ${themeLabel(theme)} ${modeLabel(theme, nextMode)}`}
           onClick={() => applyMode(nextMode)}
-          className="cursor-pointer rounded-md border border-border bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="cursor-pointer rounded-[10px] border border-border bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           {isDark ? (
             <svg
@@ -286,10 +289,11 @@ export function Header({
           ))}
         <button
           onClick={() => signOut()}
-          className="cursor-pointer rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="cursor-pointer rounded-[10px] border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           Sign Out
         </button>
+      </div>
       </div>
     </header>
   );

@@ -1,59 +1,34 @@
 # PRison Design System
 
-Design system generated with the **ui-ux-pro-max** skill
-(`.claude/skills/ui-ux-pro-max/`). Full recommendation saved at
-`design-system/prison/MASTER.md`. Style: **Data-Dense Dashboard (dark)** with a
-green "run" accent — a developer/ops aesthetic that fits a PR + CI tool.
+The board is the v2 "tiers" layout: a Next move strip, a toolbar, four work
+columns (stuck · review · reply · ready) and two history panels. The approved
+drawing lives in [`docs/design/board.html`](design/board.html). It is a static
+reference, and the `pixel-reviewer` agent compares the running app against it.
 
-## Palette (dark)
+How to change the look, and how token roles map onto the board, is written down
+in the project skill `.claude/skills/designing-prison-ui/SKILL.md`. Theme
+mechanics (families × modes, contrast rules) are in
+[`superpowers/specs/2026-08-10-theme-system-design.md`](superpowers/specs/2026-08-10-theme-system-design.md),
+and every palette is in `app/globals.css`, measured by `lib/theme.test.ts`.
 
-| Token | Hex | Usage |
-|-------|-----|-------|
-| Canvas | `#0f172a` (slate-900) | App background |
-| Surface | `#1e293b` (slate-800) | Cards, header |
-| Surface-2 | `#243043` | Hover / inputs |
-| Edge | `#334155` (slate-700) | Borders |
-| Ink | `#f8fafc` (slate-50) | Primary text |
-| Ink muted | `#94a3b8` (slate-400) | Labels, metadata |
-| Accent | `#22c55e` (green-500) | Primary CTA ("Open PR"), links, "run" |
+## Token roles on the board
 
-## Badge Colors (Age Buckets)
+| Token | Paints |
+|-------|--------|
+| `danger` | Stuck column, failing checks, NEXT MOVE badge |
+| `warning` | Reply column, pending checks, "Needs update" |
+| `success` | Ready column, approved verdicts |
+| `accent` | Review column, "Updated since", merged icon, logo |
+| `bg` / `surface` / `brd` | Ground, cards, hairlines |
+| `fg` / `muted` | Text and secondary text |
 
-Color-coded urgency with inset rings; `font-mono` + `tabular-nums`.
+## Typography and shape
 
-| Bucket | Classes |
-|--------|---------|
-| `fresh` (< 1 day) | `bg-green-500/15 text-green-400 ring-green-500/30` |
-| `warning` (1–3 days) | `bg-amber-500/15 text-amber-400 ring-amber-500/30` |
-| `urgent` (> 3 days) | `bg-red-500/15 text-red-400 ring-red-500/30` |
-
-## Font Pairing
-
-| Role | Family | Loaded via |
-|------|--------|-----------|
-| Sans (UI) | Fira Sans (400/500/600/700) | `next/font/google` in `app/layout.tsx` |
-| Mono (code, IDs, durations) | Fira Code | `next/font/google` |
-
-Exposed as `--font-fira-sans` / `--font-fira-code`, mapped to Tailwind's
-`--font-sans` / `--font-mono` in `app/globals.css`.
-
-## Spacing & motion
-
-- Tailwind default **4 px base unit**; section rhythm 8 / 12 / 32.
-- Transitions 150–300 ms; global `prefers-reduced-motion` clamp.
-
-## CSS Custom Properties
-
-Defined in `app/globals.css` under `@theme`:
-
-```css
---color-canvas: #0f172a;
---color-surface: #1e293b;
---color-surface-2: #243043;
---color-edge: #334155;
---color-ink: #f8fafc;
---color-ink-muted: #94a3b8;
---color-accent: #22c55e;
---font-sans: var(--font-fira-sans), ...;
---font-mono: var(--font-fira-code), ...;
-```
+- Each theme family brings its own sans and mono pair (loaded with `next/font`).
+  Mono is for repo coordinates, check names and ages.
+- Column count: 56 px bold, tight tracking. Column label: 12 px semibold caps.
+  Row title: 14 px medium.
+- Radii: 20 px for columns, panels and the Next move strip, 12 px for buttons,
+  pills fully round.
+- Touch targets ≥ 44 px. Transitions 150–300 ms, with a global
+  `prefers-reduced-motion` clamp.

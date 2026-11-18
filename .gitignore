@@ -49,6 +49,10 @@ next-env.d.ts
 !.claude/skills/ui-ux-pro-max/
 !.claude/skills/create-readme/
 !.claude/skills/refresh-screenshot/
+!.claude/skills/designing-prison-ui/
+!.claude/agents/
+.claude/agents/*
+!.claude/agents/pixel-reviewer.md
 
 # Python bytecode (vendored design skill)
 __pycache__/

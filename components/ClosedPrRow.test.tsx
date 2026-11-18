@@ -35,18 +35,18 @@ describe("ClosedPrRow", () => {
 
   it("shows the repo and number", () => {
     render(<ClosedPrRow pr={mergedPr} now={now} />);
-    expect(screen.getByText("org/repo #42")).toBeInTheDocument();
+    expect(screen.getByText(/org\/repo #42/)).toBeInTheDocument();
   });
 
-  it("shows a Merged badge and 'merged Xd ago' for a merged PR", () => {
+  it("shows Merged and how long ago for a merged PR", () => {
     render(<ClosedPrRow pr={mergedPr} now={now} />);
     expect(screen.getByText("Merged")).toBeInTheDocument();
-    expect(screen.getByText("merged 2d ago")).toBeInTheDocument();
+    expect(screen.getByText("2d ago")).toBeInTheDocument();
   });
 
-  it("shows a Closed badge and 'closed Xd ago' for an unmerged PR", () => {
+  it("says it closed without merging, and how long ago for an unmerged PR", () => {
     render(<ClosedPrRow pr={closedPr} now={now} />);
-    expect(screen.getByText("Closed")).toBeInTheDocument();
-    expect(screen.getByText("closed 3d ago")).toBeInTheDocument();
+    expect(screen.getByText("Closed without merge")).toBeInTheDocument();
+    expect(screen.getByText("3d ago")).toBeInTheDocument();
   });
 });

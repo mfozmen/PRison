@@ -25,7 +25,12 @@
  * previews in Settings work: a small box stamped with data-theme/data-mode
  * resolves that palette's variables inside itself, so a preview is the palette
  * rather than a hand-copied picture of it. Without this, a preview of `default`
- * would inherit whatever family the page is currently on. --- */
+ * would inherit whatever family the page is currently on.
+ *
+ * The default accent is blue in both modes, not the green it used to share
+ * with success: the tier board paints the Review column with accent and the
+ * Ready column with success, and two identical dots read as one queue.
+ * (Comments stay outside the palette blocks: lib/theme.test.ts parses them.) --- */
 :root,
 [data-theme="default"][data-mode="light"] {
   color-scheme: light;
@@ -34,7 +39,7 @@
   --fg: #0f172a;
   --muted: #475569;
   --brd: #dce3ec;
-  --accent: #117e39;
+  --accent: #1d4ed8;
   --danger: #d52222;
   --warning: #b25209;
   --success: #117e39;
@@ -59,7 +64,7 @@
   --fg: #f1f5f9;
   --muted: #94a3b8;
   --brd: #334155;
-  --accent: #22c55e;
+  --accent: #60a5fa;
   --danger: #f87171;
   --warning: #fbbf24;
   --success: #4ade80;
@@ -342,6 +347,191 @@
   --danger: #ff8a78;
   --warning: #e0a94e;
   --success: #63c98e;
+  --hover-brightness: 1.1;
+}
+
+/* --- The palette families. Each starts from a palette on colorpalettes.net and,
+ * unlike the families above, lets it paint the ground as well as the accent:
+ * a neutral grey ground under a new accent is the same theme again. Where a
+ * palette colour collides with a status meaning, the status colour moves and
+ * the comment says where. --- */
+
+/* --- Lilac (colorpalettes.net #4714, #4493). A violet-black night with lilac
+ * as the accent; raspberry, honey and mint are the three statuses because all
+ * three sit well away from purple. --- */
+[data-theme="lilac"] {
+  --fsans: var(--font-lexend), ui-sans-serif, system-ui, sans-serif;
+  --fmono: var(--font-dm-mono), ui-monospace, monospace;
+}
+
+[data-theme="lilac"][data-mode="light"] {
+  color-scheme: light;
+  --bg: #f1ecf6;
+  --surface: #fbf8fe;
+  --fg: #1d1530;
+  --muted: #5b4f72;
+  --brd: #ddd3ea;
+  --accent: #724c9d;
+  --danger: #b0234f;
+  --warning: #8a5200;
+  --success: #1e7a5a;
+  --hover-brightness: 0.95;
+}
+
+[data-theme="lilac"][data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #090712;
+  --surface: #151024;
+  --fg: #eee6f7;
+  --muted: #a99bc0;
+  --brd: #2c2442;
+  --accent: #c79acd;
+  --danger: #ff7a9c;
+  --warning: #f2c46d;
+  --success: #7fd9b0;
+  --hover-brightness: 1.1;
+}
+
+/* --- Olive (#4816, #4408). Dark olive and mustard on greige linen. The
+ * palette's mustard becomes warning, lime-olive the accent, and success moves
+ * to teal so it does not blur into the olive ground. --- */
+[data-theme="olive"] {
+  --fsans: var(--font-work-sans), ui-sans-serif, system-ui, sans-serif;
+  --fmono: var(--font-courier-prime), ui-monospace, monospace;
+}
+
+[data-theme="olive"][data-mode="light"] {
+  color-scheme: light;
+  --bg: #e8e4dd;
+  --surface: #f6f3ee;
+  --fg: #1f2404;
+  --muted: #555942;
+  --brd: #d3cdc2;
+  --accent: #4a5906;
+  --danger: #a3361c;
+  --warning: #855409;
+  --success: #1c6760;
+  --hover-brightness: 0.95;
+}
+
+[data-theme="olive"][data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #161a04;
+  --surface: #222807;
+  --fg: #ecebd9;
+  --muted: #a6a88a;
+  --brd: #353d10;
+  --accent: #c3d45a;
+  --danger: #ff7f5c;
+  --warning: #e19d29;
+  --success: #6fcbb8;
+  --hover-brightness: 1.1;
+}
+
+/* --- Acid Pop (#4306). Cobalt, acid green, baby pink, hot pink: the one
+ * deliberately loud family. A pink sheet with cobalt ink by day, navy with a
+ * hot-pink accent and acid-green success by night. --- */
+[data-theme="acid"] {
+  --fsans: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --fmono: var(--font-space-mono), ui-monospace, monospace;
+}
+
+[data-theme="acid"][data-mode="light"] {
+  color-scheme: light;
+  --bg: #fff0f4;
+  --surface: #ffffff;
+  --fg: #0b1e3f;
+  --muted: #4c5672;
+  --brd: #f5d3de;
+  --accent: #025393;
+  --danger: #c4153a;
+  --warning: #855800;
+  --success: #2a7000;
+  --hover-brightness: 0.95;
+}
+
+[data-theme="acid"][data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #04142b;
+  --surface: #0a2142;
+  --fg: #f2f6ff;
+  --muted: #9cb0d0;
+  --brd: #1a3460;
+  --accent: #fd56dc;
+  --danger: #ff6b4a;
+  --warning: #ffd23f;
+  --success: #68ef00;
+  --hover-brightness: 1.1;
+}
+
+/* --- Terracotta (#4510, #4442). Peach plaster and fired clay. Terracotta is
+ * the accent, so danger turns to a cooler wine (light) and pink-red (dark) to
+ * stay distinct from it. --- */
+[data-theme="terracotta"] {
+  --fsans: var(--font-nunito-sans), ui-sans-serif, system-ui, sans-serif;
+  --fmono: var(--font-overpass-mono), ui-monospace, monospace;
+}
+
+[data-theme="terracotta"][data-mode="light"] {
+  color-scheme: light;
+  --bg: #f7e6dc;
+  --surface: #fff6f0;
+  --fg: #2a1712;
+  --muted: #6b4a3e;
+  --brd: #ebcdbd;
+  --accent: #a14427;
+  --danger: #7a1f3d;
+  --warning: #7d5e10;
+  --success: #3a6440;
+  --hover-brightness: 0.95;
+}
+
+[data-theme="terracotta"][data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #1c1715;
+  --surface: #2a221e;
+  --fg: #f7e9e0;
+  --muted: #bfa595;
+  --brd: #3f332d;
+  --accent: #e78f63;
+  --danger: #ff6f91;
+  --warning: #e8c15a;
+  --success: #8cc69a;
+  --hover-brightness: 1.1;
+}
+
+/* --- Moss & Rose (#4595, #4391). Deep blue-green moss with a blush accent:
+ * a forest floor by night, sage paper with a rose accent by day. --- */
+[data-theme="moss"] {
+  --fsans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  --fmono: var(--font-red-hat-mono), ui-monospace, monospace;
+}
+
+[data-theme="moss"][data-mode="light"] {
+  color-scheme: light;
+  --bg: #eef1ec;
+  --surface: #fbfcfa;
+  --fg: #14231f;
+  --muted: #4d5e58;
+  --brd: #d5ded7;
+  --accent: #a23f64;
+  --danger: #b3361a;
+  --warning: #805a0f;
+  --success: #2c6e5a;
+  --hover-brightness: 0.95;
+}
+
+[data-theme="moss"][data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #0f1c19;
+  --surface: #182a26;
+  --fg: #e6efeb;
+  --muted: #9db5ad;
+  --brd: #26403a;
+  --accent: #f5b8b6;
+  --danger: #ff8166;
+  --warning: #e8c46a;
+  --success: #7fd3b0;
   --hover-brightness: 1.1;
 }
 

@@ -18,11 +18,11 @@ export interface CheckChipProps {
 
 const TONE = {
   danger:
-    "bg-danger/10 text-danger ring-1 ring-inset ring-danger/30 rounded px-1.5 py-0.5 text-xs font-medium",
+    "bg-danger/[0.12] text-danger rounded-md px-2 py-0.5 font-mono text-xs font-medium",
   warning:
-    "bg-warning/10 text-warning ring-1 ring-inset ring-warning/30 rounded px-1.5 py-0.5 text-xs font-medium",
+    "bg-warning/[0.12] text-warning rounded-md px-2 py-0.5 font-mono text-xs font-medium",
   muted:
-    "rounded border border-dashed border-muted/60 px-1.5 py-0.5 text-xs font-medium text-muted",
+    "rounded-md border border-dashed border-muted/60 px-2 py-0.5 font-mono text-xs font-medium text-muted",
 } as const;
 
 /**

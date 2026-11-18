@@ -1,0 +1,229 @@
+<!doctype html>
+<!-- KNOWN, ACCEPTED DEVIATIONS — the pixel reviewer reports these as notes, not findings:
+     1. Header: the app keeps its own controls (org select, "All repositories" filter, theme
+        toggle, version link, Sign out). The board search lives in the toolbar, not the header.
+     2. Rows keep their functional extras: the suggestion link under each row ("Re-run failed
+        checks", "Review to unblock …"), check chips with their ignore toggle, source/path chips
+        on replies, and a Draft badge before the title.
+     3. Every column header has a fold chevron and is a 44 px button (the fold is a feature).
+     4. The History panels start folded; this drawing shows them open.
+     5. No footer: the version lives in the header.
+     6. Ages are coloured by urgency (muted / warning / danger) inline on the meta line.
+-->
+<!-- Approved reference for the v2 "tiers" board (demo-board data, Default dark).
+     Frozen from the Design canvas; the pixel-reviewer agent compares the app to it.
+     Static on purpose: no runtime, no script. Do not edit to match the app — edit
+     it only when the design itself changes, and say so in the PR. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRison · approved board (reference)</title>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600;700&amp;family=Fira+Code:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0f172a}
+a{color:#f1f5f9;text-decoration:none}a:hover{color:#ffffff;text-decoration:underline}
+</style>
+</head>
+<body>
+<div style="min-height: 1500px; background: #0f172a; color: #f1f5f9; font-family: 'Fira Sans', system-ui, sans-serif;">
+
+<header style="border-bottom: 1px solid #334155;">
+<div style="max-width: 1360px; margin: 0 auto; padding: 14px 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px;">
+<div style="display: flex; align-items: center; gap: 10px; flex-grow: 1;">
+<div style="width: 28px; height: 28px; border-radius: 8px; background: #60a5fa; color: #0f172a; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px;">P</div>
+<span style="font-weight: 600; font-size: 17px; letter-spacing: -0.01em;">PRison</span>
+</div>
+<button style="height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #334155; background: #1e293b; color: #f1f5f9; font: 500 14px 'Fira Sans', sans-serif; display: flex; align-items: center; gap: 8px; cursor: pointer;">All organizations <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+<label style="display: flex; align-items: center; gap: 8px; height: 40px; width: 280px; padding: 0 12px; border-radius: 10px; border: 1px solid #334155; background: #1e293b; color: #94a3b8; box-sizing: border-box;">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+<span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Search pull requests</span>
+<input placeholder="Search title, repo, author, check…" style="flex-grow: 1; min-width: 0; background: transparent; border: 0; outline: none; color: #f1f5f9; font: 14px 'Fira Sans', sans-serif;">
+<span style="font: 12px 'Fira Code', monospace; color: #94a3b8; border: 1px solid #334155; border-radius: 6px; padding: 1px 6px;">/</span>
+</label>
+<button aria-label="Activity" style="width: 40px; height: 40px; border-radius: 10px; border: 1px solid #334155; background: #1e293b; color: #f1f5f9; display: flex; align-items: center; justify-content: center; cursor: pointer;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg></button>
+<button aria-label="Settings" style="width: 40px; height: 40px; border-radius: 10px; border: 1px solid #334155; background: #1e293b; color: #f1f5f9; display: flex; align-items: center; justify-content: center; cursor: pointer;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"></path><circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle></svg></button>
+<div style="display: flex; align-items: center; gap: 8px; padding-left: 8px; border-left: 1px solid #334155;">
+<div style="width: 32px; height: 32px; border-radius: 50%; background: #334155; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600;">oc</div>
+<span style="font-size: 14px; color: #94a3b8;">octocat</span>
+</div>
+</div>
+</header>
+
+<main style="max-width: 1360px; margin: 0 auto; padding: 32px 32px 56px; display: flex; flex-direction: column; gap: 28px;">
+
+<section aria-label="Next move" style="background: color-mix(in srgb, #f87171 4%, #1e293b); border: 1px solid #f87171; border-radius: 20px; padding: 20px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 20px; box-shadow: 0 0 0 4px rgba(248,113,113,0.10), 0 24px 64px -20px rgba(248,113,113,0.35);">
+<span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #0f172a; background: #f87171; border-radius: 999px; padding: 5px 10px;">NEXT MOVE</span>
+<div style="flex: 999 1 420px; min-width: 0;">
+<a href="#" style="font-size: 18px; font-weight: 600; letter-spacing: -0.01em;">Fix the timezone drift in scheduled reports</a>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; font: 12px 'Fira Code', monospace; color: #94a3b8;">initech/worker #13 · waited <span style="color: #f87171; font-weight: 500;">4d</span> · <span style="color: #f87171;">✗ lint</span><span style="color: #f87171;">✗ typecheck</span><span style="font-family: 'Fira Sans', sans-serif; color: #f87171;">Changes requested</span></div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<button style="height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: #f1f5f9; color: #0f172a; font: 600 14px 'Fira Sans', sans-serif; cursor: pointer;">Re-run failed checks</button>
+<button style="height: 44px; padding: 0 16px; border-radius: 12px; border: 0; background: transparent; color: #94a3b8; font: 500 14px 'Fira Sans', sans-serif; cursor: pointer;">Skip →</button>
+</div>
+</section>
+
+<section style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+<h1 style="margin: 0 12px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em;">12 things want you</h1>
+<div style="display: flex; padding: 4px; border-radius: 999px; background: #1e293b; border: 1px solid #334155;">
+<button aria-pressed="true" style="height: 36px; padding: 0 16px; border-radius: 999px; border: 0; background: #f1f5f9; color: #0f172a; font: 600 14px 'Fira Sans', sans-serif; cursor: pointer;">By queue</button>
+<button aria-pressed="false" style="height: 36px; padding: 0 16px; border-radius: 999px; border: 0; background: transparent; color: #94a3b8; font: 500 14px 'Fira Sans', sans-serif; cursor: pointer;">By repo</button>
+<button aria-pressed="false" style="height: 36px; padding: 0 16px; border-radius: 999px; border: 0; background: transparent; color: #94a3b8; font: 500 14px 'Fira Sans', sans-serif; cursor: pointer;">By check</button>
+</div>
+<div style="display: flex; padding: 4px; border-radius: 999px; background: #1e293b; border: 1px solid #334155;">
+<button aria-pressed="true" style="height: 36px; padding: 0 16px; border-radius: 999px; border: 0; background: #f1f5f9; color: #0f172a; font: 600 14px 'Fira Sans', sans-serif; cursor: pointer;">All</button>
+<button aria-pressed="false" style="height: 36px; padding: 0 16px; border-radius: 999px; border: 0; background: transparent; color: #94a3b8; font: 500 14px 'Fira Sans', sans-serif; cursor: pointer;">Only drafts</button>
+<button aria-pressed="false" style="height: 36px; padding: 0 16px; border-radius: 999px; border: 0; background: transparent; color: #94a3b8; font: 500 14px 'Fira Sans', sans-serif; cursor: pointer;">No drafts</button>
+</div>
+<span style="flex-grow: 1;"></span>
+<span style="font-size: 13px; color: #94a3b8;">Updated just now</span>
+<button style="height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid #334155; background: #1e293b; color: #f1f5f9; font: 600 14px 'Fira Sans', sans-serif; display: flex; align-items: center; gap: 8px; cursor: pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"></path><path d="M21 3v5h-5"></path></svg>Refresh</button>
+</section>
+
+<section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; align-items: start;">
+
+<article style="background: color-mix(in srgb, #f87171 4%, #1e293b); border: 1px solid rgba(248,113,113,0.4); border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: #f87171;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #f87171;"></span>STUCK ON CHECKS</div>
+<div style="display: flex; align-items: baseline; gap: 8px;"><span style="font-size: 56px; line-height: 1; font-weight: 700; letter-spacing: -0.04em;">4</span><span style="font-size: 14px; color: #94a3b8;">PRs · oldest 4d</span></div>
+<p style="margin: 0; font-size: 14px; line-height: 1.5; color: #94a3b8;">Your PRs that CI or reviewers are holding back.</p>
+<ul style="list-style: none; margin: 0; padding: 0;">
+<li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid #334155;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2.5" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><path d="M18 6 6 18M6 6l12 12"></path></svg><div style="min-width: 0;"><a href="#" style="font-size: 14px; font-weight: 500; line-height: 1.4;">Fix the timezone drift in scheduled reports</a><div style="font: 12px/1.5 'Fira Code', monospace; color: #94a3b8; margin-top: 2px;">initech/worker #13 · 4d <span style="font-family: 'Fira Sans', sans-serif; font-size: 11px; font-weight: 600; color: #f87171; margin-left: 4px;">↑ next move</span></div></div></li>
+<li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid #334155;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2.5" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><path d="M18 6 6 18M6 6l12 12"></path></svg><div style="min-width: 0;"><a href="#" style="font-size: 14px; font-weight: 500; line-height: 1.4;">Retry the payment webhook instead of dropping it</a><div style="font: 12px/1.5 'Fira Code', monospace; color: #94a3b8; margin-top: 2px;">acme/api #482 · 1d</div><div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;"><span style="font-size: 12px; font-weight: 500; color: #f87171; background: rgba(248,113,113,0.12); border-radius: 6px; padding: 2px 8px;">Merge conflict</span><span style="font: 500 12px 'Fira Code', monospace; color: #f87171; background: rgba(248,113,113,0.12); border-radius: 6px; padding: 2px 8px;">integration-tests</span></div><a href="#" style="display: inline-block; margin-top: 8px; font-size: 13px; color: #94a3b8; text-decoration: underline;">Resolve conflicts</a></div></li>
+<li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid #334155;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg><div style="min-width: 0;"><a href="#" style="font-size: 14px; font-weight: 500; line-height: 1.4;">Cache the org lookup for the duration of a request</a><div style="font: 12px/1.5 'Fira Code', monospace; color: #94a3b8; margin-top: 2px;">globex/backend #97 · 5h · e2e pending</div></div></li>
+<li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid #334155;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><circle cx="12" cy="12" r="9"></circle></svg><div style="min-width: 0;"><a href="#" style="font-size: 14px; font-weight: 500; line-height: 1.4;">Split the importer into a queue worker</a><div style="font: 12px/1.5 'Fira Code', monospace; color: #94a3b8; margin-top: 2px;">acme/api #486 · 2h · draft</div></div></li>
+</ul>
+</article>
+
+<article style="background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: #94a3b8;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #60a5fa;"></span>WAITING ON YOUR REVIEW</div>
+<div style="display: flex; align-items: baseline; gap: 8px;"><span style="font-size: 56px; line-height: 1; font-weight: 700; letter-spacing: -0.04em;">3</span><span style="font-size: 14px; color: #94a3b8;">PRs · oldest 2d</span></div>
+<p style="margin: 0; font-size: 14px; line-height: 1.5; color: #94a3b8;">Teammates blocked until you review.</p>
+<ul style="list-style: none; margin: 0; padding: 0;">
+<li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid #334155;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><circle cx="12" cy="12" r="3"></circle><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"></path></svg><div style="min-width: 0;"><a href="#" style="font-size: 14px; font-weight: 500; line-height: 1.4;">Add rate limiting to the public search endpoint</a><div style="font: 12px/1.5 'Fira Code', monospace; color: #94a3b8; margin-top: 2px;">@alice · acme/api #479 · 2d</div></div></li>
+<li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid #334155;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><circle cx="12" cy="12" r="3"></circle><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"></path></svg><div style="min-width: 0;"><a href="#" style="font-size: 14px; font-weight: 500; line-height: 1.4;">Move the CSV export off the request thread</a><div style="font: 12px/1.5 'Fira Code', monospace; color: #94a3b8; margin-top: 2px;">@bob · widgets-inc/frontend #204 · 7h</div></div></li>
+<li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid #334155;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><circle cx="12" cy="12" r="3"></circle><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"></path></svg><div style="min-width: 0;"><a href="#" style="font-size: 14px; font-weight: 500; line-height: 1.4;"><span style="font-size: 11px; font-weight: 600; color: #94a3b8; border: 1px solid #334155; border-radius: 4px; padding: 1px 5px; margin-right: 6px;">DRAFT</span>Spike: replace the polling loop with webhooks</a><div style="font: 12px/1.5 'Fira Code', monospace; color: #94a3b8; margin-top: 2px;">@carol · globex/backend #101 · 1h</div></div></li>
+</ul>
+</article>
+
+<article style="background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: #94a3b8;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #fbbf24;"></span>AWAITING YOUR REPLY</div>
+<div style="display: flex; align-items: baseline; gap: 8px;"><span style="font-size: 56px; line-height: 1; font-weight: 700; letter-spacing: -0.04em;">3</span><span style="font-size: 14px; color: #94a3b8;">threads · oldest 6h</span></div>
+<p style="margin: 0; font-size: 14px; line-height: 1.5; color: #94a3b8;">Someone asked you something. Answer or mark seen.</p>
+<ul style="list-style: none; margin: 0; padding: 0;">
+<li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid #334155;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg><div style="min-width: 0; flex-grow: 1;"><a href="#" style="font-size: 14px; font-weight: 500; line-height: 1.4;">“Does this retry on a 5xx only, or on any non-2xx?”</a><div style="font: 12px/1.5 'Fira Code', monospace; color: #94a3b8; margin-top: 2px;">dave · acme/api #482 · 6h</div></div><button aria-label="Mark as seen" style="flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; border: 1px solid #334155; background: transparent; color: #94a3b8; display: flex; align-items: center; justify-content: center; cursor: pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"></path></svg></button></li>
+<li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid #334155;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg><div style="min-width: 0; flex-grow: 1;"><a href="#" style="font-size: 14px; font-weight: 500; line-height: 1.4;">“The rollback section should say who may run it.”</a><div style="font: 12px/1.5 'Fira Code', monospace; color: #94a3b8; margin-top: 2px;">carol · acme/web #58 · 3h</div></div><button aria-label="Mark as seen" style="flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; border: 1px solid #334155; background: transparent; color: #94a3b8; display: flex; align-items: center; justify-content: center; cursor: pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"></path></svg></button></li>
+<li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid #334155;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg><div style="min-width: 0; flex-grow: 1;"><a href="#" style="font-size: 14px; font-weight: 500; line-height: 1.4;">“Moved it to the worker as you suggested.”</a><div style="font: 12px/1.5 'Fira Code', monospace; color: #94a3b8; margin-top: 2px;">bob · widgets-inc/frontend #204 · 2h</div></div><button aria-label="Mark as seen" style="flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; border: 1px solid #334155; background: transparent; color: #94a3b8; display: flex; align-items: center; justify-content: center; cursor: pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"></path></svg></button></li>
+</ul>
+</article>
+
+<article style="background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: #94a3b8;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #4ade80;"></span>READY TO MERGE</div>
+<div style="display: flex; align-items: baseline; gap: 8px;"><span style="font-size: 56px; line-height: 1; font-weight: 700; letter-spacing: -0.04em;">2</span><span style="font-size: 14px; color: #94a3b8;">PRs · oldest 20h</span></div>
+<p style="margin: 0; font-size: 14px; line-height: 1.5; color: #94a3b8;">Approved, green, mergeable. One click each.</p>
+<ul style="list-style: none; margin: 0; padding: 0;">
+<li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid #334155;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><path d="M20 6 9 17l-5-5"></path></svg><div style="min-width: 0;"><a href="#" style="font-size: 14px; font-weight: 500; line-height: 1.4;">Document the deploy rollback steps</a><div style="font: 12px/1.5 'Fira Code', monospace; color: #94a3b8; margin-top: 2px;">acme/web #58 · 20h</div><a href="#" style="display: inline-block; margin-top: 8px; font-size: 13px; color: #94a3b8; text-decoration: underline;">Merge on GitHub</a></div></li>
+<li style="display: flex; gap: 10px; padding: 12px 0; border-top: 1px solid #334155;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" aria-hidden="true" style="flex-shrink: 0; margin-top: 1px;"><path d="M20 6 9 17l-5-5"></path></svg><div style="min-width: 0;"><a href="#" style="font-size: 14px; font-weight: 500; line-height: 1.4;">Bump the client library to 3.2</a><div style="font: 12px/1.5 'Fira Code', monospace; color: #94a3b8; margin-top: 2px;">initech/worker #15 · 4h</div><span style="display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 500; color: #fbbf24; background: rgba(251,191,36,0.1); border-radius: 6px; padding: 2px 8px;">Needs update</span></div></li>
+</ul>
+</article>
+
+</section>
+
+<section aria-label="History" style="display: flex; flex-direction: column; gap: 16px; padding-top: 12px;">
+<div style="display: flex; align-items: center; gap: 12px;">
+<h2 style="margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.1em; color: #94a3b8;">HISTORY</h2>
+<span style="flex-grow: 1; height: 1px; background: #334155;"></span>
+<span style="font-size: 13px; color: #94a3b8;">Looking back, not work to do</span>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; align-items: start;">
+
+<div style="border: 1px solid #334155; border-radius: 20px; background: color-mix(in srgb, #1e293b 45%, #0f172a);">
+<button aria-expanded="true" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 18px 24px; background: transparent; border: 0; border-bottom: 1px solid #334155; color: #f1f5f9; font: 600 15px 'Fira Sans', sans-serif; text-align: left; cursor: pointer;">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" aria-hidden="true"><path d="m18 15-6-6-6 6"></path></svg>
+Recently reviewed
+<span style="font-size: 12px; font-weight: 500; color: #94a3b8; background: #334155; border-radius: 999px; padding: 1px 8px;">2</span>
+<span style="flex-grow: 1;"></span>
+<span style="font-size: 12px; font-weight: 600; color: #60a5fa;">1 updated since</span>
+</button>
+<ul style="list-style: none; margin: 0; padding: 4px 24px 8px;">
+<li style="display: flex; gap: 14px; align-items: flex-start; padding: 16px 0; border-bottom: 1px solid #334155;">
+<div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px; background: rgba(248,113,113,0.10); display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg></div>
+<div style="flex-grow: 1; min-width: 0;">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;"><a href="#" style="font-size: 14px; font-weight: 500;">Normalise the webhook signature check ↗</a></div>
+<div style="font: 12px/1.6 'Fira Code', monospace; color: #94a3b8; margin-top: 2px;">globex/backend #94 · alice</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; color: #94a3b8;">
+<span style="font-size: 12px; font-weight: 500; color: #f87171; background: rgba(248,113,113,0.10); border-radius: 6px; padding: 2px 8px;">You requested changes</span>
+<span>1d ago</span>
+</div>
+</div>
+<div style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #0f172a; background: #60a5fa; border-radius: 999px; padding: 3px 10px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"></path></svg>Updated since</span>
+<a href="#" style="font-size: 13px; color: #60a5fa; text-decoration: underline;">See new commits</a>
+</div>
+</li>
+<li style="display: flex; gap: 14px; align-items: flex-start; padding: 16px 0;">
+<div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px; background: rgba(74,222,128,0.10); display: flex; align-items: center; justify-content: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></div>
+<div style="flex-grow: 1; min-width: 0;">
+<a href="#" style="font-size: 14px; font-weight: 500; color: #cbd5e1;">Add a health endpoint to the worker ↗</a>
+<div style="font: 12px/1.6 'Fira Code', monospace; color: #94a3b8; margin-top: 2px;">widgets-inc/frontend #198 · dave</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; color: #94a3b8;">
+<span style="font-size: 12px; font-weight: 500; color: #4ade80; background: rgba(74,222,128,0.10); border-radius: 6px; padding: 2px 8px;">You approved</span>
+<span>3d ago</span>
+</div>
+</div>
+<span style="flex-shrink: 0; font-size: 12px; color: #94a3b8;">No changes since</span>
+</li>
+</ul>
+</div>
+
+<div style="border: 1px solid #334155; border-radius: 20px; background: color-mix(in srgb, #1e293b 45%, #0f172a);">
+<button aria-expanded="true" style="width: 100%; display: flex; align-items: center; gap: 10px; padding: 18px 24px; background: transparent; border: 0; border-bottom: 1px solid #334155; color: #f1f5f9; font: 600 15px 'Fira Sans', sans-serif; text-align: left; cursor: pointer;">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" aria-hidden="true"><path d="m18 15-6-6-6 6"></path></svg>
+Recently merged / closed
+<span style="font-size: 12px; font-weight: 500; color: #94a3b8; background: #334155; border-radius: 999px; padding: 1px 8px;">3</span>
+<span style="flex-grow: 1;"></span>
+<span style="font-size: 12px; color: #94a3b8;">2 merged · 1 closed</span>
+</button>
+<ol style="list-style: none; margin: 0; padding: 12px 24px 12px;">
+<li style="display: flex; gap: 14px; position: relative; padding: 8px 0 16px;">
+<div style="display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 28px;">
+<div style="width: 28px; height: 28px; border-radius: 50%; background: rgba(96,165,250,0.15); display: flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2.2" aria-hidden="true"><circle cx="6" cy="6" r="2.5"></circle><circle cx="6" cy="18" r="2.5"></circle><circle cx="18" cy="12" r="2.5"></circle><path d="M6 8.5v7M8.3 7.2C12 9 15 10 15.6 11"></path></svg></div>
+<span style="flex-grow: 1; width: 1px; background: #334155; margin-top: 6px;"></span>
+</div>
+<div style="flex-grow: 1; min-width: 0; padding-top: 3px;">
+<div style="display: flex; justify-content: space-between; gap: 12px;"><a href="#" style="font-size: 14px; font-weight: 500;">Drop the legacy exporter ↗</a><span style="flex-shrink: 0; font-size: 13px; color: #94a3b8;">1d ago</span></div>
+<div style="font: 12px/1.6 'Fira Code', monospace; color: #94a3b8; margin-top: 2px;">acme/api #470 · <span style="color: #60a5fa; font-family: 'Fira Sans', sans-serif; font-weight: 500;">Merged</span></div>
+</div>
+</li>
+<li style="display: flex; gap: 14px; padding: 0 0 16px;">
+<div style="display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 28px;">
+<div style="width: 28px; height: 28px; border-radius: 50%; background: #334155; display: flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.4" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></div>
+<span style="flex-grow: 1; width: 1px; background: #334155; margin-top: 6px;"></span>
+</div>
+<div style="flex-grow: 1; min-width: 0; padding-top: 3px;">
+<div style="display: flex; justify-content: space-between; gap: 12px;"><a href="#" style="font-size: 14px; font-weight: 500; color: #cbd5e1;">Try a shared cache for the report builder ↗</a><span style="flex-shrink: 0; font-size: 13px; color: #94a3b8;">2d ago</span></div>
+<div style="font: 12px/1.6 'Fira Code', monospace; color: #94a3b8; margin-top: 2px;">initech/worker #11 · <span style="font-family: 'Fira Sans', sans-serif; font-weight: 500;">Closed without merge</span></div>
+</div>
+</li>
+<li style="display: flex; gap: 14px; padding: 0 0 4px;">
+<div style="display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 28px;">
+<div style="width: 28px; height: 28px; border-radius: 50%; background: rgba(96,165,250,0.15); display: flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2.2" aria-hidden="true"><circle cx="6" cy="6" r="2.5"></circle><circle cx="6" cy="18" r="2.5"></circle><circle cx="18" cy="12" r="2.5"></circle><path d="M6 8.5v7M8.3 7.2C12 9 15 10 15.6 11"></path></svg></div>
+</div>
+<div style="flex-grow: 1; min-width: 0; padding-top: 3px;">
+<div style="display: flex; justify-content: space-between; gap: 12px;"><a href="#" style="font-size: 14px; font-weight: 500;">Pin the CI runner image ↗</a><span style="flex-shrink: 0; font-size: 13px; color: #94a3b8;">3d ago</span></div>
+<div style="font: 12px/1.6 'Fira Code', monospace; color: #94a3b8; margin-top: 2px;">acme/web #55 · <span style="color: #60a5fa; font-family: 'Fira Sans', sans-serif; font-weight: 500;">Merged</span></div>
+</div>
+</li>
+</ol>
+</div>
+
+</div>
+</section>
+
+<footer style="display: flex; justify-content: flex-end; font-size: 13px; color: #94a3b8;">v1.29.0</footer>
+
+</main>
+</div>
+</body>
+</html>

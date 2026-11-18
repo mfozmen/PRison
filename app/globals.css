@@ -521,6 +521,44 @@
   --hover-brightness: 0.95;
 }
 
+/* --- Bordeaux (#4748). Dark burgundy, brick, mustard and a cool grey: the one
+ * red ground in the set. Danger cannot be another dark red on wine, so it
+ * lightens to coral and is told apart by lightness; the accent is the
+ * palette's grey pushed to a cool slate blue, warning is its mustard. Rosé is
+ * the glass held to the light, Cellar the bottle in the dark. --- */
+[data-theme="bordeaux"] {
+  --fsans: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
+  --fmono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+[data-theme="bordeaux"][data-mode="light"] {
+  color-scheme: light;
+  --bg: #f5e9e8;
+  --surface: #fdf7f6;
+  --fg: #2a0a0e;
+  --muted: #6b4549;
+  --brd: #ead3d1;
+  --accent: #3d5a85;
+  --danger: #a3222b;
+  --warning: #7d5a12;
+  --success: #3b6a3f;
+  --hover-brightness: 0.95;
+}
+
+[data-theme="bordeaux"][data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #1d0507;
+  --surface: #2c0b0f;
+  --fg: #f6e6e4;
+  --muted: #c09a9d;
+  --brd: #4a1a20;
+  --accent: #a9bbdc;
+  --danger: #ff8a80;
+  --warning: #e0b04f;
+  --success: #9cc58a;
+  --hover-brightness: 1.1;
+}
+
 [data-theme="moss"][data-mode="dark"] {
   color-scheme: dark;
   --bg: #0f1c19;

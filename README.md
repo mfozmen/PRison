@@ -164,7 +164,7 @@ and expand to the latest 15, with **Load more** for the rest.
   Retry yourself. When GitHub asks for longer than a refresh should take — or
   doesn't say at all — PRison steps aside and shows the banner rather than
   guessing, since coming back early only extends the block.
-- **Thirteen themes, each with a light and a dark ground.** A theme owns its accent,
+- **Fourteen themes, each with a light and a dark ground.** A theme owns its accent,
   its three status colours and its typefaces; the ground underneath is a separate
   choice, so switching it reads as the light changing rather than the theme
   changing. **Default** is the original pair; **Aurora** is built from four
@@ -174,12 +174,12 @@ and expand to the latest 15, with **Load more** for the rest.
   it, its two grounds a depth rather than a mood — at 30 m the sea has absorbed
   the red end of the spectrum. **Saffron** takes four parts of one crocus,
   **Lichen** four species off one rock face, wet and dry. **Reflectivity** is a
-  weather radar's dBZ scale. Five more start from palettes on colorpalettes.net
+  weather radar's dBZ scale. Six more start from palettes on colorpalettes.net
   and let them colour the ground as well as the accent: **Lilac** (violet night),
   **Olive** (olive and mustard on linen), **Acid Pop** (cobalt, acid green and
-  hot pink — the loud one), **Terracotta** (peach plaster and fired clay) and
-  **Moss & Rose** (blue-green moss with a blush accent).
-  All twenty-six palettes are measured against WCAG AA by a test, with nothing
+  hot pink — the loud one), **Terracotta** (peach plaster and fired clay),
+  **Moss & Rose** (blue-green moss with a blush accent) and **Bordeaux** (wine and mustard, the one red ground).
+  All twenty-eight palettes are measured against WCAG AA by a test, with nothing
   exempt. Pick one in Settings, where each row previews itself — the swatch is
   stamped with that theme, so it renders in the real palette rather than a copy
   that can drift.
@@ -321,7 +321,7 @@ The Settings menu has six sections:
   it was ignored on, plus an owner scope for a check that is broken everywhere.
   A repo can also be picked here, to write a check off before the board has
   ever drawn its chip.
-- **Appearance** — pick one of the thirteen themes, each previewing its own colours
+- **Appearance** — pick one of the fourteen themes, each previewing its own colours
   and typeface.
 - **About** — version, repository, license, and **Check for updates**, asked
   for on the spot. **Tell me when a newer version is out** turns it into a

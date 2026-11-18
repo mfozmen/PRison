@@ -26,6 +26,8 @@ import {
   Overpass_Mono,
   Figtree,
   Red_Hat_Mono,
+  Instrument_Sans,
+  Geist_Mono,
 } from "next/font/google";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
@@ -151,7 +153,7 @@ const chivoMono = Chivo_Mono({
   preload: false,
 });
 
-// The palette families (Lilac, Olive, Acid Pop, Terracotta, Moss & Rose). DM
+// The palette families (Lilac, Olive, Acid Pop, Terracotta, Moss & Rose, Bordeaux). DM
 // Mono, Courier Prime and Space Mono ship only static cuts, so they name theirs.
 const lexend = Lexend({ variable: "--font-lexend", subsets: ["latin"], display: "swap", preload: false });
 const dmMono = DM_Mono({ variable: "--font-dm-mono", subsets: ["latin"], weight: ["400", "500"], display: "swap", preload: false });
@@ -163,6 +165,8 @@ const nunitoSans = Nunito_Sans({ variable: "--font-nunito-sans", subsets: ["lati
 const overpassMono = Overpass_Mono({ variable: "--font-overpass-mono", subsets: ["latin"], display: "swap", preload: false });
 const figtree = Figtree({ variable: "--font-figtree", subsets: ["latin"], display: "swap", preload: false });
 const redHatMono = Red_Hat_Mono({ variable: "--font-red-hat-mono", subsets: ["latin"], display: "swap", preload: false });
+const instrumentSans = Instrument_Sans({ variable: "--font-instrument-sans", subsets: ["latin"], display: "swap", preload: false });
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], display: "swap", preload: false });
 
 const fontVariables = [
   firaSans.variable,
@@ -191,6 +195,8 @@ const fontVariables = [
   overpassMono.variable,
   figtree.variable,
   redHatMono.variable,
+  instrumentSans.variable,
+  geistMono.variable,
 ].join(" ");
 
 export const metadata: Metadata = {

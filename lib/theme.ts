@@ -28,6 +28,7 @@ export const THEMES = [
   { id: "acid", label: "Acid Pop", light: "Bubblegum", dark: "Rave" },
   { id: "terracotta", label: "Terracotta", light: "Sun-baked", dark: "Kiln" },
   { id: "moss", label: "Moss & Rose", light: "Blossom", dark: "Moss" },
+  { id: "bordeaux", label: "Bordeaux", light: "Rosé", dark: "Cellar" },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]["id"];

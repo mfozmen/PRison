@@ -37,7 +37,7 @@ them, a **Next move** strip names the one thing to do first. The two histories
 sit underneath as quieter panels; both start collapsed with a count and expand
 to the latest 15, with **Load more** for the rest.
 
-![The PRison dashboard in dark mode. A Next move strip on top points at the oldest item, a PR stuck on lint and typecheck for 4 days, with a Re-run failed checks button and Skip. Under it, the heading 12 things want you sits beside pill toggles for grouping and drafts, a search box and Refresh. Four columns follow, each with a big count and its oldest wait: Stuck on checks (highlighted, 4), Waiting on your review (3), Awaiting your reply (3) and Ready to merge (2). Every row has a status icon, its repo and age, and its next action. At the foot, a History section holds the folded Recently reviewed and Recently merged / closed panels](docs/screenshot.png)
+![The PRison dashboard in dark mode. A Next move card on top points at the oldest item: its time block reads 4d, stalled, 1 of 12, on a red pace colour, beside a PR stuck on lint and typecheck on a deep indigo ground with an aurora edge, a Re-run failed checks button and Skip. Under it, the heading 12 things want you sits beside pill toggles for grouping and drafts, a search box and Refresh. Four columns follow, each with a big count and its oldest wait: Stuck on checks (highlighted, 4), Waiting on your review (3), Awaiting your reply (3) and Ready to merge (2). Every row has a status icon, its repo and age, and its next action. At the foot, a History section holds the folded Recently reviewed and Recently merged / closed panels](docs/screenshot.png)
 
 ### Features
 
@@ -79,11 +79,16 @@ to the latest 15, with **Load more** for the rest.
   (**You requested changes**, **You approved**). When the author has pushed since,
   the row shows **Updated since** and a **See new commits** link, so a discussion
   you left open is one click away instead of lost in GitHub's notification list.
-- **Next move.** A strip above the columns points at the longest wait across all
+- **Next move.** A card above the columns points at the longest wait across all
   four queues, says why (the red checks, the conflict, who is blocked), and puts
-  its one action a click away. **Skip** steps to the next oldest and wraps after
-  the last. The column that holds it is tinted and the row is marked
-  **↑ next move**, so the strip is a pointer, never a fifth list.
+  its one action a click away. It stands apart from the board on purpose: each
+  theme gives it a spot colour of its own under a soft aurora, with an aurora
+  edge and a glow. Its time block shows the **pace**: **moving** under a day,
+  **slowing** up to three, **stalled** after, in colour, in words and on a
+  three-step meter. The glow grows as the item stalls. The edge and button wear
+  the item's queue colour. **Skip** steps to the next oldest ("2 of 12") and
+  wraps after the last. The column that holds it is tinted and the row is marked
+  **↑ next move**, so the card is a pointer, never a fifth list.
 - **A big count on every column.** Each queue shows how many items it holds and
   how long its oldest one has been sitting, with a one-line description of what
   the queue is. The heading above says how many things want you in total. The

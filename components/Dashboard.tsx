@@ -992,20 +992,20 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         id: pr.id, title: pr.title, repo: pr.repo, number: pr.number, url: pr.url,
         since: pr.stuckSince, suggestion: suggestStuck(pr), tone: "danger",
         reasons: [
-          ...(pr.mergeState === "DIRTY" ? [`✗ ${MERGE_CONFLICT_LABEL.toLowerCase()}`] : []),
-          ...pr.failing.map((name) => `✗ ${name}`),
-          ...(pr.reviewDecision === "CHANGES_REQUESTED" ? ["Changes requested"] : []),
+          ...(pr.mergeState === "DIRTY" ? [{ label: MERGE_CONFLICT_LABEL }] : []),
+          ...pr.failing.map((name) => ({ label: name, mono: true })),
+          ...(pr.reviewDecision === "CHANGES_REQUESTED" ? [{ label: "Changes requested" }] : []),
         ],
       })),
       ...shownReviews.map((req): NextMoveItem => ({
         id: req.id, title: req.title, repo: req.repo, number: req.number, url: req.url,
         since: req.requestedAt, suggestion: suggestReview(req), tone: "accent",
-        reasons: [`blocking @${req.author}`],
+        reasons: [{ label: `blocking @${req.author}`, mono: true }],
       })),
       ...shownComments.map((c): NextMoveItem => ({
         id: c.id, title: c.preview, repo: c.repo, number: c.number, url: c.url,
         since: c.commentedAt, suggestion: suggestComment(c), tone: "warning",
-        reasons: [`from ${c.author}`],
+        reasons: [{ label: c.author, mono: true }, ...(c.path ? [{ label: c.path, mono: true }] : [])],
       })),
       ...shownReady.map((pr): NextMoveItem => ({
         id: pr.id, title: pr.title, repo: pr.repo, number: pr.number, url: pr.url,
@@ -1224,6 +1224,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           <NextMove
             item={nextMove}
             now={new Date()}
+            position={nextMoves.indexOf(nextMove) + 1}
+            total={nextMoves.length}
             canSkip={nextMoves.length > 1}
             onSkip={() =>
               // Skipping the last one starts the round again rather than

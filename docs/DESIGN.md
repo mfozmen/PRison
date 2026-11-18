@@ -19,6 +19,7 @@ and every palette is in `app/globals.css`, measured by `lib/theme.test.ts`.
 | `warning` | Reply column, pending checks, "Needs update" |
 | `success` | Ready column, approved verdicts |
 | `accent` | Review column, "Updated since", merged icon, logo |
+| `spot` | The Next move card's ground (one per family and mode, from its palette) |
 | `bg` / `surface` / `brd` | Ground, cards, hairlines |
 | `fg` / `muted` | Text and secondary text |
 

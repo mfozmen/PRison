@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.30.0](https://github.com/mfozmen/PRison/compare/v1.29.0...v1.30.0) (2026-11-18)
+
+### Features
+
+* redesign the board as tiers with a Next move strip and six palette themes ([#110](https://github.com/mfozmen/PRison/issues/110)) ([cea82c3](https://github.com/mfozmen/PRison/commit/cea82c3cd6bbc6dbcc6c3fb300dc94ec3d86660d)), closes [#4748](https://github.com/mfozmen/PRison/issues/4748)
+
 ## [1.29.0](https://github.com/mfozmen/prison/compare/v1.28.0...v1.29.0) (2026-11-17)
 
 ### Features

@@ -31,8 +31,8 @@ export interface PrRowProps {
 // An icon per state, so the column colour is never the only signal: a ✓, a
 // speech bubble, an eye, a ✕ and a clock read the same in any theme and to
 // anyone who cannot tell two of its colours apart.
-const ICONS: Record<RowKind, { className: string; path: React.ReactNode }> = {
-  ready: { className: "text-success", path: <path d="M20 6 9 17l-5-5" /> },
+const ICONS: Record<RowKind, { className: string; path: React.ReactNode; stroke?: string }> = {
+  ready: { className: "text-success", stroke: "2.5", path: <path d="M20 6 9 17l-5-5" /> },
   reply: {
     className: "text-warning",
     path: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
@@ -46,7 +46,7 @@ const ICONS: Record<RowKind, { className: string; path: React.ReactNode }> = {
       </>
     ),
   },
-  fail: { className: "text-danger", path: <path d="M18 6 6 18M6 6l12 12" /> },
+  fail: { className: "text-danger", stroke: "2.5", path: <path d="M18 6 6 18M6 6l12 12" /> },
   idle: { className: "text-muted", path: <circle cx="12" cy="12" r="9" /> },
   pending: {
     className: "text-warning",
@@ -81,9 +81,7 @@ export function PrRow({ title, repo, number, url, since, now, detail, suggestion
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2.25"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          strokeWidth={icon.stroke ?? "2"}
         >
           {icon.path}
         </svg>
@@ -95,10 +93,10 @@ export function PrRow({ title, repo, number, url, since, now, detail, suggestion
           target="_blank"
           rel="noopener noreferrer"
           aria-label={`Open ${title} on GitHub`}
-          className={`${clampTitle ? "line-clamp-2 " : ""}text-sm font-medium leading-snug text-foreground transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm`}
+          className={`${clampTitle ? "line-clamp-2 before:content-['“'] after:content-['”'] " : ""}text-sm font-medium leading-[1.4] text-foreground transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm`}
         >
           {draft && (
-            <span className="mr-1.5 rounded border border-border px-1 py-px align-[1px] text-[11px] font-semibold uppercase text-muted">
+            <span className="mr-1.5 rounded border border-border px-[5px] py-px align-[1px] text-[11px] font-semibold uppercase text-muted">
               Draft
             </span>
           )}

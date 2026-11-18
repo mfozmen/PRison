@@ -139,7 +139,7 @@ export function PrList<T>({
       <div className="-mt-2 flex items-baseline gap-2">
         <span
           data-testid="count-badge"
-          className="text-[56px] font-bold leading-none tracking-[-0.04em] tabular-nums text-foreground"
+          className="text-[56px] font-bold leading-none tracking-[-0.04em] text-foreground"
         >
           {items.length}
         </span>

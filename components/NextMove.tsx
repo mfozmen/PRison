@@ -64,7 +64,7 @@ export function NextMove({
       aria-label="Next move"
       className={`flex flex-wrap items-center gap-5 rounded-[20px] border px-6 py-5 ${GROUND[item.tone]} ${RING[item.tone]}`}
     >
-      <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold tracking-[0.1em] text-background ${BADGE[item.tone]}`}>
+      <span className={`rounded-full px-2.5 py-[5px] text-[11px] font-bold leading-[normal] tracking-[0.1em] text-background ${BADGE[item.tone]}`}>
         NEXT MOVE
       </span>
       <div className="min-w-0 flex-[999_1_420px]">

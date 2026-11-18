@@ -4812,6 +4812,19 @@ describe("Dashboard — searching the board", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("1 thing wants you");
   });
 
+  it("focuses the search on /, but not while typing elsewhere", async () => {
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    const box = await screen.findByRole("searchbox", { name: /search the board/i });
+
+    fireEvent.keyDown(document.body, { key: "/" });
+    expect(box).toHaveFocus();
+
+    const other = screen.getByRole("combobox", { name: "Filter by repository" });
+    other.focus();
+    fireEvent.keyDown(other, { key: "/" });
+    expect(other).toHaveFocus();
+  });
+
   it("brings everything back on Escape", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("ready pr")).toBeInTheDocument();

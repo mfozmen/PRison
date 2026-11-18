@@ -57,8 +57,16 @@ Stop any server you started when you are done.
    - position and size (x, y, w, h); spacing and gaps between siblings
    - typography: family, size, weight, line height, letter spacing, case
    - colour: text, background, border, ring/glow, using the token the skill assigns
-   - radius, border width, shadow
-   - icons: present, the right glyph, the right colour, the right size
+   - surface treatment, which the user checks first: every box-shadow layer
+     (offset, blur, spread, colour with alpha), rings and glows, border width,
+     style and colour per side, radius per corner, resolved background colour
+     (convert color-mix/oklab to sRGB), opacity, backdrop-filter
+   - line height of every chip, badge and title. A 1.5 line height where the
+     drawing uses `normal` makes each badge 2–4 px taller.
+   - icons: present, the right glyph, the right colour, the right size. Compare
+     the rendered stroke (stroke-width × size ÷ viewBox), and the line caps and joins.
+   - Open every folded section on both sides before measuring, so that what is
+     drawn open is compared open.
    - content and order: labels, counts, column order, which column is highlighted
 4. Text from the demo board will match in content. Live ages ("2h", "4d") may
    differ by a unit; don't report those.

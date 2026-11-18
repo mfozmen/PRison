@@ -42,7 +42,7 @@ export function ArchiveSection({
       tabIndex={-1}
       className="flex scroll-mt-4 flex-col rounded-[20px] border border-border bg-[color-mix(in_srgb,var(--surface)_45%,var(--bg))] focus:outline-none"
     >
-      <div className={`px-6 py-1.5 ${open ? "border-b border-border" : ""}`}>
+      <div className={`px-6 py-[5px] ${open ? "border-b border-border" : ""}`}>
         <DisclosureHeader
           variant="panel"
           open={open}
@@ -52,7 +52,7 @@ export function ArchiveSection({
           badge={
             <span
               data-testid={countTestId}
-              className="rounded-full bg-border px-2 py-px text-xs font-medium leading-normal tabular-nums text-muted"
+              className="rounded-full bg-border px-2 py-px text-xs font-medium leading-[normal] tabular-nums text-muted"
             >
               {count}
             </span>

@@ -70,7 +70,7 @@ export function DisclosureHeader({
       <h2
         className={
           variant === "panel"
-            ? "text-[15px] font-semibold text-foreground"
+            ? "text-[15px] font-semibold leading-[normal] text-foreground"
             : `text-xs font-semibold tracking-[0.08em] uppercase ${titleClassName ?? "text-muted"}`
         }
       >

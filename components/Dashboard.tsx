@@ -170,6 +170,20 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // query that outlived the sitting would hide work tomorrow morning with no
   // memory that you were the one who hid it.
   const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  // "/" jumps to the search box, the convention GitHub itself uses — but never
+  // while typing somewhere else, where "/" is just a character.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [pollInterval, setPollInterval] = useState(DEFAULT_POLL_INTERVAL_MS);
   // undefined = the budget is fine. A string is when it comes back; null is a
@@ -1271,17 +1285,28 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           {/* type="search" for the browser's own clear affordance rather than a
               hand-built one; Escape is the keyboard half of the same thing. A
               filter you cannot see the end of is one you forget is on. */}
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setQuery("");
-            }}
-            aria-label="Search the board"
-            placeholder="Search title, repo, author, check…"
-            className="min-h-[44px] w-full min-w-0 flex-1 rounded-full border border-border bg-surface px-4 text-sm text-foreground placeholder:text-muted focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none sm:min-w-48 sm:max-w-64"
-          />
+          <label className="flex h-10 w-full min-w-0 flex-1 items-center gap-2 rounded-[10px] border border-border bg-surface px-3 text-muted focus-within:ring-2 focus-within:ring-accent sm:min-w-48 sm:max-w-[280px]">
+            <svg aria-hidden="true" className="shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <input
+              ref={searchRef}
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setQuery("");
+              }}
+              aria-label="Search the board"
+              aria-keyshortcuts="/"
+              placeholder="Search title, repo, author, check…"
+              className="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted focus:outline-none"
+            />
+            <kbd aria-hidden="true" className="shrink-0 rounded-md border border-border px-1.5 py-px font-mono text-xs leading-[normal] text-muted">
+              /
+            </kbd>
+          </label>
           {/* Deliberately not a live region: the label re-renders every minute
               as it ages, and announcing "Updated 4m ago" on a loop would talk
               over everything else for as long as the tab is open. */}
@@ -1688,7 +1713,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     pr.needsUpdate || pr.ignoredChecks?.length ? (
                       <div className="flex flex-wrap items-center gap-1.5">
                         {pr.needsUpdate && (
-                          <span className="rounded-md bg-warning/10 px-2 py-0.5 text-xs font-medium leading-normal text-warning">
+                          <span className="rounded-md bg-warning/10 px-2 py-0.5 text-xs font-medium leading-[normal] text-warning">
                             Needs update
                           </span>
                         )}
@@ -1785,7 +1810,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 </p>
               ) : (
                 <>
-                  <ol className="flex flex-col pt-2">
+                  <ol className="flex flex-col pb-1 pt-3">
                     {shownClosed.slice(0, closedVisible).map((pr, i, shown) => (
                       <li key={pr.id}>
                         <ClosedPrRow pr={pr} now={new Date()} last={i === shown.length - 1} />

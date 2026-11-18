@@ -147,7 +147,15 @@ export function Header({
             </button>
           )}
         </div>
-        <span className="hidden text-sm text-muted sm:inline">
+        <span className="hidden items-center gap-2 border-l border-border pl-2 text-sm text-muted sm:flex">
+          {login && (
+            <span
+              aria-hidden="true"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-border text-[13px] font-semibold text-foreground"
+            >
+              {login.slice(0, 2).toLowerCase()}
+            </span>
+          )}
           {login || "there"}
         </span>
         <ActivityBell
@@ -163,8 +171,8 @@ export function Header({
         >
           <svg
             aria-hidden="true"
-            width="16"
-            height="16"
+            width="18"
+            height="18"
             viewBox="0 0 24 24"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
@@ -172,7 +180,7 @@ export function Header({
             <path
               d="M4 6h10M18 6h2"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
@@ -181,14 +189,14 @@ export function Header({
               cy="6"
               r="2"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
             <path
               d="M4 12h2M10 12h10"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
@@ -197,14 +205,14 @@ export function Header({
               cy="12"
               r="2"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
             <path
               d="M4 18h10M18 18h2"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
@@ -213,7 +221,7 @@ export function Header({
               cy="18"
               r="2"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
@@ -228,8 +236,8 @@ export function Header({
           {isDark ? (
             <svg
               aria-hidden="true"
-              width="16"
-              height="16"
+              width="18"
+              height="18"
               viewBox="0 0 16 16"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
@@ -239,20 +247,20 @@ export function Header({
                 cy="8"
                 r="3"
                 stroke="currentColor"
-                strokeWidth="1.5"
+                strokeWidth="2"
               />
               <path
                 d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"
                 stroke="currentColor"
-                strokeWidth="1.5"
+                strokeWidth="2"
                 strokeLinecap="round"
               />
             </svg>
           ) : (
             <svg
               aria-hidden="true"
-              width="16"
-              height="16"
+              width="18"
+              height="18"
               viewBox="0 0 16 16"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
@@ -260,7 +268,7 @@ export function Header({
               <path
                 d="M14 10A6 6 0 0 1 6 2a6 6 0 1 0 8 8z"
                 stroke="currentColor"
-                strokeWidth="1.5"
+                strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />

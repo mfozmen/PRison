@@ -24,7 +24,7 @@ export function ReviewedPrRow({ pr, now }: ReviewedPrRowProps) {
   return (
     <div className="flex items-start gap-3.5 py-3.5">
       <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${verdict.tile}`}>
-        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d={verdict.icon} />
         </svg>
       </div>
@@ -34,16 +34,15 @@ export function ReviewedPrRow({ pr, now }: ReviewedPrRowProps) {
           target="_blank"
           rel="noopener noreferrer"
           aria-label={`Open ${pr.title} on GitHub`}
-          className={`text-sm font-medium transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm ${pr.updatedSince ? "text-foreground" : "text-[color-mix(in_srgb,var(--fg)_80%,var(--muted))]"}`}
+          className={`text-sm font-medium leading-[normal] transition-colors after:ml-1 after:content-['↗'] hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm ${pr.updatedSince ? "text-foreground" : "text-[color-mix(in_srgb,var(--fg)_60%,var(--muted))]"}`}
         >
           {pr.title}
-          <svg aria-hidden="true" className="ml-1 inline-block -mt-0.5 shrink-0" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3.5 3H2a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V8.5M7 1h4m0 0v4m0-4L5 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </a>
         <div className="mt-0.5 font-mono text-xs leading-relaxed text-muted">
           {pr.repo} #{pr.number} · {pr.author}
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] leading-normal text-muted">
-          <span className={`rounded-md px-2 py-0.5 text-xs font-medium leading-normal ${verdict.className}`}>
+          <span className={`rounded-md px-2 py-0.5 text-xs font-medium leading-[normal] ${verdict.className}`}>
             {verdict.label}
           </span>
           <span>{relativeAge(pr.reviewedAt, now)} ago</span>
@@ -52,7 +51,7 @@ export function ReviewedPrRow({ pr, now }: ReviewedPrRowProps) {
       {/* The whole point of looking back: they answered with code. */}
       {pr.updatedSince ? (
         <div className="flex shrink-0 flex-col items-end gap-2">
-          <span className="flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-0.5 text-xs font-semibold text-background">
+          <span className="flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-[3px] text-xs font-semibold leading-[normal] text-background">
             <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 19V5M5 12l7-7 7 7" />
             </svg>

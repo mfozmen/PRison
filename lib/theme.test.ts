@@ -229,8 +229,11 @@ describe("palette contrast", () => {
     ["success", "bg"], ["success", "surface"],
     // The selected settings tab and the primary button are bg-accent text-background.
     ["bg", "accent"],
-    // The Next move badge is bg-danger text-background.
+    // The Next move badge is bg-<tone> text-background, in whichever queue's
+    // tone the item comes from.
     ["bg", "danger"],
+    ["bg", "warning"],
+    ["bg", "success"],
   ];
 
   // The Settings swatches are nested elements stamped with data-theme/data-mode,

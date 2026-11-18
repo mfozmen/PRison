@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within, fireEvent } from "@testing-library/react";
+import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
 import { Dashboard } from "./Dashboard";
 
 // The Next move strip against the real Dashboard. Dashboard.test.tsx stubs the
@@ -93,6 +93,24 @@ describe("Dashboard — Next move", () => {
 
     fireEvent.click(within(strip()).getByRole("button", { name: /skip/i }));
     expect(within(strip()).getByText("review pr")).toBeInTheDocument();
+  });
+
+  it("forgets a skip once its item leaves the board, so it comes back unskipped", async () => {
+    global.fetch = fetchLists([STUCK_PR], [REVIEW_PR]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await screen.findByRole("region", { name: "Next move" });
+    fireEvent.click(within(strip()).getByRole("button", { name: /skip/i }));
+    expect(within(strip()).getByText("stuck pr")).toBeInTheDocument();
+
+    // The review is answered elsewhere and drops off the board…
+    global.fetch = fetchLists([STUCK_PR], []);
+    fireEvent.click(screen.getByRole("button", { name: /^refresh$/i }));
+    await waitFor(() => expect(document.getElementById("waiting-on-your-review")!.querySelector('[data-testid="count-badge"]')).toHaveTextContent("0"));
+
+    // …then is requested again: it is the oldest, and nobody skipped it this time.
+    global.fetch = fetchLists([STUCK_PR], [REVIEW_PR]);
+    fireEvent.click(screen.getByRole("button", { name: /^refresh$/i }));
+    expect(await within(strip()).findByText("review pr")).toBeInTheDocument();
   });
 
   it("offers no Skip when there is only one thing to do", async () => {

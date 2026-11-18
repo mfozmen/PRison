@@ -998,7 +998,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     ],
     (item) => item.since,
   );
-  const nextMove = nextMoves.find((m) => !skipped.includes(m.id)) ?? nextMoves[0];
+  // Only skips that still point at something count: a PR that was skipped,
+  // then resolved, must not come back already skipped, and a gone id must not
+  // throw off when the round wraps.
+  const liveSkipped = skipped.filter((id) => nextMoves.some((m) => m.id === id));
+  // Forget the gone ones for good (React's "adjust state while rendering"
+  // pattern), so the same id reappearing after a refresh starts unskipped.
+  if (liveSkipped.length !== skipped.length) setSkipped(liveSkipped);
+  const nextMove = nextMoves.find((m) => !liveSkipped.includes(m.id)) ?? nextMoves[0];
   const updatedSinceCount = shownReviewed.filter((pr) => pr.updatedSince).length;
   const mergedCount = shownClosed.filter((pr) => pr.merged).length;
 
@@ -1203,10 +1210,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             now={new Date()}
             canSkip={nextMoves.length > 1}
             onSkip={() =>
-              setSkipped((prev) =>
-                // Skipping the last one starts the round again rather than
-                // leaving the strip with nothing to point at.
-                prev.length + 1 >= nextMoves.length ? [] : [...prev, nextMove.id],
+              // Skipping the last one starts the round again rather than
+              // leaving the strip with nothing to point at. Built from the live
+              // skips, so stale ids are dropped on every Skip.
+              setSkipped(
+                liveSkipped.length + 1 >= nextMoves.length ? [] : [...liveSkipped, nextMove.id],
               )
             }
           />

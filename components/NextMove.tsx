@@ -107,9 +107,11 @@ export function NextMove({
           </a>
           {item.reasons?.length ? (
             <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {item.reasons.map((r) => (
+              {item.reasons.map((r, i) => (
                 <span
-                  key={r.label}
+                  // Labels can repeat (two checks of one name, an author
+                  // whose name is also a path), so the index keeps keys unique.
+                  key={`${i}-${r.label}`}
                   className={`nm-chip rounded-md px-2 py-0.5 text-xs font-medium leading-[normal] text-[var(--tone-ink)] ${r.mono ? "font-mono" : ""}`}
                 >
                   {r.label}

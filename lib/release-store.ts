@@ -14,6 +14,11 @@ export const DEFAULT_RELEASE_FILE = "/data/latest-release.json";
  * one question into a hundred. */
 export const RELEASE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
+/** How old an answer the explicit "Check for updates" click will still take.
+ * The click is a question asked now, so a day is far too long (#112); a
+ * minute is just enough that hammering the button is one request. */
+export const RELEASE_FRESH_FLOOR_MS = 60 * 1000;
+
 /** `tagName` is null when the repository has published no release at all —
  * an answer worth caching, not a miss. */
 export type CachedRelease = { tagName: string | null; fetchedAt: number };
@@ -36,11 +41,15 @@ function parse(raw: unknown): CachedRelease | null {
   return { tagName, fetchedAt };
 }
 
-/** The last answer, if it is still worth trusting. `now` is passed in rather
+/** The last answer, if it is still worth trusting: younger than `maxAge`,
+ * which defaults to the background check's day. `now` is passed in rather
  * than read, so a test can age the cache without waiting a day. */
-export function readCachedRelease(now: number): CachedRelease | null {
+export function readCachedRelease(
+  now: number,
+  maxAge: number = RELEASE_MAX_AGE_MS,
+): CachedRelease | null {
   const fresh = (entry: CachedRelease) =>
-    now - entry.fetchedAt < RELEASE_MAX_AGE_MS ? entry : null;
+    now - entry.fetchedAt < maxAge ? entry : null;
   if (cached?.file === releaseFilePath()) return fresh(cached.entry);
   try {
     const entry = parse(JSON.parse(readFileSync(releaseFilePath(), "utf8")));

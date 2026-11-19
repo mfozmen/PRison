@@ -1093,7 +1093,8 @@ describe("SettingsModal — check for updates", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     clickCheck();
     await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith("/api/latest-release"),
+      // fresh=1, so the click is answered by GitHub, not a day-old cache (#112).
+      expect(fetchMock).toHaveBeenCalledWith("/api/latest-release?fresh=1"),
     );
   });
 

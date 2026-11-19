@@ -119,6 +119,45 @@ describe("GET /api/latest-release", () => {
     expect((await GET()).status).toBe(502);
   });
 
+  describe("?fresh=1, the explicit Check for updates", () => {
+    const fresh = () => GET(new Request("http://localhost/api/latest-release?fresh=1"));
+    const seed = (tagName: string, ageMs: number) =>
+      writeFileSync(
+        releaseFilePath(),
+        JSON.stringify({ tagName, fetchedAt: Date.now() - ageMs }),
+      );
+
+    it("asks GitHub now instead of answering from a day-old cache", async () => {
+      // #112: the cache said v1.29.0 for hours after v1.30.0 shipped.
+      seed("v1.29.0", 3 * 60 * 60 * 1000);
+      fetchMock.mockResolvedValue(released("v1.30.0"));
+      expect(await (await fresh()).json()).toEqual({ tagName: "v1.30.0" });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("refreshes the cache, so the background check learns it too", async () => {
+      seed("v1.29.0", 3 * 60 * 60 * 1000);
+      fetchMock.mockResolvedValue(released("v1.30.0"));
+      await fresh();
+      expect(await (await GET()).json()).toEqual({ tagName: "v1.30.0" });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("answers repeated clicks within a minute from the cache", async () => {
+      seed("v1.30.0", 20 * 1000);
+      expect(await (await fresh()).json()).toEqual({ tagName: "v1.30.0" });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("leaves the background check on its day-long cache", async () => {
+      seed("v1.29.0", 3 * 60 * 60 * 1000);
+      expect(await (await GET(new Request("http://localhost/api/latest-release"))).json()).toEqual({
+        tagName: "v1.29.0",
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
   it("does not remember a failure as an answer", async () => {
     // A day of silence because GitHub had a bad minute is the failure mode
     // this cache could easily introduce.

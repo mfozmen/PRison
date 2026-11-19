@@ -1,6 +1,11 @@
 import { readToken } from "@/lib/session";
 import { PROJECT_OWNER, PROJECT_NAME } from "@/lib/project";
-import { readCachedRelease, writeCachedRelease } from "@/lib/release-store";
+import {
+  readCachedRelease,
+  writeCachedRelease,
+  RELEASE_FRESH_FLOOR_MS,
+  RELEASE_MAX_AGE_MS,
+} from "@/lib/release-store";
 
 /** The newest PRison there is, so a container can say it has fallen behind.
  *
@@ -12,11 +17,20 @@ import { readCachedRelease, writeCachedRelease } from "@/lib/release-store";
  * restarted container are still one question a day.
  *
  * Signed in all the same: it is not the user's data, but an open proxy that
- * fetches on demand is not a thing to leave lying around. */
-export async function GET() {
+ * fetches on demand is not a thing to leave lying around.
+ *
+ * `?fresh=1` is the Settings button: an explicit question gets an answer from
+ * GitHub, not from this morning (#112). It still refreshes the shared cache,
+ * and still takes an answer under a minute old, so repeated clicks are one
+ * request. The background check sends no flag and keeps its day. */
+export async function GET(request?: Request) {
   if (!(await readToken())) return new Response("Unauthorized", { status: 401 });
 
-  const cached = readCachedRelease(Date.now());
+  const fresh = request ? new URL(request.url).searchParams.get("fresh") === "1" : false;
+  const cached = readCachedRelease(
+    Date.now(),
+    fresh ? RELEASE_FRESH_FLOOR_MS : RELEASE_MAX_AGE_MS,
+  );
   if (cached) return Response.json({ tagName: cached.tagName });
 
   try {

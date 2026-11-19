@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { SettingsModal } from "./SettingsModal";
 import type { TrackedChecks } from "@/lib/tracked-checks";
 import { THEMES } from "@/lib/theme";
@@ -27,10 +27,18 @@ const filterProps = {
   onTestNotification: vi.fn(),
 };
 
-/** Only one section is mounted at a time; open the one under test. */
+/** Every section is on the page; jump to the one under test, as a user would,
+ * and remember it so inSection() can keep queries inside that card. */
+let currentSection = "Comments";
 function selectSection(label: string) {
-  fireEvent.click(screen.getByRole("tab", { name: label }));
+  currentSection = label;
+  fireEvent.click(
+    within(screen.getByRole("navigation", { name: "Jump to section" })).getByRole("button", { name: label }),
+  );
 }
+
+/** Queries inside the section last jumped to. */
+const inSection = () => within(screen.getByRole("region", { name: currentSection }));
 
 const owners = ["acme", "beta"];
 
@@ -346,7 +354,7 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Tracked checks");
-    fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+    fireEvent.click(inSection().getByRole("button", { name: /add repository/i }));
     fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
     fireEvent.change(
@@ -377,7 +385,7 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Tracked checks");
-    fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+    fireEvent.click(inSection().getByRole("button", { name: /add repository/i }));
     fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
     expect(onChange).toHaveBeenLastCalledWith({
@@ -526,7 +534,7 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Tracked checks");
-    fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+    fireEvent.click(inSection().getByRole("button", { name: /add repository/i }));
     const combobox = screen.getByRole("combobox", { name: "Repository" });
     // Focus opens the suggestion dropdown; empty input shows availableRepos
     fireEvent.focus(combobox);
@@ -579,7 +587,7 @@ describe("SettingsModal", () => {
     // The combobox searches GitHub, so a repo can be configured before the
     // board has ever loaded one.
     expect(
-      screen.getByRole("button", { name: /add repository/i }),
+      inSection().getByRole("button", { name: /add repository/i }),
     ).toBeInTheDocument();
   });
 
@@ -660,10 +668,12 @@ describe("SettingsModal", () => {
       );
     }
 
-    it("offers every section and opens on the first one", () => {
+    const jumpNav = () => screen.getByRole("navigation", { name: "Jump to section" });
+
+    it("lays every section out on one page, with a pill to jump to each", () => {
       renderOpen();
-      const tabs = screen.getAllByRole("tab");
-      expect(tabs.map((t) => t.textContent)).toEqual([
+      const pills = within(jumpNav()).getAllByRole("button");
+      expect(pills.map((b) => b.textContent)).toEqual([
         "Comments",
         "Auto refresh",
         "Tracked checks",
@@ -671,48 +681,71 @@ describe("SettingsModal", () => {
         "Appearance",
         "About",
       ]);
-      expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+      expect(pills[0]).toHaveAttribute("aria-current", "true");
+      for (const name of ["Comments", "Auto refresh", "Tracked checks", "Ignored checks", "Appearance", "About"]) {
+        expect(screen.getByRole("region", { name })).toBeInTheDocument();
+      }
+      // No section hides another: a comments switch and the interval are both here.
+      expect(screen.getByRole("checkbox", { name: "Show bot comments" })).toBeInTheDocument();
+      expect(screen.getByRole("radiogroup", { name: /auto refresh interval/i })).toBeInTheDocument();
     });
 
-    it("shows only the selected section", () => {
+    it("marks the pill last jumped to", () => {
       renderOpen();
-      expect(
-        screen.getByRole("checkbox", { name: "Show bot comments" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole("combobox", { name: /auto refresh interval/i }),
-      ).not.toBeInTheDocument();
-
-      selectSection("Auto refresh");
-      expect(
-        screen.getByRole("combobox", { name: /auto refresh interval/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole("checkbox", { name: "Show bot comments" }),
-      ).not.toBeInTheDocument();
+      selectSection("Appearance");
+      expect(within(jumpNav()).getByRole("button", { name: "Appearance" })).toHaveAttribute("aria-current", "true");
+      expect(within(jumpNav()).getByRole("button", { name: "Comments" })).not.toHaveAttribute("aria-current");
     });
 
-    it("moves between sections with the arrow keys, wrapping at the ends", () => {
+    it("turns into a list of matching settings while you type", () => {
       renderOpen();
-      const tabs = screen.getAllByRole("tab");
-      fireEvent.keyDown(tabs[0], { key: "ArrowDown" });
-      expect(screen.getByRole("tab", { name: "Auto refresh" })).toHaveAttribute(
-        "aria-selected",
-        "true",
+      fireEvent.change(screen.getByRole("searchbox", { name: "Search settings" }), {
+        target: { value: "check" },
+      });
+      // The cards make way for the results, and the count says what matched.
+      expect(screen.queryByRole("region", { name: "Comments" })).toBeNull();
+      expect(screen.getByText(/5 settings/)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Check now" })).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "Open" })).toHaveLength(3);
+    });
+
+    it("keeps a matching switch working right in the results", () => {
+      const onShowBotsChange = vi.fn();
+      render(
+        <SettingsModal
+          {...filterProps}
+          onShowBotsChange={onShowBotsChange}
+          availableRepos={[]}
+          value={emptyValue}
+          onChange={vi.fn()}
+          open={true}
+          onClose={vi.fn()}
+        />,
       );
-      // Wrapping backwards off the first item lands on the last.
-      fireEvent.keyDown(tabs[1], { key: "ArrowUp" });
-      fireEvent.keyDown(tabs[0], { key: "ArrowLeft" });
-      expect(screen.getByRole("tab", { name: "About" })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
-      // ArrowRight is wired too, for the horizontal (mobile) menu.
-      fireEvent.keyDown(tabs[3], { key: "ArrowRight" });
-      expect(screen.getByRole("tab", { name: "Comments" })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
+      fireEvent.change(screen.getByRole("searchbox", { name: "Search settings" }), {
+        target: { value: "bot" },
+      });
+      fireEvent.click(screen.getByRole("checkbox", { name: "Show bot comments" }));
+      expect(onShowBotsChange).toHaveBeenCalledWith(true);
+    });
+
+    it("says so when nothing matches", () => {
+      renderOpen();
+      fireEvent.change(screen.getByRole("searchbox", { name: "Search settings" }), {
+        target: { value: "zzz" },
+      });
+      expect(screen.getByText(/no setting matches/i)).toBeInTheDocument();
+    });
+
+    it("opens a section from its result, back on the full page", () => {
+      renderOpen();
+      fireEvent.change(screen.getByRole("searchbox", { name: "Search settings" }), {
+        target: { value: "tracked" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Open" }));
+      expect(screen.getByRole("searchbox", { name: "Search settings" })).toHaveValue("");
+      expect(screen.getByRole("region", { name: "Tracked checks" })).toBeInTheDocument();
+      expect(within(jumpNav()).getByRole("button", { name: "Tracked checks" })).toHaveAttribute("aria-current", "true");
     });
 
     it("points About at the repository, with the running version", () => {
@@ -734,16 +767,34 @@ describe("SettingsModal", () => {
       vi.unstubAllEnvs();
     });
 
-    it("ignores keys that aren't arrows", () => {
-      renderOpen();
-      fireEvent.keyDown(screen.getAllByRole("tab")[0], { key: "a" });
-      expect(screen.getByRole("tab", { name: "Comments" })).toHaveAttribute(
-        "aria-selected",
-        "true",
+    it("clears a search on the first Escape and closes on the second", () => {
+      const onClose = vi.fn();
+      render(
+        <SettingsModal
+          {...filterProps}
+          availableRepos={[]}
+          value={emptyValue}
+          onChange={vi.fn()}
+          open={true}
+          onClose={onClose}
+        />,
       );
+      const box = screen.getByRole("searchbox", { name: "Search settings" });
+      fireEvent.change(box, { target: { value: "bot" } });
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(box).toHaveValue("");
+      expect(onClose).not.toHaveBeenCalled();
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(onClose).toHaveBeenCalled();
     });
 
-    it("reopens on the first section after being closed elsewhere", () => {
+    it("focuses the search on /", () => {
+      renderOpen();
+      fireEvent.keyDown(document.body, { key: "/" });
+      expect(screen.getByRole("searchbox", { name: "Search settings" })).toHaveFocus();
+    });
+
+    it("reopens at the top with an empty search after being closed elsewhere", () => {
       const props = {
         ...filterProps,
         availableRepos: [],
@@ -753,12 +804,15 @@ describe("SettingsModal", () => {
       };
       const { rerender } = render(<SettingsModal {...props} open={true} />);
       selectSection("Tracked checks");
+      fireEvent.change(screen.getByRole("searchbox", { name: "Search settings" }), {
+        target: { value: "bot" },
+      });
       rerender(<SettingsModal {...props} open={false} />);
       rerender(<SettingsModal {...props} open={true} />);
-      expect(screen.getByRole("tab", { name: "Comments" })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
+      expect(screen.getByRole("searchbox", { name: "Search settings" })).toHaveValue("");
+      expect(
+        within(screen.getByRole("navigation", { name: "Jump to section" })).getByRole("button", { name: "Comments" }),
+      ).toHaveAttribute("aria-current", "true");
     });
   });
 
@@ -776,13 +830,11 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Auto refresh");
-    const select = screen.getByRole("combobox", {
-      name: /auto refresh interval/i,
-    });
-    expect(select).toHaveValue(String(POLL_INTERVAL_OPTIONS[0].ms));
+    const group = screen.getByRole("radiogroup", { name: /auto refresh interval/i });
     for (const o of POLL_INTERVAL_OPTIONS) {
-      expect(screen.getByRole("option", { name: o.label })).toBeInTheDocument();
+      expect(within(group).getByRole("radio", { name: o.label })).toBeInTheDocument();
     }
+    expect(within(group).getByRole("radio", { name: POLL_INTERVAL_OPTIONS[0].label })).toBeChecked();
   });
 
   it("reports the chosen interval as a number", () => {
@@ -801,14 +853,15 @@ describe("SettingsModal", () => {
     );
     selectSection("Auto refresh");
     const target = POLL_INTERVAL_OPTIONS[POLL_INTERVAL_OPTIONS.length - 1];
-    fireEvent.change(
-      screen.getByRole("combobox", { name: /auto refresh interval/i }),
-      { target: { value: String(target.ms) } },
+    fireEvent.click(
+      within(screen.getByRole("radiogroup", { name: /auto refresh interval/i })).getByRole("radio", {
+        name: target.label,
+      }),
     );
     expect(onPollIntervalChange).toHaveBeenCalledWith(target.ms);
   });
 
-  it("disables the interval select while auto refresh is off", () => {
+  it("disables the interval while auto refresh is off", () => {
     render(
       <SettingsModal
         {...filterProps}
@@ -821,9 +874,11 @@ describe("SettingsModal", () => {
       />,
     );
     selectSection("Auto refresh");
-    expect(
-      screen.getByRole("combobox", { name: /auto refresh interval/i }),
-    ).toBeDisabled();
+    for (const radio of within(
+      screen.getByRole("radiogroup", { name: /auto refresh interval/i }),
+    ).getAllByRole("radio")) {
+      expect(radio).toBeDisabled();
+    }
   });
 
   describe("notification permission", () => {
@@ -1163,8 +1218,8 @@ describe("SettingsModal — owner defaults cover the personal account", () => {
     // Dashboard passes [login, ...orgs]; the personal account is the head of
     // that list and used to be the one owner with no way to set a default.
     renderTracked({ owners: ["octocat", "acme"] });
-    expect(screen.getByRole("option", { name: "octocat" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "acme" })).toBeInTheDocument();
+    expect(inSection().getByRole("option", { name: "octocat" })).toBeInTheDocument();
+    expect(inSection().getByRole("option", { name: "acme" })).toBeInTheDocument();
     expect(
       screen.getByRole("textbox", { name: "New check for octocat" }),
     ).toBeInTheDocument();
@@ -1199,7 +1254,7 @@ describe("SettingsModal — owner defaults cover the personal account", () => {
 
   it("says there is nothing to configure when no owner has loaded", () => {
     renderTracked({ owners: [] });
-    expect(screen.getByText(/no owners loaded yet/i)).toBeInTheDocument();
+    expect(inSection().getByText(/no owners loaded yet/i)).toBeInTheDocument();
   });
 });
 
@@ -1232,7 +1287,9 @@ describe("SettingsModal — appearance", () => {
   it("offers every family", () => {
     renderAppearance();
     expect(
-      screen.getAllByRole("radio").map((r) => (r as HTMLInputElement).value),
+      within(screen.getByRole("region", { name: "Appearance" }))
+        .getAllByRole("radio")
+        .map((r) => (r as HTMLInputElement).value),
     ).toEqual(THEMES.map((t) => t.id));
   });
 
@@ -1308,8 +1365,11 @@ describe("SettingsModal — ignored checks", () => {
   it("has its own section, apart from tracked checks", () => {
     open();
     expect(
-      screen.getByRole("tab", { name: "Ignored checks" }),
+      screen.getByRole("region", { name: "Ignored checks" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Tracked checks" })).not.toBe(
+      screen.getByRole("region", { name: "Ignored checks" }),
+    );
   });
 
   // Ignoring starts on the board. The panel is where you find out what you did
@@ -1555,7 +1615,7 @@ describe("SettingsModal — scope picker", () => {
 
   it("offers every owner and every configured repo", () => {
     openTracked({ value: { orgs: {}, repos: { "beta/api": ["ci"] } } });
-    const options = screen
+    const options = inSection()
       .getAllByRole("option")
       .map((o) => (o as HTMLOptionElement).value);
     expect(options).toEqual(["owner:acme", "owner:beta", "repo:beta/api"]);
@@ -1567,14 +1627,14 @@ describe("SettingsModal — scope picker", () => {
     openTracked({
       value: { orgs: { acme: ["lint", "ci"] }, repos: { "beta/api": ["qa"] } },
     });
-    const labels = screen.getAllByRole("option").map((o) => o.textContent);
+    const labels = inSection().getAllByRole("option").map((o) => o.textContent);
     expect(labels).toEqual(["acme (2)", "beta", "beta/api (1)"]);
   });
 
   it("adds a repo scope through the combobox and lands on it", () => {
     const onChange = vi.fn();
     openTracked({ onChange });
-    fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+    fireEvent.click(inSection().getByRole("button", { name: /add repository/i }));
     fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
     expect(onChange).toHaveBeenLastCalledWith({
@@ -1594,7 +1654,7 @@ describe("SettingsModal — scope picker", () => {
       value: { orgs: {}, repos: { "acme/web": ["lint"] } },
       onChange,
     });
-    fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+    fireEvent.click(inSection().getByRole("button", { name: /add repository/i }));
     fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
     expect(onChange).toHaveBeenLastCalledWith({
@@ -1606,7 +1666,7 @@ describe("SettingsModal — scope picker", () => {
   it("lists a repo once however many times it is picked", () => {
     openTracked();
     const addAcmeWeb = () => {
-      fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+      fireEvent.click(inSection().getByRole("button", { name: /add repository/i }));
       fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
       fireEvent.mouseDown(
         screen.getAllByRole("option", { name: "acme/web" }).slice(-1)[0],
@@ -1619,7 +1679,7 @@ describe("SettingsModal — scope picker", () => {
 
   it("backs out of adding a repository", () => {
     openTracked();
-    fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+    fireEvent.click(inSection().getByRole("button", { name: /add repository/i }));
     fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
     expect(
       screen.queryByRole("combobox", { name: "Repository" }),
@@ -1668,7 +1728,7 @@ describe("SettingsModal — scope picker", () => {
       />,
     );
     selectSection("Ignored checks");
-    fireEvent.click(screen.getByRole("button", { name: /add repository/i }));
+    fireEvent.click(inSection().getByRole("button", { name: /add repository/i }));
     fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
     fireEvent.change(screen.getByLabelText("New ignored check for acme/web"), {

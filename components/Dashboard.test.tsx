@@ -278,7 +278,10 @@ async function pickRepo(repo: string) {
  * modal; open it first, then pick the section under test. */
 function openSettings(section?: string) {
   fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-  if (section) fireEvent.click(screen.getByRole("tab", { name: section }));
+  if (section)
+    fireEvent.click(
+      within(screen.getByRole("navigation", { name: "Jump to section" })).getByRole("button", { name: section }),
+    );
 }
 
 describe("Dashboard", () => {
@@ -324,11 +327,10 @@ describe("Dashboard", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     openSettings("Auto refresh");
-    fireEvent.change(
-      screen.getByRole("combobox", { name: /auto refresh interval/i }),
-      {
-        target: { value: String(POLL_INTERVAL_OPTIONS[0].ms) },
-      },
+    fireEvent.click(
+      within(screen.getByRole("radiogroup", { name: /auto refresh interval/i })).getByRole("radio", {
+        name: POLL_INTERVAL_OPTIONS.find((o) => o.ms === POLL_INTERVAL_OPTIONS[0].ms)!.label,
+      }),
     );
     await waitFor(() => {
       const put = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
@@ -355,11 +357,10 @@ describe("Dashboard", () => {
     );
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     openSettings("Auto refresh");
-    fireEvent.change(
-      screen.getByRole("combobox", { name: /auto refresh interval/i }),
-      {
-        target: { value: String(POLL_INTERVAL_OPTIONS[0].ms) },
-      },
+    fireEvent.click(
+      within(screen.getByRole("radiogroup", { name: /auto refresh interval/i })).getByRole("radio", {
+        name: POLL_INTERVAL_OPTIONS.find((o) => o.ms === POLL_INTERVAL_OPTIONS[0].ms)!.label,
+      }),
     );
     await waitFor(() => {
       const puts = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
@@ -2527,16 +2528,16 @@ describe("Dashboard", () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-      expect(screen.getByText("Tracked checks")).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "Tracked checks" })).toBeInTheDocument();
     });
 
     it("closing the settings panel via its close button hides it", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-      expect(screen.getByText("Tracked checks")).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "Tracked checks" })).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Close settings" }));
-      expect(screen.queryByText("Tracked checks")).not.toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "Tracked checks" })).not.toBeInTheDocument();
     });
 
     it("hydrates tracked config from localStorage and persists it back", async () => {
@@ -2557,7 +2558,9 @@ describe("Dashboard", () => {
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       // STUCK_PR.repo = "acme/b", REVIEW_PR.repo = "acme/c", READY_PR.repo = "acme/d"
       openSettings("Tracked checks");
-      const addButton = screen.getByRole("button", { name: /add repository/i });
+      const addButton = within(screen.getByRole("region", { name: "Tracked checks" })).getByRole("button", {
+        name: /add repository/i,
+      });
       expect(addButton).toBeInTheDocument();
       fireEvent.click(addButton);
       // Focus the combobox; empty input shows availableRepos as suggestions
@@ -3616,9 +3619,10 @@ describe("Dashboard — auto refresh", () => {
 
     const longest = POLL_INTERVAL_OPTIONS[POLL_INTERVAL_OPTIONS.length - 1].ms;
     openSettings("Auto refresh");
-    fireEvent.change(
-      screen.getByRole("combobox", { name: /auto refresh interval/i }),
-      { target: { value: String(longest) } },
+    fireEvent.click(
+      within(screen.getByRole("radiogroup", { name: /auto refresh interval/i })).getByRole("radio", {
+        name: POLL_INTERVAL_OPTIONS.find((o) => o.ms === longest)!.label,
+      }),
     );
     await waitFor(() =>
       expect(localStorage.getItem("prison.pollInterval")).toBe(String(longest)),

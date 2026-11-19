@@ -5,6 +5,7 @@ import {
   useState,
   useEffect,
   useRef,
+  useId,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
@@ -506,25 +507,85 @@ function ScopeEditor({
   );
 }
 
+// A row with a switch on the right. Still a native checkbox underneath, so the
+// keyboard, the form semantics and every "checkbox" query keep working; only
+// its paint is a switch.
 function SettingCheckbox({
   checked,
   onChange,
+  help,
   children,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
+  help?: ReactNode;
   children: ReactNode;
 }) {
+  // The help line describes the switch rather than naming it, so a screen
+  // reader hears "Show bot comments, checkbox" and then the explanation.
+  const id = useId();
   return (
-    <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none">
+    <label className="flex cursor-pointer select-none items-center gap-4 py-3.5">
+      <span className="min-w-0 flex-1">
+        <span id={`${id}-label`} className="block text-[15px] font-medium text-foreground">{children}</span>
+        {help && <span id={`${id}-help`} className="mt-0.5 block text-[13px] text-muted">{help}</span>}
+      </span>
       <input
         type="checkbox"
+        aria-labelledby={`${id}-label`}
+        aria-describedby={help ? `${id}-help` : undefined}
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 rounded border-border bg-surface accent-accent"
+        className="relative h-[26px] w-11 shrink-0 cursor-pointer appearance-none rounded-full bg-border transition-colors before:absolute before:top-[3px] before:left-[3px] before:h-5 before:w-5 before:rounded-full before:bg-foreground before:transition-transform checked:bg-accent checked:before:translate-x-[18px] checked:before:bg-background focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
       />
-      {children}
     </label>
+  );
+}
+
+/** The six sections, each with the status dot the board uses for its kind. */
+const SECTION_DOT: Record<SectionId, string> = {
+  comments: "bg-warning",
+  "auto-refresh": "bg-accent",
+  "tracked-checks": "bg-danger",
+  "ignored-checks": "bg-muted",
+  appearance: "bg-success",
+  about: "bg-muted",
+};
+
+/** What the search box can find. Toggles work in the results; everything with
+ * more to it than a switch opens its section instead. */
+type SearchEntry = {
+  section: SectionId;
+  label: string;
+  help: string;
+  kind: "toggle" | "open" | "action";
+  toggle?: "showBots" | "hideReacted" | "hideSeen" | "autoRefresh" | "updateChecks";
+};
+
+const SEARCH_INDEX: SearchEntry[] = [
+  { section: "comments", label: "Show bot comments", help: "Bots write most review comments; they stay hidden unless you ask", kind: "toggle", toggle: "showBots" },
+  { section: "comments", label: "Hide comments I reacted to", help: "A reaction dismisses a thread, the same as replying", kind: "toggle", toggle: "hideReacted" },
+  { section: "comments", label: "Hide comments I marked as seen", help: "They come back when someone replies", kind: "toggle", toggle: "hideSeen" },
+  { section: "auto-refresh", label: "Auto refresh", help: "Checks GitHub on a schedule while a PRison tab is open", kind: "toggle", toggle: "autoRefresh" },
+  { section: "auto-refresh", label: "Refresh interval", help: "How often auto refresh checks: minutes, hourly", kind: "open" },
+  { section: "auto-refresh", label: "Desktop notifications", help: "Notify about changes that land while you're on another tab", kind: "open" },
+  { section: "tracked-checks", label: "Tracked checks", help: "Checks a PR needs, shown as Awaiting until they report", kind: "open" },
+  { section: "ignored-checks", label: "Ignored checks", help: "Broken checks that stop holding PRs out of Ready to merge", kind: "open" },
+  { section: "appearance", label: "Theme", help: "Colours and typefaces, light and dark", kind: "open" },
+  { section: "about", label: "Tell me when a newer version is out", help: "Asks GitHub once a day, without your token", kind: "toggle", toggle: "updateChecks" },
+  { section: "about", label: "Check for updates", help: "Ask GitHub for the latest release now", kind: "action" },
+];
+
+/** The label with the first occurrence of the query marked. */
+function Highlight({ text, query }: { text: string; query: string }) {
+  const i = text.toLowerCase().indexOf(query.toLowerCase());
+  if (!query || i < 0) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, i)}
+      <mark className="rounded-sm bg-accent/30 px-px text-inherit">{text.slice(i, i + query.length)}</mark>
+      {text.slice(i + query.length)}
+    </>
   );
 }
 
@@ -646,11 +707,14 @@ export function SettingsModal({
   const mode = useSyncExternalStore(subscribeToTheme, getMode, getServerMode);
 
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const tabRefs = useRef<Partial<Record<SectionId, HTMLButtonElement | null>>>(
-    {},
-  );
+  const searchRef = useRef<HTMLInputElement>(null);
 
+  // The jump pill last used; every section is on the page, this only marks it.
   const [section, setSection] = useState<SectionId>(SECTIONS[0].id);
+  // Typing turns the page into a list of matching settings; empty is the page.
+  const [query, setQuery] = useState("");
+  // Which ground the theme previews show; null follows the current one.
+  const [previewMode, setPreviewMode] = useState<"light" | "dark" | null>(null);
 
   // Re-seed local drafts from props each time the modal opens, so a parent
   // that hydrates `value` after mount (e.g. from localStorage) is reflected
@@ -663,21 +727,35 @@ export function SettingsModal({
     setWasOpen(open);
     if (open) {
       setSection(SECTIONS[0].id);
+      setQuery("");
+      setPreviewMode(null);
       // A result from the last time the modal was open is stale by an unknown
       // amount; better to offer the check again than to show an old answer.
       setUpdate({ status: "idle" });
     }
   }
 
-  // Escape key handler
+  // Escape clears a search before it closes anything: the first press takes
+  // you back to every setting, the second closes. "/" jumps to the search box,
+  // as it does on the board, unless you are typing somewhere.
   useEffect(() => {
     if (!open) return;
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        if (query) setQuery("");
+        else onClose();
+        return;
+      }
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      e.preventDefault();
+      searchRef.current?.focus();
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose]);
+  }, [open, onClose, query]);
+
 
   // Focus management: focus close button when modal opens
   useEffect(() => {
@@ -722,506 +800,558 @@ export function SettingsModal({
     onChange({ ...value, repos });
   }
 
-  // Arrow keys move between sections. The menu is a horizontal strip below the
-  // `sm` breakpoint and a vertical column above it, so both axes are wired.
-  function handleMenuKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    const step =
-      e.key === "ArrowDown" || e.key === "ArrowRight"
-        ? 1
-        : e.key === "ArrowUp" || e.key === "ArrowLeft"
-          ? -1
-          : 0;
-    if (step === 0) return;
-    e.preventDefault();
-    const current = SECTIONS.findIndex((s) => s.id === section);
-    const next = SECTIONS[(current + step + SECTIONS.length) % SECTIONS.length];
-    setSection(next.id);
-    tabRefs.current[next.id]?.focus();
+  // Jumping is a scroll, not a switch: every section stays on the page. The
+  // scroll waits a frame so a section that was hidden behind search results is
+  // back on the page first. (Optional call: jsdom has no scrollIntoView.)
+  function jump(id: SectionId) {
+    setSection(id);
+    setQuery("");
+    requestAnimationFrame(() =>
+      document.getElementById(`settings-${id}`)?.scrollIntoView?.({ block: "start" }),
+    );
   }
 
+  const toggles = {
+    showBots: [showBots, onShowBotsChange],
+    hideReacted: [hideReacted, onHideReactedChange],
+    hideSeen: [hideSeen, onHideSeenChange],
+    autoRefresh: [autoRefresh, onAutoRefreshChange],
+    updateChecks: [updateChecks, onUpdateChecksChange],
+  } as const;
+
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const results = SEARCH_INDEX.filter((e) => {
+    const sectionLabel = SECTIONS.find((s) => s.id === e.section)!.label;
+    const hay = `${e.label} ${e.help} ${sectionLabel}`.toLowerCase();
+    return terms.every((t) => hay.includes(t));
+  });
+  const resultSections = SECTIONS.filter((s) => results.some((r) => r.section === s.id));
+  const shownMode = previewMode ?? mode;
+
+  const card = (id: SectionId, body: ReactNode) => {
+    const label = SECTIONS.find((s) => s.id === id)!.label;
+    return (
+      <section
+        id={`settings-${id}`}
+        aria-labelledby={`settings-${id}-title`}
+        className="scroll-mt-4 rounded-[18px] border border-border bg-surface px-5 pb-5"
+      >
+        <h3
+          id={`settings-${id}-title`}
+          className="flex items-center gap-2 pt-4 pb-2 text-xs font-semibold tracking-[0.08em] text-muted uppercase"
+        >
+          <span aria-hidden="true" className={`h-2 w-2 rounded-full ${SECTION_DOT[id]}`} />
+          {label}
+        </h3>
+        {body}
+      </section>
+    );
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-16">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Scrim */}
-      <div className="absolute inset-0 bg-black/50" aria-hidden="true" />
+      <div className="absolute inset-0 bg-black/60" aria-hidden="true" />
 
       {/* Panel */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className="relative z-10 flex max-h-[85vh] w-full max-w-4xl flex-col rounded-xl border border-border bg-background shadow-xl"
+        className="relative z-10 flex max-h-[min(800px,90vh)] w-full max-w-[800px] flex-col rounded-[20px] border border-border bg-background shadow-[0_40px_120px_-20px_rgba(0,0,0,0.7)]"
       >
-        {/* Header row */}
-        <div className="flex items-center justify-between px-6 pt-6 pb-4">
-          <h2 id="settings-title" className="font-semibold text-foreground">
-            Settings
-          </h2>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            aria-label="Close settings"
-            onClick={onClose}
-            className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center text-muted transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            <svg
-              aria-hidden="true"
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
+        <div className="flex flex-col gap-3.5 border-b border-border px-6 pt-5 pb-3.5">
+          <div className="flex items-center gap-3">
+            <h2 id="settings-title" className="flex-1 text-lg font-bold text-foreground">
+              Settings
+            </h2>
+            <button
+              ref={closeButtonRef}
+              type="button"
+              aria-label="Close settings"
+              onClick={onClose}
+              className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-[10px] border border-border bg-surface text-foreground transition-colors hover:brightness-[var(--hover-brightness)] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
-              <path
-                d="M12 4L4 12M4 4l8 8"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <label
+            className={`flex h-12 items-center gap-3 rounded-[14px] border bg-surface px-4 ${
+              query ? "border-accent ring-[3px] ring-accent/20" : "border-border"
+            }`}
+          >
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={query ? "text-accent" : "text-muted"}>
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
             </svg>
-          </button>
+            <input
+              ref={searchRef}
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Search settings"
+              aria-keyshortcuts="/"
+              placeholder="Search settings: bots, interval, theme, checks…"
+              className="min-w-0 flex-1 bg-transparent text-[15px] text-foreground placeholder:text-muted focus:outline-none"
+            />
+            {query ? (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => setQuery("")}
+                className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-border text-foreground"
+              >
+                <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            ) : (
+              <kbd aria-hidden="true" className="rounded-md border border-border px-1.5 py-px font-mono text-xs text-muted">
+                /
+              </kbd>
+            )}
+          </label>
+          {query ? (
+            <p aria-live="polite" className="flex h-[34px] items-center gap-2 text-[13px] text-muted">
+              <span className="font-semibold text-foreground">
+                {results.length} {results.length === 1 ? "setting" : "settings"}
+              </span>
+              {results.length > 0
+                ? `in ${resultSections.length} ${resultSections.length === 1 ? "section" : "sections"} match “${query.trim()}”`
+                : `match “${query.trim()}”`}
+              <span className="flex-1" />
+              Esc clears
+            </p>
+          ) : (
+            <nav aria-label="Jump to section" className="flex flex-wrap gap-1.5">
+              {SECTIONS.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  aria-current={section === s.id ? "true" : undefined}
+                  onClick={() => jump(s.id)}
+                  className={`flex min-h-[34px] cursor-pointer items-center gap-[7px] rounded-full border border-border px-3.5 text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
+                    section === s.id ? "bg-foreground text-background" : "text-muted hover:text-foreground"
+                  }`}
+                >
+                  <span aria-hidden="true" className={`h-[7px] w-[7px] rounded-full ${SECTION_DOT[s.id]}`} />
+                  {s.label}
+                </button>
+              ))}
+            </nav>
+          )}
         </div>
 
-        {/* Menu + the one visible section. Only the section scrolls, so the
-            menu and the close button stay put however long the content is. */}
-        <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
-          {/* No aria-orientation: the menu is a vertical column at sm and up
-              and a horizontal strip below it, and there is no responsive way
-              to say so. Arrow keys move on both axes regardless. */}
-          <div
-            role="tablist"
-            aria-label="Settings sections"
-            onKeyDown={handleMenuKeyDown}
-            className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-6 pb-3 sm:w-52 sm:flex-col sm:overflow-x-visible sm:border-b-0 sm:border-r sm:pr-3 sm:pb-6"
-          >
-            {SECTIONS.map((s) => (
-              <button
-                key={s.id}
-                ref={(el) => {
-                  tabRefs.current[s.id] = el;
-                }}
-                type="button"
-                role="tab"
-                id={`settings-tab-${s.id}`}
-                aria-selected={section === s.id}
-                // Only the selected section is mounted, so only the selected
-                // tab has a panel to point at.
-                aria-controls={section === s.id ? "settings-panel" : undefined}
-                tabIndex={section === s.id ? 0 : -1}
-                onClick={() => setSection(s.id)}
-                className={`min-h-[44px] cursor-pointer whitespace-nowrap rounded-md px-3 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
-                  section === s.id
-                    ? "bg-accent text-background"
-                    : "text-muted hover:text-foreground"
-                }`}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-
-          <div
-            role="tabpanel"
-            id="settings-panel"
-            aria-labelledby={`settings-tab-${section}`}
-            tabIndex={0}
-            className="min-w-0 flex-1 overflow-y-auto px-6 pt-4 pb-6 sm:pt-0"
-          >
-            {section === "appearance" && (
-              <fieldset className="m-0 border-0 p-0">
-                <legend className="mb-3 text-sm text-muted">
-                  A theme brings its own colours and typefaces. Each swatch
-                  below is that theme rendering itself on your current ground.
-                </legend>
-                {/* auto-fit rather than a column count: the grid takes as many
-                    17rem cards as the panel is wide, so it is two here, one on
-                    a phone, and nothing to revisit the next time a family is
-                    added. A Tailwind class can't carry this — the column count
-                    isn't in the source.
-                    17rem, not less: the longest ground line a card can hold is
-                    the selected one's ("Shallow · Deep — on Deep"), and below
-                    this width it wraps to a third line and leaves the card
-                    taller than the one beside it. */}
-                <div
-                  className="grid gap-2"
-                  style={{
-                    gridTemplateColumns: "repeat(auto-fit, minmax(17rem, 1fr))",
-                  }}
-                >
-                  {THEMES.map((t) => (
-                    <label
-                      key={t.id}
-                      className={`flex cursor-pointer items-center gap-3 rounded-md border bg-surface px-3 py-2 transition-colors hover:brightness-[var(--hover-brightness)] ${
-                        theme === t.id ? "border-accent" : "border-border"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="prison-theme"
-                        value={t.id}
-                        checked={theme === t.id}
-                        onChange={() => applyTheme(t.id)}
-                        className="h-4 w-4 shrink-0 accent-accent"
-                      />
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="text-sm font-medium text-foreground">
-                          {t.label}
-                        </span>
-                        {/* Naming both grounds is what makes the header button
-                            legible: it says "Switch to Aurora Night", and this
-                            is where you learn Night is one of Aurora's two. */}
-                        <span className="text-xs text-muted">
-                          {t.light} · {t.dark}
-                          {theme === t.id && ` — on ${modeLabel(theme, mode)}`}
-                        </span>
-                      </span>
-                      {/* Stamped with the pair, so globals.css resolves that
-                          palette's variables in here: the ground, the typeface
-                          and the four hues are the real ones, not a copy that
-                          can drift. Decorative — the text above names it all. */}
-                      <span
-                        data-theme={t.id}
-                        data-mode={mode}
-                        aria-hidden="true"
-                        className="flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1.5"
-                      >
-                        <span className="font-sans text-xs font-semibold text-foreground">
-                          Aa
-                        </span>
-                        <span className="h-3.5 w-3.5 rounded-full bg-accent" />
-                        <span className="h-3.5 w-3.5 rounded-full bg-success" />
-                        <span className="h-3.5 w-3.5 rounded-full bg-warning" />
-                        <span className="h-3.5 w-3.5 rounded-full bg-danger" />
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                <p className="mt-3 text-xs text-muted">
-                  The button in the header switches between a theme&apos;s two
-                  grounds.
-                </p>
-              </fieldset>
-            )}
-
-            {section === "comments" && (
-              <div className="space-y-2">
-                <p className="mb-3 text-sm text-muted">
-                  What shows up in{" "}
-                  <strong className="font-medium text-foreground">
-                    Comments awaiting your reply
-                  </strong>
-                  .
-                </p>
-                <SettingCheckbox checked={showBots} onChange={onShowBotsChange}>
-                  Show bot comments
-                </SettingCheckbox>
-                <SettingCheckbox
-                  checked={hideReacted}
-                  onChange={onHideReactedChange}
-                >
-                  Hide comments I reacted to
-                </SettingCheckbox>
-                <SettingCheckbox
-                  checked={hideSeen}
-                  onChange={onHideSeenChange}
-                >
-                  Hide comments I marked as seen
-                </SettingCheckbox>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+          {query ? (
+            results.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted">
+                No setting matches “{query.trim()}”.
+              </p>
+            ) : (
+              <div className="-mx-2 flex flex-col">
+                {resultSections.map((s) => (
+                  <div key={s.id}>
+                    <div className="flex items-center gap-2 px-2 pt-3.5 pb-1.5 text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">
+                      <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${SECTION_DOT[s.id]}`} />
+                      {s.label}
+                    </div>
+                    {results
+                      .filter((r) => r.section === s.id)
+                      .map((r) =>
+                        r.kind === "toggle" && r.toggle ? (
+                          <div key={r.label} className="rounded-xl px-3 hover:bg-surface">
+                            <SettingCheckbox
+                              checked={toggles[r.toggle][0]}
+                              onChange={toggles[r.toggle][1]}
+                              help={r.help}
+                            >
+                              <Highlight text={r.label} query={query.trim()} />
+                            </SettingCheckbox>
+                          </div>
+                        ) : (
+                          <div key={r.label} className="flex min-h-[60px] items-center gap-3.5 rounded-xl px-3 py-2 hover:bg-surface">
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[15px] font-medium text-foreground">
+                                <Highlight text={r.label} query={query.trim()} />
+                              </div>
+                              <div className="mt-0.5 text-[13px] text-muted">{r.help}</div>
+                              {r.kind === "action" && update.status !== "idle" && (
+                                <p aria-live="polite" className="mt-1 text-xs text-muted">
+                                  {update.status === "checking" && "Checking…"}
+                                  {update.status === "error" && "Couldn't reach GitHub. Try again in a moment."}
+                                  {update.status === "done" && <UpdateResult latest={update.latest} version={version} />}
+                                </p>
+                              )}
+                            </div>
+                            <SettingButton
+                              onClick={() => (r.kind === "action" ? checkForUpdates() : jump(r.section))}
+                              className="flex shrink-0 items-center gap-1.5 rounded-[10px]"
+                            >
+                              {r.kind === "action" ? "Check now" : "Open"}
+                            </SettingButton>
+                          </div>
+                        ),
+                      )}
+                  </div>
+                ))}
               </div>
-            )}
+            )
+          ) : (
+            <div className="flex flex-col gap-4">
+              {card(
+                "comments",
+                <div className="divide-y divide-border border-t border-border">
+                  <SettingCheckbox checked={showBots} onChange={onShowBotsChange} help="Bots write most review comments; they stay hidden unless you ask.">
+                    Show bot comments
+                  </SettingCheckbox>
+                  <SettingCheckbox checked={hideReacted} onChange={onHideReactedChange} help="A reaction dismisses a thread, the same as replying.">
+                    Hide comments I reacted to
+                  </SettingCheckbox>
+                  <SettingCheckbox checked={hideSeen} onChange={onHideSeenChange} help="They come back when someone replies.">
+                    Hide comments I marked as seen
+                  </SettingCheckbox>
+                </div>,
+              )}
 
-            {section === "auto-refresh" && (
-              <div>
-                <SettingCheckbox
-                  checked={autoRefresh}
-                  onChange={onAutoRefreshChange}
-                >
-                  Auto refresh
-                </SettingCheckbox>
-                <label className="mt-2 flex items-center gap-2 text-sm text-muted">
-                  <span>Check</span>
-                  <select
-                    value={pollInterval}
-                    onChange={(e) =>
-                      onPollIntervalChange(Number(e.target.value))
+              {card(
+                "auto-refresh",
+                <div className="divide-y divide-border border-t border-border">
+                  <SettingCheckbox checked={autoRefresh} onChange={onAutoRefreshChange} help="Tells you what moved: approvals, new conflicts, replies. Works while a PRison tab is open.">
+                    Auto refresh
+                  </SettingCheckbox>
+                  <div className="flex flex-wrap items-center gap-3 py-3">
+                    <span className="flex-1 text-[15px] font-medium text-foreground">Every</span>
+                    <div
+                      role="radiogroup"
+                      aria-label="Auto refresh interval"
+                      aria-disabled={!autoRefresh || undefined}
+                      className={`flex rounded-full border border-border bg-background p-1 ${autoRefresh ? "" : "opacity-60"}`}
+                    >
+                      {POLL_INTERVAL_OPTIONS.map((o) => (
+                        <label
+                          key={o.ms}
+                          className={`flex min-h-[32px] items-center rounded-full px-3.5 text-[13px] font-medium ${
+                            pollInterval === o.ms ? "bg-foreground text-background" : "text-muted"
+                          } ${autoRefresh ? "cursor-pointer" : "cursor-not-allowed"}`}
+                        >
+                          <input
+                            type="radio"
+                            name="prison-poll-interval"
+                            value={o.ms}
+                            checked={pollInterval === o.ms}
+                            disabled={!autoRefresh}
+                            onChange={() => onPollIntervalChange(o.ms)}
+                            className="sr-only"
+                          />
+                          {o.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {budget && (
+                    // The allowance is hourly and shared with every other client
+                    // signed in as you, so an interval is a spending decision.
+                    <p className="py-3 text-xs text-muted">
+                      That refresh cost{" "}
+                      <strong className="font-medium text-foreground">{budget.cost} points</strong>{" "}
+                      of GitHub&apos;s hourly allowance;{" "}
+                      <strong className="font-medium text-foreground">{budget.remaining.toLocaleString()}</strong>{" "}
+                      are left until it returns to full. The allowance is per account, so anything else
+                      signed in as you spends from the same pocket.
+                    </p>
+                  )}
+                  {/* All of these only apply while auto refresh is on: with it off
+                      nothing polls, so there is no notification to promise or test. */}
+                  {autoRefresh && (
+                    <div className="flex flex-wrap items-center gap-3 py-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[15px] font-medium text-foreground">Desktop notifications</div>
+                        <div className="mt-0.5 text-[13px] text-muted">For changes that land while you&apos;re on another tab.</div>
+                      </div>
+                      {notifPermission === "granted" && (
+                        <>
+                          <span className="rounded-full bg-success/15 px-2.5 py-1 text-xs font-semibold text-success">Allowed</span>
+                          <SettingButton onClick={onTestNotification} className="rounded-[10px]">
+                            Send a test notification
+                          </SettingButton>
+                        </>
+                      )}
+                      {notifPermission === "default" && (
+                        <SettingButton onClick={onEnableNotifications} className="rounded-[10px]">
+                          Enable notifications
+                        </SettingButton>
+                      )}
+                      {notifPermission === "denied" && (
+                        <span className="rounded-full bg-danger/15 px-2.5 py-1 text-xs font-semibold text-danger">Blocked</span>
+                      )}
+                    </div>
+                  )}
+                  {autoRefresh && notifPermission === "default" && (
+                    <p className="py-3 text-xs text-muted">
+                      Your browser hasn&apos;t been asked yet, so you&apos;ll get the tab badge but no desktop notification.
+                    </p>
+                  )}
+                  {autoRefresh && notifPermission === "denied" && (
+                    <p className="py-3 text-xs text-muted">
+                      Notifications are blocked in your browser — you&apos;ll still get the tab badge.
+                    </p>
+                  )}
+                  {autoRefresh && notifPermission === "granted" && (
+                    // Browser permission is only half the chain: the operating system
+                    // decides separately and refuses in silence.
+                    <p className="py-3 text-xs text-muted">
+                      Nothing appeared? The browser has permission, so the block is underneath it: your operating
+                      system decides separately, and it refuses in silence. On macOS that is{" "}
+                      <strong className="font-medium text-foreground">System Settings → Notifications</strong>, where
+                      the browser needs notifications allowed <em>and</em> an alert style that isn&apos;t None — a style
+                      of None is permission that shows nothing. A browser registers more than one entry there, so check
+                      each of them. A Focus mode silences everything regardless.
+                    </p>
+                  )}
+                  {autoRefresh && (
+                    <p className="py-3 text-xs text-muted">
+                      Rather not depend on notifications at all?{" "}
+                      <a
+                        href={`${PROJECT_URL}/tree/main/extras/menubar`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-accent underline underline-offset-2 hover:brightness-110"
+                      >
+                        The menu bar
+                      </a>{" "}
+                      shows the same count on macOS without needing permission from anyone.
+                    </p>
+                  )}
+                </div>,
+              )}
+
+              {card(
+                "tracked-checks",
+                <div className="border-t border-border pt-4">
+                  <p className="mb-5 text-sm text-muted">
+                    Name the checks each PR needs (e.g. a manual qa/smoke). We&apos;ll show them as Awaiting until
+                    they report — handy for gates GitHub doesn&apos;t expose. Tick{" "}
+                    <strong className="font-medium text-foreground">Required</strong> and the check holds the PR out
+                    of Ready to merge; leave it unticked and the check is shown for information and blocks nothing.
+                  </p>
+                  {/* Owner defaults cover organizations *and* the personal
+                      account: a default is keyed by the owner segment of
+                      `owner/repo`, which is the login for a personal repo. */}
+                  <ScopeEditor
+                    label="Tracked checks scope"
+                    owners={owners}
+                    repos={Object.keys(value.repos)}
+                    availableRepos={availableRepos}
+                    count={(s) =>
+                      normalizeAll(s.kind === "owner" ? value.orgs[s.key] : value.repos[s.key]).length
                     }
-                    disabled={!autoRefresh}
-                    aria-label="Auto refresh interval"
-                    className="min-h-[36px] rounded-md border border-border bg-surface px-2 text-sm text-foreground focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                    onAddRepo={(repo) => setRepoChecks(repo, normalizeAll(value.repos[repo]))}
+                    onRemoveRepo={removeRepo}
+                    removeLabel={(repo) => `Remove ${repo} override`}
+                    ownerGroupLabel="Owner defaults"
                   >
-                    {POLL_INTERVAL_OPTIONS.map((o) => (
-                      <option key={o.ms} value={o.ms}>
-                        {o.label}
-                      </option>
+                    {(scope) => (
+                      <div>
+                        <p className="mb-3 text-xs text-muted">
+                          {scope.kind === "owner"
+                            ? "The default for every repo this owner has, unless the repo has its own list."
+                            : "Replaces the owner default for this repo."}
+                        </p>
+                        <CheckList
+                          key={scopeId(scope)}
+                          scope={scope.key}
+                          checks={scope.kind === "owner" ? value.orgs[scope.key] : value.repos[scope.key]}
+                          onChange={(checks) =>
+                            scope.kind === "owner" ? setOrgChecks(scope.key, checks) : setRepoChecks(scope.key, checks)
+                          }
+                        />
+                      </div>
+                    )}
+                  </ScopeEditor>
+                </div>,
+              )}
+
+              {card(
+                "ignored-checks",
+                <div className="border-t border-border pt-4">
+                  <p className="mb-5 text-sm text-muted">
+                    A check that is broken rather than failing. An ignored check still shows on the card &mdash;
+                    muted, never red &mdash; but it stops holding the PR out of{" "}
+                    <strong className="font-medium text-foreground">Ready to merge</strong>, and it never gets a
+                    bucket of its own under By check. Right-click a check on the board to ignore it; it lands here,
+                    under its repo.
+                  </p>
+                  <ScopeEditor
+                    label="Ignored checks scope"
+                    owners={owners}
+                    repos={ignoredRepos}
+                    availableRepos={availableRepos}
+                    count={(s) => ((s.kind === "owner" ? ignored.orgs[s.key] : ignored.repos[s.key]) ?? []).length}
+                    onRemoveRepo={(repo) => setIgnoredIn("repos", repo, [])}
+                    removeLabel={(repo) => `Stop ignoring everything for ${repo}`}
+                    ownerGroupLabel="Owner-wide"
+                  >
+                    {(scope) => (
+                      <div>
+                        <p className="mb-3 text-xs text-muted">
+                          {scope.kind === "owner"
+                            ? "Ignored on every repo the owner has — for a check that is broken everywhere, not on one repo."
+                            : "Ignored on this repo. An owner-wide entry still applies on top of it."}
+                        </p>
+                        <NameList
+                          key={scopeId(scope)}
+                          scope={scope.key}
+                          names={(scope.kind === "owner" ? ignored.orgs[scope.key] : ignored.repos[scope.key]) ?? []}
+                          onChange={(names) =>
+                            setIgnoredIn(scope.kind === "owner" ? "orgs" : "repos", scope.key, names)
+                          }
+                          addLabel={`Ignore for ${scope.key}`}
+                        />
+                      </div>
+                    )}
+                  </ScopeEditor>
+                </div>,
+              )}
+
+              {card(
+                "appearance",
+                <fieldset className="m-0 border-0 border-t border-border p-0 pt-3">
+                  <div className="mb-3.5 flex flex-wrap items-center gap-3">
+                    <legend className="flex-1 text-[13px] text-muted">
+                      Each card is the board in that theme. The sun/moon in the header flips between its two grounds.
+                    </legend>
+                    <div role="group" aria-label="Preview ground" className="flex rounded-full border border-border bg-background p-[3px]">
+                      {(["light", "dark"] as const).map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          aria-pressed={shownMode === m}
+                          onClick={() => setPreviewMode(m)}
+                          className={`min-h-[28px] cursor-pointer rounded-full px-3 text-xs ${
+                            shownMode === m ? "bg-foreground font-semibold text-background" : "font-medium text-muted"
+                          }`}
+                        >
+                          Preview {m}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(12rem, 1fr))" }}>
+                    {THEMES.map((t) => (
+                      <label
+                        key={t.id}
+                        className={`group cursor-pointer overflow-hidden rounded-[14px] border bg-background transition-colors focus-within:ring-2 focus-within:ring-accent ${
+                          theme === t.id ? "border-accent ring-[3px] ring-accent/25" : "border-border"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="prison-theme"
+                          value={t.id}
+                          checked={theme === t.id}
+                          onChange={() => applyTheme(t.id)}
+                          className="sr-only"
+                        />
+                        {/* Stamped with the pair, so globals.css resolves that
+                            palette's variables in here: the ground, the spot, the
+                            typeface and the four hues are the real ones, not a
+                            copy that can drift. Decorative; the text names it. */}
+                        <span
+                          data-theme={t.id}
+                          data-mode={shownMode}
+                          aria-hidden="true"
+                          className="flex h-[92px] flex-col gap-1.5 bg-background p-[9px]"
+                        >
+                          <span className="nm-mini flex h-6 overflow-hidden rounded-[7px]">
+                            <span className="w-[26px] bg-[linear-gradient(160deg,var(--danger),var(--warning))]" />
+                            <span className="flex flex-1 items-center gap-1 px-1.5">
+                              <span className="h-1 w-[46%] rounded-sm bg-foreground/75" />
+                              <span className="ml-auto h-2 w-[18px] rounded-[3px] bg-[linear-gradient(90deg,var(--danger),var(--warning))]" />
+                            </span>
+                          </span>
+                          <span className="grid flex-1 grid-cols-4 gap-1">
+                            {(["bg-danger", "bg-accent", "bg-warning", "bg-success"] as const).map((dot, i) => (
+                              <span
+                                key={dot}
+                                className={`flex flex-col gap-[3px] rounded-[5px] border bg-surface p-1 ${i === 0 ? "border-danger/45" : "border-border"}`}
+                              >
+                                <span className={`h-[5px] w-[5px] rounded-full ${dot}`} />
+                                <span className="h-[3px] rounded-sm bg-foreground/35" />
+                                <span className="h-[3px] w-[70%] rounded-sm bg-foreground/20" />
+                              </span>
+                            ))}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-2 bg-surface px-[11px] py-[9px]">
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[13px] font-semibold text-foreground">{t.label}</span>
+                            {/* Naming both grounds is what makes the header button
+                                legible: it says "Switch to Aurora Night". */}
+                            <span className="block text-[11px] text-muted">
+                              {t.light} · {t.dark}
+                              {theme === t.id && ` — on ${modeLabel(theme, mode)}`}
+                            </span>
+                          </span>
+                          <span
+                            aria-hidden="true"
+                            className={`flex h-[18px] w-[18px] items-center justify-center rounded-full ${
+                              theme === t.id ? "bg-accent text-background" : ""
+                            }`}
+                          >
+                            {theme === t.id && (
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5">
+                                <path d="M20 6 9 17l-5-5" />
+                              </svg>
+                            )}
+                          </span>
+                        </span>
+                      </label>
                     ))}
-                  </select>
-                </label>
-                <p className="mt-2 text-xs text-muted">
-                  On this schedule PRison re-checks the dashboard and tells you
-                  what moved — a PR that became ready, checks that went red,
-                  changes requested, a review asked of you, a new reply, or one
-                  of your PRs getting merged. Works while a PRison tab is open;
-                  there is no background service.
-                </p>
-                {budget && (
-                  // The allowance is hourly and shared with every other client
-                  // signed in as you, so an interval is a spending decision.
-                  // It was an invisible one until this line.
-                  <p className="mt-2 text-xs text-muted">
-                    That refresh cost{" "}
-                    <strong className="font-medium text-foreground">
-                      {budget.cost} points
-                    </strong>{" "}
-                    of GitHub&apos;s hourly allowance;{" "}
-                    <strong className="font-medium text-foreground">
-                      {budget.remaining.toLocaleString()}
-                    </strong>{" "}
-                    are left until it returns to full. The allowance is per
-                    account, so anything else signed in as you spends from the
-                    same pocket.
-                  </p>
-                )}
-                {/* All three only apply while auto refresh is on: with it off
-                    nothing polls, so there is no tab badge to promise and no
-                    notification to test. */}
-                {autoRefresh && notifPermission === "default" && (
-                  <div className="mt-3">
-                    <p className="mb-2 text-xs text-muted">
-                      Your browser hasn&apos;t been asked yet, so you&apos;ll
-                      get the tab badge but no desktop notification.
-                    </p>
-                    <SettingButton onClick={onEnableNotifications}>
-                      Enable notifications
-                    </SettingButton>
                   </div>
-                )}
-                {autoRefresh && notifPermission === "denied" && (
-                  <p className="mt-3 text-xs text-muted">
-                    Notifications are blocked in your browser — you&apos;ll
-                    still get the tab badge.
+                </fieldset>,
+              )}
+
+              {card(
+                "about",
+                <div className="space-y-3 border-t border-border pt-4 text-sm text-muted">
+                  <p className="text-base font-semibold text-foreground">PRison{version ? ` v${version}` : ""}</p>
+                  <p>
+                    A read-only GitHub dashboard for the pull requests waiting on you — and how long they&apos;ve
+                    been waiting. It runs on your own machine and never writes anything back to GitHub.
                   </p>
-                )}
-                {autoRefresh && notifPermission === "granted" && (
-                  <div className="mt-3">
-                    <SettingButton onClick={onTestNotification}>
-                      Send a test notification
-                    </SettingButton>
-                    {/* The browser having permission is only half the chain:
-                        the operating system decides separately whether the
-                        browser may show anything, and it refuses in silence.
-                        Without this line a swallowed notification is
-                        indistinguishable from a broken button. */}
-                    <p className="mt-2 text-xs text-muted">
-                      Nothing appeared? The browser has permission, so the block
-                      is underneath it: your operating system decides
-                      separately, and it refuses in silence. On macOS that is{" "}
-                      <strong className="font-medium text-foreground">
-                        System Settings → Notifications
-                      </strong>
-                      , where the browser needs notifications allowed{" "}
-                      <em>and</em> an alert style that isn&apos;t None — a style
-                      of None is permission that shows nothing. A browser
-                      registers more than one entry there, so check each of
-                      them. A Focus mode silences everything regardless.
-                    </p>
-                  </div>
-                )}
-                {/* Outside all three: the reader who most needs an
-                    alternative is the one whose browser said no, and they get
-                    neither a button nor a hint above. */}
-                {autoRefresh && (
-                  <p className="mt-3 text-xs text-muted">
-                    Rather not depend on notifications at all?{" "}
+                  <p>
                     <a
-                      href={`${PROJECT_URL}/tree/main/extras/menubar`}
+                      href={PROJECT_URL}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-accent underline underline-offset-2 hover:brightness-110"
                     >
-                      The menu bar
+                      {PROJECT_LABEL}
                     </a>{" "}
-                    shows the same count on macOS without needing permission
-                    from anyone.
+                    — open source, MIT licensed. Issues and pull requests welcome.
                   </p>
-                )}
-              </div>
-            )}
-
-            {section === "tracked-checks" && (
-              <div>
-                <p className="mb-6 text-sm text-muted">
-                  Name the checks each PR needs (e.g. a manual qa/smoke).
-                  We&apos;ll show them as Awaiting until they report — handy for
-                  gates GitHub doesn&apos;t expose. Tick{" "}
-                  <strong className="font-medium text-foreground">
-                    Required
-                  </strong>{" "}
-                  and the check holds the PR out of Ready to merge; leave it
-                  unticked and the check is shown for information and blocks
-                  nothing.
-                </p>
-
-                {/* Owner defaults cover organizations *and* the personal
-                    account: a default is keyed by the owner segment of
-                    `owner/repo`, which is the login for a personal repo. */}
-                <ScopeEditor
-                  label="Tracked checks scope"
-                  owners={owners}
-                  repos={Object.keys(value.repos)}
-                  availableRepos={availableRepos}
-                  count={(s) =>
-                    normalizeAll(
-                      s.kind === "owner"
-                        ? value.orgs[s.key]
-                        : value.repos[s.key],
-                    ).length
-                  }
-                  onAddRepo={(repo) =>
-                    setRepoChecks(repo, normalizeAll(value.repos[repo]))
-                  }
-                  onRemoveRepo={removeRepo}
-                  removeLabel={(repo) => `Remove ${repo} override`}
-                  ownerGroupLabel="Owner defaults"
-                >
-                  {(scope) => (
-                    <div>
-                      <p className="mb-3 text-xs text-muted">
-                        {scope.kind === "owner"
-                          ? "The default for every repo this owner has, unless the repo has its own list."
-                          : "Replaces the owner default for this repo."}
-                      </p>
-                      <CheckList
-                        key={scopeId(scope)}
-                        scope={scope.key}
-                        checks={
-                          scope.kind === "owner"
-                            ? value.orgs[scope.key]
-                            : value.repos[scope.key]
-                        }
-                        onChange={(checks) =>
-                          scope.kind === "owner"
-                            ? setOrgChecks(scope.key, checks)
-                            : setRepoChecks(scope.key, checks)
-                        }
-                      />
-                    </div>
-                  )}
-                </ScopeEditor>
-              </div>
-            )}
-
-            {section === "ignored-checks" && (
-              <div>
-                <p className="mb-6 text-sm text-muted">
-                  A check that is broken rather than failing. An ignored check
-                  still shows on the card &mdash; muted, never red &mdash; but
-                  it stops holding the PR out of{" "}
-                  <strong className="font-medium text-foreground">
-                    Ready to merge
-                  </strong>
-                  , and it never gets a bucket of its own under By check.
-                  Right-click a check on the board to ignore it; it lands here,
-                  under its repo.
-                </p>
-
-                <ScopeEditor
-                  label="Ignored checks scope"
-                  owners={owners}
-                  repos={ignoredRepos}
-                  availableRepos={availableRepos}
-                  count={(s) =>
-                    (
-                      (s.kind === "owner"
-                        ? ignored.orgs[s.key]
-                        : ignored.repos[s.key]) ?? []
-                    ).length
-                  }
-                  onRemoveRepo={(repo) => setIgnoredIn("repos", repo, [])}
-                  removeLabel={(repo) => `Stop ignoring everything for ${repo}`}
-                  ownerGroupLabel="Owner-wide"
-                >
-                  {(scope) => (
-                    <div>
-                      <p className="mb-3 text-xs text-muted">
-                        {scope.kind === "owner"
-                          ? "Ignored on every repo the owner has — for a check that is broken everywhere, not on one repo."
-                          : "Ignored on this repo. An owner-wide entry still applies on top of it."}
-                      </p>
-                      <NameList
-                        key={scopeId(scope)}
-                        scope={scope.key}
-                        names={
-                          (scope.kind === "owner"
-                            ? ignored.orgs[scope.key]
-                            : ignored.repos[scope.key]) ?? []
-                        }
-                        onChange={(names) =>
-                          setIgnoredIn(
-                            scope.kind === "owner" ? "orgs" : "repos",
-                            scope.key,
-                            names,
-                          )
-                        }
-                        addLabel={`Ignore for ${scope.key}`}
-                      />
-                    </div>
-                  )}
-                </ScopeEditor>
-              </div>
-            )}
-
-            {section === "about" && (
-              <div className="space-y-3 text-sm text-muted">
-                <p className="text-base font-semibold text-foreground">
-                  PRison{version ? ` v${version}` : ""}
-                </p>
-                <p>
-                  A read-only GitHub dashboard for the pull requests waiting on
-                  you — and how long they&apos;ve been waiting. It runs on your
-                  own machine and never writes anything back to GitHub.
-                </p>
-                <p>
-                  <a
-                    href={PROJECT_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-accent underline underline-offset-2 hover:brightness-110"
-                  >
-                    {PROJECT_LABEL}
-                  </a>{" "}
-                  — open source, MIT licensed. Issues and pull requests welcome.
-                </p>
-                <div className="flex flex-col gap-2">
-                  <SettingCheckbox
-                    checked={updateChecks}
-                    onChange={onUpdateChecksChange}
-                  >
+                  <SettingCheckbox checked={updateChecks} onChange={onUpdateChecksChange} help="Asks GitHub once a day, without your token.">
                     Tell me when a newer version is out
                   </SettingCheckbox>
-                  <p className="text-xs">
-                    Asks GitHub once a day, without your token.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <SettingButton
-                    onClick={checkForUpdates}
-                    className="self-start"
-                  >
-                    Check for updates
-                  </SettingButton>
-                  {/* aria-live: the answer arrives after the click, and the
-                      button's own label doesn't change to announce it. */}
-                  <p aria-live="polite" className="text-xs">
-                    {update.status === "checking" && "Checking…"}
-                    {update.status === "error" &&
-                      "Couldn't reach GitHub. Try again in a moment."}
-                    {update.status === "done" && (
-                      <UpdateResult latest={update.latest} version={version} />
-                    )}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
+                  <div className="flex flex-col gap-2">
+                    <SettingButton onClick={checkForUpdates} className="self-start rounded-[10px]">
+                      Check for updates
+                    </SettingButton>
+                    {/* aria-live: the answer arrives after the click, and the
+                        button's own label doesn't change to announce it. */}
+                    <p aria-live="polite" className="text-xs">
+                      {update.status === "checking" && "Checking…"}
+                      {update.status === "error" && "Couldn't reach GitHub. Try again in a moment."}
+                      {update.status === "done" && <UpdateResult latest={update.latest} version={version} />}
+                    </p>
+                  </div>
+                </div>,
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

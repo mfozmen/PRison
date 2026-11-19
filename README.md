@@ -67,7 +67,7 @@ to the latest 15, with **Load more** for the rest.
   board and choose **Ignore this check**. It stays on the card, muted instead of
   red, but its result stops counting: the PR is no longer held out of _Ready to
   merge_ over it, it gets no bucket of its own under _By check_, and it is never
-  awaited. Everything ignored is listed in **Settings → Ignored checks**, under
+  awaited. Everything ignored is listed in **Settings → Checks**, under
   the repo it was ignored on, where it can be renamed, widened to the whole
   owner, or taken back. A conflict or a review gate still holds the PR —
   ignoring a check says its result means nothing, never "merge it anyway" — but
@@ -317,22 +317,25 @@ Top-right, left to right:
 | **Sun/moon**     | Switches between the current theme's two grounds, and names them — it reads "Switch to Aurora Night" rather than "Switch to dark theme". |
 | **Sign Out**     | Clears the stored token.                                                                                                                 |
 
-The Settings menu has six sections:
+Settings opens in the middle of the screen with five tabs, one section at a
+time, so nothing needs a page scroll. The search box at the top looks through
+every tab: type and the panel becomes a list of matching settings, with the
+switches working right there and an **Open** button for the rest. Press `/` to
+jump to it and Esc to clear it.
 
-- **Comments** — show bot comments, hide comments you reacted to.
+- **Comments** — show bot comments, hide comments you reacted to or marked as
+  seen.
 - **Auto refresh** — on/off, how often to check, and the notification
   permission.
-- **Tracked checks** — add the checks to see as "Awaiting" one at a time, each
-  with its own **Required** box, and rename, re-mark, or remove any of them later.
-  Both check panels work one scope at a time: pick an owner or a repository from
-  the scope picker at the top and edit just that list, so the panel stays the
-  height of one list however many repos you configure.
-- **Ignored checks** — everything you wrote off from the board, under the repo
-  it was ignored on, plus an owner scope for a check that is broken everywhere.
-  A repo can also be picked here, to write a check off before the board has
-  ever drawn its chip.
-- **Appearance** — pick one of the fourteen themes, each previewing its own colours
-  and typeface.
+- **Checks** — one owner/repo picker over two lists side by side. **Tracked**:
+  the checks to see as "Awaiting", added one at a time, each with its own
+  **Required** box, and renamed, re-marked, or removed later. **Ignored**:
+  everything you wrote off from the board, under the repo it was ignored on,
+  plus an owner scope for a check that is broken everywhere. Picking a repo
+  changes nothing until you add a check to it, so a repo picked only to ignore a
+  check keeps its owner's tracked defaults.
+- **Appearance** — pick one of the fourteen themes. Each card is a tiny board in
+  that theme's real colours and typeface, previewed on its light or dark ground.
 - **About** — version, repository, license, and **Check for updates**, asked
   for on the spot. **Tell me when a newer version is out** turns it into a
   standing question: the version in the header becomes a link to the release

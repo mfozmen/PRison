@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.32.1](https://github.com/mfozmen/PRison/compare/v1.32.0...v1.32.1) (2026-11-19)
+
+### Bug Fixes
+
+* answer Check for updates from GitHub, not a day-old cache ([#113](https://github.com/mfozmen/PRison/issues/113)) ([ec17a74](https://github.com/mfozmen/PRison/commit/ec17a74dafebc93b120fd5ab6c8c6562214c28fd))
+
 ## [1.32.0](https://github.com/mfozmen/PRison/compare/v1.31.0...v1.32.0) (2026-11-19)
 
 ### Features

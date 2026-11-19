@@ -679,6 +679,16 @@ body {
     0 0 70px -24px color-mix(in srgb, var(--tone2) 40%, transparent);
 }
 
+/* The theme previews in Settings draw a tiny Next move card: the same spot
+ * ground and aurora edge, stamped with each family's data-theme. */
+.nm-mini {
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(var(--spot), var(--spot)) padding-box,
+    linear-gradient(100deg, var(--danger), var(--warning) 45%, var(--accent) 85%, var(--danger)) border-box;
+  box-shadow: 0 0 14px -4px color-mix(in srgb, var(--danger) 55%, transparent);
+}
+
 /* Mixed toward fg, not bg: that lightens it on a dark theme and darkens it on
  * a light one, so the bg-coloured text on it only gains contrast. */
 .nm-paceblock {

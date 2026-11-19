@@ -280,7 +280,7 @@ function openSettings(section?: string) {
   fireEvent.click(screen.getByRole("button", { name: "Settings" }));
   if (section)
     fireEvent.click(
-      within(screen.getByRole("navigation", { name: "Jump to section" })).getByRole("button", { name: section }),
+      screen.getByRole("tab", { name: section }),
     );
 }
 
@@ -2528,16 +2528,16 @@ describe("Dashboard", () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-      expect(screen.getByRole("region", { name: "Tracked checks" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Checks" })).toBeInTheDocument();
     });
 
     it("closing the settings panel via its close button hides it", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-      expect(screen.getByRole("region", { name: "Tracked checks" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Checks" })).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Close settings" }));
-      expect(screen.queryByRole("region", { name: "Tracked checks" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("tab", { name: "Checks" })).not.toBeInTheDocument();
     });
 
     it("hydrates tracked config from localStorage and persists it back", async () => {
@@ -2557,8 +2557,8 @@ describe("Dashboard", () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       // STUCK_PR.repo = "acme/b", REVIEW_PR.repo = "acme/c", READY_PR.repo = "acme/d"
-      openSettings("Tracked checks");
-      const addButton = within(screen.getByRole("region", { name: "Tracked checks" })).getByRole("button", {
+      openSettings("Checks");
+      const addButton = within(screen.getByRole("region", { name: "Checks" })).getByRole("button", {
         name: /add repository/i,
       });
       expect(addButton).toBeInTheDocument();

@@ -27,13 +27,13 @@ const filterProps = {
   onTestNotification: vi.fn(),
 };
 
-/** Every section is on the page; jump to the one under test, as a user would,
- * and remember it so inSection() can keep queries inside that card. */
+/** One section shows at a time; open the one under test with its tab, and
+ * remember it so inSection() can keep queries inside that card. */
 let currentSection = "Comments";
 function selectSection(label: string) {
   currentSection = label;
   fireEvent.click(
-    within(screen.getByRole("navigation", { name: "Jump to section" })).getByRole("button", { name: label }),
+    screen.getByRole("tab", { name: label }),
   );
 }
 
@@ -78,7 +78,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
     expect(
       screen.getByRole("textbox", { name: "Check 1 for acme" }),
     ).toHaveValue("qa/smoke");
@@ -108,7 +108,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
     // The name is not stored until Add, so nothing is announced per keystroke
     // and the box is answered before the check exists.
     fireEvent.change(
@@ -140,7 +140,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
     const field = screen.getByRole("textbox", { name: "New check for acme" });
     const box = screen.getByRole("checkbox", {
       name: "New check is required for acme",
@@ -165,7 +165,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
     const field = screen.getByRole("textbox", { name: "New check for acme" });
     fireEvent.change(field, { target: { value: "lint" } });
     fireEvent.keyDown(field, { key: "Enter" });
@@ -188,7 +188,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
     const field = screen.getByRole("textbox", { name: "New check for acme" });
     const add = screen.getByRole("button", { name: "Add check to acme" });
     fireEvent.change(field, { target: { value: "   " } });
@@ -214,7 +214,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
     fireEvent.change(
       screen.getByRole("textbox", { name: "Check 1 for acme" }),
       {
@@ -242,7 +242,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
     const field = screen.getByRole("textbox", { name: "Check 1 for acme" });
     // Clearing the field is how a rename starts; the row has to survive it or
     // the user loses the control they were typing into.
@@ -272,7 +272,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
     fireEvent.click(
       screen.getByRole("checkbox", {
         name: "nightly-e2e is required for acme",
@@ -299,7 +299,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
     fireEvent.click(
       screen.getByRole("button", { name: "Remove qa/smoke from acme" }),
     );
@@ -324,14 +324,14 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
     // One scope shows at a time, but the label still carries it: a bare "lint
     // is required" would say nothing about which list you just changed.
     expect(
       screen.getByRole("checkbox", { name: "lint is required for acme" }),
     ).toBeChecked();
     fireEvent.change(
-      screen.getByRole("combobox", { name: "Tracked checks scope" }),
+      screen.getByRole("combobox", { name: "Checks scope" }),
       {
         target: { value: "owner:globex" },
       },
@@ -353,7 +353,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
     fireEvent.click(inSection().getByRole("button", { name: /add repository/i }));
     fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
@@ -372,7 +372,7 @@ describe("SettingsModal", () => {
     });
   });
 
-  it("starts a freshly picked repo with an empty list", () => {
+  it("writes nothing for a freshly picked repo until a check is added", () => {
     const onChange = vi.fn();
     render(
       <SettingsModal
@@ -384,14 +384,12 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
     fireEvent.click(inSection().getByRole("button", { name: /add repository/i }));
     fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
-    expect(onChange).toHaveBeenLastCalledWith({
-      orgs: {},
-      repos: { "acme/web": [] },
-    });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByText("Uses the owner default until you add a check here.")).toBeInTheDocument();
   });
 
   it("stores a renamed check trimmed, and never twice under one name", () => {
@@ -407,7 +405,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
     const second = screen.getByRole("textbox", { name: "Check 2 for acme" });
     // A stray space would stop the name matching what GitHub reports.
     fireEvent.change(second, { target: { value: " lint " } });
@@ -439,9 +437,9 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
     fireEvent.change(
-      screen.getByRole("combobox", { name: "Tracked checks scope" }),
+      screen.getByRole("combobox", { name: "Checks scope" }),
       {
         target: { value: "repo:beta/api" },
       },
@@ -533,7 +531,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
     fireEvent.click(inSection().getByRole("button", { name: /add repository/i }));
     const combobox = screen.getByRole("combobox", { name: "Repository" });
     // Focus opens the suggestion dropdown; empty input shows availableRepos
@@ -561,7 +559,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
     // A configured repo is a scope whether or not GitHub listed it, so it is
     // on the picker and the panel opens on it.
     expect(
@@ -583,7 +581,7 @@ describe("SettingsModal", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
     // The combobox searches GitHub, so a repo can be configured before the
     // board has ever loaded one.
     expect(
@@ -668,33 +666,47 @@ describe("SettingsModal", () => {
       );
     }
 
-    const jumpNav = () => screen.getByRole("navigation", { name: "Jump to section" });
-
-    it("lays every section out on one page, with a pill to jump to each", () => {
+    it("offers every section as a tab and opens on the first one", () => {
       renderOpen();
-      const pills = within(jumpNav()).getAllByRole("button");
-      expect(pills.map((b) => b.textContent)).toEqual([
-        "Comments",
-        "Auto refresh",
-        "Tracked checks",
-        "Ignored checks",
-        "Appearance",
-        "About",
-      ]);
-      expect(pills[0]).toHaveAttribute("aria-current", "true");
-      for (const name of ["Comments", "Auto refresh", "Tracked checks", "Ignored checks", "Appearance", "About"]) {
-        expect(screen.getByRole("region", { name })).toBeInTheDocument();
-      }
-      // No section hides another: a comments switch and the interval are both here.
-      expect(screen.getByRole("checkbox", { name: "Show bot comments" })).toBeInTheDocument();
-      expect(screen.getByRole("radiogroup", { name: /auto refresh interval/i })).toBeInTheDocument();
+      const tabs = screen.getAllByRole("tab");
+      expect(tabs.map((t) => t.textContent)).toEqual(["Comments", "Auto refresh", "Checks", "Appearance", "About"]);
+      expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", tabs[0].id);
     });
 
-    it("marks the pill last jumped to", () => {
+    it("shows only the selected section", () => {
       renderOpen();
-      selectSection("Appearance");
-      expect(within(jumpNav()).getByRole("button", { name: "Appearance" })).toHaveAttribute("aria-current", "true");
-      expect(within(jumpNav()).getByRole("button", { name: "Comments" })).not.toHaveAttribute("aria-current");
+      expect(screen.getByRole("checkbox", { name: "Show bot comments" })).toBeInTheDocument();
+      expect(screen.queryByRole("radiogroup", { name: /auto refresh interval/i })).toBeNull();
+      selectSection("Auto refresh");
+      expect(screen.getByRole("radiogroup", { name: /auto refresh interval/i })).toBeInTheDocument();
+      expect(screen.queryByRole("checkbox", { name: "Show bot comments" })).toBeNull();
+    });
+
+    it("moves between tabs with the arrow keys, wrapping, and Home/End", () => {
+      renderOpen();
+      const tab = (name: string) => screen.getByRole("tab", { name });
+      fireEvent.keyDown(tab("Comments"), { key: "ArrowRight" });
+      expect(tab("Auto refresh")).toHaveAttribute("aria-selected", "true");
+      expect(tab("Auto refresh")).toHaveFocus();
+      fireEvent.keyDown(tab("Auto refresh"), { key: "ArrowLeft" });
+      fireEvent.keyDown(tab("Comments"), { key: "ArrowLeft" });
+      expect(tab("About")).toHaveAttribute("aria-selected", "true");
+      fireEvent.keyDown(tab("About"), { key: "ArrowRight" });
+      expect(tab("Comments")).toHaveAttribute("aria-selected", "true");
+      fireEvent.keyDown(tab("Comments"), { key: "End" });
+      expect(tab("About")).toHaveAttribute("aria-selected", "true");
+      fireEvent.keyDown(tab("About"), { key: "Home" });
+      expect(tab("Comments")).toHaveAttribute("aria-selected", "true");
+      // Only the selected tab is in the Tab order.
+      expect(tab("Comments")).toHaveAttribute("tabindex", "0");
+      expect(tab("About")).toHaveAttribute("tabindex", "-1");
+    });
+
+    it("ignores keys that aren't arrows, Home or End", () => {
+      renderOpen();
+      fireEvent.keyDown(screen.getByRole("tab", { name: "Comments" }), { key: "a" });
+      expect(screen.getByRole("tab", { name: "Comments" })).toHaveAttribute("aria-selected", "true");
     });
 
     it("turns into a list of matching settings while you type", () => {
@@ -737,15 +749,15 @@ describe("SettingsModal", () => {
       expect(screen.getByText(/no setting matches/i)).toBeInTheDocument();
     });
 
-    it("opens a section from its result, back on the full page", () => {
+    it("opens a section from its result", () => {
       renderOpen();
       fireEvent.change(screen.getByRole("searchbox", { name: "Search settings" }), {
         target: { value: "tracked" },
       });
       fireEvent.click(screen.getByRole("button", { name: "Open" }));
       expect(screen.getByRole("searchbox", { name: "Search settings" })).toHaveValue("");
-      expect(screen.getByRole("region", { name: "Tracked checks" })).toBeInTheDocument();
-      expect(within(jumpNav()).getByRole("button", { name: "Tracked checks" })).toHaveAttribute("aria-current", "true");
+      expect(screen.getByRole("region", { name: "Checks" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Checks" })).toHaveAttribute("aria-selected", "true");
     });
 
     it("points About at the repository, with the running version", () => {
@@ -794,7 +806,7 @@ describe("SettingsModal", () => {
       expect(screen.getByRole("searchbox", { name: "Search settings" })).toHaveFocus();
     });
 
-    it("reopens at the top with an empty search after being closed elsewhere", () => {
+    it("reopens on the first tab with an empty search after being closed elsewhere", () => {
       const props = {
         ...filterProps,
         availableRepos: [],
@@ -803,16 +815,14 @@ describe("SettingsModal", () => {
         onClose: vi.fn(),
       };
       const { rerender } = render(<SettingsModal {...props} open={true} />);
-      selectSection("Tracked checks");
+      selectSection("Checks");
       fireEvent.change(screen.getByRole("searchbox", { name: "Search settings" }), {
         target: { value: "bot" },
       });
       rerender(<SettingsModal {...props} open={false} />);
       rerender(<SettingsModal {...props} open={true} />);
       expect(screen.getByRole("searchbox", { name: "Search settings" })).toHaveValue("");
-      expect(
-        within(screen.getByRole("navigation", { name: "Jump to section" })).getByRole("button", { name: "Comments" }),
-      ).toHaveAttribute("aria-current", "true");
+      expect(screen.getByRole("tab", { name: "Comments" })).toHaveAttribute("aria-selected", "true");
     });
   });
 
@@ -1211,7 +1221,7 @@ describe("SettingsModal — owner defaults cover the personal account", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
   }
 
   it("offers a row for the personal account alongside the orgs", () => {
@@ -1362,27 +1372,26 @@ describe("SettingsModal — ignored checks", () => {
       />,
     );
 
-  it("has its own section, apart from tracked checks", () => {
+  it("shares the Checks section and its one scope picker with tracked checks", () => {
     open();
-    expect(
-      screen.getByRole("region", { name: "Ignored checks" }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Tracked checks" })).not.toBe(
-      screen.getByRole("region", { name: "Ignored checks" }),
-    );
+    selectSection("Checks");
+    const region = within(screen.getByRole("region", { name: "Checks" }));
+    expect(region.getByRole("heading", { name: "Tracked" })).toBeInTheDocument();
+    expect(region.getByRole("heading", { name: "Ignored" })).toBeInTheDocument();
+    expect(region.getAllByRole("combobox", { name: "Checks scope" })).toHaveLength(1);
   });
 
   // Ignoring starts on the board. The panel is where you find out what you did
   // there, so an empty one has to say where the names come from.
   it("says where ignored checks come from while there are none", () => {
     open();
-    selectSection("Ignored checks");
+    selectSection("Checks");
     expect(screen.getByText(/right-click a check/i)).toBeInTheDocument();
   });
 
   it("lists what a repo ignores, under the repo's name", () => {
     open({ ignored: { orgs: {}, repos: { "acme/web": ["flaky-e2e"] } } });
-    selectSection("Ignored checks");
+    selectSection("Checks");
     // The picker names the repo and says how much it ignores; the panel opens
     // on it, because it is the only scope holding anything.
     expect(
@@ -1399,7 +1408,7 @@ describe("SettingsModal — ignored checks", () => {
       ignored: { orgs: {}, repos: { "acme/web": ["flaky-e2e", "nightly"] } },
       onIgnoredChange,
     });
-    selectSection("Ignored checks");
+    selectSection("Checks");
     fireEvent.click(
       screen.getByRole("button", { name: "Remove flaky-e2e from acme/web" }),
     );
@@ -1415,7 +1424,7 @@ describe("SettingsModal — ignored checks", () => {
       ignored: { orgs: {}, repos: { "acme/web": ["flaky-e2e"] } },
       onIgnoredChange,
     });
-    selectSection("Ignored checks");
+    selectSection("Checks");
     fireEvent.click(
       screen.getByRole("button", { name: "Remove flaky-e2e from acme/web" }),
     );
@@ -1428,7 +1437,7 @@ describe("SettingsModal — ignored checks", () => {
       ignored: { orgs: {}, repos: { "acme/web": ["flaky-e2e"] } },
       onIgnoredChange,
     });
-    selectSection("Ignored checks");
+    selectSection("Checks");
     fireEvent.change(screen.getByLabelText("Ignored check 1 for acme/web"), {
       target: { value: "flaky-e2e-v2" },
     });
@@ -1446,7 +1455,7 @@ describe("SettingsModal — ignored checks", () => {
       ignored: { orgs: {}, repos: { "acme/web": ["flaky", "nightly"] } },
       onIgnoredChange,
     });
-    selectSection("Ignored checks");
+    selectSection("Checks");
     fireEvent.change(screen.getByLabelText("Ignored check 1 for acme/web"), {
       target: { value: "flaky-v2" },
     });
@@ -1471,7 +1480,7 @@ describe("SettingsModal — ignored checks", () => {
         onClose={vi.fn()}
       />,
     );
-    selectSection("Ignored checks");
+    selectSection("Checks");
     fireEvent.change(screen.getByLabelText("New ignored check for acme"), {
       target: { value: "nightly" },
     });
@@ -1483,7 +1492,7 @@ describe("SettingsModal — ignored checks", () => {
   it("ignores a check for every repo an owner has", () => {
     const onIgnoredChange = vi.fn();
     open({ onIgnoredChange });
-    selectSection("Ignored checks");
+    selectSection("Checks");
     fireEvent.change(screen.getByLabelText("New ignored check for acme"), {
       target: { value: "nightly-e2e" },
     });
@@ -1497,7 +1506,7 @@ describe("SettingsModal — ignored checks", () => {
   it("adds on Enter too", () => {
     const onIgnoredChange = vi.fn();
     open({ onIgnoredChange });
-    selectSection("Ignored checks");
+    selectSection("Checks");
     fireEvent.change(screen.getByLabelText("New ignored check for acme"), {
       target: { value: "nightly-e2e" },
     });
@@ -1516,7 +1525,7 @@ describe("SettingsModal — ignored checks", () => {
       ignored: { orgs: { acme: ["nightly"] }, repos: {} },
       onIgnoredChange,
     });
-    selectSection("Ignored checks");
+    selectSection("Checks");
     fireEvent.click(screen.getByRole("button", { name: "Ignore for acme" }));
     fireEvent.change(screen.getByLabelText("New ignored check for acme"), {
       target: { value: "nightly" },
@@ -1534,9 +1543,9 @@ describe("SettingsModal — ignored checks", () => {
       },
       onIgnoredChange,
     });
-    selectSection("Ignored checks");
+    selectSection("Checks");
     fireEvent.change(
-      screen.getByRole("combobox", { name: "Ignored checks scope" }),
+      screen.getByRole("combobox", { name: "Checks scope" }),
       {
         target: { value: "repo:acme/web" },
       },
@@ -1571,7 +1580,7 @@ describe("SettingsModal — scope picker", () => {
         {...props}
       />,
     );
-    selectSection("Tracked checks");
+    selectSection("Checks");
   };
 
   const pick = (label: string, value: string) =>
@@ -1595,7 +1604,7 @@ describe("SettingsModal — scope picker", () => {
     openTracked({
       value: { orgs: { acme: ["lint"], beta: ["ci"] }, repos: {} },
     });
-    pick("Tracked checks scope", "owner:beta");
+    pick("Checks scope", "owner:beta");
     expect(
       screen.getByRole("textbox", { name: "Check 1 for beta" }),
     ).toHaveValue("ci");
@@ -1637,10 +1646,7 @@ describe("SettingsModal — scope picker", () => {
     fireEvent.click(inSection().getByRole("button", { name: /add repository/i }));
     fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
-    expect(onChange).toHaveBeenLastCalledWith({
-      orgs: {},
-      repos: { "acme/web": [] },
-    });
+    expect(onChange).not.toHaveBeenCalled();
     expect(
       screen.getByRole("textbox", { name: "New check for acme/web" }),
     ).toBeInTheDocument();
@@ -1657,10 +1663,8 @@ describe("SettingsModal — scope picker", () => {
     fireEvent.click(inSection().getByRole("button", { name: /add repository/i }));
     fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
-    expect(onChange).toHaveBeenLastCalledWith({
-      orgs: {},
-      repos: { "acme/web": [required("lint")] },
-    });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("textbox", { name: "Check 1 for acme/web" })).toHaveValue("lint");
   });
 
   it("lists a repo once however many times it is picked", () => {
@@ -1701,10 +1705,10 @@ describe("SettingsModal — scope picker", () => {
         onIgnoredChange={onIgnoredChange}
       />,
     );
-    selectSection("Ignored checks");
+    selectSection("Checks");
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Stop ignoring everything for acme/web",
+        name: "Remove acme/web: its tracked and ignored checks",
       }),
     );
     expect(onIgnoredChange).toHaveBeenCalledWith({ orgs: {}, repos: {} });
@@ -1727,7 +1731,7 @@ describe("SettingsModal — scope picker", () => {
         onIgnoredChange={onIgnoredChange}
       />,
     );
-    selectSection("Ignored checks");
+    selectSection("Checks");
     fireEvent.click(inSection().getByRole("button", { name: /add repository/i }));
     fireEvent.focus(screen.getByRole("combobox", { name: "Repository" }));
     fireEvent.mouseDown(screen.getByRole("option", { name: "acme/web" }));
@@ -1745,7 +1749,7 @@ describe("SettingsModal — scope picker", () => {
 
   // An owner scope is a default in one panel and a blanket ignore in the
   // other; one hard-coded group label would contradict the panel it sits in.
-  it("names the owner group after what the panel does with it", () => {
+  it("names the owner group plainly, since it holds both lists", () => {
     openTracked();
     const groups = (label: string) =>
       Array.from(
@@ -1753,20 +1757,18 @@ describe("SettingsModal — scope picker", () => {
           screen.getByRole("combobox", { name: label }) as HTMLSelectElement
         ).querySelectorAll("optgroup"),
       ).map((g) => g.label);
-    expect(groups("Tracked checks scope")).toContain("Owner defaults");
-    selectSection("Ignored checks");
-    expect(groups("Ignored checks scope")).toContain("Owner-wide");
+    expect(groups("Checks scope")).toContain("Owners");
   });
 
   it("puts focus back on the picker after removing a scope", () => {
     openTracked({ value: { orgs: {}, repos: { "acme/web": ["lint"] } } });
     fireEvent.click(
-      screen.getByRole("button", { name: "Remove acme/web override" }),
+      screen.getByRole("button", { name: "Remove acme/web: its tracked and ignored checks" }),
     );
     // The button unmounts with the scope it removed; focus has to land
     // somewhere, and the picker is where the work continues.
     expect(
-      screen.getByRole("combobox", { name: "Tracked checks scope" }),
+      screen.getByRole("combobox", { name: "Checks scope" }),
     ).toHaveFocus();
   });
 
@@ -1794,7 +1796,7 @@ describe("SettingsModal — scope picker", () => {
     const { rerender } = render(
       props({ orgs: {}, repos: { "acme/web": ["flaky"] } }),
     );
-    selectSection("Ignored checks");
+    selectSection("Checks");
     fireEvent.click(
       screen.getByRole("button", { name: "Remove flaky from acme/web" }),
     );
@@ -1829,9 +1831,9 @@ describe("SettingsModal — scope picker", () => {
       );
     }
     render(<Harness />);
-    selectSection("Tracked checks");
+    selectSection("Checks");
     fireEvent.click(
-      screen.getByRole("button", { name: "Remove acme/web override" }),
+      screen.getByRole("button", { name: "Remove acme/web: its tracked and ignored checks" }),
     );
     expect(onChange).toHaveBeenLastCalledWith({ orgs: {}, repos: {} });
     // The scope goes with the checks, so the panel has to land somewhere: the
@@ -1865,11 +1867,11 @@ describe("SettingsModal — scope picker", () => {
         onIgnoredChange={vi.fn()}
       />,
     );
-    selectSection("Ignored checks");
+    selectSection("Checks");
     expect(screen.getByLabelText("Ignored check 1 for beta")).toHaveValue(
       "nightly",
     );
-    pick("Ignored checks scope", "owner:acme");
+    pick("Checks scope", "owner:acme");
     expect(
       screen.getByLabelText("New ignored check for acme"),
     ).toBeInTheDocument();

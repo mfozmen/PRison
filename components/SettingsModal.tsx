@@ -78,8 +78,7 @@ export interface SettingsModalProps {
 const SECTIONS = [
   { id: "comments", label: "Comments" },
   { id: "auto-refresh", label: "Auto refresh" },
-  { id: "tracked-checks", label: "Tracked checks" },
-  { id: "ignored-checks", label: "Ignored checks" },
+  { id: "checks", label: "Checks" },
   { id: "appearance", label: "Appearance" },
   { id: "about", label: "About" },
 ] as const;
@@ -542,12 +541,11 @@ function SettingCheckbox({
   );
 }
 
-/** The six sections, each with the status dot the board uses for its kind. */
+/** The five sections, each with the status dot the board uses for its kind. */
 const SECTION_DOT: Record<SectionId, string> = {
   comments: "bg-warning",
   "auto-refresh": "bg-accent",
-  "tracked-checks": "bg-danger",
-  "ignored-checks": "bg-muted",
+  checks: "bg-danger",
   appearance: "bg-success",
   about: "bg-muted",
 };
@@ -569,8 +567,8 @@ const SEARCH_INDEX: SearchEntry[] = [
   { section: "auto-refresh", label: "Auto refresh", help: "Checks GitHub on a schedule while a PRison tab is open", kind: "toggle", toggle: "autoRefresh" },
   { section: "auto-refresh", label: "Refresh interval", help: "How often auto refresh checks: minutes, hourly", kind: "open" },
   { section: "auto-refresh", label: "Desktop notifications", help: "Notify about changes that land while you're on another tab", kind: "open" },
-  { section: "tracked-checks", label: "Tracked checks", help: "Checks a PR needs, shown as Awaiting until they report", kind: "open" },
-  { section: "ignored-checks", label: "Ignored checks", help: "Broken checks that stop holding PRs out of Ready to merge", kind: "open" },
+  { section: "checks", label: "Tracked checks", help: "Checks a PR needs, shown as Awaiting until they report", kind: "open" },
+  { section: "checks", label: "Ignored checks", help: "Broken checks that stop holding PRs out of Ready to merge", kind: "open" },
   { section: "appearance", label: "Theme", help: "Colours and typefaces, light and dark", kind: "open" },
   { section: "about", label: "Tell me when a newer version is out", help: "Asks GitHub once a day, without your token", kind: "toggle", toggle: "updateChecks" },
   { section: "about", label: "Check for updates", help: "Ask GitHub for the latest release now", kind: "action" },
@@ -709,7 +707,7 @@ export function SettingsModal({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // The jump pill last used; every section is on the page, this only marks it.
+  // The tab on show. One section at a time keeps the modal free of a page scroll.
   const [section, setSection] = useState<SectionId>(SECTIONS[0].id);
   // Typing turns the page into a list of matching settings; empty is the page.
   const [query, setQuery] = useState("");
@@ -800,15 +798,26 @@ export function SettingsModal({
     onChange({ ...value, repos });
   }
 
-  // Jumping is a scroll, not a switch: every section stays on the page. The
-  // scroll waits a frame so a section that was hidden behind search results is
-  // back on the page first. (Optional call: jsdom has no scrollIntoView.)
+  // Opening a section leaves the search: a result's Open button lands here too.
   function jump(id: SectionId) {
     setSection(id);
     setQuery("");
-    requestAnimationFrame(() =>
-      document.getElementById(`settings-${id}`)?.scrollIntoView?.({ block: "start" }),
-    );
+  }
+
+  // The tabs pattern: arrows move along the row (wrapping), Home/End jump to
+  // its ends, and focus follows the selection.
+  function handleTabKeyDown(e: React.KeyboardEvent, i: number) {
+    const last = SECTIONS.length - 1;
+    const next =
+      e.key === "ArrowRight" ? (i === last ? 0 : i + 1)
+      : e.key === "ArrowLeft" ? (i === 0 ? last : i - 1)
+      : e.key === "Home" ? 0
+      : e.key === "End" ? last
+      : null;
+    if (next === null) return;
+    e.preventDefault();
+    jump(SECTIONS[next].id);
+    document.getElementById(`settings-tab-${SECTIONS[next].id}`)?.focus();
   }
 
   const toggles = {
@@ -829,12 +838,13 @@ export function SettingsModal({
   const shownMode = previewMode ?? mode;
 
   const card = (id: SectionId, body: ReactNode) => {
+    if (id !== section) return null;
     const label = SECTIONS.find((s) => s.id === id)!.label;
     return (
       <section
         id={`settings-${id}`}
         aria-labelledby={`settings-${id}-title`}
-        className="scroll-mt-4 rounded-[18px] border border-border bg-surface px-5 pb-5"
+        className="rounded-[18px] border border-border bg-surface px-5 pb-5"
       >
         <h3
           id={`settings-${id}-title`}
@@ -858,13 +868,49 @@ export function SettingsModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className="relative z-10 flex max-h-[min(800px,90vh)] w-full max-w-[800px] flex-col rounded-[20px] border border-border bg-background shadow-[0_40px_120px_-20px_rgba(0,0,0,0.7)]"
+        className="relative z-10 flex h-[min(680px,90vh)] w-full max-w-[800px] flex-col rounded-[20px] border border-border bg-background shadow-[0_40px_120px_-20px_rgba(0,0,0,0.7)]"
       >
-        <div className="flex flex-col gap-3.5 border-b border-border px-6 pt-5 pb-3.5">
+        <div className="flex flex-col gap-3.5 border-b border-border px-6 pt-5 pb-4">
           <div className="flex items-center gap-3">
-            <h2 id="settings-title" className="flex-1 text-lg font-bold text-foreground">
+            <h2 id="settings-title" className="text-lg font-bold text-foreground sm:w-[92px]">
               Settings
             </h2>
+            <label
+              className={`flex h-11 min-w-0 flex-1 items-center gap-3 rounded-xl border bg-surface px-3.5 ${
+                query ? "border-accent ring-[3px] ring-accent/20" : "border-border"
+              }`}
+            >
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={query ? "text-accent" : "text-muted"}>
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              <input
+                ref={searchRef}
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                aria-label="Search settings"
+                aria-keyshortcuts="/"
+                placeholder="Search all settings…"
+                className="min-w-0 flex-1 bg-transparent text-[15px] text-foreground placeholder:text-muted focus:outline-none"
+              />
+              {query ? (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={() => setQuery("")}
+                  className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-border text-foreground"
+                >
+                  <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              ) : (
+                <kbd aria-hidden="true" className="rounded-md border border-border px-1.5 py-px font-mono text-xs text-muted">
+                  /
+                </kbd>
+              )}
+            </label>
             <button
               ref={closeButtonRef}
               type="button"
@@ -877,44 +923,8 @@ export function SettingsModal({
               </svg>
             </button>
           </div>
-          <label
-            className={`flex h-12 items-center gap-3 rounded-[14px] border bg-surface px-4 ${
-              query ? "border-accent ring-[3px] ring-accent/20" : "border-border"
-            }`}
-          >
-            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={query ? "text-accent" : "text-muted"}>
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
-            <input
-              ref={searchRef}
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              aria-label="Search settings"
-              aria-keyshortcuts="/"
-              placeholder="Search settings: bots, interval, theme, checks…"
-              className="min-w-0 flex-1 bg-transparent text-[15px] text-foreground placeholder:text-muted focus:outline-none"
-            />
-            {query ? (
-              <button
-                type="button"
-                aria-label="Clear search"
-                onClick={() => setQuery("")}
-                className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-border text-foreground"
-              >
-                <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-            ) : (
-              <kbd aria-hidden="true" className="rounded-md border border-border px-1.5 py-px font-mono text-xs text-muted">
-                /
-              </kbd>
-            )}
-          </label>
           {query ? (
-            <p aria-live="polite" className="flex h-[34px] items-center gap-2 text-[13px] text-muted">
+            <p aria-live="polite" className="flex min-h-9 items-center gap-2 text-[13px] text-muted">
               <span className="font-semibold text-foreground">
                 {results.length} {results.length === 1 ? "setting" : "settings"}
               </span>
@@ -925,26 +935,37 @@ export function SettingsModal({
               Esc clears
             </p>
           ) : (
-            <nav aria-label="Jump to section" className="flex flex-wrap gap-1.5">
-              {SECTIONS.map((s) => (
+            <div role="tablist" aria-label="Settings sections" className="flex flex-wrap gap-1.5">
+              {SECTIONS.map((s, i) => (
                 <button
                   key={s.id}
+                  id={`settings-tab-${s.id}`}
                   type="button"
-                  aria-current={section === s.id ? "true" : undefined}
+                  role="tab"
+                  aria-selected={section === s.id}
+                  aria-controls="settings-panel"
+                  tabIndex={section === s.id ? 0 : -1}
                   onClick={() => jump(s.id)}
-                  className={`flex min-h-[34px] cursor-pointer items-center gap-[7px] rounded-full border border-border px-3.5 text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
+                  onKeyDown={(e) => handleTabKeyDown(e, i)}
+                  className={`flex min-h-9 cursor-pointer items-center gap-2 rounded-full border border-border px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
                     section === s.id ? "bg-foreground text-background" : "text-muted hover:text-foreground"
                   }`}
                 >
-                  <span aria-hidden="true" className={`h-[7px] w-[7px] rounded-full ${SECTION_DOT[s.id]}`} />
+                  <span aria-hidden="true" className={`h-2 w-2 rounded-full ${SECTION_DOT[s.id]}`} />
                   {s.label}
                 </button>
               ))}
-            </nav>
+            </div>
           )}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        {/* Scrolls only when one list outgrows the panel, e.g. a long check list. */}
+        <div
+          id="settings-panel"
+          role={query ? undefined : "tabpanel"}
+          aria-labelledby={query ? undefined : `settings-tab-${section}`}
+          className="min-h-0 flex-1 overflow-y-auto px-6 py-5"
+        >
           {query ? (
             results.length === 0 ? (
               <p className="py-10 text-center text-sm text-muted">
@@ -1129,89 +1150,82 @@ export function SettingsModal({
               )}
 
               {card(
-                "tracked-checks",
+                "checks",
                 <div className="border-t border-border pt-4">
-                  <p className="mb-5 text-sm text-muted">
-                    Name the checks each PR needs (e.g. a manual qa/smoke). We&apos;ll show them as Awaiting until
-                    they report — handy for gates GitHub doesn&apos;t expose. Tick{" "}
-                    <strong className="font-medium text-foreground">Required</strong> and the check holds the PR out
-                    of Ready to merge; leave it unticked and the check is shown for information and blocks nothing.
+                  <p className="mb-4 text-sm text-muted">
+                    Pick an owner or a repo; both lists below belong to it.{" "}
+                    <strong className="font-medium text-foreground">Tracked</strong>{" "}checks show as Awaiting until
+                    they report — handy for gates GitHub doesn&apos;t expose; tick Required and one holds the PR out
+                    of Ready to merge.{" "}
+                    <strong className="font-medium text-foreground">Ignored</strong> checks are broken rather than
+                    failing: still on the card, muted, never red, and they never hold a PR back.
                   </p>
-                  {/* Owner defaults cover organizations *and* the personal
-                      account: a default is keyed by the owner segment of
-                      `owner/repo`, which is the login for a personal repo. */}
+                  {/* One picker for both lists: they answer the same question —
+                      for which owner or repo? Owner scopes cover organizations
+                      *and* the personal account, keyed by the owner segment of
+                      `owner/repo`. */}
                   <ScopeEditor
-                    label="Tracked checks scope"
+                    label="Checks scope"
                     owners={owners}
-                    repos={Object.keys(value.repos)}
+                    repos={Array.from(new Set([...Object.keys(value.repos), ...ignoredRepos]))}
                     availableRepos={availableRepos}
                     count={(s) =>
-                      normalizeAll(s.kind === "owner" ? value.orgs[s.key] : value.repos[s.key]).length
+                      normalizeAll(s.kind === "owner" ? value.orgs[s.key] : value.repos[s.key]).length +
+                      ((s.kind === "owner" ? ignored.orgs[s.key] : ignored.repos[s.key]) ?? []).length
                     }
-                    onAddRepo={(repo) => setRepoChecks(repo, normalizeAll(value.repos[repo]))}
-                    onRemoveRepo={removeRepo}
-                    removeLabel={(repo) => `Remove ${repo} override`}
-                    ownerGroupLabel="Owner defaults"
+                    onRemoveRepo={(repo) => {
+                      removeRepo(repo);
+                      setIgnoredIn("repos", repo, []);
+                    }}
+                    removeLabel={(repo) => `Remove ${repo}: its tracked and ignored checks`}
+                    ownerGroupLabel="Owners"
                   >
-                    {(scope) => (
-                      <div>
-                        <p className="mb-3 text-xs text-muted">
-                          {scope.kind === "owner"
-                            ? "The default for every repo this owner has, unless the repo has its own list."
-                            : "Replaces the owner default for this repo."}
-                        </p>
-                        <CheckList
-                          key={scopeId(scope)}
-                          scope={scope.key}
-                          checks={scope.kind === "owner" ? value.orgs[scope.key] : value.repos[scope.key]}
-                          onChange={(checks) =>
-                            scope.kind === "owner" ? setOrgChecks(scope.key, checks) : setRepoChecks(scope.key, checks)
-                          }
-                        />
-                      </div>
-                    )}
-                  </ScopeEditor>
-                </div>,
-              )}
-
-              {card(
-                "ignored-checks",
-                <div className="border-t border-border pt-4">
-                  <p className="mb-5 text-sm text-muted">
-                    A check that is broken rather than failing. An ignored check still shows on the card &mdash;
-                    muted, never red &mdash; but it stops holding the PR out of{" "}
-                    <strong className="font-medium text-foreground">Ready to merge</strong>, and it never gets a
-                    bucket of its own under By check. Right-click a check on the board to ignore it; it lands here,
-                    under its repo.
-                  </p>
-                  <ScopeEditor
-                    label="Ignored checks scope"
-                    owners={owners}
-                    repos={ignoredRepos}
-                    availableRepos={availableRepos}
-                    count={(s) => ((s.kind === "owner" ? ignored.orgs[s.key] : ignored.repos[s.key]) ?? []).length}
-                    onRemoveRepo={(repo) => setIgnoredIn("repos", repo, [])}
-                    removeLabel={(repo) => `Stop ignoring everything for ${repo}`}
-                    ownerGroupLabel="Owner-wide"
-                  >
-                    {(scope) => (
-                      <div>
-                        <p className="mb-3 text-xs text-muted">
-                          {scope.kind === "owner"
-                            ? "Ignored on every repo the owner has — for a check that is broken everywhere, not on one repo."
-                            : "Ignored on this repo. An owner-wide entry still applies on top of it."}
-                        </p>
-                        <NameList
-                          key={scopeId(scope)}
-                          scope={scope.key}
-                          names={(scope.kind === "owner" ? ignored.orgs[scope.key] : ignored.repos[scope.key]) ?? []}
-                          onChange={(names) =>
-                            setIgnoredIn(scope.kind === "owner" ? "orgs" : "repos", scope.key, names)
-                          }
-                          addLabel={`Ignore for ${scope.key}`}
-                        />
-                      </div>
-                    )}
+                    {(scope) => {
+                      // Picking a repo creates nothing: an empty override would
+                      // silently drop the owner's tracked defaults for a repo
+                      // someone only came to ignore a check on.
+                      const override = scope.kind === "repo" && value.repos[scope.key] !== undefined;
+                      return (
+                        <div className="grid gap-6 sm:grid-cols-2">
+                          <div>
+                            <h4 className="text-sm font-semibold text-foreground">Tracked</h4>
+                            <p className="mt-0.5 mb-3 text-xs text-muted">
+                              {scope.kind === "owner"
+                                ? "The default for every repo this owner has, unless the repo has its own list."
+                                : override
+                                  ? "Replaces the owner default for this repo."
+                                  : "Uses the owner default until you add a check here."}
+                            </p>
+                            <CheckList
+                              key={scopeId(scope)}
+                              scope={scope.key}
+                              checks={scope.kind === "owner" ? value.orgs[scope.key] : value.repos[scope.key]}
+                              onChange={(checks) =>
+                                scope.kind === "owner" ? setOrgChecks(scope.key, checks) : setRepoChecks(scope.key, checks)
+                              }
+                            />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-semibold text-foreground">Ignored</h4>
+                            <p className="mt-0.5 mb-3 text-xs text-muted">
+                              {scope.kind === "owner"
+                                ? "Ignored on every repo the owner has — for a check that is broken everywhere."
+                                : "Ignored on this repo. An owner-wide entry still applies on top of it."}{" "}
+                              Right-click a check on the board to ignore it; it lands here, under its repo.
+                            </p>
+                            <NameList
+                              key={scopeId(scope)}
+                              scope={scope.key}
+                              names={(scope.kind === "owner" ? ignored.orgs[scope.key] : ignored.repos[scope.key]) ?? []}
+                              onChange={(names) =>
+                                setIgnoredIn(scope.kind === "owner" ? "orgs" : "repos", scope.key, names)
+                              }
+                              addLabel={`Ignore for ${scope.key}`}
+                            />
+                          </div>
+                        </div>
+                      );
+                    }}
                   </ScopeEditor>
                 </div>,
               )}
@@ -1221,7 +1235,10 @@ export function SettingsModal({
                 <fieldset className="m-0 border-0 border-t border-border p-0 pt-3">
                   <div className="mb-3.5 flex flex-wrap items-center gap-3">
                     <legend className="flex-1 text-[13px] text-muted">
-                      Each card is the board in that theme. The sun/moon in the header flips between its two grounds.
+                      <span className="font-medium text-foreground">
+                        {THEMES.find((t) => t.id === theme)?.label}, on {modeLabel(theme, mode)}.
+                      </span>{" "}
+                      The sun/moon in the header flips between its two grounds.
                     </legend>
                     <div role="group" aria-label="Preview ground" className="flex rounded-full border border-border bg-background p-[3px]">
                       {(["light", "dark"] as const).map((m) => (
@@ -1239,11 +1256,11 @@ export function SettingsModal({
                       ))}
                     </div>
                   </div>
-                  <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(12rem, 1fr))" }}>
+                  <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(7.5rem, 1fr))" }}>
                     {THEMES.map((t) => (
                       <label
                         key={t.id}
-                        className={`group cursor-pointer overflow-hidden rounded-[14px] border bg-background transition-colors focus-within:ring-2 focus-within:ring-accent ${
+                        className={`group cursor-pointer overflow-hidden rounded-xl border bg-background transition-colors focus-within:ring-2 focus-within:ring-accent ${
                           theme === t.id ? "border-accent ring-[3px] ring-accent/25" : "border-border"
                         }`}
                       >
@@ -1263,46 +1280,43 @@ export function SettingsModal({
                           data-theme={t.id}
                           data-mode={shownMode}
                           aria-hidden="true"
-                          className="flex h-[92px] flex-col gap-1.5 bg-background p-[9px]"
+                          className="flex h-[62px] flex-col gap-1 bg-background p-1.5"
                         >
-                          <span className="nm-mini flex h-6 overflow-hidden rounded-[7px]">
-                            <span className="w-[26px] bg-[linear-gradient(160deg,var(--danger),var(--warning))]" />
-                            <span className="flex flex-1 items-center gap-1 px-1.5">
-                              <span className="h-1 w-[46%] rounded-sm bg-foreground/75" />
-                              <span className="ml-auto h-2 w-[18px] rounded-[3px] bg-[linear-gradient(90deg,var(--danger),var(--warning))]" />
+                          <span className="nm-mini flex h-4 overflow-hidden rounded-[5px]">
+                            <span className="w-[18px] bg-[linear-gradient(160deg,var(--danger),var(--warning))]" />
+                            <span className="flex flex-1 items-center px-[5px]">
+                              <span className="h-[3px] w-1/2 rounded-sm bg-foreground/75" />
                             </span>
                           </span>
-                          <span className="grid flex-1 grid-cols-4 gap-1">
+                          <span className="grid flex-1 grid-cols-4 gap-[3px]">
                             {(["bg-danger", "bg-accent", "bg-warning", "bg-success"] as const).map((dot, i) => (
                               <span
                                 key={dot}
-                                className={`flex flex-col gap-[3px] rounded-[5px] border bg-surface p-1 ${i === 0 ? "border-danger/45" : "border-border"}`}
+                                className={`flex flex-col gap-0.5 rounded border bg-surface p-[3px] ${i === 0 ? "border-danger/45" : "border-border"}`}
                               >
-                                <span className={`h-[5px] w-[5px] rounded-full ${dot}`} />
-                                <span className="h-[3px] rounded-sm bg-foreground/35" />
-                                <span className="h-[3px] w-[70%] rounded-sm bg-foreground/20" />
+                                <span className={`h-1 w-1 rounded-full ${dot}`} />
+                                <span className="h-0.5 rounded-sm bg-foreground/35" />
                               </span>
                             ))}
                           </span>
                         </span>
-                        <span className="flex items-center gap-2 bg-surface px-[11px] py-[9px]">
+                        <span className="flex items-center gap-1.5 bg-surface px-[9px] py-[7px]">
                           <span className="min-w-0 flex-1">
-                            <span className="block text-[13px] font-semibold text-foreground">{t.label}</span>
+                            <span className="block truncate text-xs font-semibold text-foreground">{t.label}</span>
                             {/* Naming both grounds is what makes the header button
                                 legible: it says "Switch to Aurora Night". */}
-                            <span className="block text-[11px] text-muted">
+                            <span className="block truncate text-[10px] text-muted">
                               {t.light} · {t.dark}
-                              {theme === t.id && ` — on ${modeLabel(theme, mode)}`}
                             </span>
                           </span>
                           <span
                             aria-hidden="true"
-                            className={`flex h-[18px] w-[18px] items-center justify-center rounded-full ${
+                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
                               theme === t.id ? "bg-accent text-background" : ""
                             }`}
                           >
                             {theme === t.id && (
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5">
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5">
                                 <path d="M20 6 9 17l-5-5" />
                               </svg>
                             )}

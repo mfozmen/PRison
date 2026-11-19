@@ -96,7 +96,8 @@ describe("Dashboard — Next move", () => {
 
     fireEvent.click(within(strip()).getByRole("button", { name: /skip/i }));
     expect(within(strip()).getByText("stuck pr")).toBeInTheDocument();
-    expect(within(strip()).getByText("✗ build")).toBeInTheDocument();
+    expect(within(strip()).getByText("build")).toBeInTheDocument();
+    expect(within(strip()).getByText(/2 of 2/)).toBeInTheDocument();
     expect(document.getElementById("stuck-on-checks")).toHaveAttribute("data-highlighted", "true");
 
     fireEvent.click(within(strip()).getByRole("button", { name: /skip/i }));
@@ -119,6 +120,37 @@ describe("Dashboard — Next move", () => {
     global.fetch = fetchLists([STUCK_PR], [REVIEW_PR]);
     await refresh();
     expect(await within(strip()).findByText("review pr")).toBeInTheDocument();
+  });
+
+  it("names its queue and where it sits in the round", async () => {
+    global.fetch = fetchLists([STUCK_PR], [REVIEW_PR]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await screen.findByRole("region", { name: "Next move" });
+    expect(within(strip()).getByText(/WAITING ON YOUR REVIEW/)).toBeInTheDocument();
+    expect(within(strip()).getByText(/1 of 2/)).toBeInTheDocument();
+  });
+
+  it.each([
+    ["moving", 2 * 60 * 60 * 1000, 1],
+    ["slowing", 2 * 24 * 60 * 60 * 1000, 2],
+    ["stalled", 5 * 24 * 60 * 60 * 1000, 3],
+  ])("calls a wait %s and fills its meter, never by colour alone", async (word, ageMs, steps) => {
+    const since = new Date(Date.now() - ageMs).toISOString();
+    global.fetch = fetchLists([{ ...STUCK_PR, stuckSince: since }], []);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    const card = await screen.findByRole("region", { name: "Next move" });
+    expect(card).toHaveAttribute("data-pace", word);
+    expect(card).toHaveClass(`nm-pace-${word}`);
+    expect(within(card).getByRole("img", { name: `Pace: ${word}` })).toBeInTheDocument();
+    const meter = within(card).getByRole("img", { name: `Pace: ${word}` });
+    expect(meter.querySelectorAll(".bg-background")).toHaveLength(steps);
+    expect(within(card).getByText(new RegExp(`${word} · 1 of 1`))).toBeInTheDocument();
+  });
+
+  it("wears its queue's colour on the card, whatever the pace", async () => {
+    global.fetch = fetchLists([STUCK_PR], [REVIEW_PR]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByRole("region", { name: "Next move" })).toHaveClass("nm-tone-accent");
   });
 
   it("offers no Skip when there is only one thing to do", async () => {

@@ -1,0 +1,135 @@
+<!doctype html>
+<!-- Approved reference for the Next move card (demo data, Default theme). The
+     pixel-reviewer compares the app's card with this. Static on purpose. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PRison · Next move card (reference)</title>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600;700;800&amp;family=Fira+Code:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'Fira Sans',system-ui,sans-serif}
+.frame{padding:32px 40px;display:flex;flex-direction:column;gap:24px;background:var(--bg)}
+.label{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.08em}
+
+.nm-tone-danger{--tone:var(--danger);--tone2:var(--warning)}
+.nm-tone-accent{--tone:var(--accent);--tone2:var(--success)}
+.nm-pace-moving{--pace:var(--success);--glow:22%}
+.nm-pace-slowing{--pace:var(--warning);--glow:38%}
+.nm-pace-stalled{--pace:var(--danger);--glow:62%}
+.nm-card{--tone-ink:color-mix(in srgb,var(--tone) 70%,var(--fg));border:2px solid transparent;color:var(--fg);background:radial-gradient(110% 150% at 0% 0%,color-mix(in srgb,var(--tone) 22%,transparent),transparent 55%) padding-box,radial-gradient(90% 140% at 100% 100%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 60%) padding-box,radial-gradient(70% 120% at 60% 0%,color-mix(in srgb,var(--tone2) 12%,transparent),transparent 60%) padding-box,linear-gradient(var(--spot),var(--spot)) padding-box,linear-gradient(100deg,var(--tone),var(--tone2) 45%,var(--accent) 85%,var(--tone)) border-box;box-shadow:0 0 40px -10px color-mix(in srgb,var(--pace) var(--glow),transparent),0 0 70px -24px color-mix(in srgb,var(--tone2) 40%,transparent)}
+.nm-paceblock{color:var(--bg);background:linear-gradient(160deg,var(--pace),color-mix(in srgb,var(--pace) 80%,var(--fg)))}
+.nm-chip{color:var(--tone-ink);background:color-mix(in srgb,var(--tone) 14%,transparent);border-radius:6px;padding:2px 8px;font-size:12px;font-weight:500}
+.nm-cta{color:var(--bg);background:linear-gradient(90deg,var(--tone),var(--tone2))}
+.dark{--bg:#0f172a;--surface:#1e293b;--fg:#f1f5f9;--muted:#94a3b8;--brd:#334155;--accent:#60a5fa;--danger:#f87171;--warning:#fbbf24;--success:#4ade80;--spot:#1e1b4b}
+.light{--bg:#eef2f7;--surface:#fafbfe;--fg:#0f172a;--muted:#475569;--brd:#dce3ec;--accent:#1d4ed8;--danger:#d52222;--warning:#b25209;--success:#117e39;--spot:#f2f5ff}
+
+</style>
+</head>
+<body>
+<div class="dark frame">
+<div class="label">STALLED · DEFAULT DARK</div>
+<section aria-label="Next move" data-pace="stalled" class="nm-card nm-tone-danger nm-pace-stalled" style="display: flex; flex-wrap: wrap; overflow: hidden; border-radius: 20px;">
+<div class="nm-paceblock" style="flex: 0 0 210px; display: flex; flex-direction: column; gap: 6px; padding: 22px 24px;">
+<span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em;">NEXT MOVE</span>
+<span style="font-size: 60px; font-weight: 800; line-height: 1; letter-spacing: -0.04em;">4d</span>
+<span style="font-size: 12px; font-weight: 700;">stalled · 1 of 12</span>
+<span style="display: flex; gap: 4px; margin-top: 4px;"><span style="height: 4px; width: 18px; border-radius: 2px; background: var(--bg);"></span><span style="height: 4px; width: 18px; border-radius: 2px; background: var(--bg);"></span><span style="height: 4px; width: 18px; border-radius: 2px; background: var(--bg);"></span></span>
+</div>
+<div style="flex: 1 1 420px; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 20px; padding: 22px 26px;">
+<div style="flex: 999 1 320px; min-width: 0;">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: var(--tone-ink);">● STUCK ON CHECKS · <span style="font-family: 'Fira Code', monospace; letter-spacing: 0;">initech/worker #13</span></div>
+<a href="#" style="display: block; margin-top: 6px; font-size: 21px; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; color: var(--fg); text-decoration: none;">Fix the timezone drift in scheduled reports</a>
+<div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px;"><span class="nm-chip" style="font-family: 'Fira Code', monospace;">lint</span><span class="nm-chip" style="font-family: 'Fira Code', monospace;">typecheck</span><span class="nm-chip">Changes requested</span></div>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+<span class="nm-cta" style="display: flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 12px; font-size: 14px; font-weight: 600;">Re-run failed checks</span>
+<span style="display: flex; align-items: center; min-height: 44px; padding: 0 16px; font-size: 14px; font-weight: 500; color: var(--muted);">Skip →</span>
+</div>
+</div>
+</section>
+<div class="label">SLOWING</div>
+<section aria-label="Next move" data-pace="slowing" class="nm-card nm-tone-danger nm-pace-slowing" style="display: flex; flex-wrap: wrap; overflow: hidden; border-radius: 20px;">
+<div class="nm-paceblock" style="flex: 0 0 210px; display: flex; flex-direction: column; gap: 6px; padding: 22px 24px;">
+<span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em;">NEXT MOVE</span>
+<span style="font-size: 60px; font-weight: 800; line-height: 1; letter-spacing: -0.04em;">2d</span>
+<span style="font-size: 12px; font-weight: 700;">slowing · 1 of 12</span>
+<span style="display: flex; gap: 4px; margin-top: 4px;"><span style="height: 4px; width: 18px; border-radius: 2px; background: var(--bg);"></span><span style="height: 4px; width: 18px; border-radius: 2px; background: var(--bg);"></span><span style="height: 4px; width: 18px; border-radius: 2px; background: color-mix(in srgb, var(--bg) 30%, transparent);"></span></span>
+</div>
+<div style="flex: 1 1 420px; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 20px; padding: 22px 26px;">
+<div style="flex: 999 1 320px; min-width: 0;">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: var(--tone-ink);">● STUCK ON CHECKS · <span style="font-family: 'Fira Code', monospace; letter-spacing: 0;">initech/worker #13</span></div>
+<a href="#" style="display: block; margin-top: 6px; font-size: 21px; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; color: var(--fg); text-decoration: none;">Fix the timezone drift in scheduled reports</a>
+<div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px;"><span class="nm-chip" style="font-family: 'Fira Code', monospace;">lint</span><span class="nm-chip" style="font-family: 'Fira Code', monospace;">typecheck</span><span class="nm-chip">Changes requested</span></div>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+<span class="nm-cta" style="display: flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 12px; font-size: 14px; font-weight: 600;">Re-run failed checks</span>
+<span style="display: flex; align-items: center; min-height: 44px; padding: 0 16px; font-size: 14px; font-weight: 500; color: var(--muted);">Skip →</span>
+</div>
+</div>
+</section>
+<div class="label">MOVING</div>
+<section aria-label="Next move" data-pace="moving" class="nm-card nm-tone-danger nm-pace-moving" style="display: flex; flex-wrap: wrap; overflow: hidden; border-radius: 20px;">
+<div class="nm-paceblock" style="flex: 0 0 210px; display: flex; flex-direction: column; gap: 6px; padding: 22px 24px;">
+<span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em;">NEXT MOVE</span>
+<span style="font-size: 60px; font-weight: 800; line-height: 1; letter-spacing: -0.04em;">20m</span>
+<span style="font-size: 12px; font-weight: 700;">moving · 1 of 12</span>
+<span style="display: flex; gap: 4px; margin-top: 4px;"><span style="height: 4px; width: 18px; border-radius: 2px; background: var(--bg);"></span><span style="height: 4px; width: 18px; border-radius: 2px; background: color-mix(in srgb, var(--bg) 30%, transparent);"></span><span style="height: 4px; width: 18px; border-radius: 2px; background: color-mix(in srgb, var(--bg) 30%, transparent);"></span></span>
+</div>
+<div style="flex: 1 1 420px; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 20px; padding: 22px 26px;">
+<div style="flex: 999 1 320px; min-width: 0;">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: var(--tone-ink);">● STUCK ON CHECKS · <span style="font-family: 'Fira Code', monospace; letter-spacing: 0;">initech/worker #13</span></div>
+<a href="#" style="display: block; margin-top: 6px; font-size: 21px; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; color: var(--fg); text-decoration: none;">Fix the timezone drift in scheduled reports</a>
+<div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px;"><span class="nm-chip" style="font-family: 'Fira Code', monospace;">lint</span><span class="nm-chip" style="font-family: 'Fira Code', monospace;">typecheck</span><span class="nm-chip">Changes requested</span></div>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+<span class="nm-cta" style="display: flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 12px; font-size: 14px; font-weight: 600;">Re-run failed checks</span>
+<span style="display: flex; align-items: center; min-height: 44px; padding: 0 16px; font-size: 14px; font-weight: 500; color: var(--muted);">Skip →</span>
+</div>
+</div>
+</section>
+<div class="label">ANOTHER QUEUE · REVIEW, STALLED</div>
+<section aria-label="Next move" data-pace="stalled" class="nm-card nm-tone-accent nm-pace-stalled" style="display: flex; flex-wrap: wrap; overflow: hidden; border-radius: 20px;">
+<div class="nm-paceblock" style="flex: 0 0 210px; display: flex; flex-direction: column; gap: 6px; padding: 22px 24px;">
+<span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em;">NEXT MOVE</span>
+<span style="font-size: 60px; font-weight: 800; line-height: 1; letter-spacing: -0.04em;">5d</span>
+<span style="font-size: 12px; font-weight: 700;">stalled · 1 of 12</span>
+<span style="display: flex; gap: 4px; margin-top: 4px;"><span style="height: 4px; width: 18px; border-radius: 2px; background: var(--bg);"></span><span style="height: 4px; width: 18px; border-radius: 2px; background: var(--bg);"></span><span style="height: 4px; width: 18px; border-radius: 2px; background: var(--bg);"></span></span>
+</div>
+<div style="flex: 1 1 420px; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 20px; padding: 22px 26px;">
+<div style="flex: 999 1 320px; min-width: 0;">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: var(--tone-ink);">● WAITING ON YOUR REVIEW · <span style="font-family: 'Fira Code', monospace; letter-spacing: 0;">acme/api #479</span></div>
+<a href="#" style="display: block; margin-top: 6px; font-size: 21px; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; color: var(--fg); text-decoration: none;">Add rate limiting to the public search endpoint</a>
+<div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px;"><span class="nm-chip" style="font-family: 'Fira Code', monospace;">blocking @alice</span></div>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+<span class="nm-cta" style="display: flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 12px; font-size: 14px; font-weight: 600;">Review to unblock alice</span>
+<span style="display: flex; align-items: center; min-height: 44px; padding: 0 16px; font-size: 14px; font-weight: 500; color: var(--muted);">Skip →</span>
+</div>
+</div>
+</section>
+</div>
+<div class="light frame">
+<div class="label">STALLED · DEFAULT LIGHT</div>
+<section aria-label="Next move" data-pace="stalled" class="nm-card nm-tone-danger nm-pace-stalled" style="display: flex; flex-wrap: wrap; overflow: hidden; border-radius: 20px;">
+<div class="nm-paceblock" style="flex: 0 0 210px; display: flex; flex-direction: column; gap: 6px; padding: 22px 24px;">
+<span style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em;">NEXT MOVE</span>
+<span style="font-size: 60px; font-weight: 800; line-height: 1; letter-spacing: -0.04em;">4d</span>
+<span style="font-size: 12px; font-weight: 700;">stalled · 1 of 12</span>
+<span style="display: flex; gap: 4px; margin-top: 4px;"><span style="height: 4px; width: 18px; border-radius: 2px; background: var(--bg);"></span><span style="height: 4px; width: 18px; border-radius: 2px; background: var(--bg);"></span><span style="height: 4px; width: 18px; border-radius: 2px; background: var(--bg);"></span></span>
+</div>
+<div style="flex: 1 1 420px; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 20px; padding: 22px 26px;">
+<div style="flex: 999 1 320px; min-width: 0;">
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: var(--tone-ink);">● STUCK ON CHECKS · <span style="font-family: 'Fira Code', monospace; letter-spacing: 0;">initech/worker #13</span></div>
+<a href="#" style="display: block; margin-top: 6px; font-size: 21px; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; color: var(--fg); text-decoration: none;">Fix the timezone drift in scheduled reports</a>
+<div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px;"><span class="nm-chip" style="font-family: 'Fira Code', monospace;">lint</span><span class="nm-chip" style="font-family: 'Fira Code', monospace;">typecheck</span><span class="nm-chip">Changes requested</span></div>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+<span class="nm-cta" style="display: flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 12px; font-size: 14px; font-weight: 600;">Re-run failed checks</span>
+<span style="display: flex; align-items: center; min-height: 44px; padding: 0 16px; font-size: 14px; font-weight: 500; color: var(--muted);">Skip →</span>
+</div>
+</div>
+</section>
+</div>
+</body>
+</html>

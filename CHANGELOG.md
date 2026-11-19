@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.32.0](https://github.com/mfozmen/PRison/compare/v1.31.0...v1.32.0) (2026-11-19)
+
+### Features
+
+* centred settings with tabs, search, one Checks section and theme previews ([#115](https://github.com/mfozmen/PRison/issues/115)) ([cefb122](https://github.com/mfozmen/PRison/commit/cefb122db52ab059a8334ffca34d8276f6d9039f))
+
+## [1.31.0](https://github.com/mfozmen/PRison/compare/v1.30.0...v1.31.0) (2026-11-18)
+
+### Features
+
+* make Next move stand out with a spot ground, aurora and a pace colour ([#114](https://github.com/mfozmen/PRison/issues/114)) ([1464662](https://github.com/mfozmen/PRison/commit/1464662813e167d85ad857051066a19376f075df))
+
 ## [1.30.0](https://github.com/mfozmen/PRison/compare/v1.29.0...v1.30.0) (2026-11-18)
 
 ### Features

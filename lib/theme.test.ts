@@ -234,6 +234,9 @@ describe("palette contrast", () => {
     ["bg", "danger"],
     ["bg", "warning"],
     ["bg", "success"],
+    // The Next move card's ground: its title, meta and every tone it can take.
+    ["fg", "spot"], ["muted", "spot"],
+    ["danger", "spot"], ["warning", "spot"], ["success", "spot"], ["accent", "spot"],
   ];
 
   // The Settings swatches are nested elements stamped with data-theme/data-mode,
@@ -263,10 +266,39 @@ describe("palette contrast", () => {
     expect(Object.keys(palettes()).sort()).toEqual([...GROUNDS].sort());
   });
 
+  // The Next move card lays its queue colour as a light over the spot (22% at
+  // the top left, right under the queue label and the reason chips), and sets
+  // that label and those chips in the queue colour. A flat spot passing says
+  // nothing about the lit one, so this measures the worst point: each tone over
+  // the spot lit by itself at full strength. The text is the tone pushed 30%
+  // toward fg (--tone-ink in globals.css): deeper on a light ground, brighter
+  // on a dark one, so it gains contrast either way.
+  it.each(GROUNDS)("%s keeps the Next move label readable under its own light", (name) => {
+    const base = palettes()["default/light"];
+    const v = { ...base, ...palettes()[name] };
+    const mix = (a: string, b: string, t: number) => {
+      const [x, y] = [a, b].map((h) => parseInt(h.slice(1), 16));
+      const ch = (n: number, s: number) => (n >> s) & 255;
+      const c = [16, 8, 0].map((s) => Math.round(ch(x, s) * t + ch(y, s) * (1 - t)));
+      return "#" + c.map((n) => n.toString(16).padStart(2, "0")).join("");
+    };
+    // Both strengths are read from the stylesheet, so the test moves with it.
+    const light = Number(/color-mix\(in srgb, var\(--tone\) (\d+)%, transparent\), transparent 55%\)/.exec(css)![1]) / 100;
+    const inkShare = Number(/--tone-ink: color-mix\(in srgb, var\(--tone\) (\d+)%, var\(--fg\)\)/.exec(css)![1]) / 100;
+    const failures = ["danger", "warning", "success", "accent"].map((tone) => {
+      const lit = mix(v[tone], v.spot, light);
+      const ink = mix(v[tone], v.fg, inkShare);
+      const r = contrast(ink, lit);
+      return r < 4.5 ? `${tone} ${r.toFixed(2)}` : null;
+    }).filter(Boolean);
+    expect(failures).toEqual([]);
+  });
+
   // Every ground, with nothing exempt. default/light used to be: it predates
   // the theme system and missed AA on seven pairs, and was left alone so that
   // adding themes changed nobody's colours. #40 corrected it, which is what
   // let this list stop having an exception to explain.
+
   it.each(GROUNDS)("%s clears WCAG AA on every text pair", (name) => {
     const vars = palettes()[name];
     expect(vars, `${name} has no palette block`).toBeDefined();

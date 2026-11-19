@@ -37,7 +37,7 @@ them, a **Next move** strip names the one thing to do first. The two histories
 sit underneath as quieter panels; both start collapsed with a count and expand
 to the latest 15, with **Load more** for the rest.
 
-![The PRison dashboard in dark mode. A Next move strip on top points at the oldest item, a PR stuck on lint and typecheck for 4 days, with a Re-run failed checks button and Skip. Under it, the heading 12 things want you sits beside pill toggles for grouping and drafts, a search box and Refresh. Four columns follow, each with a big count and its oldest wait: Stuck on checks (highlighted, 4), Waiting on your review (3), Awaiting your reply (3) and Ready to merge (2). Every row has a status icon, its repo and age, and its next action. At the foot, a History section holds the folded Recently reviewed and Recently merged / closed panels](docs/screenshot.png)
+![The PRison dashboard in dark mode. A Next move card on top points at the oldest item: its time block reads 4d, stalled, 1 of 12, on a red pace colour, beside a PR stuck on lint and typecheck on a deep indigo ground with an aurora edge, a Re-run failed checks button and Skip. Under it, the heading 12 things want you sits beside pill toggles for grouping and drafts, a search box and Refresh. Four columns follow, each with a big count and its oldest wait: Stuck on checks (highlighted, 4), Waiting on your review (3), Awaiting your reply (3) and Ready to merge (2). Every row has a status icon, its repo and age, and its next action. At the foot, a History section holds the folded Recently reviewed and Recently merged / closed panels](docs/screenshot.png)
 
 ### Features
 
@@ -67,7 +67,7 @@ to the latest 15, with **Load more** for the rest.
   board and choose **Ignore this check**. It stays on the card, muted instead of
   red, but its result stops counting: the PR is no longer held out of _Ready to
   merge_ over it, it gets no bucket of its own under _By check_, and it is never
-  awaited. Everything ignored is listed in **Settings → Ignored checks**, under
+  awaited. Everything ignored is listed in **Settings → Checks**, under
   the repo it was ignored on, where it can be renamed, widened to the whole
   owner, or taken back. A conflict or a review gate still holds the PR —
   ignoring a check says its result means nothing, never "merge it anyway" — but
@@ -79,11 +79,16 @@ to the latest 15, with **Load more** for the rest.
   (**You requested changes**, **You approved**). When the author has pushed since,
   the row shows **Updated since** and a **See new commits** link, so a discussion
   you left open is one click away instead of lost in GitHub's notification list.
-- **Next move.** A strip above the columns points at the longest wait across all
+- **Next move.** A card above the columns points at the longest wait across all
   four queues, says why (the red checks, the conflict, who is blocked), and puts
-  its one action a click away. **Skip** steps to the next oldest and wraps after
-  the last. The column that holds it is tinted and the row is marked
-  **↑ next move**, so the strip is a pointer, never a fifth list.
+  its one action a click away. It stands apart from the board on purpose: each
+  theme gives it a spot colour of its own under a soft aurora, with an aurora
+  edge and a glow. Its time block shows the **pace**: **moving** under a day,
+  **slowing** up to three, **stalled** after, in colour, in words and on a
+  three-step meter. The glow grows as the item stalls. The edge and button wear
+  the item's queue colour. **Skip** steps to the next oldest ("2 of 12") and
+  wraps after the last. The column that holds it is tinted and the row is marked
+  **↑ next move**, so the card is a pointer, never a fifth list.
 - **A big count on every column.** Each queue shows how many items it holds and
   how long its oldest one has been sitting, with a one-line description of what
   the queue is. The heading above says how many things want you in total. The
@@ -312,22 +317,25 @@ Top-right, left to right:
 | **Sun/moon**     | Switches between the current theme's two grounds, and names them — it reads "Switch to Aurora Night" rather than "Switch to dark theme". |
 | **Sign Out**     | Clears the stored token.                                                                                                                 |
 
-The Settings menu has six sections:
+Settings opens in the middle of the screen with five tabs, one section at a
+time, so nothing needs a page scroll. The search box at the top looks through
+every tab: type and the panel becomes a list of matching settings, with the
+switches working right there and an **Open** button for the rest. Press `/` to
+jump to it and Esc to clear it.
 
-- **Comments** — show bot comments, hide comments you reacted to.
+- **Comments** — show bot comments, hide comments you reacted to or marked as
+  seen.
 - **Auto refresh** — on/off, how often to check, and the notification
   permission.
-- **Tracked checks** — add the checks to see as "Awaiting" one at a time, each
-  with its own **Required** box, and rename, re-mark, or remove any of them later.
-  Both check panels work one scope at a time: pick an owner or a repository from
-  the scope picker at the top and edit just that list, so the panel stays the
-  height of one list however many repos you configure.
-- **Ignored checks** — everything you wrote off from the board, under the repo
-  it was ignored on, plus an owner scope for a check that is broken everywhere.
-  A repo can also be picked here, to write a check off before the board has
-  ever drawn its chip.
-- **Appearance** — pick one of the fourteen themes, each previewing its own colours
-  and typeface.
+- **Checks** — one owner/repo picker over two lists side by side. **Tracked**:
+  the checks to see as "Awaiting", added one at a time, each with its own
+  **Required** box, and renamed, re-marked, or removed later. **Ignored**:
+  everything you wrote off from the board, under the repo it was ignored on,
+  plus an owner scope for a check that is broken everywhere. Picking a repo
+  changes nothing until you add a check to it, so a repo picked only to ignore a
+  check keeps its owner's tracked defaults.
+- **Appearance** — pick one of the fourteen themes. Each card is a tiny board in
+  that theme's real colours and typeface, previewed on its light or dark ground.
 - **About** — version, repository, license, and **Check for updates**, asked
   for on the spot. **Tell me when a newer version is out** turns it into a
   standing question: the version in the header becomes a link to the release

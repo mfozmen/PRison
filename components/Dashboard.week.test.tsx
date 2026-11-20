@@ -64,7 +64,7 @@ describe("Weekly look back", () => {
 
 describe("Weekly look back — whose copy", () => {
   it("never reads another account's cached week", async () => {
-    localStorage.setItem("prison.week", JSON.stringify({ login: "someone-else", qs: "", at: Date.now(), facts: FACTS }));
+    localStorage.setItem("prison.week", JSON.stringify({ login: "octocat", qs: "", at: Date.now(), facts: FACTS }));
     global.fetch = serve([]);
     render(<Dashboard orgs={ORGS} login="me" />);
     await waitFor(() => expect(weekCalls()).toHaveLength(1));

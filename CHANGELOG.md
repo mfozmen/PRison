@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.34.0](https://github.com/mfozmen/PRison/compare/v1.33.0...v1.34.0) (2026-11-20)
+
+### Features
+
+* run PRison without Docker: npx @mfozmen/prison ([4b37742](https://github.com/mfozmen/PRison/commit/4b377421970fb2a5a3e125713f1a608e747c1dc8))
+
+### Bug Fixes
+
+* order the columns your PRs by stage, then what waits on you ([705f1ac](https://github.com/mfozmen/PRison/commit/705f1ac7fc52c6727316abf24040c439e30dcca4))
+
 ## [1.33.0](https://github.com/mfozmen/PRison/compare/v1.32.1...v1.33.0) (2026-11-20)
 
 ### Features

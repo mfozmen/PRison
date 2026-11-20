@@ -107,3 +107,21 @@ describe("Waiting on others", () => {
     expect(await within(column()).findByText(/copied/i)).toBeInTheDocument();
   });
 });
+
+describe("Wait limits on the board", () => {
+  it("says how late a row is, counts it in the heading, and names the limit on the column", async () => {
+    localStorage.setItem("prison.limits", JSON.stringify({ others: 24 }));
+    global.fetch = serve({ awaiting: [awaiting()] });
+    render(<Dashboard orgs={ORGS} login="me" />);
+    await waitFor(() => expect(within(column()).getByText("Late · 2d over")).toBeInTheDocument());
+    expect(screen.getByText("1 late")).toBeInTheDocument();
+    expect(within(column()).getByText(/limit 1 day/)).toBeInTheDocument();
+  });
+
+  it("stays quiet with no limit set", async () => {
+    global.fetch = serve({ awaiting: [awaiting()] });
+    render(<Dashboard orgs={ORGS} login="me" />);
+    await waitFor(() => expect(within(column()).getByText("held by a review")).toBeInTheDocument());
+    expect(screen.queryByText(/late/i)).toBeNull();
+  });
+});

@@ -44,6 +44,7 @@ import {
 } from "@/lib/estimate";
 import { SIZE } from "./NextMove";
 import { SnoozeMenu, SnoozedFold } from "./Snooze";
+import { limitState, limitLabel, parseLimits, type Limits } from "@/lib/limits";
 import { isSnoozed, parseSnoozes, pruneSnoozes, snoozeFor, type Snoozes, type SnoozeChoice } from "@/lib/snooze";
 import { ClosedPrRow } from "./ClosedPrRow";
 import { ReviewedPrRow } from "./ReviewedPrRow";
@@ -257,6 +258,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [timeBudget, setTimeBudget] = useState<TimeBudget>(null);
   // Items put off until a time or until they change; see lib/snooze.
   const [snoozes, setSnoozes] = useState<Snoozes>({});
+  // How long each queue may wait before it is late; empty is off.
+  const [limits, setLimits] = useState<Limits>({});
   const [closedVisible, setClosedVisible] = useState(ARCHIVE_PAGE_SIZE);
   // Same shape as the closed history: a look-back list, so it starts collapsed
   // and reveals a page at a time.
@@ -586,6 +589,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     const storedReviewedOpen = localStorage.getItem("prison.reviewedOpen");
     const storedTimeBudget = localStorage.getItem("prison.timeBudget");
     const storedSnoozes = localStorage.getItem("prison.snoozes");
+    const storedLimits = localStorage.getItem("prison.limits");
     const storedActivity = localStorage.getItem(ACTIVITY_KEY);
     // Refs, not state: the detection effect reads them, and a restored
     // snapshot must be in place before the first fetch lands or that fetch
@@ -644,6 +648,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       const budgetChoice = TIME_BUDGETS.find((b) => b !== null && String(b) === storedTimeBudget);
       if (budgetChoice) setTimeBudget(budgetChoice);
       setSnoozes(parseSnoozes(storedSnoozes));
+      setLimits(parseLimits(storedLimits));
       // "blocker" (old value) falls through → stays "flat" (default)
       setTracked(parseTracked(storedTracked));
       setIgnored(parseIgnored(storedIgnored));
@@ -702,6 +707,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     if (!hydrated) return;
     localStorage.setItem("prison.snoozes", JSON.stringify(snoozes));
   }, [snoozes, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.limits", JSON.stringify(limits));
+  }, [limits, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -1165,6 +1175,16 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // pattern), so the same id reappearing after a refresh starts unskipped.
   if (liveSkipped.length !== skipped.length) setSkipped(liveSkipped);
   const nextMove = nextMoves.find((m) => !liveSkipped.includes(m.id)) ?? nextMoves[0];
+  const limitNow = new Date();
+  const lateCount = [
+    ...shownStuck.map((pr) => limitState(pr.stuckSince, limits.stuck, limitNow)),
+    ...shownReviews.map((r) => limitState(r.requestedAt, limits.review, limitNow)),
+    ...shownComments.map((c) => limitState(c.commentedAt, limits.reply, limitNow)),
+    ...shownAwaiting.map((pr) => limitState(pr.waitingSince, limits.others, limitNow)),
+  ].filter((l) => l?.state === "late").length;
+  // "· limit 1 day" on a column's caption, once a limit is set for it.
+  const withLimit = (text: string, hours: number | undefined) =>
+    hours ? `${text} · limit ${limitLabel(hours)}` : text;
   const updatedSinceCount = shownReviewed.filter((pr) => pr.updatedSince).length;
   const mergedCount = shownClosed.filter((pr) => pr.merged).length;
 
@@ -1352,6 +1372,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         onIgnoredChange={setIgnored}
         updateChecks={updateChecks}
         onUpdateChecksChange={setUpdateChecks}
+        limits={limits}
+        onLimitsChange={setLimits}
       />
       <main className="mx-auto flex w-full max-w-[1424px] flex-1 flex-col gap-7 px-4 py-8 sm:px-6 lg:px-8">
         {isPending && (
@@ -1396,6 +1418,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 ? "Nothing wants you"
                 : `${owed} ${owed === 1 ? "thing wants" : "things want"} you`}
             </h1>
+          )}
+          {lateCount > 0 && (
+            <span className="-ml-3 mr-3 rounded-md bg-danger px-2 py-1 text-[13px] font-semibold leading-none text-background">
+              {lateCount} late
+            </span>
           )}
           <div role="group" aria-label="Group by" className="flex rounded-full border border-border bg-surface p-1">
             {GROUP_BYS.map(({ value, label }) => (
@@ -1521,7 +1548,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               emptyMessage={emptyText("No PRs stuck on checks 🎉")}
               keyExtractor={(pr) => pr.id}
               tone="danger"
-              caption={caption(shownStuck.length, "PRs", shownStuck[0]?.stuckSince)}
+              caption={withLimit(caption(shownStuck.length, "PRs", shownStuck[0]?.stuckSince), limits.stuck)}
               description="Your PRs that CI or reviewers are holding back."
               footer={<SnoozedFold items={foldOf(visibleStuck, (pr) => pr.title)} onWake={wake} />}
               highlighted={nextMove?.tone === "danger"}
@@ -1676,6 +1703,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     detail={detail}
                     suggestion={suggestStuck(pr)}
                     aside={<SnoozeMenu title={pr.title} onSnooze={(c) => snooze(pr.id, c)} />}
+                    limit={limitState(pr.stuckSince, limits.stuck, limitNow)}
                   />
                 );
               }}
@@ -1700,7 +1728,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               emptyMessage={emptyText("No PRs waiting on your review 🎉")}
               keyExtractor={(req) => req.id}
               tone="accent"
-              caption={caption(shownReviews.length, "PRs", shownReviews[0]?.requestedAt)}
+              caption={withLimit(caption(shownReviews.length, "PRs", shownReviews[0]?.requestedAt), limits.review)}
               description="Teammates blocked until you review."
               footer={<SnoozedFold items={foldOf(visibleReviews, (r) => r.title)} onWake={wake} />}
               highlighted={nextMove?.tone === "accent"}
@@ -1724,6 +1752,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   marked={nextMove?.id === req.id}
                   suggestion={suggestReview(req)}
                   aside={<SnoozeMenu title={req.title} onSnooze={(c) => snooze(req.id, c)} />}
+                  limit={limitState(req.requestedAt, limits.review, limitNow)}
                   detail={(() => {
                     const minutes = reviewMinutes(req);
                     return minutes === null ? undefined : (
@@ -1755,7 +1784,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               emptyMessage={emptyText("No comments awaiting your reply 🎉")}
               keyExtractor={(c) => c.id}
               tone="warning"
-              caption={caption(shownComments.length, "threads", shownComments[0]?.commentedAt)}
+              caption={withLimit(caption(shownComments.length, "threads", shownComments[0]?.commentedAt), limits.reply)}
               description="Someone asked you something. Answer or mark seen."
               footer={<SnoozedFold items={foldOf(visibleComments, (c) => c.preview)} onWake={wake} />}
               highlighted={nextMove?.tone === "warning"}
@@ -1812,6 +1841,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 </span>
                   }
                   marked={nextMove?.id === c.id}
+                  limit={limitState(c.commentedAt, limits.reply, limitNow)}
                   clampTitle
                   detail={
                     <span className="flex flex-wrap items-center gap-1.5">
@@ -1925,7 +1955,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               emptyMessage={emptyText("None of your PRs is waiting on a reviewer")}
               keyExtractor={(pr) => pr.id}
               tone="accent"
-              caption={caption(shownAwaiting.length, "PRs", shownAwaiting[0]?.waitingSince)}
+              caption={withLimit(caption(shownAwaiting.length, "PRs", shownAwaiting[0]?.waitingSince), limits.others)}
               description="Your PRs that wait on someone else's review. The ball is in their court."
               groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
               groupHref={
@@ -1944,6 +1974,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   draft={pr.isDraft}
                   kind="others"
                   suggestion={{ text: "Open on GitHub", href: pr.url }}
+                  limit={limitState(pr.waitingSince, limits.others, limitNow)}
                   detail={
                     <AwaitingDetail
                       pr={pr}

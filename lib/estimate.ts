@@ -16,19 +16,21 @@ export function reviewMinutes(size: Size): number | null {
   }
   const lines = (size.additions ?? 0) + (size.deletions ?? 0);
   const raw = 2 + lines / 15 + (size.changedFiles ?? 0);
-  return STEPS.find((s) => raw <= s) ?? STEPS[STEPS.length - 1];
+  return STEPS.find((s) => raw <= s) ?? STEPS.at(-1)!;
 }
 
 /** "~10 min", "~1 h", "~2 h+". */
 export function minutesLabel(minutes: number): string {
   if (minutes >= 120) return "~2 h+";
-  if (minutes >= 60) return minutes === 60 ? "~1 h" : "~1.5 h";
+  if (minutes > 60) return "~1.5 h";
+  if (minutes === 60) return "~1 h";
   return `~${minutes} min`;
 }
 
 /** Green, amber or red: small, medium, large. */
 export function sizeTone(minutes: number): "success" | "warning" | "danger" {
-  return minutes <= 10 ? "success" : minutes <= 30 ? "warning" : "danger";
+  if (minutes <= 10) return "success";
+  return minutes <= 30 ? "warning" : "danger";
 }
 
 // Fixed guesses for the queues with no diff to read: a reply, a merge, and a
@@ -45,5 +47,6 @@ export const TIME_BUDGETS = [5, 15, 60, null] as const;
 export type TimeBudget = (typeof TIME_BUDGETS)[number];
 
 export function budgetLabel(b: TimeBudget): string {
-  return b === null ? "Any" : b >= 60 ? "1 hour" : `${b} min`;
+  if (b === null) return "Any";
+  return b >= 60 ? "1 hour" : `${b} min`;
 }

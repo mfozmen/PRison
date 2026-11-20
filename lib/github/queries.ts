@@ -795,53 +795,64 @@ export const AWAITING_REVIEWERS_QUERY = `
 
 const reviewerName = (r: any): string => r?.login ?? r?.combinedSlug ?? "";
 
+/** When each reviewer was last asked. Chronological, so the last event per name
+ * is the latest (re-)request. */
+function requestTimes(n: any): Map<string, string> {
+  const askedAt = new Map<string, string>();
+  for (const e of n.timelineItems?.nodes ?? []) {
+    const name = reviewerName(e?.requestedReviewer);
+    if (name && e.createdAt) askedAt.set(name, e.createdAt);
+  }
+  return askedAt;
+}
+
+/** The pending requests: nobody has reviewed since they were asked. */
+function pendingReviewers(n: any): Reviewer[] {
+  const askedAt = requestTimes(n);
+  const out: Reviewer[] = [];
+  for (const req of n.reviewRequests?.nodes ?? []) {
+    const r = req?.requestedReviewer;
+    const name = reviewerName(r);
+    if (!name || out.some((x) => x.name === name)) continue;
+    out.push({ name, team: r.__typename === "Team", state: "requested", since: askedAt.get(name) ?? n.createdAt ?? "" });
+  }
+  return out;
+}
+
+/** One reviewer's latest verdict, or null for one that says nothing (dismissed). */
+function verdict(rv: any, name: string, pushedAt: string): Reviewer | null {
+  if (rv.state === "APPROVED") return { name, team: false, state: "approved", since: rv.submittedAt };
+  if (rv.state === "COMMENTED") return { name, team: false, state: "commented", since: rv.submittedAt };
+  if (rv.state !== "CHANGES_REQUESTED") return null;
+  const pushedSince = !!pushedAt && pushedAt > rv.submittedAt;
+  return { name, team: false, state: "changes", since: pushedSince ? pushedAt : rv.submittedAt, pushedSince };
+}
+
 export function parseAwaitingReviewers(raw: any): AwaitingPr[] {
   const out: AwaitingPr[] = [];
   for (const n of searchNodes(raw)) {
     if (!n?.id) continue;
     const commit = n.commits?.nodes?.[0]?.commit ?? {};
     const pushedAt: string = commit.pushedDate ?? commit.committedDate ?? n.createdAt ?? "";
-    // Chronological, so the last event per name is the latest (re-)request.
-    const askedAt = new Map<string, string>();
-    for (const e of n.timelineItems?.nodes ?? []) {
-      const name = reviewerName(e?.requestedReviewer);
-      if (name && e.createdAt) askedAt.set(name, e.createdAt);
-    }
-    const reviewers: Reviewer[] = [];
-    const listed = new Set<string>();
-    for (const req of n.reviewRequests?.nodes ?? []) {
-      const r = req?.requestedReviewer;
-      const name = reviewerName(r);
-      if (!name || listed.has(name)) continue;
-      listed.add(name);
-      reviewers.push({
-        name, team: r.__typename === "Team", state: "requested",
-        since: askedAt.get(name) ?? n.createdAt ?? "",
-      });
-    }
-    const author = n.author?.login;
+    const reviewers = pendingReviewers(n);
     for (const rv of n.latestReviews?.nodes ?? []) {
       const name = rv?.author?.login;
       // A pending re-request already says where that reviewer stands; your own
       // COMMENTED self-annotations are not a review of anything.
-      if (!name || name === author || listed.has(name)) continue;
-      if (rv.state === "APPROVED") reviewers.push({ name, team: false, state: "approved", since: rv.submittedAt });
-      else if (rv.state === "COMMENTED") reviewers.push({ name, team: false, state: "commented", since: rv.submittedAt });
-      else if (rv.state === "CHANGES_REQUESTED") {
-        const pushedSince = !!pushedAt && pushedAt > rv.submittedAt;
-        reviewers.push({ name, team: false, state: "changes", since: pushedSince ? pushedAt : rv.submittedAt, pushedSince });
-      } else continue;
-      listed.add(name);
+      if (!name || name === n.author?.login || reviewers.some((r) => r.name === name)) continue;
+      const v = verdict(rv, name, pushedAt);
+      if (v) reviewers.push(v);
     }
     const waits = reviewers
       .filter((r) => r.state === "requested" || (r.state === "changes" && r.pushedSince))
-      .map((r) => r.since);
+      .map((r) => r.since)
+      .sort((a, b) => a.localeCompare(b));
     if (waits.length === 0) continue;
     out.push({
       id: n.id, title: n.title, url: n.url, number: n.number,
       repo: n.repository?.nameWithOwner ?? "",
       isDraft: n.isDraft ?? false,
-      waitingSince: waits.sort()[0],
+      waitingSince: waits[0],
       reviewers,
     });
   }
@@ -870,7 +881,8 @@ export const MY_WEEK_QUERY = `
 /** The search for the look back: reviewed by the viewer, touched since `since`
  * (a YYYY-MM-DD date), within the scope. */
 export function myWeekSearch(since: string, scope?: string): string {
-  return `is:pr reviewed-by:@me -author:@me updated:>=${since}${scope ? ` ${scope}` : ""} sort:updated-desc`;
+  const where = scope ? ` ${scope}` : "";
+  return `is:pr reviewed-by:@me -author:@me updated:>=${since}${where} sort:updated-desc`;
 }
 
 export function parseMyWeek(raw: any, viewerLogin: string): ReviewFact[] {
@@ -880,11 +892,11 @@ export function parseMyWeek(raw: any, viewerLogin: string): ReviewFact[] {
     const asked: string[] = (n.timelineItems?.nodes ?? [])
       .filter((e: any) => e?.requestedReviewer?.login === viewerLogin && e.createdAt)
       .map((e: any) => e.createdAt)
-      .sort();
+      .sort((a: string, b: string) => a.localeCompare(b));
     for (const r of n.reviews?.nodes ?? []) {
       if (r?.author?.login !== viewerLogin || !r.submittedAt) continue;
       // The request this review answered: the latest one made before it.
-      const request = asked.filter((t) => t <= r.submittedAt).at(-1);
+      const request = asked.findLast((t) => t <= r.submittedAt);
       out.push({
         prId: n.id, title: n.title, url: n.url, number: n.number,
         repo: n.repository?.nameWithOwner ?? "",

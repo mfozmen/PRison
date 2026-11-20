@@ -37,14 +37,16 @@ export function AwaitingDetail({
         {pr.reviewers.map((r) => {
           const st = stateText(r, now);
           return (
-            <li key={r.name} className="flex min-w-0 items-center gap-2">
+            // The name is never cut short — it is who to nudge. In a narrow
+            // column the state wraps under it instead.
+            <li key={r.name} className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
               <span
                 aria-hidden="true"
                 className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-border text-[10px] font-semibold uppercase text-foreground"
               >
                 {r.name.replace(/^.*\//, "").slice(0, 1)}
               </span>
-              <span className="truncate font-mono text-xs text-foreground">@{r.name}</span>
+              <span className="break-all font-mono text-xs text-foreground">@{r.name}</span>
               <span className={`text-xs ${st.className}`}>{st.text}</span>
             </li>
           );

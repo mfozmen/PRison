@@ -149,7 +149,7 @@ const GITHUB_RESERVED_PATHS = new Set([
 // Skipping the whole match here would wave a real org straight through.
 const IDENTITY_IN_SECOND_SEGMENT = new Set(["orgs", "apps", "marketplace", "repos"]);
 
-const SKIP_DIRS = new Set(["node_modules", ".next", ".git", "coverage", "dist"]);
+const SKIP_DIRS = new Set(["node_modules", ".next", ".git", "coverage", "dist", "npm-package"]);
 // Lockfiles are machine-generated and full of upstream package metadata
 // ("sponsors" funding URLs, maintainer handles) — never authored here.
 const SKIP_FILES = new Set(["package-lock.json"]);

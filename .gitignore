@@ -57,3 +57,4 @@ next-env.d.ts
 # Python bytecode (vendored design skill)
 __pycache__/
 *.pyc
+npm-package/

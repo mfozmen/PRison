@@ -58,17 +58,17 @@ const reviews = [
   {
     id: "PR_r1", title: "Add rate limiting to the public search endpoint",
     url: "https://github.com/acme/api/pull/479", repo: "acme/api", number: 479,
-    author: "alice", requestedAt: ago(50), isDraft: false,
+    author: "alice", requestedAt: ago(50), isDraft: false, additions: 212, deletions: 48, changedFiles: 7,
   },
   {
     id: "PR_r2", title: "Move the CSV export off the request thread",
     url: "https://github.com/widgets-inc/frontend/pull/204", repo: "widgets-inc/frontend", number: 204,
-    author: "bob", requestedAt: ago(7), isDraft: false,
+    author: "bob", requestedAt: ago(7), isDraft: false, additions: 64, deletions: 20, changedFiles: 3,
   },
   {
     id: "PR_r3", title: "Spike: replace the polling loop with webhooks",
     url: "https://github.com/globex/backend/pull/101", repo: "globex/backend", number: 101,
-    author: "carol", requestedAt: ago(1), isDraft: true,
+    author: "carol", requestedAt: ago(1), isDraft: true, additions: 6, deletions: 2, changedFiles: 1,
   },
 ];
 

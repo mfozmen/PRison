@@ -167,3 +167,43 @@ describe("Dashboard — Next move", () => {
     expect(screen.queryByRole("region", { name: "Next move" })).toBeNull();
   });
 });
+
+describe("Dashboard — Next move fits the time you have", () => {
+  const timeGroup = () => within(strip()).getByRole("group", { name: "Time you have" });
+
+  it("picks the longest wait that fits, and says it is one of those that fit", async () => {
+    // The review is older but unmeasured, so it counts as long; the stuck PR's
+    // red check is a quick re-run.
+    global.fetch = fetchLists([STUCK_PR], [REVIEW_PR]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await screen.findByRole("region", { name: "Next move" });
+    expect(within(strip()).getByText("review pr")).toBeInTheDocument();
+    fireEvent.click(within(timeGroup()).getByRole("button", { name: "15 min" }));
+    expect(within(strip()).getByText("stuck pr")).toBeInTheDocument();
+    expect(within(strip()).getByText(/1 of 1\s*that fit/)).toBeInTheDocument();
+    expect(localStorage.getItem("prison.timeBudget")).toBe("15");
+    fireEvent.click(within(timeGroup()).getByRole("button", { name: "Any" }));
+    expect(within(strip()).getByText("review pr")).toBeInTheDocument();
+  });
+
+  it("shows a review's size on the card and its row, and fits it by that size", async () => {
+    const small = { ...REVIEW_PR, additions: 3, deletions: 1, changedFiles: 1 };
+    global.fetch = fetchLists([STUCK_PR], [small]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await screen.findByRole("region", { name: "Next move" });
+    fireEvent.click(within(timeGroup()).getByRole("button", { name: "5 min" }));
+    expect(within(strip()).getByText("review pr")).toBeInTheDocument();
+    expect(within(strip()).getByText("~5 min · 4 lines · 1 file")).toBeInTheDocument();
+    const column = document.getElementById("waiting-on-your-review")!;
+    expect(within(column).getByText("~5 min · 4 lines · 1 file")).toBeInTheDocument();
+  });
+
+  it("falls back to the longest wait, and says so, when nothing fits", async () => {
+    global.fetch = fetchLists([], [REVIEW_PR]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    await screen.findByRole("region", { name: "Next move" });
+    fireEvent.click(within(timeGroup()).getByRole("button", { name: "5 min" }));
+    expect(within(strip()).getByText("review pr")).toBeInTheDocument();
+    expect(within(strip()).getByText(/nothing fits that/i)).toBeInTheDocument();
+  });
+});

@@ -38,6 +38,11 @@ import { NextMove, type NextMoveItem } from "./NextMove";
 import { PrRow } from "./PrRow";
 import { AwaitingDetail } from "./AwaitingDetail";
 import { reminderText } from "@/lib/reminder";
+import {
+  reviewMinutes, minutesLabel, sizeTone, stuckMinutes,
+  REPLY_MINUTES, MERGE_MINUTES, TIME_BUDGETS, type TimeBudget,
+} from "@/lib/estimate";
+import { SIZE } from "./NextMove";
 import { ClosedPrRow } from "./ClosedPrRow";
 import { ReviewedPrRow } from "./ReviewedPrRow";
 import { ArchiveSection } from "./ArchiveSection";
@@ -122,6 +127,16 @@ const GROUP_BYS: { value: "flat" | "repo" | "check"; label: string }[] = [
 ];
 
 /** "3 PRs · oldest 2d" under a column's count; just the unit when it is empty. */
+/** A review's estimate with the size behind it, so the guess shows its working. */
+function sizeText(
+  req: { additions?: number; deletions?: number; changedFiles?: number },
+  minutes: number,
+): string {
+  const lines = (req.additions ?? 0) + (req.deletions ?? 0);
+  const files = req.changedFiles ?? 0;
+  return `${minutesLabel(minutes)} · ${lines.toLocaleString("en-US")} ${lines === 1 ? "line" : "lines"} · ${files} ${files === 1 ? "file" : "files"}`;
+}
+
 function caption(count: number, unit: string, oldest: string | undefined): string {
   return oldest && count > 0 ? `${unit} · oldest ${relativeAge(oldest, new Date())}` : unit;
 }
@@ -236,6 +251,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // Next move ids the user stepped past this sitting. Not persisted: Skip is
   // "not this one right now", and tomorrow it may well be the right one.
   const [skipped, setSkipped] = useState<string[]>([]);
+  // How long the user said they have; null ("Any") is the longest wait first.
+  const [timeBudget, setTimeBudget] = useState<TimeBudget>(null);
   const [closedVisible, setClosedVisible] = useState(ARCHIVE_PAGE_SIZE);
   // Same shape as the closed history: a look-back list, so it starts collapsed
   // and reveals a page at a time.
@@ -563,6 +580,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     const storedIgnored = localStorage.getItem("prison.ignoredChecks");
     const storedClosedOpen = localStorage.getItem("prison.closedOpen");
     const storedReviewedOpen = localStorage.getItem("prison.reviewedOpen");
+    const storedTimeBudget = localStorage.getItem("prison.timeBudget");
     const storedActivity = localStorage.getItem(ACTIVITY_KEY);
     // Refs, not state: the detection effect reads them, and a restored
     // snapshot must be in place before the first fetch lands or that fetch
@@ -618,6 +636,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       if (storedReviewedOpen === "true") {
         setReviewedOpen(true);
       }
+      const budgetChoice = TIME_BUDGETS.find((b) => b !== null && String(b) === storedTimeBudget);
+      if (budgetChoice) setTimeBudget(budgetChoice);
       // "blocker" (old value) falls through → stays "flat" (default)
       setTracked(parseTracked(storedTracked));
       setIgnored(parseIgnored(storedIgnored));
@@ -666,6 +686,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     if (!hydrated) return;
     localStorage.setItem("prison.groupBy", groupBy);
   }, [groupBy, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.timeBudget", String(timeBudget));
+  }, [timeBudget, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -1046,34 +1071,47 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // lists, so a search or the draft filter moves it too.
   const owed =
     shownStuck.length + shownReviews.length + shownComments.length + shownReady.length;
-  const nextMoves: NextMoveItem[] = sortByAgeAsc(
+  const allMoves: NextMoveItem[] = sortByAgeAsc(
     [
       ...shownStuck.map((pr): NextMoveItem => ({
         id: pr.id, title: pr.title, repo: pr.repo, number: pr.number, url: pr.url,
         since: pr.stuckSince, suggestion: suggestStuck(pr), tone: "danger",
+        minutes: stuckMinutes(pr),
         reasons: [
           ...(pr.mergeState === "DIRTY" ? [{ label: MERGE_CONFLICT_LABEL }] : []),
           ...pr.failing.map((name) => ({ label: name, mono: true })),
           ...(pr.reviewDecision === "CHANGES_REQUESTED" ? [{ label: "Changes requested" }] : []),
         ],
       })),
-      ...shownReviews.map((req): NextMoveItem => ({
-        id: req.id, title: req.title, repo: req.repo, number: req.number, url: req.url,
-        since: req.requestedAt, suggestion: suggestReview(req), tone: "accent",
-        reasons: [{ label: `blocking @${req.author}`, mono: true }],
-      })),
+      ...shownReviews.map((req): NextMoveItem => {
+        const minutes = reviewMinutes(req);
+        return {
+          id: req.id, title: req.title, repo: req.repo, number: req.number, url: req.url,
+          since: req.requestedAt, suggestion: suggestReview(req), tone: "accent",
+          reasons: [{ label: `blocking @${req.author}`, mono: true }],
+          // An unmeasured review is treated as a long one: fitting it into five
+          // minutes on a guess would be the wrong kind of optimism.
+          minutes: minutes ?? 60,
+          size: minutes === null ? undefined : { label: sizeText(req, minutes), tone: sizeTone(minutes) },
+        };
+      }),
       ...shownComments.map((c): NextMoveItem => ({
         id: c.id, title: c.preview, repo: c.repo, number: c.number, url: c.url,
         since: c.commentedAt, suggestion: suggestComment(c), tone: "warning",
+        minutes: REPLY_MINUTES,
         reasons: [{ label: c.author, mono: true }, ...(c.path ? [{ label: c.path, mono: true }] : [])],
       })),
       ...shownReady.map((pr): NextMoveItem => ({
         id: pr.id, title: pr.title, repo: pr.repo, number: pr.number, url: pr.url,
         since: pr.readySince, suggestion: suggestReady(pr), tone: "success",
+        minutes: MERGE_MINUTES,
       })),
     ],
     (item) => item.since,
   );
+  const fitting = timeBudget === null ? allMoves : allMoves.filter((m) => m.minutes <= timeBudget);
+  const fits = fitting.length > 0;
+  const nextMoves = fits ? fitting : allMoves;
   // Only skips that still point at something count: a PR that was skipped,
   // then resolved, must not come back already skipped, and a gone id must not
   // throw off when the round wraps.
@@ -1287,6 +1325,13 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             position={nextMoves.indexOf(nextMove) + 1}
             total={nextMoves.length}
             canSkip={nextMoves.length > 1}
+            budget={timeBudget}
+            onBudget={(b) => {
+              setTimeBudget(b);
+              // A new budget is a new round: old skips belonged to the old one.
+              setSkipped([]);
+            }}
+            fits={fits}
             onSkip={() =>
               // Skipping the last one starts the round again rather than
               // leaving the strip with nothing to point at. Built from the live
@@ -1630,6 +1675,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   byline={`@${req.author}`}
                   marked={nextMove?.id === req.id}
                   suggestion={suggestReview(req)}
+                  detail={(() => {
+                    const minutes = reviewMinutes(req);
+                    return minutes === null ? undefined : (
+                      <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-semibold leading-[normal] ${SIZE[sizeTone(minutes)]}`}>
+                        {sizeText(req, minutes)}
+                      </span>
+                    );
+                  })()}
                 />
               )}
             />

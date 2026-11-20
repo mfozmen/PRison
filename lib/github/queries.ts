@@ -103,6 +103,8 @@ export const REVIEW_REQUESTS_QUERY = `
     search(query: $q, type: ISSUE, first: 50) {
       nodes { ... on PullRequest {
         id title url number isDraft updatedAt
+        # Plain fields, so free: the size behind a rough review time.
+        additions deletions changedFiles
         repository { nameWithOwner }
         author { login }
         timelineItems(itemTypes: [REVIEW_REQUESTED_EVENT], first: 100) {
@@ -355,6 +357,9 @@ export function parseReviewRequests(raw: any, viewerLogin: string): ReviewReques
         // only the real one can be treated as "this was requested again".
         requestedDirectly: !!mine?.createdAt,
         isDraft: n.isDraft ?? false,
+        ...(typeof n.additions === "number" ? { additions: n.additions } : {}),
+        ...(typeof n.deletions === "number" ? { deletions: n.deletions } : {}),
+        ...(typeof n.changedFiles === "number" ? { changedFiles: n.changedFiles } : {}),
       } as ReviewRequest;
     });
 }

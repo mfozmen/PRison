@@ -33,6 +33,11 @@ export type ReviewRequest = {
   // updatedAt moves on any activity — only the direct one dates the request.
   requestedDirectly: boolean;
   isDraft: boolean;
+  // The diff's size, for a rough review time (lib/estimate). Optional: a
+  // payload from before these were asked for simply shows no estimate.
+  additions?: number;
+  deletions?: number;
+  changedFiles?: number;
 };
 
 export type ReadyPr = {

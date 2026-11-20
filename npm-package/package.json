@@ -1,0 +1,33 @@
+{
+  "name": "@mfozmen/prison",
+  "version": "1.33.0",
+  "description": "A read-only GitHub dashboard for the pull requests waiting on you, and for how long.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mfozmen/PRison"
+  },
+  "homepage": "https://github.com/mfozmen/PRison#readme",
+  "bugs": "https://github.com/mfozmen/PRison/issues",
+  "keywords": [
+    "github",
+    "pull-requests",
+    "code-review",
+    "dashboard"
+  ],
+  "type": "module",
+  "bin": {
+    "prison": "bin/prison.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "bin",
+    "server"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

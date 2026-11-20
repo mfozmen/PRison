@@ -2858,17 +2858,16 @@ describe("Dashboard", () => {
       ).toBeInTheDocument();
     });
 
-    it("puts the ready column after the review column", async () => {
+    it("puts the ready column last among your own PRs, before the review column", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("ready pr")).toBeInTheDocument();
       // Compare the sections themselves: the index above names them both, so a
       // text search of the page would only ever measure the index.
       const ready = document.getElementById("ready-to-merge")!;
+      const others = document.getElementById("waiting-on-others")!;
       const review = document.getElementById("waiting-on-your-review")!;
-      expect(
-        review.compareDocumentPosition(ready) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
+      expect(others.compareDocumentPosition(ready) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(ready.compareDocumentPosition(review) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it("includes ready-to-merge in a Refresh", async () => {
@@ -4687,16 +4686,19 @@ describe("Dashboard — tier layout", () => {
     global.fetch = okFetch();
   });
 
+  // Your own PRs by stage — held back, waiting on a reviewer, ready — then the
+  // queues where someone waits on you, then the histories.
   const SECTIONS = [
     "stuck-on-checks",
+    "waiting-on-others",
+    "ready-to-merge",
     "waiting-on-your-review",
     "comments-awaiting-reply",
-    "ready-to-merge",
     "recently-reviewed",
     "recently-closed",
   ];
 
-  it("orders the columns stuck, review, reply, ready, then the histories", async () => {
+  it("orders your PRs by stage, then the queues waiting on you, then the histories", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("ready pr")).toBeInTheDocument();
     const els = SECTIONS.map((id) => document.getElementById(id)!);
@@ -4719,7 +4721,7 @@ describe("Dashboard — tier layout", () => {
   it("never nests one queue inside another", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("ready pr")).toBeInTheDocument();
-    const queues = SECTIONS.slice(0, 4).map((id) => document.getElementById(id)!);
+    const queues = SECTIONS.slice(0, 5).map((id) => document.getElementById(id)!);
     for (const a of queues) {
       for (const b of queues) if (a !== b) expect(a.contains(b)).toBe(false);
     }

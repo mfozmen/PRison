@@ -1,0 +1,22 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/api/awaiting-reviewers/route": "/api/awaiting-reviewers",
+  "/api/closed-prs/route": "/api/closed-prs",
+  "/api/latest-release/route": "/api/latest-release",
+  "/api/my-week/route": "/api/my-week",
+  "/api/orgs/route": "/api/orgs",
+  "/api/poll-interval/route": "/api/poll-interval",
+  "/api/pr-comments/route": "/api/pr-comments",
+  "/api/ready-to-merge/route": "/api/ready-to-merge",
+  "/api/repos/route": "/api/repos",
+  "/api/review-requests/route": "/api/review-requests",
+  "/api/reviewed-prs/route": "/api/reviewed-prs",
+  "/api/stuck-prs/route": "/api/stuck-prs",
+  "/api/token/cli/route": "/api/token/cli",
+  "/api/token/env/route": "/api/token/env",
+  "/api/token/route": "/api/token",
+  "/favicon.ico/route": "/favicon.ico",
+  "/icon.svg/route": "/icon.svg",
+  "/page": "/"
+}

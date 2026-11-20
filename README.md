@@ -17,20 +17,21 @@ anything back to GitHub.
 **[Controls](#controls)** ·
 **[Docs](#documentation)**
 
-![The PRison dashboard in dark mode. A Next move card on top points at the oldest item, 4d and stalled, a PR stuck on lint and typecheck, with an I have choice of 5 min, 15 min, 1 hour or Any, a Re-run failed checks button and Skip. Under it, 12 things want you sits beside grouping and draft toggles, a search box and Refresh. Five columns follow, each with a big count and its oldest wait: Stuck on checks, Waiting on your review with a size chip like ~15 min · 84 lines · 3 files on each row, Awaiting your reply, Ready to merge, and Waiting on others, where each PR lists its reviewers and where they stand, with a Copy reminder button. Every row has a moon to snooze it. At the foot, History opens with a This week card — median wait before your review, reviews you gave, PRs you reviewed, the longest wait — and a bar per day, above the folded Recently reviewed and Recently merged / closed panels](docs/screenshot.png)
+![The PRison dashboard in dark mode. A Next move card on top points at the oldest item, 4d and stalled, a PR stuck on lint and typecheck, with an I have choice of 5 min, 15 min, 1 hour or Any, a Re-run failed checks button and Skip. Under it, 12 things want you sits beside grouping and draft toggles, a search box and Refresh. Five columns follow, each with a big count and its oldest wait. The first row is your own PRs: Stuck on checks, Waiting on others — where each PR lists its reviewers and where they stand, with a Copy reminder button — and Ready to merge. The second row is what waits on you: Waiting on your review, with a size chip like ~15 min · 84 lines · 3 files on each row, and Awaiting your reply. Every row has a moon to snooze it. At the foot, History opens with a This week card — median wait before your review, reviews you gave, PRs you reviewed, the longest wait — and a bar per day, above the folded Recently reviewed and Recently merged / closed panels](docs/screenshot.png)
 
 ## What it shows
 
-Five columns, oldest first, with a **[Next move](#next-move)** card above them
-pointing at the one thing to do first.
+Five columns, oldest first within each, with a **[Next move](#next-move)** card
+above them pointing at the one thing to do first. Left to right, first your own
+PRs by stage, then the queues where someone waits on you:
 
-| Column | What's in it |
-| --- | --- |
-| **Stuck on checks** | Your PRs that CI, a conflict or a branch rule is holding back, with the reason on each row. |
-| **Waiting on your review** | PRs where a teammate is blocked on you, each with a rough [review time](#next-move). |
-| **Awaiting your reply** | Review comments where the last word isn't yours — on your PRs and on the threads you raised. [More](#comments-and-reviews) |
-| **Ready to merge** | Approved, green, mergeable. An out-of-date branch still counts, with **Needs update**. |
-| **Waiting on others** | Your PRs that wait on somebody else's review: who, and how long. [More](#waiting-on-others) |
+| | Column | What's in it |
+| --- | --- | --- |
+| **Your PRs** | **Stuck on checks** | Held back by CI, a conflict or a branch rule, with the reason on each row. |
+| | **Waiting on others** | Waiting on somebody else's review: who, and how long. [More](#waiting-on-others) |
+| | **Ready to merge** | Approved, green, mergeable. An out-of-date branch still counts, with **Needs update**. |
+| **Waiting on you** | **Waiting on your review** | A teammate is blocked on you; each row has a rough [review time](#next-move). |
+| | **Awaiting your reply** | Review comments where the last word isn't yours — on your PRs and on the threads you raised. [More](#comments-and-reviews) |
 
 Underneath, quieter on purpose, **History**: a [weekly look back](#looking-back)
 at your reviewing, the PRs you reviewed (with your verdict, and **Updated

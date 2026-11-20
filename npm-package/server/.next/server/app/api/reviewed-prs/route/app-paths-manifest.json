@@ -1,0 +1,3 @@
+{
+  "/api/reviewed-prs/route": "app/api/reviewed-prs/route.js"
+}

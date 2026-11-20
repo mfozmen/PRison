@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { ageBucket, relativeAge } from "@/lib/prioritize";
 import type { Suggestion } from "@/lib/suggest";
 import type { Tone } from "./PrList";
+import { TIME_BUDGETS, budgetLabel, type TimeBudget } from "@/lib/estimate";
 
 export interface NextMoveReason {
   label: string;
@@ -21,6 +22,10 @@ export interface NextMoveItem {
   tone: Tone;
   /** Why it is waiting, in a few words: failing checks, a conflict, a verdict. */
   reasons?: NextMoveReason[];
+  /** Rough minutes it takes, used to fit a time budget. */
+  minutes: number;
+  /** Shown only where it was measured (a review's diff): "~10 min · 84 lines · 3 files". */
+  size?: { label: string; tone: "success" | "warning" | "danger" };
 }
 
 // Which queue the item belongs to: the card's edge, label, chips and button.
@@ -30,6 +35,13 @@ const QUEUE: Record<Tone, string> = {
   warning: "Awaiting your reply",
   success: "Ready to merge",
 };
+
+// A review's size in the board's status colours: small, medium, large.
+export const SIZE = {
+  success: "bg-success/15 text-success",
+  warning: "bg-warning/15 text-warning",
+  danger: "bg-danger/15 text-danger",
+} as const;
 
 // How long it has been waiting: the time block's colour, word and meter, on
 // the same thresholds as every row's age.
@@ -54,6 +66,9 @@ export function NextMove({
   total,
   onSkip,
   canSkip,
+  budget = null,
+  onBudget,
+  fits = true,
 }: {
   item: NextMoveItem;
   now: Date;
@@ -62,6 +77,11 @@ export function NextMove({
   total: number;
   onSkip: () => void;
   canSkip: boolean;
+  /** How long the user said they have; null is "Any". */
+  budget?: TimeBudget;
+  onBudget?: (b: TimeBudget) => void;
+  /** False when nothing fits the budget and this is the longest wait instead. */
+  fits?: boolean;
 }): ReactNode {
   const pace = PACE[ageBucket(item.since, now)];
   return (
@@ -77,6 +97,7 @@ export function NextMove({
         </span>
         <span className="text-xs font-bold leading-[normal]">
           {pace.word} · {position} of {total}
+          {budget !== null && fits ? " that fit" : ""}
         </span>
         <span className="mt-1 flex gap-1" role="img" aria-label={`Pace: ${pace.word}`}>
           {[1, 2, 3].map((step) => (
@@ -91,6 +112,31 @@ export function NextMove({
       </div>
       <div className="flex min-w-0 flex-[1_1_472px] flex-wrap items-center gap-5 px-[26px] py-[22px]">
         <div className="min-w-0 flex-[999_1_320px]">
+          {onBudget && (
+            // How long the user has. Picks the longest wait that fits instead
+            // of the longest wait, so a spare quarter hour clears something.
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="text-[13px] text-muted">I have</span>
+              <div role="group" aria-label="Time you have" className="flex rounded-full border border-border bg-background/60 p-[3px]">
+                {TIME_BUDGETS.map((b) => (
+                  <button
+                    key={String(b)}
+                    type="button"
+                    aria-pressed={budget === b}
+                    onClick={() => onBudget(b)}
+                    className={`min-h-7 cursor-pointer rounded-full px-3 text-xs focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
+                      budget === b ? "bg-foreground font-semibold text-background" : "font-medium text-muted hover:text-foreground"
+                    }`}
+                  >
+                    {budgetLabel(b)}
+                  </button>
+                ))}
+              </div>
+              {budget !== null && !fits && (
+                <span className="text-xs text-muted">Nothing fits that — here is the longest wait.</span>
+              )}
+            </div>
+          )}
           <div className="text-xs font-semibold leading-[normal] tracking-[0.08em] text-[var(--tone-ink)]">
             ● {QUEUE[item.tone].toUpperCase()} ·{" "}
             <span className="font-mono tracking-normal">
@@ -105,9 +151,14 @@ export function NextMove({
           >
             {item.title}
           </a>
-          {item.reasons?.length ? (
+          {item.reasons?.length || item.size ? (
             <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {item.reasons.map((r, i) => (
+              {item.size && (
+                <span className={`rounded-md px-2 py-0.5 text-xs font-semibold leading-[normal] ${SIZE[item.size.tone]}`}>
+                  {item.size.label}
+                </span>
+              )}
+              {item.reasons?.map((r, i) => (
                 <span
                   // Labels can repeat (two checks of one name, an author
                   // whose name is also a path), so the index keeps keys unique.

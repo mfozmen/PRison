@@ -17,6 +17,7 @@ import type {
   PrComment,
   ClosedPr,
   ReviewedPr,
+  AwaitingPr,
 } from "@/lib/types";
 import { sortByAgeAsc, sortByAgeDesc, relativeAge } from "@/lib/prioritize";
 import { isValidRepo } from "@/lib/github/validate";
@@ -33,8 +34,20 @@ import {
   MERGE_CONFLICT_LABEL,
 } from "@/lib/suggest";
 import { PrList } from "./PrList";
-import { NextMove, type NextMoveItem } from "./NextMove";
+import { NextMove, SIZE, type NextMoveItem } from "./NextMove";
 import { PrRow } from "./PrRow";
+import { AwaitingDetail } from "./AwaitingDetail";
+import { reminderText } from "@/lib/reminder";
+import {
+  reviewMinutes, minutesLabel, sizeTone, stuckMinutes,
+  REPLY_MINUTES, MERGE_MINUTES, TIME_BUDGETS, type TimeBudget,
+} from "@/lib/estimate";
+import { SnoozeMenu, SnoozedFold } from "./Snooze";
+import { limitState, limitLabel, parseLimits, type Limits } from "@/lib/limits";
+import { WeekCard } from "./WeekCard";
+import type { ReviewFact } from "@/lib/week";
+
+import { isSnoozed, parseSnoozes, pruneSnoozes, snoozeFor, type Snoozes, type SnoozeChoice } from "@/lib/snooze";
 import { ClosedPrRow } from "./ClosedPrRow";
 import { ReviewedPrRow } from "./ReviewedPrRow";
 import { ArchiveSection } from "./ArchiveSection";
@@ -85,6 +98,10 @@ import {
   type ActivityEntry,
 } from "@/lib/activity";
 
+// The look back is asked once in this long per scope, not on every refresh.
+const WEEK_TTL_MS = 12 * 3_600_000;
+const WEEK_KEY = "prison.week";
+
 export interface DashboardProps {
   orgs: Org[];
   login: string;
@@ -117,6 +134,28 @@ const GROUP_BYS: { value: "flat" | "repo" | "check"; label: string }[] = [
   { value: "repo", label: "By repo" },
   { value: "check", label: "By check" },
 ];
+
+/** A review's estimate with the size behind it, so the guess shows its working. */
+function sizeText(
+  req: { additions?: number; deletions?: number; changedFiles?: number },
+  minutes: number,
+): string {
+  const lines = (req.additions ?? 0) + (req.deletions ?? 0);
+  const files = req.changedFiles ?? 0;
+  return `${minutesLabel(minutes)} · ${lines.toLocaleString("en-US")} ${lines === 1 ? "line" : "lines"} · ${files} ${files === 1 ? "file" : "files"}`;
+}
+
+/** Same precedence the server applies in resolveScope: repo:owner/name already
+ * names its owner, so sending an org beside it could only agree or contradict. */
+function scopeQuery(org: string, repo: string, login: string): string {
+  return repo
+    ? `?repo=${encodeURIComponent(repo)}`
+    : org === login
+      ? `?user=${encodeURIComponent(login)}`
+      : org
+        ? `?org=${encodeURIComponent(org)}`
+        : "";
+}
 
 /** "3 PRs · oldest 2d" under a column's count; just the unit when it is empty. */
 function caption(count: number, unit: string, oldest: string | undefined): string {
@@ -217,18 +256,31 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [comments, setComments] = useState<PrComment[]>([]);
   const [closedPrs, setClosedPrs] = useState<ClosedPr[]>([]);
   const [reviewedPrs, setReviewedPrs] = useState<ReviewedPr[]>([]);
+  const [awaitingPrs, setAwaitingPrs] = useState<AwaitingPr[]>([]);
   const [stuckError, setStuckError] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [readyError, setReadyError] = useState<string | null>(null);
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [closedError, setClosedError] = useState<string | null>(null);
   const [reviewedError, setReviewedError] = useState<string | null>(null);
+  const [awaitingError, setAwaitingError] = useState<string | null>(null);
+  // The row whose reminder was just copied, so its button can say so.
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   // Closed PRs are history, not a work queue, so the section starts collapsed;
   // closedVisible drives the client-side "Load more" (15 at a time).
   const [closedOpen, setClosedOpen] = useState(false);
   // Next move ids the user stepped past this sitting. Not persisted: Skip is
   // "not this one right now", and tomorrow it may well be the right one.
   const [skipped, setSkipped] = useState<string[]>([]);
+  // How long the user said they have; null ("Any") is the longest wait first.
+  const [timeBudget, setTimeBudget] = useState<TimeBudget>(null);
+  // Items put off until a time or until they change; see lib/snooze.
+  const [snoozes, setSnoozes] = useState<Snoozes>({});
+  // How long each queue may wait before it is late; empty is off.
+  const [limits, setLimits] = useState<Limits>({});
+  // The weekly look back; null until it has loaded.
+  const [week, setWeek] = useState<ReviewFact[] | null>(null);
+  const [weekError, setWeekError] = useState(false);
   const [closedVisible, setClosedVisible] = useState(ARCHIVE_PAGE_SIZE);
   // Same shape as the closed history: a look-back list, so it starts collapsed
   // and reveals a page at a time.
@@ -276,16 +328,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       // Same precedence the server applies in resolveScope: repo:owner/name
       // already names its owner, so sending an org beside it could only agree
       // or contradict.
-      const qs = repo
-        ? `?repo=${encodeURIComponent(repo)}`
-        : org === login
-          ? `?user=${encodeURIComponent(login)}`
-          : org
-            ? `?org=${encodeURIComponent(org)}`
-            : "";
+      const qs = scopeQuery(org, repo, login);
       const run = async () => {
         // A 429 is the hourly point budget, spent — the same wall for every
-        // list, so it is recorded once for the run rather than six times.
+        // list, so it is recorded once for the run rather than once per list.
         let spent: string | null | undefined = undefined;
         // The refresh's price is the sum of its queries; what is left is
         // whatever the last one to reach GitHub saw, which is the smallest.
@@ -316,6 +362,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           commentsResult,
           closedResult,
           reviewedResult,
+          awaitingResult,
         ] = await Promise.allSettled([
           fetch(`/api/stuck-prs${qs}`).then(async (r) => {
             noteBudget(r);
@@ -363,6 +410,18 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             const items = (await r.json()) as ReviewedPr[];
             return { items, partial };
           }),
+          fetch(`/api/awaiting-reviewers${qs}`).then(async (r) => {
+            noteBudget(r);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const partial = r.headers?.get?.("X-Partial") === "1";
+            const body = await r.json();
+            // Only rows that carry their reviewers: anything else is not this
+            // route's answer, and drawing it would claim a wait it can't show.
+            const items = (Array.isArray(body) ? body : []).filter(
+              (pr: AwaitingPr) => Array.isArray(pr?.reviewers),
+            ) as AwaitingPr[];
+            return { items, partial };
+          }),
         ]);
 
         if (latestScopeRef.current !== `${org}|${repo}`) return;
@@ -389,6 +448,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             commentsResult,
             closedResult,
             reviewedResult,
+            awaitingResult,
           ].some((r) => r.status === "fulfilled")
         ) {
           setLastRefreshedAt(new Date().toISOString());
@@ -478,6 +538,16 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               : [],
           );
         }
+        if (!silent || awaitingResult.status === "fulfilled") {
+          setAwaitingError(
+            awaitingResult.status === "rejected"
+              ? "Failed to load PRs waiting on reviewers. Please retry."
+              : null,
+          );
+          setAwaitingPrs(
+            awaitingResult.status === "fulfilled" ? awaitingResult.value.items : [],
+          );
+        }
         // Fresh list for this scope, so collapse the reveal back to the first
         // page — but never on a silent poll, which refreshes in place and must
         // not fold a "Load more" expansion the user is reading.
@@ -499,7 +569,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             !(commentsResult.value.incomplete && !silent)) ||
           (closedResult.status === "fulfilled" && closedResult.value.partial) ||
           (reviewedResult.status === "fulfilled" &&
-            reviewedResult.value.partial);
+            reviewedResult.value.partial) ||
+          (awaitingResult.status === "fulfilled" && awaitingResult.value.partial);
         setPartial(anyPartial);
       };
       // Silent polls skip the transition so isPending (the "Loading…" banner
@@ -531,6 +602,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     const storedIgnored = localStorage.getItem("prison.ignoredChecks");
     const storedClosedOpen = localStorage.getItem("prison.closedOpen");
     const storedReviewedOpen = localStorage.getItem("prison.reviewedOpen");
+    const storedTimeBudget = localStorage.getItem("prison.timeBudget");
+    const storedSnoozes = localStorage.getItem("prison.snoozes");
+    const storedLimits = localStorage.getItem("prison.limits");
     const storedActivity = localStorage.getItem(ACTIVITY_KEY);
     // Refs, not state: the detection effect reads them, and a restored
     // snapshot must be in place before the first fetch lands or that fetch
@@ -586,6 +660,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       if (storedReviewedOpen === "true") {
         setReviewedOpen(true);
       }
+      const budgetChoice = TIME_BUDGETS.find((b) => b !== null && String(b) === storedTimeBudget);
+      if (budgetChoice) setTimeBudget(budgetChoice);
+      setSnoozes(parseSnoozes(storedSnoozes));
+      setLimits(parseLimits(storedLimits));
       // "blocker" (old value) falls through → stays "flat" (default)
       setTracked(parseTracked(storedTracked));
       setIgnored(parseIgnored(storedIgnored));
@@ -634,6 +712,63 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     if (!hydrated) return;
     localStorage.setItem("prison.groupBy", groupBy);
   }, [groupBy, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.timeBudget", String(timeBudget));
+  }, [timeBudget, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.snoozes", JSON.stringify(snoozes));
+  }, [snoozes, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.limits", JSON.stringify(limits));
+  }, [limits, hydrated]);
+
+  // The look back changes slowly and costs a query, so it is cached per scope
+  // and asked again only when the copy is half a day old.
+  useEffect(() => {
+    if (!hydrated) return;
+    const qs = scopeQuery(selectedOrg, selectedRepo, login);
+    let cached: { login?: string; qs?: string; at?: number; facts?: ReviewFact[] } = {};
+    try {
+      cached = JSON.parse(localStorage.getItem(WEEK_KEY) ?? "{}");
+    } catch {
+      cached = {};
+    }
+    // Keyed by who as well as where: the all-organizations scope is the same empty
+    // string for every account, and one person must never see another’s reviews.
+    const fresh =
+      cached.login === login && cached.qs === qs && typeof cached.at === "number" && Date.now() - cached.at < WEEK_TTL_MS;
+    if (fresh && Array.isArray(cached.facts)) {
+      const facts = cached.facts;
+      startTransition(() => {
+        setWeek(facts);
+        setWeekError(false);
+      });
+      return;
+    }
+    let live = true;
+    fetch(`/api/my-week${qs}`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const body = await r.json();
+        const facts = (Array.isArray(body) ? body : []) as ReviewFact[];
+        if (!live) return;
+        localStorage.setItem(WEEK_KEY, JSON.stringify({ login, qs, at: Date.now(), facts }));
+        setWeek(facts);
+        setWeekError(false);
+      })
+      .catch(() => {
+        if (live) setWeekError(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, [hydrated, selectedOrg, selectedRepo, login, startTransition]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -872,10 +1007,24 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // A BLOCKED+approved+green PR with no awaiting tracked checks is already in the ready
   // list; exclude it from stuck so it doesn't appear in both lists.
   const promotedIds = new Set(promotedReady.map((pr) => pr.id));
+  const awaitingIds = new Set(awaitingPrs.map((pr) => pr.id));
+  // Held only by a review: nothing red or running that the user still counts,
+  // no conflict, no open conversation, no tracked check outstanding. Such a PR
+  // waits on a person, and "Waiting on others" says who; with any other
+  // blocker it is the author's move, and it stays stuck.
+  const heldOnlyByReview = (pr: StuckPr) =>
+    awaitingIds.has(pr.id) &&
+    !pr.isDraft &&
+    pr.failing.every((name) => isIgnoredCheck(pr.repo, name, ignored)) &&
+    pr.pending.every((name) => isIgnoredCheck(pr.repo, name, ignored)) &&
+    pr.mergeState !== "DIRTY" &&
+    pr.unresolvedThreads === 0 &&
+    !isAwaiting(pr.repo, pr.checkNames);
   const visibleStuck = sortedStuckAll.filter(
     (pr) =>
       !(pr.readyViaBlocked && !isAwaiting(pr.repo, pr.checkNames)) &&
-      !promotedIds.has(pr.id),
+      !promotedIds.has(pr.id) &&
+      !heldOnlyByReview(pr),
   );
   const visibleReviews = sortedReviews.filter((req) =>
     matchesDraft(req.isDraft),
@@ -887,6 +1036,17 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // A BLOCKED+approved+green PR with awaiting tracked checks belongs in stuck, not here.
   const visibleReady = sortedReady.filter(
     (pr) => !(pr.viaBlocked && isAwaiting(pr.repo, pr.checkNames)),
+  );
+  // Not the viewer's move, so never counted in "N things want you" and never a
+  // Next move. A PR another list already holds is said there: ready to merge
+  // is a move the author can make now, and stuck names a blocker of its own.
+  const ownListIds = new Set([
+    ...visibleStuck.map((pr) => pr.id),
+    ...visibleReady.map((pr) => pr.id),
+  ]);
+  const visibleAwaiting = sortByAgeAsc(
+    awaitingPrs.filter((pr) => !ownListIds.has(pr.id) && matchesDraft(pr.isDraft)),
+    (pr) => pr.waitingSince,
   );
 
   // A PR the viewer is being asked to review AGAIN is not history — it is back
@@ -954,18 +1114,52 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // make every row you typed past "vanish", then report the lot as news the
   // moment you cleared the box.
   const terms = parseTerms(query);
+
+  // What "it changed" means for each queue: a stuck PR's last push and its
+  // blockers, a review's (re-)request, a thread's last comment, a ready PR's
+  // last push. Any of these moving wakes a snooze early.
+  const stuckMark = (pr: StuckPr) =>
+    [pr.stuckSince, pr.mergeState, pr.reviewDecision, ...pr.failing, ...pr.pending].join("|");
+  const marks = new Map<string, string>([
+    ...visibleStuck.map((pr): [string, string] => [pr.id, stuckMark(pr)]),
+    ...visibleReviews.map((r): [string, string] => [r.id, r.requestedAt]),
+    ...visibleComments.map((c): [string, string] => [c.id, c.commentedAt]),
+    ...visibleReady.map((pr): [string, string] => [pr.id, pr.readySince]),
+  ]);
+  const snoozeNow = new Date();
+  const asleep = (id: string) => isSnoozed(snoozes[id], marks.get(id) ?? "", snoozeNow);
+  // Forget what has woken or left the board, once a load has landed: before
+  // that every list is empty and would wipe the lot.
+  if (lastRefreshedAt) {
+    const pruned = pruneSnoozes(snoozes, marks, snoozeNow);
+    if (Object.keys(pruned).length !== Object.keys(snoozes).length) setSnoozes(pruned);
+  }
+  const snooze = (id: string, choice: SnoozeChoice) =>
+    setSnoozes((prev) => ({ ...prev, [id]: snoozeFor(choice, marks.get(id) ?? "", new Date()) }));
+  const wake = (id: string) =>
+    setSnoozes((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  const foldOf = <T extends { id: string; repo: string; number: number }>(items: T[], title: (t: T) => string) =>
+    items
+      .filter((t) => asleep(t.id))
+      .map((t) => ({ id: t.id, title: title(t), repo: t.repo, number: t.number, snooze: snoozes[t.id] }));
   const shownReady = visibleReady.filter((pr) =>
-    matches(terms, pr.title, pr.repo, pr.number, pr.checkNames),
+    !asleep(pr.id) && matches(terms, pr.title, pr.repo, pr.number, pr.checkNames),
   );
   const shownReviews = visibleReviews.filter((req) =>
-    matches(terms, req.title, req.repo, req.number, req.author),
+    !asleep(req.id) && matches(terms, req.title, req.repo, req.number, req.author),
   );
   const shownStuck = visibleStuck.filter((pr) =>
+    !asleep(pr.id) &&
     // Check names are the useful half here: "which of mine is integration-tests
     // red on" is a question the board can answer and could not be asked.
     matches(terms, pr.title, pr.repo, pr.number, pr.checkNames),
   );
   const shownComments = visibleComments.filter((c) =>
+    !asleep(c.id) &&
     matches(terms, c.preview, c.repo, c.number, c.author, c.path),
   );
   const shownReviewed = sortedReviewed.filter((pr) =>
@@ -973,6 +1167,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   );
   const shownClosed = sortedClosed.filter((pr) =>
     matches(terms, pr.title, pr.repo, pr.number),
+  );
+  const shownAwaiting = visibleAwaiting.filter((pr) =>
+    matches(terms, pr.title, pr.repo, pr.number, pr.reviewers.map((r) => r.name)),
   );
 
   // A section emptied by the query must not read like a section that is
@@ -986,34 +1183,47 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // lists, so a search or the draft filter moves it too.
   const owed =
     shownStuck.length + shownReviews.length + shownComments.length + shownReady.length;
-  const nextMoves: NextMoveItem[] = sortByAgeAsc(
+  const allMoves: NextMoveItem[] = sortByAgeAsc(
     [
       ...shownStuck.map((pr): NextMoveItem => ({
         id: pr.id, title: pr.title, repo: pr.repo, number: pr.number, url: pr.url,
         since: pr.stuckSince, suggestion: suggestStuck(pr), tone: "danger",
+        minutes: stuckMinutes(pr),
         reasons: [
           ...(pr.mergeState === "DIRTY" ? [{ label: MERGE_CONFLICT_LABEL }] : []),
           ...pr.failing.map((name) => ({ label: name, mono: true })),
           ...(pr.reviewDecision === "CHANGES_REQUESTED" ? [{ label: "Changes requested" }] : []),
         ],
       })),
-      ...shownReviews.map((req): NextMoveItem => ({
-        id: req.id, title: req.title, repo: req.repo, number: req.number, url: req.url,
-        since: req.requestedAt, suggestion: suggestReview(req), tone: "accent",
-        reasons: [{ label: `blocking @${req.author}`, mono: true }],
-      })),
+      ...shownReviews.map((req): NextMoveItem => {
+        const minutes = reviewMinutes(req);
+        return {
+          id: req.id, title: req.title, repo: req.repo, number: req.number, url: req.url,
+          since: req.requestedAt, suggestion: suggestReview(req), tone: "accent",
+          reasons: [{ label: `blocking @${req.author}`, mono: true }],
+          // An unmeasured review is treated as a long one: fitting it into five
+          // minutes on a guess would be the wrong kind of optimism.
+          minutes: minutes ?? 60,
+          size: minutes === null ? undefined : { label: sizeText(req, minutes), tone: sizeTone(minutes) },
+        };
+      }),
       ...shownComments.map((c): NextMoveItem => ({
         id: c.id, title: c.preview, repo: c.repo, number: c.number, url: c.url,
         since: c.commentedAt, suggestion: suggestComment(c), tone: "warning",
+        minutes: REPLY_MINUTES,
         reasons: [{ label: c.author, mono: true }, ...(c.path ? [{ label: c.path, mono: true }] : [])],
       })),
       ...shownReady.map((pr): NextMoveItem => ({
         id: pr.id, title: pr.title, repo: pr.repo, number: pr.number, url: pr.url,
         since: pr.readySince, suggestion: suggestReady(pr), tone: "success",
+        minutes: MERGE_MINUTES,
       })),
     ],
     (item) => item.since,
   );
+  const fitting = timeBudget === null ? allMoves : allMoves.filter((m) => m.minutes <= timeBudget);
+  const fits = fitting.length > 0;
+  const nextMoves = fits ? fitting : allMoves;
   // Only skips that still point at something count: a PR that was skipped,
   // then resolved, must not come back already skipped, and a gone id must not
   // throw off when the round wraps.
@@ -1022,6 +1232,16 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // pattern), so the same id reappearing after a refresh starts unskipped.
   if (liveSkipped.length !== skipped.length) setSkipped(liveSkipped);
   const nextMove = nextMoves.find((m) => !liveSkipped.includes(m.id)) ?? nextMoves[0];
+  const limitNow = new Date();
+  const lateCount = [
+    ...shownStuck.map((pr) => limitState(pr.stuckSince, limits.stuck, limitNow)),
+    ...shownReviews.map((r) => limitState(r.requestedAt, limits.review, limitNow)),
+    ...shownComments.map((c) => limitState(c.commentedAt, limits.reply, limitNow)),
+    ...shownAwaiting.map((pr) => limitState(pr.waitingSince, limits.others, limitNow)),
+  ].filter((l) => l?.state === "late").length;
+  // "· limit 1 day" on a column's caption, once a limit is set for it.
+  const withLimit = (text: string, hours: number | undefined) =>
+    hours ? `${text} · limit ${limitLabel(hours)}` : text;
   const updatedSinceCount = shownReviewed.filter((pr) => pr.updatedSince).length;
   const mergedCount = shownClosed.filter((pr) => pr.merged).length;
 
@@ -1209,6 +1429,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         onIgnoredChange={setIgnored}
         updateChecks={updateChecks}
         onUpdateChecksChange={setUpdateChecks}
+        limits={limits}
+        onLimitsChange={setLimits}
       />
       <main className="mx-auto flex w-full max-w-[1424px] flex-1 flex-col gap-7 px-4 py-8 sm:px-6 lg:px-8">
         {isPending && (
@@ -1227,6 +1449,13 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             position={nextMoves.indexOf(nextMove) + 1}
             total={nextMoves.length}
             canSkip={nextMoves.length > 1}
+            budget={timeBudget}
+            onBudget={(b) => {
+              setTimeBudget(b);
+              // A new budget is a new round: old skips belonged to the old one.
+              setSkipped([]);
+            }}
+            fits={fits}
             onSkip={() =>
               // Skipping the last one starts the round again rather than
               // leaving the strip with nothing to point at. Built from the live
@@ -1246,6 +1475,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 ? "Nothing wants you"
                 : `${owed} ${owed === 1 ? "thing wants" : "things want"} you`}
             </h1>
+          )}
+          {lateCount > 0 && (
+            <span className="-ml-3 mr-3 rounded-md bg-danger px-2 py-1 text-[13px] font-semibold leading-none text-background">
+              {lateCount} late
+            </span>
           )}
           <div role="group" aria-label="Group by" className="flex rounded-full border border-border bg-surface p-1">
             {GROUP_BYS.map(({ value, label }) => (
@@ -1346,11 +1580,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             Refresh
           </button>
         </div>
-        {/* The four work queues side by side, most urgent kind first. Columns,
-            not rows: a row is as tall as its tallest cell, and each queue
-            grows on its own. Grouping by repo or check happens inside each
-            column, so the queue a PR belongs to never changes with the view. */}
-        <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {/* The four work queues side by side, most urgent kind first, then the
+            one that waits on other people. Columns, not rows: a row is as tall
+            as its tallest cell, and each queue grows on its own. Grouping by
+            repo or check happens inside each column, so the queue a PR belongs
+            to never changes with the view. */}
+        <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
           <div className="flex flex-col gap-3">
             {budgetSpent === undefined && stuckError && (
               <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
@@ -1370,8 +1605,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               emptyMessage={emptyText("No PRs stuck on checks 🎉")}
               keyExtractor={(pr) => pr.id}
               tone="danger"
-              caption={caption(shownStuck.length, "PRs", shownStuck[0]?.stuckSince)}
+              caption={withLimit(caption(shownStuck.length, "PRs", shownStuck[0]?.stuckSince), limits.stuck)}
               description="Your PRs that CI or reviewers are holding back."
+              footer={<SnoozedFold items={foldOf(visibleStuck, (pr) => pr.title)} onWake={wake} />}
               highlighted={nextMove?.tone === "danger"}
               groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
               groupKeys={
@@ -1523,6 +1759,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     marked={nextMove?.id === pr.id}
                     detail={detail}
                     suggestion={suggestStuck(pr)}
+                    aside={<SnoozeMenu title={pr.title} onSnooze={(c) => snooze(pr.id, c)} />}
+                    limit={limitState(pr.stuckSince, limits.stuck, limitNow)}
                   />
                 );
               }}
@@ -1547,8 +1785,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               emptyMessage={emptyText("No PRs waiting on your review 🎉")}
               keyExtractor={(req) => req.id}
               tone="accent"
-              caption={caption(shownReviews.length, "PRs", shownReviews[0]?.requestedAt)}
+              caption={withLimit(caption(shownReviews.length, "PRs", shownReviews[0]?.requestedAt), limits.review)}
               description="Teammates blocked until you review."
+              footer={<SnoozedFold items={foldOf(visibleReviews, (r) => r.title)} onWake={wake} />}
               highlighted={nextMove?.tone === "accent"}
               groupBy={groupBy === "repo" ? (req) => req.repo : undefined}
               groupHref={
@@ -1569,6 +1808,16 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   byline={`@${req.author}`}
                   marked={nextMove?.id === req.id}
                   suggestion={suggestReview(req)}
+                  aside={<SnoozeMenu title={req.title} onSnooze={(c) => snooze(req.id, c)} />}
+                  limit={limitState(req.requestedAt, limits.review, limitNow)}
+                  detail={(() => {
+                    const minutes = reviewMinutes(req);
+                    return minutes === null ? undefined : (
+                      <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-semibold leading-[normal] ${SIZE[sizeTone(minutes)]}`}>
+                        {sizeText(req, minutes)}
+                      </span>
+                    );
+                  })()}
                 />
               )}
             />
@@ -1592,8 +1841,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               emptyMessage={emptyText("No comments awaiting your reply 🎉")}
               keyExtractor={(c) => c.id}
               tone="warning"
-              caption={caption(shownComments.length, "threads", shownComments[0]?.commentedAt)}
+              caption={withLimit(caption(shownComments.length, "threads", shownComments[0]?.commentedAt), limits.reply)}
               description="Someone asked you something. Answer or mark seen."
+              footer={<SnoozedFold items={foldOf(visibleComments, (c) => c.preview)} onWake={wake} />}
               highlighted={nextMove?.tone === "warning"}
               groupBy={groupBy === "repo" ? (c) => c.repo : undefined}
               groupHref={
@@ -1613,6 +1863,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   kind="reply"
                   byline={c.author}
                   aside={
+                <span className="flex gap-1.5">
+                <SnoozeMenu title={c.preview} onSnooze={(choice) => snooze(c.id, choice)} />
                 <button
                   type="button"
                   onClick={() =>
@@ -1643,8 +1895,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     </svg>
                   )}
                 </button>
+                </span>
                   }
                   marked={nextMove?.id === c.id}
+                  limit={limitState(c.commentedAt, limits.reply, limitNow)}
                   clampTitle
                   detail={
                     <span className="flex flex-wrap items-center gap-1.5">
@@ -1698,6 +1952,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               tone="success"
               caption={caption(shownReady.length, "PRs", shownReady[0]?.readySince)}
               description="Approved, green, mergeable. One click each."
+              footer={<SnoozedFold items={foldOf(visibleReady, (pr) => pr.title)} onWake={wake} />}
               highlighted={nextMove?.tone === "success"}
               renderRow={(pr) => (
                 <PrRow
@@ -1710,6 +1965,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   suggestion={suggestReady(pr)}
                   kind="ready"
                   marked={nextMove?.id === pr.id}
+                  aside={<SnoozeMenu title={pr.title} onSnooze={(c) => snooze(pr.id, c)} />}
                   // A PR promoted here over a red check still says so — muted,
                   // because the user already answered for it, but said: a card
                   // with nothing on it would read as spotlessly green.
@@ -1737,6 +1993,67 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               )}
             />
           </div>
+          <div className="flex flex-col gap-3">
+            {budgetSpent === undefined && awaitingError && (
+              <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+                <span>{awaitingError}</span>
+                <button
+                  onClick={() => fetchData(selectedOrg, selectedRepo)}
+                  className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            <PrList
+              title="Waiting on others"
+              id="waiting-on-others"
+              items={shownAwaiting}
+              emptyMessage={emptyText("None of your PRs is waiting on a reviewer")}
+              keyExtractor={(pr) => pr.id}
+              tone="accent"
+              caption={withLimit(caption(shownAwaiting.length, "PRs", shownAwaiting[0]?.waitingSince), limits.others)}
+              description="Your PRs that wait on someone else's review. The ball is in their court."
+              groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
+              groupHref={
+                groupBy === "repo"
+                  ? (repo) => `https://github.com/${repo}`
+                  : undefined
+              }
+              renderRow={(pr) => (
+                <PrRow
+                  title={pr.title}
+                  repo={pr.repo}
+                  number={pr.number}
+                  url={pr.url}
+                  since={pr.waitingSince}
+                  now={new Date()}
+                  draft={pr.isDraft}
+                  kind="others"
+                  suggestion={{ text: "Open on GitHub", href: pr.url }}
+                  limit={limitState(pr.waitingSince, limits.others, limitNow)}
+                  detail={
+                    <AwaitingDetail
+                      pr={pr}
+                      now={new Date()}
+                      copied={copiedId === pr.id}
+                      onCopy={() => {
+                        // A clipboard the browser refuses (an insecure origin,
+                        // a denied permission) leaves the button as it was.
+                        void navigator.clipboard
+                          ?.writeText(reminderText(pr, new Date()))
+                          .then(() => {
+                            setCopiedId(pr.id);
+                            setTimeout(() => setCopiedId((id) => (id === pr.id ? null : id)), 2000);
+                          })
+                          .catch(() => {});
+                      }}
+                    />
+                  }
+                />
+              )}
+            />
+          </div>
         </div>
         {/* History: looking back, not work to do. Your review verdicts beside
             your finished PRs, quieter than the columns above on purpose. */}
@@ -1748,6 +2065,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             <span aria-hidden="true" className="h-px flex-1 bg-border" />
             <span className="text-[13px] text-muted">Looking back, not work to do</span>
           </div>
+          <WeekCard facts={week} now={new Date()} error={weekError} />
           <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
             <ArchiveSection
               title="Recently reviewed"

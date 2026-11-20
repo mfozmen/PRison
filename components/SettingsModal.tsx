@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { normalizeAll } from "@/lib/tracked-checks";
+import { LIMIT_QUEUES, LIMIT_OPTIONS, limitLabel, type Limits } from "@/lib/limits";
 import type {
   TrackedChecks,
   TrackedCheck,
@@ -70,6 +71,8 @@ export interface SettingsModalProps {
   onIgnoredChange?: (next: IgnoredChecks) => void;
   updateChecks?: boolean;
   onUpdateChecksChange?: (v: boolean) => void;
+  limits?: Limits;
+  onLimitsChange?: (next: Limits) => void;
 }
 
 // Comments stays first: it is the section the modal opens on, and the one most
@@ -79,6 +82,7 @@ const SECTIONS = [
   { id: "comments", label: "Comments" },
   { id: "auto-refresh", label: "Auto refresh" },
   { id: "checks", label: "Checks" },
+  { id: "limits", label: "Limits" },
   { id: "appearance", label: "Appearance" },
   { id: "about", label: "About" },
 ] as const;
@@ -541,11 +545,12 @@ function SettingCheckbox({
   );
 }
 
-/** The five sections, each with the status dot the board uses for its kind. */
+/** The six sections, each with the status dot the board uses for its kind. */
 const SECTION_DOT: Record<SectionId, string> = {
   comments: "bg-warning",
   "auto-refresh": "bg-accent",
   checks: "bg-danger",
+  limits: "bg-warning",
   appearance: "bg-success",
   about: "bg-muted",
 };
@@ -569,6 +574,7 @@ const SEARCH_INDEX: SearchEntry[] = [
   { section: "auto-refresh", label: "Desktop notifications", help: "Notify about changes that land while you're on another tab", kind: "open" },
   { section: "checks", label: "Tracked checks", help: "Checks a PR needs, shown as Awaiting until they report", kind: "open" },
   { section: "checks", label: "Ignored checks", help: "Broken checks that stop holding PRs out of Ready to merge", kind: "open" },
+  { section: "limits", label: "Wait limits", help: "How long each queue may wait before it shows as late", kind: "open" },
   { section: "appearance", label: "Theme", help: "Colours and typefaces, light and dark", kind: "open" },
   { section: "about", label: "Tell me when a newer version is out", help: "Asks GitHub once a day, without your token", kind: "toggle", toggle: "updateChecks" },
   { section: "about", label: "Check for updates", help: "Ask GitHub for the latest release now", kind: "action" },
@@ -670,6 +676,8 @@ export function SettingsModal({
   onIgnoredChange = () => {},
   updateChecks = false,
   onUpdateChecksChange = () => {},
+  limits = {},
+  onLimitsChange = () => {},
 }: SettingsModalProps) {
   // Read inside the component, not at module scope, so tests can stub it.
   const version = appVersion();
@@ -1228,6 +1236,45 @@ export function SettingsModal({
                       );
                     }}
                   </ScopeEditor>
+                </div>,
+              )}
+
+              {card(
+                "limits",
+                <div className="border-t border-border">
+                  <p className="pt-4 pb-2 text-sm text-muted">
+                    How long is too long, per queue. Each row then shows a bar filling toward its limit, says
+                    &ldquo;Due in 6h&rdquo; from three quarters of the way, and &ldquo;Late&rdquo; with how much
+                    after; the heading counts what is late. Off until you set one.
+                  </p>
+                  <div className="divide-y divide-border">
+                    {LIMIT_QUEUES.map((q) => (
+                      <div key={q.key} className="flex flex-wrap items-center gap-3 py-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[15px] font-medium text-foreground">{q.label}</div>
+                          <div className="mt-0.5 text-[13px] text-muted">{q.help}</div>
+                        </div>
+                        <select
+                          aria-label={`Limit for ${q.label}`}
+                          value={limits[q.key] ?? 0}
+                          onChange={(e) => {
+                            const hours = Number(e.target.value);
+                            const next = { ...limits };
+                            if (hours > 0) next[q.key] = hours;
+                            else delete next[q.key];
+                            onLimitsChange(next);
+                          }}
+                          className="min-h-[40px] cursor-pointer rounded-[10px] border border-border bg-background px-3 font-mono text-sm text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                        >
+                          {LIMIT_OPTIONS.map((h) => (
+                            <option key={h} value={h}>
+                              {limitLabel(h)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
                 </div>,
               )}
 

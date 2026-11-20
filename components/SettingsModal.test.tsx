@@ -669,7 +669,7 @@ describe("SettingsModal", () => {
     it("offers every section as a tab and opens on the first one", () => {
       renderOpen();
       const tabs = screen.getAllByRole("tab");
-      expect(tabs.map((t) => t.textContent)).toEqual(["Comments", "Auto refresh", "Checks", "Appearance", "About"]);
+      expect(tabs.map((t) => t.textContent)).toEqual(["Comments", "Auto refresh", "Checks", "Limits", "Appearance", "About"]);
       expect(tabs[0]).toHaveAttribute("aria-selected", "true");
       expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", tabs[0].id);
     });
@@ -1876,5 +1876,30 @@ describe("SettingsModal — scope picker", () => {
     expect(
       screen.getByLabelText("New ignored check for acme"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("SettingsModal — wait limits", () => {
+  it("sets and clears a queue's limit", () => {
+    const onLimitsChange = vi.fn();
+    render(
+      <SettingsModal
+        {...filterProps}
+        availableRepos={[]}
+        value={emptyValue}
+        onChange={vi.fn()}
+        open={true}
+        onClose={vi.fn()}
+        limits={{ reply: 8 }}
+        onLimitsChange={onLimitsChange}
+      />,
+    );
+    selectSection("Limits");
+    const review = screen.getByRole("combobox", { name: "Limit for Review requested" });
+    expect(review).toHaveValue("0");
+    fireEvent.change(review, { target: { value: "24" } });
+    expect(onLimitsChange).toHaveBeenLastCalledWith({ reply: 8, review: 24 });
+    fireEvent.change(screen.getByRole("combobox", { name: "Limit for Reply to a comment" }), { target: { value: "0" } });
+    expect(onLimitsChange).toHaveBeenLastCalledWith({});
   });
 });

@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Raw GraphQL responses are intentionally untyped at the boundary; parsers
 // convert them to domain types as the first step.
-import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr, ReviewedPr } from "@/lib/types";
+import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr, ReviewedPr, AwaitingPr, Reviewer } from "@/lib/types";
+import type { ReviewFact } from "@/lib/week";
 
 // scope is optional: when omitted, the search spans every repo the token can
 // see (the user's personal account plus all accessible organizations).
@@ -103,6 +104,8 @@ export const REVIEW_REQUESTS_QUERY = `
     search(query: $q, type: ISSUE, first: 50) {
       nodes { ... on PullRequest {
         id title url number isDraft updatedAt
+        # Plain fields, so free: the size behind a rough review time.
+        additions deletions changedFiles
         repository { nameWithOwner }
         author { login }
         timelineItems(itemTypes: [REVIEW_REQUESTED_EVENT], first: 100) {
@@ -355,6 +358,9 @@ export function parseReviewRequests(raw: any, viewerLogin: string): ReviewReques
         // only the real one can be treated as "this was requested again".
         requestedDirectly: !!mine?.createdAt,
         isDraft: n.isDraft ?? false,
+        ...(typeof n.additions === "number" ? { additions: n.additions } : {}),
+        ...(typeof n.deletions === "number" ? { deletions: n.deletions } : {}),
+        ...(typeof n.changedFiles === "number" ? { changedFiles: n.changedFiles } : {}),
       } as ReviewRequest;
     });
 }
@@ -759,3 +765,146 @@ export function parseReadyPrs(raw: any): ReadyPr[] {
     });
 }
 
+
+// The viewer's own open PRs and who they wait on. Kept out of STUCK_PRS_QUERY
+// on purpose: that one prices check rollups, and this list needs none of them.
+// A request leaves reviewRequests the moment the reviewer submits anything, so
+// a pending request is "no review since it was asked". latestReviews is one
+// entry per reviewer, their most recent review of any kind.
+export const AWAITING_REVIEWERS_QUERY = `
+  query($q: String!) {
+    search(query: $q, type: ISSUE, first: 50) {
+      nodes { ... on PullRequest {
+        id title url number isDraft createdAt
+        repository { nameWithOwner }
+        author { login }
+        reviewRequests(first: 10) { nodes { requestedReviewer {
+          __typename ... on User { login } ... on Team { combinedSlug }
+        } } }
+        timelineItems(itemTypes: [REVIEW_REQUESTED_EVENT], last: 30) {
+          nodes { ... on ReviewRequestedEvent {
+            createdAt requestedReviewer { ... on User { login } ... on Team { combinedSlug } }
+          } }
+        }
+        latestReviews(first: 20) { nodes { state submittedAt author { login } } }
+        commits(last: 1) { nodes { commit { pushedDate committedDate } } }
+      } }
+    }
+      ${RATE_LIMIT}
+  }`;
+
+const reviewerName = (r: any): string => r?.login ?? r?.combinedSlug ?? "";
+
+/** When each reviewer was last asked. Chronological, so the last event per name
+ * is the latest (re-)request. */
+function requestTimes(n: any): Map<string, string> {
+  const askedAt = new Map<string, string>();
+  for (const e of n.timelineItems?.nodes ?? []) {
+    const name = reviewerName(e?.requestedReviewer);
+    if (name && e.createdAt) askedAt.set(name, e.createdAt);
+  }
+  return askedAt;
+}
+
+/** The pending requests: nobody has reviewed since they were asked. */
+function pendingReviewers(n: any): Reviewer[] {
+  const askedAt = requestTimes(n);
+  const out: Reviewer[] = [];
+  for (const req of n.reviewRequests?.nodes ?? []) {
+    const r = req?.requestedReviewer;
+    const name = reviewerName(r);
+    if (!name || out.some((x) => x.name === name)) continue;
+    out.push({ name, team: r.__typename === "Team", state: "requested", since: askedAt.get(name) ?? n.createdAt ?? "" });
+  }
+  return out;
+}
+
+/** One reviewer's latest verdict, or null for one that says nothing (dismissed). */
+function verdict(rv: any, name: string, pushedAt: string): Reviewer | null {
+  if (rv.state === "APPROVED") return { name, team: false, state: "approved", since: rv.submittedAt };
+  if (rv.state === "COMMENTED") return { name, team: false, state: "commented", since: rv.submittedAt };
+  if (rv.state !== "CHANGES_REQUESTED") return null;
+  const pushedSince = !!pushedAt && pushedAt > rv.submittedAt;
+  return { name, team: false, state: "changes", since: pushedSince ? pushedAt : rv.submittedAt, pushedSince };
+}
+
+export function parseAwaitingReviewers(raw: any): AwaitingPr[] {
+  const out: AwaitingPr[] = [];
+  for (const n of searchNodes(raw)) {
+    if (!n?.id) continue;
+    const commit = n.commits?.nodes?.[0]?.commit ?? {};
+    const pushedAt: string = commit.pushedDate ?? commit.committedDate ?? n.createdAt ?? "";
+    const reviewers = pendingReviewers(n);
+    for (const rv of n.latestReviews?.nodes ?? []) {
+      const name = rv?.author?.login;
+      // A pending re-request already says where that reviewer stands; your own
+      // COMMENTED self-annotations are not a review of anything.
+      if (!name || name === n.author?.login || reviewers.some((r) => r.name === name)) continue;
+      const v = verdict(rv, name, pushedAt);
+      if (v) reviewers.push(v);
+    }
+    const waits = reviewers
+      .filter((r) => r.state === "requested" || (r.state === "changes" && r.pushedSince))
+      .map((r) => r.since)
+      .sort((a, b) => a.localeCompare(b));
+    if (waits.length === 0) continue;
+    out.push({
+      id: n.id, title: n.title, url: n.url, number: n.number,
+      repo: n.repository?.nameWithOwner ?? "",
+      isDraft: n.isDraft ?? false,
+      waitingSince: waits[0],
+      reviewers,
+    });
+  }
+  return out;
+}
+
+// Two weeks of the viewer's reviews, open PRs or closed, for the weekly look
+// back. Asked once a day, not on every refresh. sort:updated-desc biases the
+// 50-row window toward the recent ones, which is the window this is about.
+export const MY_WEEK_QUERY = `
+  query($q: String!) {
+    search(query: $q, type: ISSUE, first: 50) {
+      nodes { ... on PullRequest {
+        id title url number
+        repository { nameWithOwner }
+        author { login }
+        reviews(last: 50) { nodes { submittedAt author { login } } }
+        timelineItems(itemTypes: [REVIEW_REQUESTED_EVENT], last: 30) {
+          nodes { ... on ReviewRequestedEvent { createdAt requestedReviewer { ... on User { login } } } }
+        }
+      } }
+    }
+      ${RATE_LIMIT}
+  }`;
+
+/** The search for the look back: reviewed by the viewer, touched since `since`
+ * (a YYYY-MM-DD date), within the scope. */
+export function myWeekSearch(since: string, scope?: string): string {
+  const where = scope ? ` ${scope}` : "";
+  return `is:pr reviewed-by:@me -author:@me updated:>=${since}${where} sort:updated-desc`;
+}
+
+export function parseMyWeek(raw: any, viewerLogin: string): ReviewFact[] {
+  const out: ReviewFact[] = [];
+  for (const n of searchNodes(raw)) {
+    if (!n?.id) continue;
+    const asked: string[] = (n.timelineItems?.nodes ?? [])
+      .filter((e: any) => e?.requestedReviewer?.login === viewerLogin && e.createdAt)
+      .map((e: any) => e.createdAt)
+      .sort((a: string, b: string) => a.localeCompare(b));
+    for (const r of n.reviews?.nodes ?? []) {
+      if (r?.author?.login !== viewerLogin || !r.submittedAt) continue;
+      // The request this review answered: the latest one made before it.
+      const request = asked.findLast((t) => t <= r.submittedAt);
+      out.push({
+        prId: n.id, title: n.title, url: n.url, number: n.number,
+        repo: n.repository?.nameWithOwner ?? "",
+        author: n.author?.login ?? "unknown",
+        submittedAt: r.submittedAt,
+        waitedMs: request ? new Date(r.submittedAt).getTime() - new Date(request).getTime() : null,
+      });
+    }
+  }
+  return out;
+}

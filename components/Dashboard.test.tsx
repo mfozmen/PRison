@@ -132,6 +132,13 @@ const ORPHAN_COMMENT = {
   preview: "comment on an invisible pr",
 };
 
+/** Fetches to the board's list endpoints, leaving out the once-a-day look back. */
+function listCalls() {
+  return (global.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
+    (c) => !String(c[0]).includes("/api/my-week"),
+  );
+}
+
 function okFetch() {
   // SIX-WAY: reviewed-prs → [], closed-prs → [], pr-comments → [], ready → [READY_PR],
   // stuck → [STUCK_PR], else (review-requests) → [REVIEW_PR]. "reviewed" is tested
@@ -449,9 +456,9 @@ describe("Dashboard", () => {
       await screen.findByText(/nothing ready to merge/i),
     ).toBeInTheDocument();
     openSettings("Auto refresh");
-    // Six endpoints at ten points each, and the smallest remaining is the one
+    // Seven endpoints at ten points each, and the smallest remaining is the one
     // that saw the account last.
-    expect(await screen.findByText(/60 points/i)).toBeInTheDocument();
+    expect(await screen.findByText(/70 points/i)).toBeInTheDocument();
     // Formatted the way the component formats it. Hard-coding "4,200" asserted
     // the group separator of whoever ran the suite: on a machine that resolves
     // to tr-TR the panel says "4.200" and only this line failed.
@@ -1806,7 +1813,7 @@ describe("Dashboard", () => {
           .length;
         // One refresh = stuck-prs + review-requests + ready-to-merge + pr-comments
         // + closed-prs + reviewed-prs.
-        expect(after).toBe(before + 6);
+        expect(after).toBe(before + 7);
       });
     });
 
@@ -2768,16 +2775,19 @@ describe("Dashboard", () => {
       expect(
         screen.getByText(/failed to load reviewed prs/i),
       ).toBeInTheDocument();
+      expect(
+        screen.getByText(/failed to load prs waiting on reviewers/i),
+      ).toBeInTheDocument();
 
       const before = (global.fetch as ReturnType<typeof vi.fn>).mock.calls
         .length;
       const retries = screen.getAllByRole("button", { name: /retry/i });
-      expect(retries).toHaveLength(6);
+      expect(retries).toHaveLength(7);
       for (const retry of retries) fireEvent.click(retry);
       await waitFor(() =>
         expect(
           (global.fetch as ReturnType<typeof vi.fn>).mock.calls,
-        ).toHaveLength(before + 6 * retries.length),
+        ).toHaveLength(before + 7 * retries.length),
       );
     });
 
@@ -2789,11 +2799,7 @@ describe("Dashboard", () => {
       ).toBeInTheDocument();
       const notice = screen.getByRole("status");
       fireEvent.click(within(notice).getByRole("button", { name: /retry/i }));
-      await waitFor(() =>
-        expect(
-          (global.fetch as ReturnType<typeof vi.fn>).mock.calls,
-        ).toHaveLength(12),
-      );
+      await waitFor(() => expect(listCalls()).toHaveLength(14));
     });
   });
 
@@ -2874,13 +2880,11 @@ describe("Dashboard", () => {
       const refreshButton = screen.getByRole("button", { name: /^refresh$/i });
       await waitFor(() => expect(refreshButton).toBeEnabled());
       fireEvent.click(refreshButton);
-      // 6 fetches on mount + 6 on refresh (stuck + review + ready + comments + closed
-      // + reviewed) = 12 total.
+      // 7 fetches on mount + 7 on refresh (stuck + review + ready + comments + closed
+      // + reviewed + awaiting-reviewers) = 14 total.
       // Use waitFor so the assertion retries until all async refresh fetches register.
       await waitFor(() =>
-        expect(global.fetch as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(
-          12,
-        ),
+        expect(listCalls()).toHaveLength(14),
       );
     });
 
@@ -3562,18 +3566,20 @@ describe("Dashboard — auto refresh", () => {
     vi.restoreAllMocks();
   });
 
+  // The list endpoints only: the weekly look back is asked once a day on its
+  // own schedule, not on a refresh or a poll.
   function fetchCalls() {
-    return (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
+    return listCalls().length;
   }
 
-  it("polls all six endpoints once per interval when enabled, without the loading banner", async () => {
+  it("polls all seven endpoints once per interval when enabled, without the loading banner", async () => {
     localStorage.setItem("prison.autoRefresh", "true");
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    expect(fetchCalls()).toBe(6);
+    expect(fetchCalls()).toBe(7);
 
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
-    expect(fetchCalls()).toBe(12);
+    expect(fetchCalls()).toBe(14);
     expect(screen.queryByText(/loading/i)).not.toBeInTheDocument();
   });
 
@@ -3583,13 +3589,13 @@ describe("Dashboard — auto refresh", () => {
     localStorage.setItem("prison.pollInterval", String(longest));
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
-    expect(fetchCalls()).toBe(6);
+    expect(fetchCalls()).toBe(7);
 
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
-    expect(fetchCalls()).toBe(6);
+    expect(fetchCalls()).toBe(7);
 
     await act(() => vi.advanceTimersByTimeAsync(longest));
-    expect(fetchCalls()).toBe(12);
+    expect(fetchCalls()).toBe(14);
   });
 
   it("defaults to 30 minutes when nothing is stored", async () => {
@@ -3601,10 +3607,10 @@ describe("Dashboard — auto refresh", () => {
     await act(() =>
       vi.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS - 1000),
     );
-    expect(fetchCalls()).toBe(6);
+    expect(fetchCalls()).toBe(7);
 
     await act(() => vi.advanceTimersByTimeAsync(1000));
-    expect(fetchCalls()).toBe(12);
+    expect(fetchCalls()).toBe(14);
     await waitFor(() =>
       expect(localStorage.getItem("prison.pollInterval")).toBe(
         String(DEFAULT_POLL_INTERVAL_MS),
@@ -3711,7 +3717,7 @@ describe("Dashboard — auto refresh", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS * 2));
-    expect(fetchCalls()).toBe(6);
+    expect(fetchCalls()).toBe(7);
   });
 
   it("enabling the checkbox persists and requests notification permission when undecided", async () => {
@@ -3981,12 +3987,12 @@ describe("Dashboard — auto refresh", () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("stuck pr")).toBeInTheDocument();
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
-    expect(fetchCalls()).toBe(12);
+    expect(fetchCalls()).toBe(14);
 
     openSettings("Auto refresh");
     fireEvent.click(screen.getByRole("checkbox", { name: /auto refresh/i }));
     await act(() => vi.advanceTimersByTimeAsync(POLL_MS * 2));
-    expect(fetchCalls()).toBe(12);
+    expect(fetchCalls()).toBe(14);
   });
 
   it("starts with an empty feed — the first load is a seed, not news", async () => {

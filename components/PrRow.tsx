@@ -1,9 +1,10 @@
 import React from "react";
 import { ageBucket, relativeAge } from "@/lib/prioritize";
 import type { Suggestion } from "@/lib/suggest";
+import type { LimitState } from "@/lib/limits";
 
 /** What the row is waiting on — picks the status icon and its colour. */
-export type RowKind = "ready" | "reply" | "review" | "fail" | "pending" | "idle";
+export type RowKind = "ready" | "reply" | "review" | "fail" | "pending" | "idle" | "others";
 
 export interface PrRowProps {
   title: string;
@@ -26,6 +27,8 @@ export interface PrRowProps {
   // stay fully readable. On for comment previews, which are prose and would
   // otherwise stretch the row to an unbounded height.
   clampTitle?: boolean;
+  /** Where it stands against the user's wait limit for its queue, if any. */
+  limit?: LimitState | null;
 }
 
 // An icon per state, so the column colour is never the only signal: a ✓, a
@@ -48,6 +51,11 @@ const ICONS: Record<RowKind, { className: string; path: React.ReactNode; stroke?
   },
   fail: { className: "text-danger", stroke: "2.5", path: <path d="M18 6 6 18M6 6l12 12" /> },
   idle: { className: "text-muted", path: <circle cx="12" cy="12" r="9" /> },
+  // An hourglass: the PR is waiting on somebody else, not on you.
+  others: {
+    className: "text-accent",
+    path: <path d="M6 2h12M6 22h12M7 2c0 6 10 6 10 10S7 16 7 22M17 2c0 6-10 6-10 10s10 4 10 10" />,
+  },
   pending: {
     className: "text-warning",
     path: (
@@ -67,7 +75,11 @@ const AGE: Record<ReturnType<typeof ageBucket>, string> = {
   urgent: "text-danger",
 };
 
-export function PrRow({ title, repo, number, url, since, now, detail, suggestion, draft, kind, byline, aside, marked, clampTitle }: PrRowProps) {
+// The limit's colours: quiet while there is time, amber when due, red when late.
+const LIMIT_BAR = { ok: "bg-success", due: "bg-warning", late: "bg-danger" } as const;
+const LIMIT_CHIP = { ok: "", due: "bg-warning/15 text-warning", late: "bg-danger/15 text-danger" } as const;
+
+export function PrRow({ title, repo, number, url, since, now, detail, suggestion, draft, kind, byline, aside, marked, clampTitle, limit }: PrRowProps) {
   const icon = kind ? ICONS[kind] : null;
   const bucket = ageBucket(since, now);
   return (
@@ -123,6 +135,11 @@ export function PrRow({ title, repo, number, url, since, now, detail, suggestion
           )}
         </span>
         {detail && <div className="mt-1.5 text-sm text-muted">{detail}</div>}
+        {limit?.label && (
+          <span className={`mt-1.5 self-start rounded-md px-2 py-0.5 text-xs font-semibold leading-[normal] ${LIMIT_CHIP[limit.state]}`}>
+            {limit.label}
+          </span>
+        )}
         <a
           href={suggestion.href}
           target="_blank"
@@ -131,6 +148,12 @@ export function PrRow({ title, repo, number, url, since, now, detail, suggestion
         >
           {suggestion.text}
         </a>
+        {limit && (
+          // The words are in the chip above; the bar is the at-a-glance half.
+          <div aria-hidden="true" className="mt-2 h-1 overflow-hidden rounded-sm bg-border">
+            <div className={`h-full ${LIMIT_BAR[limit.state]}`} style={{ width: `${limit.pct}%` }} />
+          </div>
+        )}
       </div>
     </div>
   );

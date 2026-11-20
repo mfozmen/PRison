@@ -17,6 +17,7 @@ import type {
   PrComment,
   ClosedPr,
   ReviewedPr,
+  AwaitingPr,
 } from "@/lib/types";
 import { sortByAgeAsc, sortByAgeDesc, relativeAge } from "@/lib/prioritize";
 import { isValidRepo } from "@/lib/github/validate";
@@ -35,6 +36,8 @@ import {
 import { PrList } from "./PrList";
 import { NextMove, type NextMoveItem } from "./NextMove";
 import { PrRow } from "./PrRow";
+import { AwaitingDetail } from "./AwaitingDetail";
+import { reminderText } from "@/lib/reminder";
 import { ClosedPrRow } from "./ClosedPrRow";
 import { ReviewedPrRow } from "./ReviewedPrRow";
 import { ArchiveSection } from "./ArchiveSection";
@@ -217,12 +220,16 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [comments, setComments] = useState<PrComment[]>([]);
   const [closedPrs, setClosedPrs] = useState<ClosedPr[]>([]);
   const [reviewedPrs, setReviewedPrs] = useState<ReviewedPr[]>([]);
+  const [awaitingPrs, setAwaitingPrs] = useState<AwaitingPr[]>([]);
   const [stuckError, setStuckError] = useState<string | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [readyError, setReadyError] = useState<string | null>(null);
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [closedError, setClosedError] = useState<string | null>(null);
   const [reviewedError, setReviewedError] = useState<string | null>(null);
+  const [awaitingError, setAwaitingError] = useState<string | null>(null);
+  // The row whose reminder was just copied, so its button can say so.
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   // Closed PRs are history, not a work queue, so the section starts collapsed;
   // closedVisible drives the client-side "Load more" (15 at a time).
   const [closedOpen, setClosedOpen] = useState(false);
@@ -316,6 +323,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           commentsResult,
           closedResult,
           reviewedResult,
+          awaitingResult,
         ] = await Promise.allSettled([
           fetch(`/api/stuck-prs${qs}`).then(async (r) => {
             noteBudget(r);
@@ -363,6 +371,18 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             const items = (await r.json()) as ReviewedPr[];
             return { items, partial };
           }),
+          fetch(`/api/awaiting-reviewers${qs}`).then(async (r) => {
+            noteBudget(r);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const partial = r.headers?.get?.("X-Partial") === "1";
+            const body = await r.json();
+            // Only rows that carry their reviewers: anything else is not this
+            // route's answer, and drawing it would claim a wait it can't show.
+            const items = (Array.isArray(body) ? body : []).filter(
+              (pr: AwaitingPr) => Array.isArray(pr?.reviewers),
+            ) as AwaitingPr[];
+            return { items, partial };
+          }),
         ]);
 
         if (latestScopeRef.current !== `${org}|${repo}`) return;
@@ -389,6 +409,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             commentsResult,
             closedResult,
             reviewedResult,
+            awaitingResult,
           ].some((r) => r.status === "fulfilled")
         ) {
           setLastRefreshedAt(new Date().toISOString());
@@ -478,6 +499,16 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               : [],
           );
         }
+        if (!silent || awaitingResult.status === "fulfilled") {
+          setAwaitingError(
+            awaitingResult.status === "rejected"
+              ? "Failed to load PRs waiting on reviewers. Please retry."
+              : null,
+          );
+          setAwaitingPrs(
+            awaitingResult.status === "fulfilled" ? awaitingResult.value.items : [],
+          );
+        }
         // Fresh list for this scope, so collapse the reveal back to the first
         // page — but never on a silent poll, which refreshes in place and must
         // not fold a "Load more" expansion the user is reading.
@@ -499,7 +530,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             !(commentsResult.value.incomplete && !silent)) ||
           (closedResult.status === "fulfilled" && closedResult.value.partial) ||
           (reviewedResult.status === "fulfilled" &&
-            reviewedResult.value.partial);
+            reviewedResult.value.partial) ||
+          (awaitingResult.status === "fulfilled" && awaitingResult.value.partial);
         setPartial(anyPartial);
       };
       // Silent polls skip the transition so isPending (the "Loading…" banner
@@ -872,10 +904,24 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // A BLOCKED+approved+green PR with no awaiting tracked checks is already in the ready
   // list; exclude it from stuck so it doesn't appear in both lists.
   const promotedIds = new Set(promotedReady.map((pr) => pr.id));
+  const awaitingIds = new Set(awaitingPrs.map((pr) => pr.id));
+  // Held only by a review: nothing red or running that the user still counts,
+  // no conflict, no open conversation, no tracked check outstanding. Such a PR
+  // waits on a person, and "Waiting on others" says who; with any other
+  // blocker it is the author's move, and it stays stuck.
+  const heldOnlyByReview = (pr: StuckPr) =>
+    awaitingIds.has(pr.id) &&
+    !pr.isDraft &&
+    pr.failing.every((name) => isIgnoredCheck(pr.repo, name, ignored)) &&
+    pr.pending.every((name) => isIgnoredCheck(pr.repo, name, ignored)) &&
+    pr.mergeState !== "DIRTY" &&
+    pr.unresolvedThreads === 0 &&
+    !isAwaiting(pr.repo, pr.checkNames);
   const visibleStuck = sortedStuckAll.filter(
     (pr) =>
       !(pr.readyViaBlocked && !isAwaiting(pr.repo, pr.checkNames)) &&
-      !promotedIds.has(pr.id),
+      !promotedIds.has(pr.id) &&
+      !heldOnlyByReview(pr),
   );
   const visibleReviews = sortedReviews.filter((req) =>
     matchesDraft(req.isDraft),
@@ -887,6 +933,17 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // A BLOCKED+approved+green PR with awaiting tracked checks belongs in stuck, not here.
   const visibleReady = sortedReady.filter(
     (pr) => !(pr.viaBlocked && isAwaiting(pr.repo, pr.checkNames)),
+  );
+  // Not the viewer's move, so never counted in "N things want you" and never a
+  // Next move. A PR another list already holds is said there: ready to merge
+  // is a move the author can make now, and stuck names a blocker of its own.
+  const ownListIds = new Set([
+    ...visibleStuck.map((pr) => pr.id),
+    ...visibleReady.map((pr) => pr.id),
+  ]);
+  const visibleAwaiting = sortByAgeAsc(
+    awaitingPrs.filter((pr) => !ownListIds.has(pr.id) && matchesDraft(pr.isDraft)),
+    (pr) => pr.waitingSince,
   );
 
   // A PR the viewer is being asked to review AGAIN is not history — it is back
@@ -973,6 +1030,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   );
   const shownClosed = sortedClosed.filter((pr) =>
     matches(terms, pr.title, pr.repo, pr.number),
+  );
+  const shownAwaiting = visibleAwaiting.filter((pr) =>
+    matches(terms, pr.title, pr.repo, pr.number, pr.reviewers.map((r) => r.name)),
   );
 
   // A section emptied by the query must not read like a section that is
@@ -1346,11 +1406,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             Refresh
           </button>
         </div>
-        {/* The four work queues side by side, most urgent kind first. Columns,
-            not rows: a row is as tall as its tallest cell, and each queue
-            grows on its own. Grouping by repo or check happens inside each
-            column, so the queue a PR belongs to never changes with the view. */}
-        <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {/* The four work queues side by side, most urgent kind first, then the
+            one that waits on other people. Columns, not rows: a row is as tall
+            as its tallest cell, and each queue grows on its own. Grouping by
+            repo or check happens inside each column, so the queue a PR belongs
+            to never changes with the view. */}
+        <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
           <div className="flex flex-col gap-3">
             {budgetSpent === undefined && stuckError && (
               <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
@@ -1732,6 +1793,66 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                         ))}
                       </div>
                     ) : undefined
+                  }
+                />
+              )}
+            />
+          </div>
+          <div className="flex flex-col gap-3">
+            {budgetSpent === undefined && awaitingError && (
+              <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+                <span>{awaitingError}</span>
+                <button
+                  onClick={() => fetchData(selectedOrg, selectedRepo)}
+                  className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            <PrList
+              title="Waiting on others"
+              id="waiting-on-others"
+              items={shownAwaiting}
+              emptyMessage={emptyText("None of your PRs is waiting on a reviewer")}
+              keyExtractor={(pr) => pr.id}
+              tone="accent"
+              caption={caption(shownAwaiting.length, "PRs", shownAwaiting[0]?.waitingSince)}
+              description="Your PRs that wait on someone else's review. The ball is in their court."
+              groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
+              groupHref={
+                groupBy === "repo"
+                  ? (repo) => `https://github.com/${repo}`
+                  : undefined
+              }
+              renderRow={(pr) => (
+                <PrRow
+                  title={pr.title}
+                  repo={pr.repo}
+                  number={pr.number}
+                  url={pr.url}
+                  since={pr.waitingSince}
+                  now={new Date()}
+                  draft={pr.isDraft}
+                  kind="others"
+                  suggestion={{ text: "Open on GitHub", href: pr.url }}
+                  detail={
+                    <AwaitingDetail
+                      pr={pr}
+                      now={new Date()}
+                      copied={copiedId === pr.id}
+                      onCopy={() => {
+                        // A clipboard the browser refuses (an insecure origin,
+                        // a denied permission) leaves the button as it was.
+                        void navigator.clipboard
+                          ?.writeText(reminderText(pr, new Date()))
+                          .then(() => {
+                            setCopiedId(pr.id);
+                            setTimeout(() => setCopiedId((id) => (id === pr.id ? null : id)), 2000);
+                          })
+                          .catch(() => {});
+                      }}
+                    />
                   }
                 />
               )}

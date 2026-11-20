@@ -3,7 +3,7 @@ import { ageBucket, relativeAge } from "@/lib/prioritize";
 import type { Suggestion } from "@/lib/suggest";
 
 /** What the row is waiting on — picks the status icon and its colour. */
-export type RowKind = "ready" | "reply" | "review" | "fail" | "pending" | "idle";
+export type RowKind = "ready" | "reply" | "review" | "fail" | "pending" | "idle" | "others";
 
 export interface PrRowProps {
   title: string;
@@ -48,6 +48,11 @@ const ICONS: Record<RowKind, { className: string; path: React.ReactNode; stroke?
   },
   fail: { className: "text-danger", stroke: "2.5", path: <path d="M18 6 6 18M6 6l12 12" /> },
   idle: { className: "text-muted", path: <circle cx="12" cy="12" r="9" /> },
+  // An hourglass: the PR is waiting on somebody else, not on you.
+  others: {
+    className: "text-accent",
+    path: <path d="M6 2h12M6 22h12M7 2c0 6 10 6 10 10S7 16 7 22M17 2c0 6-10 6-10 10s10 4 10 10" />,
+  },
   pending: {
     className: "text-warning",
     path: (

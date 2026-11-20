@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Raw GraphQL responses are intentionally untyped at the boundary; parsers
 // convert them to domain types as the first step.
-import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr, ReviewedPr } from "@/lib/types";
+import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr, ReviewedPr, AwaitingPr, Reviewer } from "@/lib/types";
 
 // scope is optional: when omitted, the search spans every repo the token can
 // see (the user's personal account plus all accessible organizations).
@@ -759,3 +759,85 @@ export function parseReadyPrs(raw: any): ReadyPr[] {
     });
 }
 
+
+// The viewer's own open PRs and who they wait on. Kept out of STUCK_PRS_QUERY
+// on purpose: that one prices check rollups, and this list needs none of them.
+// A request leaves reviewRequests the moment the reviewer submits anything, so
+// a pending request is "no review since it was asked". latestReviews is one
+// entry per reviewer, their most recent review of any kind.
+export const AWAITING_REVIEWERS_QUERY = `
+  query($q: String!) {
+    search(query: $q, type: ISSUE, first: 50) {
+      nodes { ... on PullRequest {
+        id title url number isDraft createdAt
+        repository { nameWithOwner }
+        author { login }
+        reviewRequests(first: 10) { nodes { requestedReviewer {
+          __typename ... on User { login } ... on Team { combinedSlug }
+        } } }
+        timelineItems(itemTypes: [REVIEW_REQUESTED_EVENT], last: 30) {
+          nodes { ... on ReviewRequestedEvent {
+            createdAt requestedReviewer { ... on User { login } ... on Team { combinedSlug } }
+          } }
+        }
+        latestReviews(first: 20) { nodes { state submittedAt author { login } } }
+        commits(last: 1) { nodes { commit { pushedDate committedDate } } }
+      } }
+    }
+      ${RATE_LIMIT}
+  }`;
+
+const reviewerName = (r: any): string => r?.login ?? r?.combinedSlug ?? "";
+
+export function parseAwaitingReviewers(raw: any): AwaitingPr[] {
+  const out: AwaitingPr[] = [];
+  for (const n of searchNodes(raw)) {
+    if (!n?.id) continue;
+    const commit = n.commits?.nodes?.[0]?.commit ?? {};
+    const pushedAt: string = commit.pushedDate ?? commit.committedDate ?? n.createdAt ?? "";
+    // Chronological, so the last event per name is the latest (re-)request.
+    const askedAt = new Map<string, string>();
+    for (const e of n.timelineItems?.nodes ?? []) {
+      const name = reviewerName(e?.requestedReviewer);
+      if (name && e.createdAt) askedAt.set(name, e.createdAt);
+    }
+    const reviewers: Reviewer[] = [];
+    const listed = new Set<string>();
+    for (const req of n.reviewRequests?.nodes ?? []) {
+      const r = req?.requestedReviewer;
+      const name = reviewerName(r);
+      if (!name || listed.has(name)) continue;
+      listed.add(name);
+      reviewers.push({
+        name, team: r.__typename === "Team", state: "requested",
+        since: askedAt.get(name) ?? n.createdAt ?? "",
+      });
+    }
+    const author = n.author?.login;
+    for (const rv of n.latestReviews?.nodes ?? []) {
+      const name = rv?.author?.login;
+      // A pending re-request already says where that reviewer stands; your own
+      // COMMENTED self-annotations are not a review of anything.
+      if (!name || name === author || listed.has(name)) continue;
+      if (rv.state === "APPROVED") reviewers.push({ name, team: false, state: "approved", since: rv.submittedAt });
+      else if (rv.state === "COMMENTED") reviewers.push({ name, team: false, state: "commented", since: rv.submittedAt });
+      else if (rv.state === "CHANGES_REQUESTED") {
+        const pushedSince = !!pushedAt && pushedAt > rv.submittedAt;
+        reviewers.push({ name, team: false, state: "changes", since: pushedSince ? pushedAt : rv.submittedAt, pushedSince });
+      } else continue;
+      listed.add(name);
+    }
+    const waits = reviewers
+      .filter((r) => r.state === "requested" || (r.state === "changes" && r.pushedSince))
+      .map((r) => r.since);
+    if (waits.length === 0) continue;
+    out.push({
+      id: n.id, title: n.title, url: n.url, number: n.number,
+      repo: n.repository?.nameWithOwner ?? "",
+      isDraft: n.isDraft ?? false,
+      waitingSince: waits.sort()[0],
+      reviewers,
+    });
+  }
+  return out;
+}

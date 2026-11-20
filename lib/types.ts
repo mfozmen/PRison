@@ -110,3 +110,30 @@ export type ReviewedPr = {
 };
 
 export type AgeBucket = "fresh" | "warning" | "urgent";
+
+// One person or team on one of the viewer's own PRs, and where their review
+// stands. "requested" is a pending request with no review since; "changes" is
+// a changes-requested verdict, which is the reviewer's move again only once the
+// author has pushed after it (pushedSince).
+export type ReviewerState = "requested" | "commented" | "changes" | "approved";
+export type Reviewer = {
+  name: string;   // a login, or a team's org/slug
+  team: boolean;
+  state: ReviewerState;
+  since: string;  // ISO — when the request was made, or the review submitted
+  pushedSince?: boolean; // "changes" only: a commit landed after the verdict
+};
+
+// One of the viewer's own open PRs that waits on somebody else's review: a
+// pending request, or a changes-requested verdict the author has since pushed
+// an answer to. Powers the "Waiting on others" column. See parseAwaitingReviewers.
+export type AwaitingPr = {
+  id: string;
+  title: string;
+  url: string;
+  number: number;
+  repo: string;
+  isDraft: boolean;
+  waitingSince: string; // ISO — the oldest wait among the reviewers it waits on
+  reviewers: Reviewer[];
+};

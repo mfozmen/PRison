@@ -131,9 +131,39 @@ const reviewed = [
   },
 ];
 
+// The viewer's own PRs that wait on somebody else. None of them is in another
+// list, so the column shows every reviewer state it can draw.
+const awaiting = [
+  {
+    id: "PR_a1", title: "Add an audit log for token changes",
+    url: "https://github.com/acme/api/pull/491", repo: "acme/api", number: 491, isDraft: false,
+    waitingSince: ago(74),
+    reviewers: [
+      { name: "alice", team: false, state: "requested", since: ago(74) },
+      { name: "bob", team: false, state: "commented", since: ago(50) },
+    ],
+  },
+  {
+    id: "PR_a2", title: "Drop the legacy CSV importer",
+    url: "https://github.com/acme/web/pull/61", repo: "acme/web", number: 61, isDraft: false,
+    waitingSince: ago(22),
+    reviewers: [{ name: "carol", team: false, state: "changes", since: ago(22), pushedSince: true }],
+  },
+  {
+    id: "PR_a3", title: "Bump the client library to 3.2",
+    url: "https://github.com/initech/worker/pull/16", repo: "initech/worker", number: 16, isDraft: false,
+    waitingSince: ago(6),
+    reviewers: [
+      { name: "dave", team: false, state: "approved", since: ago(4) },
+      { name: "acme/backend", team: true, state: "requested", since: ago(6) },
+    ],
+  },
+];
+
 // Keyed by the fragment of the route path that identifies it, longest first so
 // "pr-comments" is never matched by a shorter sibling.
 export const BOARD = {
+  "awaiting-reviewers": awaiting,
   "review-requests": reviews,
   "ready-to-merge": ready,
   "reviewed-prs": reviewed,

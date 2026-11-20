@@ -52,4 +52,16 @@ describe("isLoopback", () => {
   it("returns false for a public host", () => {
     expect(isLoopback(req("example.com"))).toBe(false);
   });
+
+  // DNS rebinding: a page on evil.example points its name at 127.0.0.1, so its
+  // requests reach a server bound there (npx mode) with the URL built from the
+  // bind address but the Host header still naming the attacker's site. Trusting
+  // the URL would mint a session for that site from your GitHub credentials.
+  it("trusts the Host header over a loopback URL, so a rebound name is refused", () => {
+    const r = new Request("http://127.0.0.1:7747/api/token/env", {
+      method: "POST",
+      headers: { host: "evil.example:7747" },
+    });
+    expect(isLoopback(r)).toBe(false);
+  });
 });

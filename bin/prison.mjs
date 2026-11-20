@@ -49,12 +49,19 @@ const dir = configDir(process.env, process.platform, homedir());
 // own profile.)
 mkdirSync(dir, { recursive: true, mode: 0o700 });
 const secretFile = join(dir, "auth-secret");
+const newSecret = () => randomBytes(32).toString("base64");
 try {
-  writeFileSync(secretFile, randomBytes(32).toString("base64"), { mode: 0o600, flag: "wx" });
+  writeFileSync(secretFile, newSecret(), { mode: 0o600, flag: "wx" });
 } catch (e) {
   if (e.code !== "EEXIST") throw e;
 }
-const secret = readFileSync(secretFile, "utf8").trim();
+let secret = readFileSync(secretFile, "utf8").trim();
+// A file a crash left empty or cut short would give the session an empty or
+// guessable key. Start over with a fresh one (it signs you out once).
+if (secret.length < 32) {
+  secret = newSecret();
+  writeFileSync(secretFile, secret, { mode: 0o600 });
+}
 
 // The GitHub CLI's token, if it is installed and signed in. Read on every
 // start, because it rotates. Never printed.

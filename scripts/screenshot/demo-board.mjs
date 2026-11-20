@@ -160,10 +160,27 @@ const awaiting = [
   },
 ];
 
+// Two weeks of the viewer's reviews for the weekly look back.
+const review = (n, title, repo, author, hoursAgo, waitedHours) => ({
+  prId: `PR_w${n}`, title, url: `https://github.com/${repo}/pull/${n}`, repo, number: n, author,
+  submittedAt: ago(hoursAgo), waitedMs: waitedHours === null ? null : waitedHours * 3_600_000,
+});
+const week = [
+  review(94, "Normalise the webhook signature check", "globex/backend", "alice", 26, 4),
+  review(198, "Add a health endpoint to the worker", "widgets-inc/frontend", "dave", 70, 30),
+  review(88, "Retry uploads with backoff", "acme/web", "bob", 5, 2),
+  review(301, "Rename the billing tables", "acme/api", "carol", 98, 52),
+  review(77, "Cache tenant settings", "initech/worker", "bob", 122, 6),
+  review(64, "Split the importer", "acme/api", "alice", 140, null),
+  review(52, "Pin the CI image", "acme/web", "dave", 200, 9),
+  review(49, "Drop the old cron", "globex/backend", "carol", 230, 14),
+];
+
 // Keyed by the fragment of the route path that identifies it, longest first so
 // "pr-comments" is never matched by a shorter sibling.
 export const BOARD = {
   "awaiting-reviewers": awaiting,
+  "my-week": week,
   "review-requests": reviews,
   "ready-to-merge": ready,
   "reviewed-prs": reviewed,

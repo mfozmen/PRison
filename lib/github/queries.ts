@@ -2,6 +2,7 @@
 // Raw GraphQL responses are intentionally untyped at the boundary; parsers
 // convert them to domain types as the first step.
 import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr, ReviewedPr, AwaitingPr, Reviewer } from "@/lib/types";
+import type { ReviewFact } from "@/lib/week";
 
 // scope is optional: when omitted, the search spans every repo the token can
 // see (the user's personal account plus all accessible organizations).
@@ -843,6 +844,55 @@ export function parseAwaitingReviewers(raw: any): AwaitingPr[] {
       waitingSince: waits.sort()[0],
       reviewers,
     });
+  }
+  return out;
+}
+
+// Two weeks of the viewer's reviews, open PRs or closed, for the weekly look
+// back. Asked once a day, not on every refresh. sort:updated-desc biases the
+// 50-row window toward the recent ones, which is the window this is about.
+export const MY_WEEK_QUERY = `
+  query($q: String!) {
+    search(query: $q, type: ISSUE, first: 50) {
+      nodes { ... on PullRequest {
+        id title url number
+        repository { nameWithOwner }
+        author { login }
+        reviews(last: 50) { nodes { submittedAt author { login } } }
+        timelineItems(itemTypes: [REVIEW_REQUESTED_EVENT], last: 30) {
+          nodes { ... on ReviewRequestedEvent { createdAt requestedReviewer { ... on User { login } } } }
+        }
+      } }
+    }
+      ${RATE_LIMIT}
+  }`;
+
+/** The search for the look back: reviewed by the viewer, touched since `since`
+ * (a YYYY-MM-DD date), within the scope. */
+export function myWeekSearch(since: string, scope?: string): string {
+  return `is:pr reviewed-by:@me -author:@me updated:>=${since}${scope ? ` ${scope}` : ""} sort:updated-desc`;
+}
+
+export function parseMyWeek(raw: any, viewerLogin: string): ReviewFact[] {
+  const out: ReviewFact[] = [];
+  for (const n of searchNodes(raw)) {
+    if (!n?.id) continue;
+    const asked: string[] = (n.timelineItems?.nodes ?? [])
+      .filter((e: any) => e?.requestedReviewer?.login === viewerLogin && e.createdAt)
+      .map((e: any) => e.createdAt)
+      .sort();
+    for (const r of n.reviews?.nodes ?? []) {
+      if (r?.author?.login !== viewerLogin || !r.submittedAt) continue;
+      // The request this review answered: the latest one made before it.
+      const request = asked.filter((t) => t <= r.submittedAt).at(-1);
+      out.push({
+        prId: n.id, title: n.title, url: n.url, number: n.number,
+        repo: n.repository?.nameWithOwner ?? "",
+        author: n.author?.login ?? "unknown",
+        submittedAt: r.submittedAt,
+        waitedMs: request ? new Date(r.submittedAt).getTime() - new Date(request).getTime() : null,
+      });
+    }
   }
   return out;
 }

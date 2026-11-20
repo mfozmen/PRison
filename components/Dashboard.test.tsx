@@ -132,6 +132,13 @@ const ORPHAN_COMMENT = {
   preview: "comment on an invisible pr",
 };
 
+/** Fetches to the board's list endpoints, leaving out the once-a-day look back. */
+function listCalls() {
+  return (global.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
+    (c) => !String(c[0]).includes("/api/my-week"),
+  );
+}
+
 function okFetch() {
   // SIX-WAY: reviewed-prs → [], closed-prs → [], pr-comments → [], ready → [READY_PR],
   // stuck → [STUCK_PR], else (review-requests) → [REVIEW_PR]. "reviewed" is tested
@@ -2792,11 +2799,7 @@ describe("Dashboard", () => {
       ).toBeInTheDocument();
       const notice = screen.getByRole("status");
       fireEvent.click(within(notice).getByRole("button", { name: /retry/i }));
-      await waitFor(() =>
-        expect(
-          (global.fetch as ReturnType<typeof vi.fn>).mock.calls,
-        ).toHaveLength(14),
-      );
+      await waitFor(() => expect(listCalls()).toHaveLength(14));
     });
   });
 
@@ -2881,9 +2884,7 @@ describe("Dashboard", () => {
       // + reviewed + awaiting-reviewers) = 14 total.
       // Use waitFor so the assertion retries until all async refresh fetches register.
       await waitFor(() =>
-        expect(global.fetch as ReturnType<typeof vi.fn>).toHaveBeenCalledTimes(
-          14,
-        ),
+        expect(listCalls()).toHaveLength(14),
       );
     });
 
@@ -3565,8 +3566,10 @@ describe("Dashboard — auto refresh", () => {
     vi.restoreAllMocks();
   });
 
+  // The list endpoints only: the weekly look back is asked once a day on its
+  // own schedule, not on a refresh or a poll.
   function fetchCalls() {
-    return (global.fetch as ReturnType<typeof vi.fn>).mock.calls.length;
+    return listCalls().length;
   }
 
   it("polls all seven endpoints once per interval when enabled, without the loading banner", async () => {

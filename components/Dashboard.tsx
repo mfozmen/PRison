@@ -45,6 +45,12 @@ import {
 import { SIZE } from "./NextMove";
 import { SnoozeMenu, SnoozedFold } from "./Snooze";
 import { limitState, limitLabel, parseLimits, type Limits } from "@/lib/limits";
+import { WeekCard } from "./WeekCard";
+import type { ReviewFact } from "@/lib/week";
+
+// The look back is asked once in this long per scope, not on every refresh.
+const WEEK_TTL_MS = 12 * 3_600_000;
+const WEEK_KEY = "prison.week";
 import { isSnoozed, parseSnoozes, pruneSnoozes, snoozeFor, type Snoozes, type SnoozeChoice } from "@/lib/snooze";
 import { ClosedPrRow } from "./ClosedPrRow";
 import { ReviewedPrRow } from "./ReviewedPrRow";
@@ -138,6 +144,18 @@ function sizeText(
   const lines = (req.additions ?? 0) + (req.deletions ?? 0);
   const files = req.changedFiles ?? 0;
   return `${minutesLabel(minutes)} · ${lines.toLocaleString("en-US")} ${lines === 1 ? "line" : "lines"} · ${files} ${files === 1 ? "file" : "files"}`;
+}
+
+/** Same precedence the server applies in resolveScope: repo:owner/name already
+ * names its owner, so sending an org beside it could only agree or contradict. */
+function scopeQuery(org: string, repo: string, login: string): string {
+  return repo
+    ? `?repo=${encodeURIComponent(repo)}`
+    : org === login
+      ? `?user=${encodeURIComponent(login)}`
+      : org
+        ? `?org=${encodeURIComponent(org)}`
+        : "";
 }
 
 function caption(count: number, unit: string, oldest: string | undefined): string {
@@ -260,6 +278,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [snoozes, setSnoozes] = useState<Snoozes>({});
   // How long each queue may wait before it is late; empty is off.
   const [limits, setLimits] = useState<Limits>({});
+  // The weekly look back; null until it has loaded.
+  const [week, setWeek] = useState<ReviewFact[] | null>(null);
+  const [weekError, setWeekError] = useState(false);
   const [closedVisible, setClosedVisible] = useState(ARCHIVE_PAGE_SIZE);
   // Same shape as the closed history: a look-back list, so it starts collapsed
   // and reveals a page at a time.
@@ -307,13 +328,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       // Same precedence the server applies in resolveScope: repo:owner/name
       // already names its owner, so sending an org beside it could only agree
       // or contradict.
-      const qs = repo
-        ? `?repo=${encodeURIComponent(repo)}`
-        : org === login
-          ? `?user=${encodeURIComponent(login)}`
-          : org
-            ? `?org=${encodeURIComponent(org)}`
-            : "";
+      const qs = scopeQuery(org, repo, login);
       const run = async () => {
         // A 429 is the hourly point budget, spent — the same wall for every
         // list, so it is recorded once for the run rather than six times.
@@ -712,6 +727,45 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     if (!hydrated) return;
     localStorage.setItem("prison.limits", JSON.stringify(limits));
   }, [limits, hydrated]);
+
+  // The look back changes slowly and costs a query, so it is cached per scope
+  // and asked again only when the copy is half a day old.
+  useEffect(() => {
+    if (!hydrated) return;
+    const qs = scopeQuery(selectedOrg, selectedRepo, login);
+    let cached: { qs?: string; at?: number; facts?: ReviewFact[] } = {};
+    try {
+      cached = JSON.parse(localStorage.getItem(WEEK_KEY) ?? "{}");
+    } catch {
+      cached = {};
+    }
+    const fresh = cached.qs === qs && typeof cached.at === "number" && Date.now() - cached.at < WEEK_TTL_MS;
+    if (fresh && Array.isArray(cached.facts)) {
+      const facts = cached.facts;
+      startTransition(() => {
+        setWeek(facts);
+        setWeekError(false);
+      });
+      return;
+    }
+    let live = true;
+    fetch(`/api/my-week${qs}`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const body = await r.json();
+        const facts = (Array.isArray(body) ? body : []) as ReviewFact[];
+        if (!live) return;
+        localStorage.setItem(WEEK_KEY, JSON.stringify({ qs, at: Date.now(), facts }));
+        setWeek(facts);
+        setWeekError(false);
+      })
+      .catch(() => {
+        if (live) setWeekError(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, [hydrated, selectedOrg, selectedRepo, login, startTransition]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -2008,6 +2062,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             <span aria-hidden="true" className="h-px flex-1 bg-border" />
             <span className="text-[13px] text-muted">Looking back, not work to do</span>
           </div>
+          <WeekCard facts={week} now={new Date()} error={weekError} />
           <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
             <ArchiveSection
               title="Recently reviewed"

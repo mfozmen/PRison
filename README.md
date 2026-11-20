@@ -5,227 +5,196 @@
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=mfozmen_PRison&metric=coverage)](https://sonarcloud.io/summary/new_code?id=mfozmen_PRison)
 [![Docker Pulls](https://img.shields.io/docker/pulls/mfozmen/prison)](https://hub.docker.com/r/mfozmen/prison)
 
-A read-only GitHub dashboard that shows which pull requests need your attention,
-and for how long — across your personal account and every organization you can
-access. Four queues, oldest first, side by side as columns (stuck on checks,
-waiting on your review, awaiting your reply, ready to merge), plus two history
-sections:
+A read-only GitHub dashboard for the pull requests waiting on you, and on the
+people you are waiting on — and for how long. It runs on your own machine, reads
+your personal account and every organization you can access, and never writes
+anything back to GitHub.
 
-- **Ready to merge** — PRs GitHub reports as mergeable now. An out-of-date branch
-  still counts, with a **"Needs update"** hint (a bot/manual update handles it) —
-  but only once its checks are green; while one is red or still running it
-  belongs under _Stuck on checks_, and no PR is ever in both lists.
-- **Awaiting your reply** — review comments where the last word isn't
-  yours: every unresolved inline thread on your own PRs, the threads you raised
-  on PRs you reviewed, and questions left in the body of a review rather than on
-  a line of the diff. Each row opens the comment itself, not the top of the PR.
-- **Waiting on your review** — PRs you're blocking others on.
-- **Stuck on checks** — your open PRs with failing/pending checks, or otherwise
-  blocked from merging (required checks, review, or conflicts).
-- **Recently reviewed** — open PRs you already reviewed, badged with the verdict
-  you left (**Dismissed**, struck through, when the author has cleared it), and
-  flagged **"Updated since"** when the author has pushed after it.
-  A PR that comes back for another review leaves this list and returns to
-  _Waiting on your review_.
-- **Recently merged / closed** — your own PRs that were merged or closed, newest
-  first, so finished work confirms itself.
+**[What it shows](#what-it-shows)** ·
+**[Features](#features)** ·
+**[Getting started](#getting-started)** ·
+**[Settings](#settings)** ·
+**[Controls](#controls)** ·
+**[Docs](#documentation)**
 
-The four work queues sit side by side as columns, most urgent kind first:
-stuck on checks, waiting on your review, awaiting your reply, ready to merge.
-Each column grows on its own, so a long queue never pushes another down. Above
-them, a **Next move** strip names the one thing to do first. The two histories
-sit underneath as quieter panels; both start collapsed with a count and expand
-to the latest 15, with **Load more** for the rest.
+![The PRison dashboard in dark mode. A Next move card on top points at the oldest item, 4d and stalled, a PR stuck on lint and typecheck, with an I have choice of 5 min, 15 min, 1 hour or Any, a Re-run failed checks button and Skip. Under it, 12 things want you sits beside grouping and draft toggles, a search box and Refresh. Five columns follow, each with a big count and its oldest wait: Stuck on checks, Waiting on your review with a size chip like ~15 min · 84 lines · 3 files on each row, Awaiting your reply, Ready to merge, and Waiting on others, where each PR lists its reviewers and where they stand, with a Copy reminder button. Every row has a moon to snooze it. At the foot, History opens with a This week card — median wait before your review, reviews you gave, PRs you reviewed, the longest wait — and a bar per day, above the folded Recently reviewed and Recently merged / closed panels](docs/screenshot.png)
 
-![The PRison dashboard in dark mode. A Next move card on top points at the oldest item: its time block reads 4d, stalled, 1 of 12, on a red pace colour, beside a PR stuck on lint and typecheck on a deep indigo ground with an aurora edge, a Re-run failed checks button and Skip. Under it, the heading 12 things want you sits beside pill toggles for grouping and drafts, a search box and Refresh. Four columns follow, each with a big count and its oldest wait: Stuck on checks (highlighted, 4), Waiting on your review (3), Awaiting your reply (3) and Ready to merge (2). Every row has a status icon, its repo and age, and its next action. At the foot, a History section holds the folded Recently reviewed and Recently merged / closed panels](docs/screenshot.png)
+## What it shows
 
-### Features
+Five columns, oldest first, with a **[Next move](#next-move)** card above them
+pointing at the one thing to do first.
 
-- **Unanswered review comments.** An inline thread is waiting on you when it is
-  unresolved _and_ its most recent comment isn't yours — replying adds a comment,
-  so your own last word means the ball is back in the reviewer's court. A review
-  _body_ has neither replies nor a resolve bit, so it waits until you say
-  something on the PR after it; a reaction dismisses one, the same emoji that
-  dismisses a thread. Rows say which surface they came from, because the two are
-  answered in different places. The age counts from the comment, so you can see
-  what you've been sitting on for four days. Bots write most review comments, so
-  they're hidden behind a **Show bot comments** toggle.
-- **Tracked checks → Awaiting.** GitHub's API hides "expected" required checks
-  (e.g. a manually-triggered `qa/smoke` or automation) from non-admins. Name the
-  checks you care about — a default per owner (your personal account and every
-  org) plus per-repo overrides, with a
-  type-to-search repo picker — and PRison shows them as **"⏳ Awaiting: &lt;name&gt;"**
-  on a blocked PR until they report. Each check is added with a **Required** box
-  answered up front, and the board stops guessing: a required one is drawn solid and
-  holds the PR out of _Ready to merge_; an unticked one is shown for information,
-  drawn dashed, and blocks nothing — including when GitHub does report it, so a
-  red job that cannot hold the merge up stops reading like one that can. A check
-  you never named keeps the dashed chip, which is what "PRison doesn't know"
-  looks like.
-- **Ignored checks.** Some checks are broken rather than failing — the flaky
-  one, the one somebody else's team owns. Right-click (or click) its chip on the
-  board and choose **Ignore this check**. It stays on the card, muted instead of
-  red, but its result stops counting: the PR is no longer held out of _Ready to
-  merge_ over it, it gets no bucket of its own under _By check_, and it is never
-  awaited. Everything ignored is listed in **Settings → Checks**, under
-  the repo it was ignored on, where it can be renamed, widened to the whole
-  owner, or taken back. A conflict or a review gate still holds the PR —
-  ignoring a check says its result means nothing, never "merge it anyway" — but
-  GitHub's own _blocked_ state doesn't, since a red **required** check is
-  exactly what puts a PR there.
-- **History you can walk back into.** Merged and closed-without-merging PRs on a
-  short timeline, each marked **Merged** or **Closed without merge** with how long
-  ago it ended. Beside them are the PRs you reviewed, worded as what you did
-  (**You requested changes**, **You approved**). When the author has pushed since,
-  the row shows **Updated since** and a **See new commits** link, so a discussion
-  you left open is one click away instead of lost in GitHub's notification list.
-- **Next move.** A card above the columns points at the longest wait across all
-  four queues, says why (the red checks, the conflict, who is blocked), and puts
-  its one action a click away. It stands apart from the board on purpose: each
-  theme gives it a spot colour of its own under a soft aurora, with an aurora
-  edge and a glow. Its time block shows the **pace**: **moving** under a day,
-  **slowing** up to three, **stalled** after, in colour, in words and on a
-  three-step meter. The glow grows as the item stalls. The edge and button wear
-  the item's queue colour. **Skip** steps to the next oldest ("2 of 12") and
-  wraps after the last. The column that holds it is tinted and the row is marked
-  **↑ next move**, so the card is a pointer, never a fifth list.
-- **A big count on every column.** Each queue shows how many items it holds and
-  how long its oldest one has been sitting, with a one-line description of what
-  the queue is. The heading above says how many things want you in total. The
-  counts follow the filters and the search, so a column never disagrees with
-  its own rows, and they cost no extra API calls: it is all data already on the
-  page. Every row carries a status icon (✕ failing, clock pending, eye review,
-  speech bubble reply, ✓ ready), so colour is never the only signal.
-- **Everything folds by its header.** Each of the four lists, each repo/check
-  group inside them, and both history sections collapse to a single line that
-  keeps its title and count — so a section you are not working in today stops
-  taking up the screen without ever hiding how much is in it. Folds last the
-  sitting, not forever: a board that quietly omitted your review queue tomorrow
-  morning would be worse than a long one.
-- **Grouping** — by queue, by repository, or by check, applied inside each
-  column so a PR never changes queue with the view. Next to it in the filter
-  bar, a **draft filter**: **All**, **Only drafts** to see just what you have in
-  progress, or **No drafts** to get them out of the way.
-- **One search box over the whole board.** Type a word and every list narrows at
-  once — title, repository, PR number, author, comment text, file path, and the
-  names of the checks that are red on a PR. Terms are ANDed and each may land on
-  a different field, so `acme 482` finds that one PR. It filters what is already
-  on the page rather than asking GitHub anything, it never touches what auto
-  refresh considers new, and it is forgotten when you close the tab.
-- **Auto refresh (opt-in).** Turn it on in Settings and pick how often to check
-  — every 5, 15, or 30 minutes, or hourly (30 minutes by default). PRison then
-  tells you what _moved_, not just what's new: a PR of yours that was approved
-  — you hear that as soon as it happens, not when CI eventually catches up and
-  the PR turns mergeable — a PR that became ready to merge, one that fell into
-  a merge conflict because somebody else merged first, checks that went
-  red, changes requested, a review asked of you, an author answering the review
-  you left with code, a fresh reply
-  on a thread, or one of your own PRs getting merged — while a PR simply falling
-  back to waiting (you pushed a fix) stays quiet. Works only while a PRison tab
-  is open — there's no background service.
-- **Activity feed.** Everything a poll detects is kept, newest first, behind the
-  bell in the header. The bell carries an unseen count and pulses while there is
-  something new (never against a reduced-motion preference), and each row names
-  the PR, says what happened, and links straight to it — a comment lands on the
-  thread itself. The last 100 events survive a reload. Opening the panel is what
-  marks it read, so the count waits for you instead of vanishing the moment you
-  return to the tab; the **`(3) PRison`** tab-title badge follows the same count.
-- **Desktop notifications (opt-in).** On the same schedule, changes that land
-  while you're on another tab also raise a desktop notification naming them —
-  `acme/web #42 is ready to merge` — up to three at a time, then `+N more`.
-  Settings shows whether your browser has actually granted permission and offers
-  a test notification, and says where else to look if nothing appears: your
-  operating system decides separately whether the browser may show anything, and
-  it refuses in silence. Whatever the notification misses is in the activity
-  feed regardless — and, if your operating system keeps swallowing them, in the
-  menu bar: `extras/menubar/` puts an unread count there, where nothing has to
-  be permitted for you to see it and nothing disappears after five seconds.
-- **Catch-up on open.** PRison remembers what everything was doing when you
-  last closed it, so a review that arrived overnight is still news in the
-  morning — the first load reports what moved while no tab was polling,
-  instead of quietly accepting it as the way things always were. It fills the
-  feed and the bell, never a desktop notification: what it reports is by
-  definition old, and a browser reloads a tab on its own — a discarded one
-  restored in the background is not you opening PRison.
-- **Last refreshed indicator.** The filter bar says how long ago the data
-  landed, so you always know whether you're looking at something stale.
-- **Shows what a refresh costs.** GitHub prices every query, the allowance is
-  hourly, and it is shared with anything else signed in as you — so how often
-  you refresh is a spending decision. Settings → Auto refresh names the price
-  of the last refresh and what is left of the hour, and the board warns while
-  there is still enough left to act on rather than after the wall.
-- **Says when GitHub's budget is spent.** The API allowance is hourly and
-  account-wide, so a busy morning can empty it — and every list then fails at
-  once, which looks exactly like the app being broken. PRison tells the two
-  apart: a spent budget gets its own notice, with the clock time it comes back
-  and the setting that stops it happening again, instead of a retry that is
-  guaranteed to fail.
-- **Partial-data notice.** When GitHub drops part of a response (an org restricts
-  the token, a search times out), a banner says so instead of silently showing
-  less — with a Retry button, like every failed list.
-- **Rides out GitHub's rate limiting.** A refresh needs seven queries, and asking
-  for them all at once trips GitHub's secondary rate limit — which applies to
-  your whole account, so lists fail together and the page looks broken. PRison
-  sends three at a time instead. That costs nothing: the refresh is as fast as it
-  was, because its speed was always set by the slowest single query, and each
-  query actually comes back quicker once GitHub isn't throttling the burst.
-  Should the limit still land, and GitHub says how long the block runs and it's
-  short, PRison waits that out and asks once more instead of making you press
-  Retry yourself. When GitHub asks for longer than a refresh should take — or
-  doesn't say at all — PRison steps aside and shows the banner rather than
-  guessing, since coming back early only extends the block.
-- **Fourteen themes, each with a light and a dark ground.** A theme owns its accent,
-  its three status colours and its typefaces; the ground underneath is a separate
-  choice, so switching it reads as the light changing rather than the theme
-  changing. **Default** is the original pair; **Aurora** is built from four
-  atmospheric emission wavelengths, **İznik** from the metal oxides the 16th
-  century tile workshops fired, and **Cyanotype** from the 1842 blueprint
-  reaction and its negative. **Coral** takes a reef and the algae that colour
-  it, its two grounds a depth rather than a mood — at 30 m the sea has absorbed
-  the red end of the spectrum. **Saffron** takes four parts of one crocus,
-  **Lichen** four species off one rock face, wet and dry. **Reflectivity** is a
-  weather radar's dBZ scale. Six more start from palettes on colorpalettes.net
-  and let them colour the ground as well as the accent: **Lilac** (violet night),
-  **Olive** (olive and mustard on linen), **Acid Pop** (cobalt, acid green and
-  hot pink — the loud one), **Terracotta** (peach plaster and fired clay),
-  **Moss & Rose** (blue-green moss with a blush accent) and **Bordeaux** (wine and mustard, the one red ground).
-  All twenty-eight palettes are measured against WCAG AA by a test, with nothing
-  exempt. Pick one in Settings, where each row previews itself — the swatch is
-  stamped with that theme, so it renders in the real palette rather than a copy
-  that can drift.
-- **A tier board.** A Next move strip on top points at the longest wait across
-  every queue, with its one action and a Skip. Below it, four columns side by
-  side: stuck on checks, waiting on your review, awaiting your reply, ready to
-  merge. Each has a big count, its oldest age, and status icons, so colour is
-  never the only signal. The two histories, recently reviewed and recently
-  merged/closed, sit underneath, quieter on purpose. The columns stack on a
-  narrow screen.
-- **Personal account + per-org filter** in the top-right switcher, and a
-  **single-repo filter** beside it for the days spent inside one repository.
-  Both narrow the GitHub search itself rather than the rows already on screen,
-  so the 50-result window is spent on what you are looking at.
-- **Your own access** — sign in with the GitHub CLI or a token; no third-party
-  app to approve. Every row deep-links to GitHub; PRison never writes anything.
+| Column | What's in it |
+| --- | --- |
+| **Stuck on checks** | Your PRs that CI, a conflict or a branch rule is holding back, with the reason on each row. |
+| **Waiting on your review** | PRs where a teammate is blocked on you, each with a rough [review time](#next-move). |
+| **Awaiting your reply** | Review comments where the last word isn't yours — on your PRs and on the threads you raised. [More](#comments-and-reviews) |
+| **Ready to merge** | Approved, green, mergeable. An out-of-date branch still counts, with **Needs update**. |
+| **Waiting on others** | Your PRs that wait on somebody else's review: who, and how long. [More](#waiting-on-others) |
+
+Underneath, quieter on purpose, **History**: a [weekly look back](#looking-back)
+at your reviewing, the PRs you reviewed (with your verdict, and **Updated
+since** when the author pushed after it), and your merged or closed PRs.
+
+A PR is only ever in one column. Columns stack on a narrow screen.
+
+## Features
+
+### Next move
+
+The card on top points at the longest wait across your four queues, says why
+(the red checks, the conflict, who is blocked), and puts its one action a click
+away.
+
+- **Pace.** The time block reads **moving** under a day, **slowing** up to
+  three, **stalled** after — in colour, in words and on a three-step meter.
+- **Skip** steps to the next oldest ("2 of 12") and wraps after the last. The
+  column holding the item is tinted and the row is marked **↑ next move**: the
+  card is a pointer, never another list.
+- **I have 5 min / 15 min / 1 hour / Any.** Tell it how long you have and it
+  picks the longest wait that *fits*, so a spare quarter hour clears something
+  instead of opening a review you can't finish. Each review gets a rough time
+  from its diff — `~15 min · 84 lines · 3 files` — shown on the card and on its
+  row. If nothing fits, it says so and shows the longest wait. **Any** is the
+  longest wait first.
+- Each theme gives the card a spot colour of its own under a soft aurora, so it
+  stands apart from the board.
+
+### Waiting on others
+
+The other half of the queue: your PRs that wait on a reviewer. Each row names
+its reviewers and where each one stands — **no review yet**, **commented, no
+verdict**, **asked for changes · you've pushed since** (their move again),
+**approved** — and how long it has been.
+
+**Copy reminder** puts a short, polite nudge on your clipboard, ready to paste
+into Slack or a comment. PRison never posts it.
+
+A stuck PR whose only blocker is a review moves here, because it waits on a
+person. One with any other blocker stays stuck. These PRs are not counted in
+"N things want you", since the move isn't yours.
+
+### Comments and reviews
+
+- **An inline thread waits on you** when it is unresolved and its last comment
+  isn't yours. A question left in the body of a review waits until you say
+  something on the PR after it. Rows say which kind they are, because the two
+  are answered in different places, and open the comment itself.
+- **A reaction or Mark as seen** dismisses a thread until someone replies.
+- **Bots** write most review comments, so they stay hidden unless you turn
+  them on.
+
+### Checks: tracked and ignored
+
+- **Tracked checks → Awaiting.** GitHub hides "expected" required checks (a
+  manual `qa/smoke`, say) from non-admins. Name the checks you care about, per
+  owner or per repo, and PRison shows **⏳ Awaiting: name** until they report.
+  Tick **Required** and the check holds the PR out of _Ready to merge_; leave it
+  unticked and it is shown dashed, for information.
+- **Ignored checks.** A check that is broken rather than failing — the flaky
+  one, another team's. Right-click its chip and choose **Ignore this check**: it
+  stays on the card, muted, but stops holding the PR back and never gets a
+  _By check_ bucket. A conflict or a review still holds the PR.
+
+Both live in **Settings → Checks**, one owner/repo picker over the two lists.
+
+### Snooze and wait limits
+
+- **Snooze.** The moon on every row puts it off until **tomorrow 9:00**,
+  **Monday 9:00**, or **until it changes** — a new commit, a re-request, a
+  reply. A snoozed row leaves its column, the count and the Next move, and
+  waits folded at the foot of the column with when it wakes and a **Wake**
+  button.
+- **Wait limits.** Say how long each queue may wait — a review 24 hours, a
+  reply 8 — and every row gets a thin bar filling toward it, **Due in 6h** from
+  three quarters of the way, and **Late · 1d over** after. The heading counts
+  what is late. Off until you set one, in **Settings → Limits**.
+
+Both live in this browser and cost nothing from GitHub.
+
+### Staying up to date
+
+- **Auto refresh (opt-in)** every 5, 15 or 30 minutes, or hourly. PRison says
+  what *moved*, not just what's new: approved, ready to merge, fell into a
+  conflict, checks went red, changes requested, a review asked of you, a fresh
+  reply, merged. A PR falling back to waiting stays quiet. It works while a
+  PRison tab is open; there is no background service.
+- **Activity feed** behind the bell, newest first, with an unseen count that
+  waits for you, the same count in the tab title, and the last 100 events kept
+  across reloads.
+- **Desktop notifications (opt-in)** for changes that land while you're on
+  another tab. Settings shows whether your browser actually granted permission,
+  sends a test, and says where to look when your operating system swallows it.
+- **Catch-up on open.** What moved while no tab was open is reported on the
+  first load, in the feed — never as a desktop notification, since it is old.
+- **The [menu bar](#then-put-it-in-the-menu-bar-macos)** on a Mac keeps an
+  unread count that needs nobody's permission.
+
+### Looking back
+
+- **This week**, at the top of History: the median time people waited for your
+  review, how many reviews you gave and on how many PRs, and the one wait that
+  ran longest with a link to it — each beside the week before, plus a bar per
+  day. A mirror, not a score: no streaks, nothing about anyone else. It asks
+  GitHub once every half day, not on every refresh.
+- **Recently reviewed** — PRs you reviewed, worded as what you did (**You
+  requested changes**, **You approved**), with **Updated since** and a **See
+  new commits** link when the author has answered.
+- **Recently merged / closed** — your finished PRs on a short timeline.
+
+### Finding things
+
+- **Group** by queue, repository or check, inside each column.
+- **Drafts**: All, Only drafts, or No drafts.
+- **One search box** narrows every list at once — title, repo, number, author,
+  reviewer, comment text, file path, failing check names. Terms are ANDed, so
+  `acme 482` finds that PR. `/` jumps to it.
+- **Scope** to all of it, your personal account, one organization, or one
+  repository. The scope narrows the GitHub search itself.
+- **Everything folds** by its header, keeping its count, for the sitting.
+
+### GitHub's API budget
+
+GitHub prices every query from an hourly allowance shared with anything else
+signed in as you, so PRison is open about it:
+
+- **Settings → Auto refresh** names what the last refresh cost and what is left.
+- The board warns while there is still enough left to act on, and a spent
+  budget gets its own notice with the time it comes back — not seven failing
+  lists and a Retry that cannot work.
+- Queries go out three at a time, which keeps GitHub's secondary rate limit
+  from failing them together; a short block is waited out once, automatically.
+- When GitHub drops part of a response, a banner says so instead of quietly
+  showing less.
+
+| What | Cost |
+| --- | --- |
+| The new Waiting on others list | 2 points per refresh |
+| Review time estimates, snooze, wait limits | nothing extra |
+| The weekly look back | 1 point, twice a day at most |
+
+### Fourteen themes
+
+Each with a light and a dark ground, its own accent, status colours and
+typefaces: **Default**, **Aurora**, **İznik**, **Cyanotype**, **Coral**,
+**Saffron**, **Lichen**, **Reflectivity**, **Lilac**, **Olive**, **Acid Pop**,
+**Terracotta**, **Moss & Rose** and **Bordeaux**. All twenty-eight palettes are
+held to WCAG AA by a test. See [docs/DESIGN.md](docs/DESIGN.md) for where each
+comes from.
 
 ## Getting started
 
-PRison runs on **your own machine** — no third-party app to approve. The easiest
-way is Docker (one command); or run it locally with Node.
-
-**Sign Out** ends _your session_ — it clears the encrypted cookie. It cannot revoke
-the host's credentials: on a `GITHUB_TOKEN`-configured instance, one click signs you
-back in, and anyone who can reach the instance can do the same. That is what the
-warning below is about.
+PRison runs on **your own machine** — no third-party app to approve. Docker is
+one command; Node works too.
 
 > [!WARNING]
 > Sign-in mints a session from the host's GitHub credentials (your `gh` CLI token
-> or a `GITHUB_TOKEN`). PRison is designed to run on your own machine — do NOT
-> expose a `gh`-authenticated or `GITHUB_TOKEN`-configured instance on a reachable
-> network without adding your own access control.
+> or a `GITHUB_TOKEN`). Do NOT expose a `gh`-authenticated or
+> `GITHUB_TOKEN`-configured instance on a reachable network without adding your
+> own access control. **Sign Out** clears your session cookie; it cannot revoke
+> the host's credentials.
 
 ### Run with Docker (recommended)
-
-Zero-config — `AUTH_SECRET` is auto-generated and persisted in a volume (nothing to set).
 
 From the published image, no clone needed:
 
@@ -233,29 +202,26 @@ From the published image, no clone needed:
 docker run -p 7747:7747 -v prison-data:/data -e GITHUB_TOKEN="$(gh auth token)" mfozmen/prison
 ```
 
-Or build it yourself from a checkout:
+Or build it from a checkout:
 
 ```sh
 GITHUB_TOKEN="$(gh auth token)" docker compose up --build
 ```
 
-Either way, open http://localhost:7747.
+Then open http://localhost:7747.
 
-The `prison-data` volume holds the generated `AUTH_SECRET`, so your session
-survives a restart. Images are published for `linux/amd64` and `linux/arm64`.
-
-Passing your `gh` token signs you in automatically — needed for SSO-restricted orgs
-(where SSO/SAML enforcement blocks classic PATs). The token rotates, so re-run when
-it expires. Without `GITHUB_TOKEN`, just open the app and paste a token.
+- `AUTH_SECRET` is generated and kept in the `prison-data` volume, so your
+  session survives a restart. Images are published for `linux/amd64` and
+  `linux/arm64`.
+- Passing your `gh` token signs you in automatically, which SSO-restricted orgs
+  need. It rotates, so re-run when it expires. Without `GITHUB_TOKEN`, open the
+  app and [paste a token](#no-github-cli-paste-a-token).
 
 ### Then put it in the menu bar (macOS)
 
-The container is the dashboard; on a Mac this is the other half. A desktop
-notification is only as reliable as the four switches between the page and
-your screen, and it is gone in seconds whether or not you were looking.
 `extras/menubar/prison.1m.py` is a [SwiftBar](https://swiftbar.app) (or xbar)
-plugin that puts an **unread count** up there instead: it appears when
-something lands and stays until you click it.
+plugin that puts an **unread count** in the menu bar: it appears when something
+lands and stays until you click it, with no permission to grant.
 
 ![The macOS menu bar with the PRison plugin clicked open. In the bar, the PRison icon and the number 2. The menu below lists Unread (2) and Mark all read, then the live totals — Ready to merge 2, Waiting on your review 2, Comments awaiting reply 3, Stuck on checks 4 — each opening a submenu of its own PRs, then Open PRison and Refresh now](docs/menubar.png)
 
@@ -263,13 +229,8 @@ something lands and stays until you click it.
 brew install --cask swiftbar && mkdir -p ~/SwiftBar && cp extras/menubar/prison.1m.py ~/SwiftBar/ && chmod +x ~/SwiftBar/prison.1m.py
 ```
 
-`~/SwiftBar` is the folder SwiftBar asks for on first launch; `chmod +x` matters
-because the executable bit survives `cp`, not a raw download.
-
-It reads the PRison you just started — no token of its own, no configuration,
-and no schedule of its own: it asks GitHub on the same interval the dashboard
-uses, so the two never spend the hourly budget twice. Clicking an unread row
-opens that PR and marks it read; the live totals sit one click below. See
+It reads the PRison you just started — no token, no configuration, and the same
+refresh interval as the dashboard, so the two never spend the budget twice. See
 [extras/menubar/README.md](extras/menubar/README.md).
 
 ### Run locally (development)
@@ -278,90 +239,76 @@ opens that PR and marks it read; the live totals sit one click below. See
 npm install && npm run dev
 ```
 
-Then open http://localhost:7747.
+Then open http://localhost:7747 and click **Sign in with GitHub CLI**. The
+server reads your CLI token and keeps it only in an encrypted, httpOnly cookie.
+`AUTH_SECRET` is written to `.env.local` on the first run.
 
-7747 is taken? Pick another port with `npm run dev -- -p 8000` (or
-`docker run -p 8000:7747 …`), and set the menu bar plugin's `PRISON_URL` to
-`http://localhost:8000` so the two keep reading the same PRison.
-
-`npm run dev` generates `AUTH_SECRET` into `.env.local` on first run (it encrypts
-the session cookie) — nothing to configure. Open the app and click **Sign in with
-GitHub CLI**; the server reads your CLI token and stores it only in an encrypted,
-httpOnly cookie — never in the browser.
+Port taken? `npm run dev -- -p 8000` (or `docker run -p 8000:7747 …`), and set
+the menu bar plugin's `PRISON_URL` to match.
 
 ### No GitHub CLI? Paste a token
 
-If `gh` isn't installed or signed in, the app falls back to a paste-a-token form:
-
 1. Go to [github.com/settings/tokens](https://github.com/settings/tokens/new?scopes=read:org,repo&description=PRison) → **Generate new token (classic)**.
-2. Select the **`read:org`** and **`repo`** scopes, generate, and copy it.
+2. Select **`read:org`** and **`repo`**, generate, and paste it into PRison.
 
 > [!NOTE]
-> For SAML SSO orgs, click **Configure SSO** on the token and **Authorize** it —
-> self-service, no org owner approval. Some orgs forbid classic PATs entirely;
-> there the GitHub CLI token is the only way in.
+> For SAML SSO orgs, click **Configure SSO** on the token and **Authorize** it.
+> Some orgs forbid classic tokens; there the GitHub CLI is the only way in.
 
-## Usage
+## Settings
 
-Sign in with the GitHub CLI or paste a token.
+The sliders icon opens Settings in the middle of the screen: six tabs, one at a
+time, and a search box over all of them — type, and the panel becomes the
+matching settings, with switches working right there. `/` jumps to it, Esc
+clears it.
 
-### Header controls
+| Tab | What's in it |
+| --- | --- |
+| **Comments** | Show bot comments; hide comments you reacted to or marked as seen. |
+| **Auto refresh** | On or off, how often, notification permission, and what a refresh costs. |
+| **Checks** | One owner/repo picker over **Tracked** and **Ignored** checks, side by side. Picking a repo changes nothing until you add a check to it. |
+| **Limits** | How long each queue may wait before it shows as late. |
+| **Appearance** | The fourteen themes, each previewed as a tiny board in its real colours, on its light or dark ground. |
+| **About** | Version, links, **Check for updates**, and **Tell me when a newer version is out** — which asks GitHub once a day, without your token. |
 
-Top-right, left to right:
+## Controls
 
-| Control          | What it does                                                                                                                             |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| **Switcher**     | Scopes the board to All / your personal account / a single org.                                                                          |
-| **Bell**         | Opens the **activity feed** and marks it read.                                                                                           |
-| **Sliders icon** | Opens **Settings** (below).                                                                                                              |
-| **Sun/moon**     | Switches between the current theme's two grounds, and names them — it reads "Switch to Aurora Night" rather than "Switch to dark theme". |
-| **Sign Out**     | Clears the stored token.                                                                                                                 |
+**Header**, left to right:
 
-Settings opens in the middle of the screen with five tabs, one section at a
-time, so nothing needs a page scroll. The search box at the top looks through
-every tab: type and the panel becomes a list of matching settings, with the
-switches working right there and an **Open** button for the rest. Press `/` to
-jump to it and Esc to clear it.
+| Control | What it does |
+| --- | --- |
+| **Switcher** | Scope to everything, your personal account, or one organization. |
+| **Repository** | Narrow to a single repository. |
+| **Bell** | Opens the activity feed and marks it read. |
+| **Sliders** | Opens [Settings](#settings). |
+| **Sun / moon** | Flips the theme's ground, naming it — "Switch to Aurora Night". |
+| **Sign Out** | Clears your session. |
 
-- **Comments** — show bot comments, hide comments you reacted to or marked as
-  seen.
-- **Auto refresh** — on/off, how often to check, and the notification
-  permission.
-- **Checks** — one owner/repo picker over two lists side by side. **Tracked**:
-  the checks to see as "Awaiting", added one at a time, each with its own
-  **Required** box, and renamed, re-marked, or removed later. **Ignored**:
-  everything you wrote off from the board, under the repo it was ignored on,
-  plus an owner scope for a check that is broken everywhere. Picking a repo
-  changes nothing until you add a check to it, so a repo picked only to ignore a
-  check keeps its owner's tracked defaults.
-- **Appearance** — pick one of the fourteen themes. Each card is a tiny board in
-  that theme's real colours and typeface, previewed on its light or dark ground.
-- **About** — version, repository, license, and **Check for updates**, asked
-  for on the spot. **Tell me when a newer version is out** turns it into a
-  standing question: the version in the header becomes a link to the release
-  notes once your container has fallen behind. Off by default; asks GitHub once
-  a day, without your token, and stays quiet when it can't reach it.
+**Board:**
 
-### Filter bar
+| Control | What it does |
+| --- | --- |
+| **I have … / Skip** | On the Next move: fit the time you have, or step to the next oldest. |
+| **By queue / repo / check** | Groups rows inside each column; group headers fold. |
+| **All / Only drafts / No drafts** | Filters by draft state. |
+| **Search** | Narrows every list to rows matching all your terms; Esc clears it. |
+| **Refresh** · **Updated Xm ago** | Re-fetches without a reload, and says how fresh the data is. |
 
-| Control                           | What it does                                                                                                             |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **By queue / By repo / By check** | Groups the rows inside each column. Group headers fold and unfold, and under **By repo** the ↗ beside one opens that repository on GitHub. |
-| **All / Only drafts / No drafts** | Filters by draft state.                                                                                                  |
-| **Search**                        | Narrows every list to the rows matching all your terms; Esc clears it.                                                   |
-| **Refresh**                       | Re-fetches without reloading the page.                                                                                   |
-| **Updated Xm ago**                | How fresh the data is, next to Refresh.                                                                                  |
-| **Next move → Skip**              | Steps the strip above the columns to the next oldest item; it wraps after the last.                                      |
+**On a row:**
 
-Click a **PR title** (or a suggested-action link) to jump to GitHub — a comment
-row lands on that exact thread. On a Mac, the same counts are in
-[the menu bar](#then-put-it-in-the-menu-bar-macos) without opening the tab.
+| Control | What it does |
+| --- | --- |
+| **Title** or **suggested action** | Opens it on GitHub; a comment opens on its thread. |
+| **Moon** | [Snooze](#snooze-and-wait-limits) until tomorrow, Monday, or until it changes. |
+| **Eye** | Mark a comment as seen until someone replies. |
+| **Check chip** | Right-click (or click) to ignore or un-ignore that check. |
+| **Copy reminder** | On Waiting on others: a polite nudge for your clipboard. |
 
 ## Documentation
 
 - [CONTRIBUTING.md](CONTRIBUTING.md) — conventions, tests, and CI setup
 - [RELEASING.md](RELEASING.md) — how to cut a release, and how to roll one back
-- [docs/DESIGN.md](docs/DESIGN.md) — design system
+- [docs/DESIGN.md](docs/DESIGN.md) — design system and themes
 - [docs/UI-AUDIT.md](docs/UI-AUDIT.md) — UI/UX audit notes
 
 Licensed under [MIT](LICENSE).

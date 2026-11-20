@@ -199,7 +199,7 @@ command with Node, or one with Docker.
 With [Node.js](https://nodejs.org) 20 or newer:
 
 ```sh
-npx @mfozmen/prison
+npx @mfozmen/prison@latest
 ```
 
 It starts PRison on http://localhost:7747 and opens it in your browser. Signed
@@ -209,8 +209,11 @@ otherwise it asks for a [token](#no-github-cli-paste-a-token). Ctrl+C stops it.
 - It listens on this machine only (`127.0.0.1`), never on your network.
 - Its secret and settings live in `~/.config/prison` (`%APPDATA%\prison` on
   Windows), so a restart keeps you signed in.
-- `npx @mfozmen/prison@latest` runs the newest release; `--port 8000` picks
-  another port; `--no-open` leaves the browser alone; `--help` lists it all.
+- Updating is the same command: `@latest` makes npx check for a newer release
+  on every start, so a restart is an upgrade. (Without it npx may reuse the
+  copy it cached last time.)
+- `--port 8000` picks another port; `--no-open` leaves the browser alone;
+  `--help` lists it all.
 
 ### Run with Docker
 

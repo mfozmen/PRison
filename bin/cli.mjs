@@ -15,7 +15,7 @@ export function configDir(env, platform, home) {
   return join(env.XDG_CONFIG_HOME || join(home, ".config"), "prison");
 }
 
-const HELP = `Usage: npx @mfozmen/prison [options]
+const HELP = `Usage: npx @mfozmen/prison@latest [options]
 
 Starts PRison on this machine and opens it in your browser.
 

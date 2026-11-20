@@ -34,7 +34,7 @@ import {
   MERGE_CONFLICT_LABEL,
 } from "@/lib/suggest";
 import { PrList } from "./PrList";
-import { NextMove, type NextMoveItem } from "./NextMove";
+import { NextMove, SIZE, type NextMoveItem } from "./NextMove";
 import { PrRow } from "./PrRow";
 import { AwaitingDetail } from "./AwaitingDetail";
 import { reminderText } from "@/lib/reminder";
@@ -42,15 +42,11 @@ import {
   reviewMinutes, minutesLabel, sizeTone, stuckMinutes,
   REPLY_MINUTES, MERGE_MINUTES, TIME_BUDGETS, type TimeBudget,
 } from "@/lib/estimate";
-import { SIZE } from "./NextMove";
 import { SnoozeMenu, SnoozedFold } from "./Snooze";
 import { limitState, limitLabel, parseLimits, type Limits } from "@/lib/limits";
 import { WeekCard } from "./WeekCard";
 import type { ReviewFact } from "@/lib/week";
 
-// The look back is asked once in this long per scope, not on every refresh.
-const WEEK_TTL_MS = 12 * 3_600_000;
-const WEEK_KEY = "prison.week";
 import { isSnoozed, parseSnoozes, pruneSnoozes, snoozeFor, type Snoozes, type SnoozeChoice } from "@/lib/snooze";
 import { ClosedPrRow } from "./ClosedPrRow";
 import { ReviewedPrRow } from "./ReviewedPrRow";
@@ -102,6 +98,10 @@ import {
   type ActivityEntry,
 } from "@/lib/activity";
 
+// The look back is asked once in this long per scope, not on every refresh.
+const WEEK_TTL_MS = 12 * 3_600_000;
+const WEEK_KEY = "prison.week";
+
 export interface DashboardProps {
   orgs: Org[];
   login: string;
@@ -135,7 +135,6 @@ const GROUP_BYS: { value: "flat" | "repo" | "check"; label: string }[] = [
   { value: "check", label: "By check" },
 ];
 
-/** "3 PRs · oldest 2d" under a column's count; just the unit when it is empty. */
 /** A review's estimate with the size behind it, so the guess shows its working. */
 function sizeText(
   req: { additions?: number; deletions?: number; changedFiles?: number },
@@ -158,6 +157,7 @@ function scopeQuery(org: string, repo: string, login: string): string {
         : "";
 }
 
+/** "3 PRs · oldest 2d" under a column's count; just the unit when it is empty. */
 function caption(count: number, unit: string, oldest: string | undefined): string {
   return oldest && count > 0 ? `${unit} · oldest ${relativeAge(oldest, new Date())}` : unit;
 }
@@ -331,7 +331,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       const qs = scopeQuery(org, repo, login);
       const run = async () => {
         // A 429 is the hourly point budget, spent — the same wall for every
-        // list, so it is recorded once for the run rather than six times.
+        // list, so it is recorded once for the run rather than once per list.
         let spent: string | null | undefined = undefined;
         // The refresh's price is the sum of its queries; what is left is
         // whatever the last one to reach GitHub saw, which is the smallest.

@@ -5,8 +5,9 @@ import { MY_WEEK_QUERY, myWeekSearch, parseMyWeek } from "@/lib/github/queries";
 import { resolveScope } from "@/lib/github/scope";
 import { readToken, readLogin } from "@/lib/session";
 
-// Fourteen days: this week and the one before it, to compare against.
-const WINDOW_DAYS = 14;
+// This week and the one before it, plus a day: the search takes a UTC date, so
+// the extra day keeps the oldest hours of last week inside it wherever you are.
+const WINDOW_DAYS = 15;
 
 export async function GET(request: Request) {
   const token = await readToken();

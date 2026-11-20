@@ -20,6 +20,8 @@ export interface PrListProps<T> {
   highlighted?: boolean;
   /** Anchor target for the jump links above. */
   id?: string;
+  /** Under the rows, inside the fold: the snoozed items of this queue. */
+  footer?: React.ReactNode;
 }
 
 export type Tone = "success" | "warning" | "danger" | "accent";
@@ -61,6 +63,7 @@ export function PrList<T>({
   caption,
   highlighted,
   id,
+  footer,
 }: PrListProps<T>) {
   // Open, and component state only — never localStorage.
   //
@@ -174,6 +177,7 @@ export function PrList<T>({
               ))}
             </ul>
           )}
+          {footer}
         </div>
       )}
     </section>

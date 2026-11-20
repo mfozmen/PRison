@@ -43,6 +43,8 @@ import {
   REPLY_MINUTES, MERGE_MINUTES, TIME_BUDGETS, type TimeBudget,
 } from "@/lib/estimate";
 import { SIZE } from "./NextMove";
+import { SnoozeMenu, SnoozedFold } from "./Snooze";
+import { isSnoozed, parseSnoozes, pruneSnoozes, snoozeFor, type Snoozes, type SnoozeChoice } from "@/lib/snooze";
 import { ClosedPrRow } from "./ClosedPrRow";
 import { ReviewedPrRow } from "./ReviewedPrRow";
 import { ArchiveSection } from "./ArchiveSection";
@@ -253,6 +255,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const [skipped, setSkipped] = useState<string[]>([]);
   // How long the user said they have; null ("Any") is the longest wait first.
   const [timeBudget, setTimeBudget] = useState<TimeBudget>(null);
+  // Items put off until a time or until they change; see lib/snooze.
+  const [snoozes, setSnoozes] = useState<Snoozes>({});
   const [closedVisible, setClosedVisible] = useState(ARCHIVE_PAGE_SIZE);
   // Same shape as the closed history: a look-back list, so it starts collapsed
   // and reveals a page at a time.
@@ -581,6 +585,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     const storedClosedOpen = localStorage.getItem("prison.closedOpen");
     const storedReviewedOpen = localStorage.getItem("prison.reviewedOpen");
     const storedTimeBudget = localStorage.getItem("prison.timeBudget");
+    const storedSnoozes = localStorage.getItem("prison.snoozes");
     const storedActivity = localStorage.getItem(ACTIVITY_KEY);
     // Refs, not state: the detection effect reads them, and a restored
     // snapshot must be in place before the first fetch lands or that fetch
@@ -638,6 +643,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       }
       const budgetChoice = TIME_BUDGETS.find((b) => b !== null && String(b) === storedTimeBudget);
       if (budgetChoice) setTimeBudget(budgetChoice);
+      setSnoozes(parseSnoozes(storedSnoozes));
       // "blocker" (old value) falls through → stays "flat" (default)
       setTracked(parseTracked(storedTracked));
       setIgnored(parseIgnored(storedIgnored));
@@ -691,6 +697,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     if (!hydrated) return;
     localStorage.setItem("prison.timeBudget", String(timeBudget));
   }, [timeBudget, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.snoozes", JSON.stringify(snoozes));
+  }, [snoozes, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -1036,18 +1047,52 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // make every row you typed past "vanish", then report the lot as news the
   // moment you cleared the box.
   const terms = parseTerms(query);
+
+  // What "it changed" means for each queue: a stuck PR's last push and its
+  // blockers, a review's (re-)request, a thread's last comment, a ready PR's
+  // last push. Any of these moving wakes a snooze early.
+  const stuckMark = (pr: StuckPr) =>
+    [pr.stuckSince, pr.mergeState, pr.reviewDecision, ...pr.failing, ...pr.pending].join("|");
+  const marks = new Map<string, string>([
+    ...visibleStuck.map((pr): [string, string] => [pr.id, stuckMark(pr)]),
+    ...visibleReviews.map((r): [string, string] => [r.id, r.requestedAt]),
+    ...visibleComments.map((c): [string, string] => [c.id, c.commentedAt]),
+    ...visibleReady.map((pr): [string, string] => [pr.id, pr.readySince]),
+  ]);
+  const snoozeNow = new Date();
+  const asleep = (id: string) => isSnoozed(snoozes[id], marks.get(id) ?? "", snoozeNow);
+  // Forget what has woken or left the board, once a load has landed: before
+  // that every list is empty and would wipe the lot.
+  if (lastRefreshedAt) {
+    const pruned = pruneSnoozes(snoozes, marks, snoozeNow);
+    if (Object.keys(pruned).length !== Object.keys(snoozes).length) setSnoozes(pruned);
+  }
+  const snooze = (id: string, choice: SnoozeChoice) =>
+    setSnoozes((prev) => ({ ...prev, [id]: snoozeFor(choice, marks.get(id) ?? "", new Date()) }));
+  const wake = (id: string) =>
+    setSnoozes((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  const foldOf = <T extends { id: string; repo: string; number: number }>(items: T[], title: (t: T) => string) =>
+    items
+      .filter((t) => asleep(t.id))
+      .map((t) => ({ id: t.id, title: title(t), repo: t.repo, number: t.number, snooze: snoozes[t.id] }));
   const shownReady = visibleReady.filter((pr) =>
-    matches(terms, pr.title, pr.repo, pr.number, pr.checkNames),
+    !asleep(pr.id) && matches(terms, pr.title, pr.repo, pr.number, pr.checkNames),
   );
   const shownReviews = visibleReviews.filter((req) =>
-    matches(terms, req.title, req.repo, req.number, req.author),
+    !asleep(req.id) && matches(terms, req.title, req.repo, req.number, req.author),
   );
   const shownStuck = visibleStuck.filter((pr) =>
+    !asleep(pr.id) &&
     // Check names are the useful half here: "which of mine is integration-tests
     // red on" is a question the board can answer and could not be asked.
     matches(terms, pr.title, pr.repo, pr.number, pr.checkNames),
   );
   const shownComments = visibleComments.filter((c) =>
+    !asleep(c.id) &&
     matches(terms, c.preview, c.repo, c.number, c.author, c.path),
   );
   const shownReviewed = sortedReviewed.filter((pr) =>
@@ -1478,6 +1523,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               tone="danger"
               caption={caption(shownStuck.length, "PRs", shownStuck[0]?.stuckSince)}
               description="Your PRs that CI or reviewers are holding back."
+              footer={<SnoozedFold items={foldOf(visibleStuck, (pr) => pr.title)} onWake={wake} />}
               highlighted={nextMove?.tone === "danger"}
               groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
               groupKeys={
@@ -1629,6 +1675,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     marked={nextMove?.id === pr.id}
                     detail={detail}
                     suggestion={suggestStuck(pr)}
+                    aside={<SnoozeMenu title={pr.title} onSnooze={(c) => snooze(pr.id, c)} />}
                   />
                 );
               }}
@@ -1655,6 +1702,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               tone="accent"
               caption={caption(shownReviews.length, "PRs", shownReviews[0]?.requestedAt)}
               description="Teammates blocked until you review."
+              footer={<SnoozedFold items={foldOf(visibleReviews, (r) => r.title)} onWake={wake} />}
               highlighted={nextMove?.tone === "accent"}
               groupBy={groupBy === "repo" ? (req) => req.repo : undefined}
               groupHref={
@@ -1675,6 +1723,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   byline={`@${req.author}`}
                   marked={nextMove?.id === req.id}
                   suggestion={suggestReview(req)}
+                  aside={<SnoozeMenu title={req.title} onSnooze={(c) => snooze(req.id, c)} />}
                   detail={(() => {
                     const minutes = reviewMinutes(req);
                     return minutes === null ? undefined : (
@@ -1708,6 +1757,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               tone="warning"
               caption={caption(shownComments.length, "threads", shownComments[0]?.commentedAt)}
               description="Someone asked you something. Answer or mark seen."
+              footer={<SnoozedFold items={foldOf(visibleComments, (c) => c.preview)} onWake={wake} />}
               highlighted={nextMove?.tone === "warning"}
               groupBy={groupBy === "repo" ? (c) => c.repo : undefined}
               groupHref={
@@ -1727,6 +1777,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   kind="reply"
                   byline={c.author}
                   aside={
+                <span className="flex gap-1.5">
+                <SnoozeMenu title={c.preview} onSnooze={(choice) => snooze(c.id, choice)} />
                 <button
                   type="button"
                   onClick={() =>
@@ -1757,6 +1809,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     </svg>
                   )}
                 </button>
+                </span>
                   }
                   marked={nextMove?.id === c.id}
                   clampTitle
@@ -1812,6 +1865,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               tone="success"
               caption={caption(shownReady.length, "PRs", shownReady[0]?.readySince)}
               description="Approved, green, mergeable. One click each."
+              footer={<SnoozedFold items={foldOf(visibleReady, (pr) => pr.title)} onWake={wake} />}
               highlighted={nextMove?.tone === "success"}
               renderRow={(pr) => (
                 <PrRow
@@ -1824,6 +1878,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                   suggestion={suggestReady(pr)}
                   kind="ready"
                   marked={nextMove?.id === pr.id}
+                  aside={<SnoozeMenu title={pr.title} onSnooze={(c) => snooze(pr.id, c)} />}
                   // A PR promoted here over a red check still says so — muted,
                   // because the user already answered for it, but said: a card
                   // with nothing on it would read as spotlessly green.

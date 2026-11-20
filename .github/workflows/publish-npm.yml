@@ -33,7 +33,9 @@ jobs:
           cache: npm
 
       # Trusted publishing needs npm 11.5.1 or newer; Node 22 ships an older one.
-      - run: npm install -g npm@latest
+      # Pinned: this job holds publish rights, so it runs a known npm, not
+      # whatever is newest on the day.
+      - run: npm install -g npm@11.21.3
 
       - run: npm ci
 

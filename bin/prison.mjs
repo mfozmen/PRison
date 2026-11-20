@@ -6,7 +6,7 @@
 // server on 127.0.0.1, and opens the browser once it answers.
 
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
@@ -43,22 +43,26 @@ if (!existsSync(server)) {
 
 // The secret encrypts the session cookie. Kept, so a restart doesn't sign you out.
 const dir = configDir(process.env, process.platform, homedir());
-mkdirSync(dir, { recursive: true });
+// Yours alone from the moment they exist: the folder 0700, and the secret
+// created 0600 by the same call that writes it, so it is never readable by
+// anyone else in between. (Windows ignores the modes; the folder is in your
+// own profile.)
+mkdirSync(dir, { recursive: true, mode: 0o700 });
 const secretFile = join(dir, "auth-secret");
-if (!existsSync(secretFile)) {
-  writeFileSync(secretFile, randomBytes(32).toString("base64"));
-  try {
-    chmodSync(secretFile, 0o600);
-  } catch {
-    // Windows keeps it under your profile; there is no mode to set.
-  }
+try {
+  writeFileSync(secretFile, randomBytes(32).toString("base64"), { mode: 0o600, flag: "wx" });
+} catch (e) {
+  if (e.code !== "EEXIST") throw e;
 }
 const secret = readFileSync(secretFile, "utf8").trim();
 
 // The GitHub CLI's token, if it is installed and signed in. Read on every
 // start, because it rotates. Never printed.
 let token = "";
-const gh = spawnSync("gh", ["auth", "token"], { encoding: "utf8", shell: process.platform === "win32" });
+// No shell, and run from the config folder: Windows looks for a program in the
+// current directory first, and a gh.exe planted in whatever folder you ran npx
+// from must never be the one handed your session.
+const gh = spawnSync("gh", ["auth", "token"], { encoding: "utf8", cwd: dir });
 if (gh.status === 0) token = gh.stdout.trim();
 
 const url = `http://localhost:${opts.port}`;

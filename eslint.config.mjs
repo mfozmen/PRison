@@ -9,6 +9,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // The assembled npm package: a copy of the build output, not source.
+    "npm-package/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

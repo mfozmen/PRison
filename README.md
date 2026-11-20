@@ -184,8 +184,8 @@ comes from.
 
 ## Getting started
 
-PRison runs on **your own machine** — no third-party app to approve. Docker is
-one command; Node works too.
+PRison runs on **your own machine** — no third-party app to approve. One
+command with Node, or one with Docker.
 
 > [!WARNING]
 > Sign-in mints a session from the host's GitHub credentials (your `gh` CLI token
@@ -194,7 +194,25 @@ one command; Node works too.
 > own access control. **Sign Out** clears your session cookie; it cannot revoke
 > the host's credentials.
 
-### Run with Docker (recommended)
+### Run with Node — one command
+
+With [Node.js](https://nodejs.org) 20 or newer:
+
+```sh
+npx @mfozmen/prison
+```
+
+It starts PRison on http://localhost:7747 and opens it in your browser. Signed
+in to the [GitHub CLI](https://cli.github.com)? You're signed in to PRison too;
+otherwise it asks for a [token](#no-github-cli-paste-a-token). Ctrl+C stops it.
+
+- It listens on this machine only (`127.0.0.1`), never on your network.
+- Its secret and settings live in `~/.config/prison` (`%APPDATA%\prison` on
+  Windows), so a restart keeps you signed in.
+- `npx @mfozmen/prison@latest` runs the newest release; `--port 8000` picks
+  another port; `--no-open` leaves the browser alone; `--help` lists it all.
+
+### Run with Docker
 
 From the published image, no clone needed:
 

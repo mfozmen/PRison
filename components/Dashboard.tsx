@@ -733,13 +733,16 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   useEffect(() => {
     if (!hydrated) return;
     const qs = scopeQuery(selectedOrg, selectedRepo, login);
-    let cached: { qs?: string; at?: number; facts?: ReviewFact[] } = {};
+    let cached: { login?: string; qs?: string; at?: number; facts?: ReviewFact[] } = {};
     try {
       cached = JSON.parse(localStorage.getItem(WEEK_KEY) ?? "{}");
     } catch {
       cached = {};
     }
-    const fresh = cached.qs === qs && typeof cached.at === "number" && Date.now() - cached.at < WEEK_TTL_MS;
+    // Keyed by who as well as where: the all-organizations scope is the same empty
+    // string for every account, and one person must never see another’s reviews.
+    const fresh =
+      cached.login === login && cached.qs === qs && typeof cached.at === "number" && Date.now() - cached.at < WEEK_TTL_MS;
     if (fresh && Array.isArray(cached.facts)) {
       const facts = cached.facts;
       startTransition(() => {
@@ -755,7 +758,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         const body = await r.json();
         const facts = (Array.isArray(body) ? body : []) as ReviewFact[];
         if (!live) return;
-        localStorage.setItem(WEEK_KEY, JSON.stringify({ qs, at: Date.now(), facts }));
+        localStorage.setItem(WEEK_KEY, JSON.stringify({ login, qs, at: Date.now(), facts }));
         setWeek(facts);
         setWeekError(false);
       })

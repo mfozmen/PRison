@@ -61,3 +61,13 @@ describe("Weekly look back", () => {
     expect(await within(await screen.findByRole("region", { name: /this week/i })).findByText(/couldn't load your reviews/i)).toBeInTheDocument();
   });
 });
+
+describe("Weekly look back — whose copy", () => {
+  it("never reads another account's cached week", async () => {
+    localStorage.setItem("prison.week", JSON.stringify({ login: "someone-else", qs: "", at: Date.now(), facts: FACTS }));
+    global.fetch = serve([]);
+    render(<Dashboard orgs={ORGS} login="me" />);
+    await waitFor(() => expect(weekCalls()).toHaveLength(1));
+    expect(JSON.parse(localStorage.getItem("prison.week")!).login).toBe("me");
+  });
+});

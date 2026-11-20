@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.33.0](https://github.com/mfozmen/PRison/compare/v1.32.1...v1.33.0) (2026-11-20)
+
+### Features
+
+* waiting on others, time-aware Next move, snooze, wait limits, weekly look back ([#117](https://github.com/mfozmen/PRison/issues/117)) ([42d506e](https://github.com/mfozmen/PRison/commit/42d506e12bc222e79824d59ee6e3ffe8d7446ac8))
+
 ## [1.32.1](https://github.com/mfozmen/PRison/compare/v1.32.0...v1.32.1) (2026-11-19)
 
 ### Bug Fixes

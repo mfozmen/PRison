@@ -72,7 +72,8 @@ let token = "";
 const gh = spawnSync("gh", ["auth", "token"], { encoding: "utf8", cwd: dir });
 if (gh.status === 0) token = gh.stdout.trim();
 
-const url = `http://localhost:${opts.port}`;
+// The address the server binds, not "localhost": that can resolve to ::1 first.
+const url = `http://127.0.0.1:${opts.port}`;
 
 console.log(`PRison ${pkg.version} — starting on ${url}`);
 console.log(token ? "Signing in with your GitHub CLI token." : "No GitHub CLI token found; paste a token in the browser.");

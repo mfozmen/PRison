@@ -202,7 +202,7 @@ With [Node.js](https://nodejs.org) 20 or newer:
 npx @mfozmen/prison@latest
 ```
 
-It starts PRison on http://localhost:7747 and opens it in your browser. Signed
+It starts PRison on http://127.0.0.1:7747 and opens it in your browser. Signed
 in to the [GitHub CLI](https://cli.github.com)? You're signed in to PRison too;
 otherwise it asks for a [token](#no-github-cli-paste-a-token). Ctrl+C stops it.
 

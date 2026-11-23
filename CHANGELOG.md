@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.35.0](https://github.com/mfozmen/PRison/compare/v1.34.1...v1.35.0) (2026-11-23)
+
+### Features
+
+* replace Next's startup banner with a PRison cell door ([6d0cae1](https://github.com/mfozmen/PRison/commit/6d0cae1f795c3c0c0e696c793d2ceee71e12c38b))
+
+### Bug Fixes
+
+* also swallow the config-load timing line Next 16.4 prints at startup ([c3675c8](https://github.com/mfozmen/PRison/commit/c3675c87d3d11ff4442d7240a02f462472fdb2f3))
+
 ## [1.34.1](https://github.com/mfozmen/prison/compare/v1.34.0...v1.34.1) (2026-11-23)
 
 ## [1.34.0](https://github.com/mfozmen/PRison/compare/v1.33.0...v1.34.0) (2026-11-20)

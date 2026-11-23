@@ -68,6 +68,45 @@ export function serverEnv(base, { dir, secret, port, token }) {
   return env;
 }
 
+/** The startup banner, printed once the server answers. ASCII only, because a
+ * Windows console in a non-UTF-8 code page turns box-drawing characters into
+ * mojibake. Colored only when the caller says the terminal takes it. */
+export function banner({ version, url, token, dir, color = false }) {
+  const fg = (rgb, s) => (color ? `\x1b[38;2;${rgb}m${s}\x1b[39m` : s);
+  const dim = (s) => (color ? `\x1b[2m${s}\x1b[22m` : s);
+  const bold = (s) => (color ? `\x1b[1m${s}\x1b[22m` : s);
+  const slate = (s) => fg("148;163;184", s);
+  const green = (s) => fg("34;197;94", s);
+  const amber = (s) => fg("245;158;11", s);
+  const white = (s) => fg("248;250;252", s);
+
+  // A cell door: bars above and below, `| |` at either side, content inside.
+  const WIDTH = 70;
+  const INNER = WIDTH - 12;
+  const bars = dim(slate("| ".repeat(WIDTH / 2)));
+  const edge = dim(slate("| |   "));
+  const close = dim(slate("   | |"));
+  const blank = edge + " ".repeat(INNER) + close;
+  const row = (leftPlain, left, rightPlain = "", right = "") =>
+    edge + left + " ".repeat(INNER - leftPlain.length - rightPlain.length) + right + close;
+  const line = (label, value) => "     " + dim(slate(label.padEnd(13))) + value;
+
+  const slogan = "The bars are made of merge conflicts.";
+  return [
+    bars,
+    blank,
+    row("P R I S O N", bold(green("P R")) + bold(white(" I S O N")), `v${version}`, dim(`v${version}`)),
+    row(slogan, dim(slogan), "read-only", dim("read-only")),
+    blank,
+    bars,
+    "",
+    line("WARDEN", amber(token ? "GitHub CLI token" : "paste a token in the browser")),
+    line("CELL BLOCK", slate(dir)),
+    line("GATE OPEN", green(url)),
+    line("PAROLE", dim("Ctrl+C")),
+  ].join("\n");
+}
+
 /** The command that opens a URL in the default browser. */
 export function openCommand(platform, url) {
   if (platform === "darwin") return ["open", [url]];

@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { join } from "node:path";
-import { configDir, parseArgs, serverEnv, openCommand, nodeIsSupported } from "./cli.mjs";
+import {
+  configDir, parseArgs, serverEnv, openCommand, nodeIsSupported, banner,
+} from "./cli.mjs";
 
 describe("configDir", () => {
   it("uses %APPDATA% on Windows and ~/.config elsewhere, honouring XDG", () => {
@@ -9,6 +11,37 @@ describe("configDir", () => {
     );
     expect(configDir({}, "darwin", "/Users/a")).toBe(join("/Users/a", ".config", "prison"));
     expect(configDir({ XDG_CONFIG_HOME: "/x" }, "linux", "/home/a")).toBe(join("/x", "prison"));
+  });
+});
+
+describe("banner", () => {
+  const args = {
+    version: "1.34.0",
+    url: "http://127.0.0.1:7747",
+    token: "gh",
+    dir: "/home/a/.config/prison",
+  };
+  const strip = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
+
+  it("shows where it is, how you signed in, where it keeps things, and how to leave", () => {
+    const text = banner(args);
+    expect(text).toContain("P R I S O N");
+    expect(text).toContain("The bars are made of merge conflicts.");
+    expect(text).toContain("v1.34.0");
+    expect(text).toContain(args.url);
+    expect(text).toContain(args.dir);
+    expect(text).toContain("GitHub CLI token");
+    expect(text).toContain("Ctrl+C");
+  });
+
+  it("asks for a token when the GitHub CLI has none", () => {
+    expect(banner({ ...args, token: "" })).toContain("paste a token in the browser");
+  });
+
+  it("keeps every box line the same width; color only adds escape codes", () => {
+    const plain = banner(args);
+    expect(new Set(plain.split("\n").slice(0, 6).map((l) => l.length))).toEqual(new Set([70]));
+    expect(strip(banner({ ...args, color: true }))).toBe(plain);
   });
 });
 

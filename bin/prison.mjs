@@ -12,7 +12,7 @@ import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
-  configDir, parseArgs, serverEnv, openCommand, nodeIsSupported, MIN_NODE,
+  configDir, parseArgs, serverEnv, openCommand, nodeIsSupported, MIN_NODE, banner,
 } from "./cli.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -75,10 +75,16 @@ if (gh.status === 0) token = gh.stdout.trim();
 // The address the server binds, not "localhost": that can resolve to ::1 first.
 const url = `http://127.0.0.1:${opts.port}`;
 
-console.log(`PRison ${pkg.version} — starting on ${url}`);
-console.log(token ? "Signing in with your GitHub CLI token." : "No GitHub CLI token found; paste a token in the browser.");
-console.log(`Config: ${dir}`);
-console.log("Press Ctrl+C to stop.");
+// Next prints its own startup banner ("Next.js ...", "- Local:", "Ready in")
+// through console.log as the server listens. Swallow that burst; ours goes out
+// once the first request answers, and console.log is put back right after.
+// Nothing but that banner is logged in this window; errors use console.error.
+const log = console.log;
+const NEXT_BANNER = /Next\.js \d|^\s*- (Local|Network|Debugger port|Environments):|Ready in /;
+console.log = (...args) => {
+  if (typeof args[0] === "string" && NEXT_BANNER.test(args[0])) return;
+  log(...args);
+};
 
 // Open the browser once the server answers, not before: a tab that loads into
 // "connection refused" looks like a broken install.
@@ -88,7 +94,14 @@ const waitAndOpen = async () => {
     try {
       const res = await fetch(url, { redirect: "manual" });
       if (res.status > 0) {
-        console.log(`Ready: ${url}`);
+        console.log = log;
+        log(banner({
+          version: pkg.version,
+          url,
+          token,
+          dir,
+          color: Boolean(process.stdout.isTTY && process.stdout.hasColors?.()),
+        }));
         if (opts.open) {
           const [cmd, args] = openCommand(process.platform, url);
           spawn(cmd, args, { stdio: "ignore", detached: true }).on("error", () => {}).unref();
@@ -100,6 +113,7 @@ const waitAndOpen = async () => {
     }
     await new Promise((r) => setTimeout(r, 300));
   }
+  console.log = log;
   console.error(`PRison didn't answer on ${url} within a minute. Is the port in use? Try --port.`);
 };
 // The server runs in this process, not a child of it: however this command

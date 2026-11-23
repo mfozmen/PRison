@@ -13,6 +13,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   configDir, parseArgs, serverEnv, openCommand, nodeIsSupported, MIN_NODE, banner,
+  isNextStartupLog,
 } from "./cli.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -80,9 +81,8 @@ const url = `http://127.0.0.1:${opts.port}`;
 // once the first request answers, and console.log is put back right after.
 // Nothing but that banner is logged in this window; errors use console.error.
 const log = console.log;
-const NEXT_BANNER = /Next\.js \d|^\s*- (Local|Network|Debugger port|Environments):|Ready in /;
 console.log = (...args) => {
-  if (typeof args[0] === "string" && NEXT_BANNER.test(args[0])) return;
+  if (typeof args[0] === "string" && isNextStartupLog(args[0])) return;
   log(...args);
 };
 

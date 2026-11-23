@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import {
-  configDir, parseArgs, serverEnv, openCommand, nodeIsSupported, banner,
+  configDir, parseArgs, serverEnv, openCommand, nodeIsSupported, banner, isNextStartupLog,
 } from "./cli.mjs";
 
 describe("configDir", () => {
@@ -42,6 +42,26 @@ describe("banner", () => {
     const plain = banner(args);
     expect(new Set(plain.split("\n").slice(0, 6).map((l) => l.length))).toEqual(new Set([70]));
     expect(strip(banner({ ...args, color: true }))).toBe(plain);
+  });
+});
+
+describe("isNextStartupLog", () => {
+  it("recognises the lines Next prints about its own startup", () => {
+    for (const line of [
+      "✓ Next.js 16.4.6",
+      "- Local:         http://127.0.0.1:7747",
+      "- Network:       http://127.0.0.1:7747",
+      "- Environments: .env.local",
+      "✓ Ready in 0ms",
+      "✓ Running next.config took 7ms",
+    ]) {
+      expect(isNextStartupLog(line)).toBe(true);
+    }
+  });
+
+  it("leaves ordinary logs alone", () => {
+    expect(isNextStartupLog("Ready to serve requests")).toBe(false);
+    expect(isNextStartupLog("✓ Compiled successfully")).toBe(false);
   });
 });
 

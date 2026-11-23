@@ -68,6 +68,15 @@ export function serverEnv(base, { dir, secret, port, token }) {
   return env;
 }
 
+/** True for the lines Next prints about its own startup, which PRison replaces
+ * with its banner: the version line, the URLs, "Ready in", and the config-load
+ * timing newer Next versions add after it. */
+export function isNextStartupLog(line) {
+  return /Next\.js \d|^\s*- (Local|Network|Debugger port|Environments):|Ready in |Running .* took \d/.test(
+    line,
+  );
+}
+
 /** The startup banner, printed once the server answers. ASCII only, because a
  * Windows console in a non-UTF-8 code page turns box-drawing characters into
  * mojibake. Colored only when the caller says the terminal takes it. */

@@ -1489,9 +1489,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     </div>
   );
   // Folds a whole side of the board, like the history panels' headers do.
-  const sideToggle = (key: string, title: string) => {
+  const sideToggle = (key: string, title: string, count?: number) => {
     const open = !foldedSides.includes(key);
     return (
+      <>
       <button
         type="button"
         aria-expanded={open}
@@ -1515,6 +1516,33 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         </svg>
         {title}
       </button>
+      {/* Folded, the columns' big numbers are gone, so the header carries the total. */}
+      {!open && count !== undefined && (
+        <span
+          data-testid={`side-${key}-count`}
+          className="rounded-full bg-border px-2 py-px text-xs font-medium normal-case tracking-normal tabular-nums text-muted"
+        >
+          {count}
+        </span>
+      )}
+      </>
+    );
+  };
+  // A folded side still says when one of its lists failed to load, the same
+  // as a folded history panel does.
+  const foldedErrors = (errors: (string | null)[]) => {
+    const failed = errors.filter(Boolean);
+    if (budgetSpent !== undefined || failed.length === 0) return null;
+    return (
+      <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+        <span>{failed.join(" · ")}</span>
+        <button
+          onClick={() => fetchData(selectedOrg, selectedRepo)}
+          className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+        >
+          Retry
+        </button>
+      </div>
     );
   };
   return (
@@ -1770,13 +1798,13 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             column, so the queue a PR belongs to never changes with the view. */}
         <section aria-labelledby="others-heading" className="flex flex-col gap-4">
           <div className="flex items-center gap-3">
-            <h2 id="others-heading" className="text-xs font-semibold tracking-[0.1em] text-foreground">
-              {sideToggle("others", "OTHERS' PRS")}
+            <h2 id="others-heading" className="flex items-center gap-2 text-xs font-semibold tracking-[0.1em] text-foreground">
+              {sideToggle("others", "OTHERS' PRS", shownReviews.length + shownComments.filter((c) => c.viewerStarted).length)}
             </h2>
             <span aria-hidden="true" className="h-px flex-1 bg-border" />
             <span className="text-[13px] text-muted">Teammates wait on you. Clear these first</span>
           </div>
-          {!foldedSides.includes("others") && (
+          {foldedSides.includes("others") ? foldedErrors([reviewError]) : (
           <div id="side-others" className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
             <div className="flex flex-col gap-3">
               {budgetSpent === undefined && reviewError && (
@@ -1847,13 +1875,13 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         </section>
         <section aria-labelledby="mine-heading" className="flex flex-col gap-4 pt-3">
           <div className="flex items-center gap-3">
-            <h2 id="mine-heading" className="text-xs font-semibold tracking-[0.1em] text-muted">
-              {sideToggle("mine", "YOUR PRS")}
+            <h2 id="mine-heading" className="flex items-center gap-2 text-xs font-semibold tracking-[0.1em] text-muted">
+              {sideToggle("mine", "YOUR PRS", shownStuck.length + shownComments.filter((c) => !c.viewerStarted).length + shownAwaiting.length + shownReady.length)}
             </h2>
             <span aria-hidden="true" className="h-px flex-1 bg-border" />
             <span className="text-[13px] text-muted">Your own work, once nobody waits on you</span>
           </div>
-          {!foldedSides.includes("mine") && (
+          {foldedSides.includes("mine") ? foldedErrors([stuckError, commentsError, awaitingError, readyError]) : (
           <div id="side-mine" className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="flex flex-col gap-3">
               {budgetSpent === undefined && stuckError && (
@@ -2150,6 +2178,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 description="Approved, green, mergeable. One click each."
                 footer={<SnoozedFold items={foldOf(visibleReady, (pr) => pr.title)} onWake={wake} />}
                 highlighted={nextMove?.tone === "success"}
+                groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
+                groupHref={
+                  groupBy === "repo"
+                    ? (repo) => `https://github.com/${repo}`
+                    : undefined
+                }
                 renderRow={(pr) => (
                   <PrRow
                     title={pr.title}
@@ -2193,15 +2227,15 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           </div>
           )}
         </section>
-        {/* History: looking back, not work to do, so it stays below the work and
-            quieter than the columns above on purpose. */}
-        <section aria-labelledby="history-heading" className="flex flex-col gap-4 pt-3">
+        {/* Insights: how the week went, numbers rather than PRs. Same two
+            sides as the board, one week picker for both. */}
+        <section aria-labelledby="insights-heading" className="flex flex-col gap-4 pt-3">
           <div className="flex items-center gap-3">
-            <h2 id="history-heading" className="text-xs font-semibold tracking-[0.1em] text-muted">
-              {sideToggle("history", "HISTORY")}
+            <h2 id="insights-heading" className="flex items-center gap-2 text-xs font-semibold tracking-[0.1em] text-muted">
+              {sideToggle("insights", "INSIGHTS")}
             </h2>
             <span aria-hidden="true" className="h-px flex-1 bg-border" />
-            <span className="text-[13px] text-muted">Looking back, not work to do</span>
+            <span className="text-[13px] text-muted">How your week went</span>
             <div role="group" aria-label="Which week" className="flex rounded-full border border-border bg-background p-[3px]">
               {(["This week", "Last week"] as const).map((label, i) => (
                 <button
@@ -2218,12 +2252,28 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               ))}
             </div>
           </div>
+          {!foldedSides.includes("insights") && (
+          <div id="side-insights" className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+            <WeekCard facts={week} now={new Date()} error={weekError} offset={weekOffset} />
+            <MergedCard facts={merged} now={new Date()} error={mergedError} offset={weekOffset} />
+          </div>
+          )}
+        </section>
+        {/* History: looking back, not work to do, so it stays below the work and
+            quieter than the columns above on purpose. */}
+        <section aria-labelledby="history-heading" className="flex flex-col gap-4 pt-3">
+          <div className="flex items-center gap-3">
+            <h2 id="history-heading" className="flex items-center gap-2 text-xs font-semibold tracking-[0.1em] text-muted">
+              {sideToggle("history", "HISTORY", shownReviewed.length + shownClosed.length)}
+            </h2>
+            <span aria-hidden="true" className="h-px flex-1 bg-border" />
+            <span className="text-[13px] text-muted">Looking back, not work to do</span>
+          </div>
           {/* Two sides, matching the board above: your reviewing on the left,
-              your own PRs on the right. One week picker for both. */}
-          {!foldedSides.includes("history") && (
+              your own PRs on the right. */}
+          {foldedSides.includes("history") ? foldedErrors([reviewedError, closedError]) : (
           <div id="side-history" className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
             <div className="flex flex-col gap-4">
-              <WeekCard facts={week} now={new Date()} error={weekError} offset={weekOffset} />
               <ArchiveSection
                 title="Recently reviewed"
                 id="recently-reviewed"
@@ -2271,7 +2321,6 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               </ArchiveSection>
             </div>
             <div className="flex flex-col gap-4">
-              <MergedCard facts={merged} now={new Date()} error={mergedError} offset={weekOffset} />
               <ArchiveSection
                 title="Recently merged / closed"
                 id="recently-closed"

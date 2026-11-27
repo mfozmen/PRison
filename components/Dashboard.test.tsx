@@ -1722,7 +1722,7 @@ describe("Dashboard", () => {
       fireEvent.click(screen.getByRole("button", { name: /^by check$/i }));
       // STUCK_PR has failing: ["build"] → "build" check → 1 group header
       // Review list is flat in check mode → 0 group headers from review
-      // Ready list is always flat → 0 group headers from ready
+      // Ready list groups only by repo → 0 group headers from ready
       await waitFor(() =>
         expect(screen.getAllByTestId("group-header")).toHaveLength(1),
       );
@@ -1742,9 +1742,11 @@ describe("Dashboard", () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: /^by repo$/i }));
+      // stuck's two repos, plus Ready to merge's acme/d
       await waitFor(() =>
-        expect(screen.getAllByTestId("group-header")).toHaveLength(2),
+        expect(screen.getAllByTestId("group-header")).toHaveLength(3),
       );
+      expect(screen.getByRole("link", { name: /open acme\/d on github/i })).toBeInTheDocument();
       const link = screen.getByRole("link", {
         name: /open acme\/b on github/i,
       });
@@ -3257,8 +3259,11 @@ describe("Dashboard — awaiting your reply", () => {
     await waitFor(() =>
       expect(screen.getByTestId("closed-count-badge")).toHaveTextContent("3"),
     );
+    expect(screen.queryByTestId("side-history-count")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "HISTORY" }));
     expect(screen.queryByTestId("closed-count-badge")).not.toBeInTheDocument();
+    // Folded, the header carries the total: 3 closed + 0 reviewed.
+    expect(screen.getByTestId("side-history-count")).toHaveTextContent("3");
     await waitFor(() =>
       expect(localStorage.getItem("prison.foldedSides")).toBe('["history"]'),
     );
@@ -3268,6 +3273,18 @@ describe("Dashboard — awaiting your reply", () => {
     await waitFor(() => expect(toggle).toHaveAttribute("aria-expanded", "false"));
     fireEvent.click(toggle);
     expect(await screen.findByTestId("closed-count-badge")).toBeInTheDocument();
+  });
+
+  it("still shows a load error for a folded side", async () => {
+    localStorage.setItem("prison.foldedSides", '["mine"]');
+    global.fetch = vi.fn((url: string) =>
+      url.includes("stuck")
+        ? Promise.reject(new Error("network error"))
+        : Promise.resolve({ ok: true, headers: { get: () => null }, json: () => Promise.resolve([]) }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText(/failed to load/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "YOUR PRS" })).toHaveAttribute("aria-expanded", "false");
   });
 
   it("hydrates the closed section open from localStorage", async () => {

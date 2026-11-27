@@ -98,7 +98,7 @@ export function Header({
     <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
       {/* Same column as the board under it, so the logo and the first card
           share a left edge. The controls wrap rather than run off a phone. */}
-      <div className="mx-auto flex max-w-[1424px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-6 lg:px-8">
+      <div className="mx-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-6 lg:px-8">
       <div className="flex items-center gap-2.5">
         <span
           aria-hidden="true"

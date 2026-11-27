@@ -910,15 +910,19 @@ export function parseMyWeek(raw: any, viewerLogin: string): ReviewFact[] {
 }
 
 // Two weeks of the viewer's own merged PRs, for the authoring half of the look
-// back: how long each took and when someone first reviewed it.
+// back: how long each took and when someone first reviewed it. Reviews come
+// oldest first, so the first ten hold the first one by anyone else; keeping
+// them to ten pays for a page of 100 PRs at the price of 50 with twenty.
+// shortcut: one page, so past 100 merges in 15 days the stats cover the latest
+// 100 only; page through the search if that ever happens.
 export const MY_MERGED_QUERY = `
   query($q: String!) {
-    search(query: $q, type: ISSUE, first: 50) {
+    search(query: $q, type: ISSUE, first: 100) {
       nodes { ... on PullRequest {
         id title url number createdAt mergedAt
         repository { nameWithOwner }
         author { login }
-        reviews(first: 20) { nodes { submittedAt author { login } } }
+        reviews(first: 10) { nodes { submittedAt author { login } } }
       } }
     }
       ${RATE_LIMIT}

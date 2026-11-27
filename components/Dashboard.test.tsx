@@ -2972,6 +2972,23 @@ describe("Dashboard — awaiting your reply", () => {
     ).toBeInTheDocument();
   });
 
+  // A reply owed on a stuck PR is often what holds it, so each side points at
+  // the other.
+  it("tells a stuck PR how many comments wait on your reply, linking to them", async () => {
+    global.fetch = fetchWithComments([COMMENT, REVIEW_COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    const stuck = document.getElementById("stuck-on-checks")!;
+    const link = await within(stuck).findByRole("link", { name: /2 comments wait on your reply/i });
+    expect(link).toHaveAttribute("href", "#comments-awaiting-reply");
+  });
+
+  it("marks a comment whose PR is stuck", async () => {
+    global.fetch = fetchWithComments([COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    const column = document.getElementById("comments-awaiting-reply")!;
+    expect(await within(column).findByText("PR stuck")).toBeInTheDocument();
+  });
+
   it("renders a comment preview and links straight to the comment anchor", async () => {
     global.fetch = fetchWithComments([COMMENT]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
@@ -4692,15 +4709,15 @@ describe("Dashboard — tier layout", () => {
     global.fetch = okFetch();
   });
 
-  // Teammates' PRs, then your own PRs by stage — held back, waiting on a
-  // reviewer, ready, comments on them — then the histories.
+  // Teammates' PRs, then your own PRs by stage — held back, the comments that
+  // often hold them, waiting on a reviewer, ready last — then the histories.
   const SECTIONS = [
     "waiting-on-your-review",
     "replies-on-their-prs",
     "stuck-on-checks",
+    "comments-awaiting-reply",
     "waiting-on-others",
     "ready-to-merge",
-    "comments-awaiting-reply",
     "recently-reviewed",
     "recently-closed",
   ];

@@ -167,7 +167,9 @@ Both live in this browser and cost nothing from GitHub.
   `acme 482` finds that PR. `/` jumps to it.
 - **Scope** to all of it, your personal account, one organization, or one
   repository. The scope narrows the GitHub search itself.
-- **Everything folds** by its header, keeping its count, for the sitting.
+- **Everything folds** by its header, keeping its count, for the sitting. The
+  three sections (**Others' PRs**, **Your PRs**, **History**) fold whole, and
+  stay folded across reloads.
 
 ### GitHub's API budget
 

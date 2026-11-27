@@ -3251,6 +3251,25 @@ describe("Dashboard — awaiting your reply", () => {
     );
   });
 
+  it("folds a whole board side and remembers it", async () => {
+    global.fetch = fetchWithClosed(makeClosed(3));
+    const { unmount } = render(<Dashboard orgs={ORGS} login="testuser" />);
+    await waitFor(() =>
+      expect(screen.getByTestId("closed-count-badge")).toHaveTextContent("3"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "HISTORY" }));
+    expect(screen.queryByTestId("closed-count-badge")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(localStorage.getItem("prison.foldedSides")).toBe('["history"]'),
+    );
+    unmount();
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    const toggle = await screen.findByRole("button", { name: "HISTORY" });
+    await waitFor(() => expect(toggle).toHaveAttribute("aria-expanded", "false"));
+    fireEvent.click(toggle);
+    expect(await screen.findByTestId("closed-count-badge")).toBeInTheDocument();
+  });
+
   it("hydrates the closed section open from localStorage", async () => {
     localStorage.setItem("prison.closedOpen", "true");
     global.fetch = fetchWithClosed(makeClosed(2));

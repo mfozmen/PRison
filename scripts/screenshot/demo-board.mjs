@@ -26,7 +26,7 @@ const stuck = [
     isDraft: false, blocked: true, readyViaBlocked: false,
     // DIRTY alongside a red check, which is the pair the board used to get
     // wrong: the conflict is the harder blocker and was the one being hidden.
-    reviewDecision: "APPROVED", mergeState: "DIRTY", stuckSince: ago(30),
+    reviewDecision: "APPROVED", mergeState: "DIRTY", stuckSince: ago(30), approvedBy: ["carol"],
   },
   {
     id: "PR_s2", title: "Cache the org lookup for the duration of a request",
@@ -34,7 +34,7 @@ const stuck = [
     failingChecks: 0, pendingChecks: 2, failing: [], pending: ["e2e", "deploy-preview"],
     checkNames: ["build", "e2e", "deploy-preview"],
     isDraft: false, blocked: false, readyViaBlocked: false,
-    reviewDecision: "REVIEW_REQUIRED", mergeState: "", stuckSince: ago(5),
+    reviewDecision: "REVIEW_REQUIRED", mergeState: "", stuckSince: ago(5), approvedBy: [],
   },
   {
     id: "PR_s3", title: "Split the importer into a queue worker",
@@ -42,7 +42,7 @@ const stuck = [
     failingChecks: 0, pendingChecks: 0, failing: [], pending: [],
     checkNames: ["build"],
     isDraft: true, blocked: false, readyViaBlocked: false,
-    reviewDecision: "", mergeState: "", stuckSince: ago(2),
+    reviewDecision: "", mergeState: "", stuckSince: ago(2), approvedBy: [],
   },
   {
     id: "PR_s4", title: "Fix the timezone drift in scheduled reports",
@@ -50,7 +50,7 @@ const stuck = [
     failingChecks: 2, pendingChecks: 0, failing: ["lint", "typecheck"], pending: [],
     checkNames: ["build", "lint", "typecheck"],
     isDraft: false, blocked: false, readyViaBlocked: false,
-    reviewDecision: "CHANGES_REQUESTED", mergeState: "", stuckSince: ago(96),
+    reviewDecision: "CHANGES_REQUESTED", mergeState: "", stuckSince: ago(96), approvedBy: [],
   },
 ];
 
@@ -76,12 +76,15 @@ const ready = [
   {
     id: "PR_m1", title: "Document the deploy rollback steps",
     url: "https://github.com/acme/web/pull/58", repo: "acme/web", number: 58,
-    readySince: ago(20), needsUpdate: false, checkNames: ["build"], viaBlocked: false,
+    readySince: ago(20), needsUpdate: false, checkNames: ["build"], viaBlocked: false, approvedBy: ["alice", "dave"],
   },
   {
     id: "PR_m2", title: "Bump the client library to 3.2",
     url: "https://github.com/initech/worker/pull/15", repo: "initech/worker", number: 15,
     readySince: ago(4), needsUpdate: true, checkNames: ["build", "lint"], viaBlocked: false,
+    // Green and mergeable where no review is required: the case the approver
+    // line exists for.
+    approvedBy: [],
   },
 ];
 

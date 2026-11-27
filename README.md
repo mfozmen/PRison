@@ -17,25 +17,30 @@ anything back to GitHub.
 **[Controls](#controls)** ·
 **[Docs](#documentation)**
 
-![The PRison dashboard in dark mode. A Next move card on top points at the oldest item, 4d and stalled, a PR stuck on lint and typecheck, with an I have choice of 5 min, 15 min, 1 hour or Any, a Re-run failed checks button and Skip. Under it, 12 things want you sits beside grouping and draft toggles, a search box and Refresh. Five columns follow, each with a big count and its oldest wait. The first row is your own PRs: Stuck on checks, Waiting on others — where each PR lists its reviewers and where they stand, with a Copy reminder button — and Ready to merge. The second row is what waits on you: Waiting on your review, with a size chip like ~15 min · 84 lines · 3 files on each row, and Awaiting your reply. Every row has a moon to snooze it. At the foot, History opens with a This week card — median wait before your review, reviews you gave, PRs you reviewed, the longest wait — and a bar per day, above the folded Recently reviewed and Recently merged / closed panels](docs/screenshot.png)
+![The PRison dashboard in dark mode. A Next move card on top points at a review a teammate is blocked on, 2d and slowing, with an I have choice of 5 min, 15 min, 1 hour or Any, a Review to unblock alice button and Skip. Under it, 12 things want you sits beside grouping and draft toggles, a search box and Refresh. The board is in two sections. Others' PRs comes first: Waiting on your review, with a size chip like ~15 min · 84 lines · 3 files on each row, beside Replies on their PRs. Your PRs follows, in stage order, each of its rows saying who approved it or No approvals yet: Stuck on checks, where a row can say 1 comment waits on your reply; Comments on your PRs, marking a comment whose PR is stuck; Waiting on others, where each PR lists its reviewers and where they stand, with a Copy reminder button; and Ready to merge last. Every row has a moon to snooze it. At the foot, History is split the same way, under one This week / Last week picker: Your reviewing with its tiles and a bar per day above the folded Recently reviewed panel, and Your merged PRs (PRs merged, median open to merge, median wait for a first review, merged with no review) above the folded Recently merged / closed panel](docs/screenshot.png)
 
 ## What it shows
 
-Five columns, oldest first within each, with a **[Next move](#next-move)** card
-above them pointing at the one thing to do first. Left to right, first your own
-PRs by stage, then the queues where someone waits on you:
+Two sections, by whose PR it is, with a **[Next move](#next-move)** card above
+them pointing at the one thing to do first. Teammates' PRs come first: a review
+or reply you owe holds up someone else's work. Oldest first within each column.
 
 | | Column | What's in it |
 | --- | --- | --- |
+| **Others' PRs** | **Waiting on your review** | A teammate is blocked on you; each row has a rough [review time](#next-move). |
+| | **Replies on their PRs** | You left a review comment on their PR and they answered. [More](#comments-and-reviews) |
 | **Your PRs** | **Stuck on checks** | Held back by CI, a conflict or a branch rule, with the reason on each row. |
+| | **Comments on your PRs** | Review comments on your PRs where the last word isn't yours. Next to Stuck, since a reply owed is often what holds a PR. [More](#comments-and-reviews) |
 | | **Waiting on others** | Waiting on somebody else's review: who, and how long. [More](#waiting-on-others) |
-| | **Ready to merge** | Approved, green, mergeable. An out-of-date branch still counts, with **Needs update**. |
-| **Waiting on you** | **Waiting on your review** | A teammate is blocked on you; each row has a rough [review time](#next-move). |
-| | **Awaiting your reply** | Review comments where the last word isn't yours — on your PRs and on the threads you raised. [More](#comments-and-reviews) |
+| | **Ready to merge** | Green and mergeable, the last step. An out-of-date branch still counts, with **Needs update**. |
 
-Underneath, quieter on purpose, **History**: a [weekly look back](#looking-back)
-at your reviewing, the PRs you reviewed (with your verdict, and **Updated
-since** when the author pushed after it), and your merged or closed PRs.
+Your PRs in Stuck and Ready say who approved them (**Approved by @alice**) or
+**No approvals yet**, also where no approval is required.
+
+Underneath, quieter on purpose, **History**, split the same way: your
+[reviewing](#looking-back) and the PRs you reviewed (with your verdict, and
+**Updated since** when the author pushed after it) on one side, your merged PRs
+and your merged or closed list on the other.
 
 A PR is only ever in one column. Columns stack on a narrow screen.
 
@@ -43,9 +48,10 @@ A PR is only ever in one column. Columns stack on a narrow screen.
 
 ### Next move
 
-The card on top points at the longest wait across your four queues, says why
-(the red checks, the conflict, who is blocked), and puts its one action a click
-away.
+The card on top points at the longest wait on a teammate's PR — a review, or a
+reply on a thread you started there — and only when none is left, the longest
+wait on your own. It says why (the red checks, the conflict, who is blocked),
+and puts its one action a click away.
 
 - **Pace.** The time block reads **moving** under a day, **slowing** up to
   three, **stalled** after — in colour, in words and on a three-step meter.
@@ -84,6 +90,11 @@ person. One with any other blocker stays stuck. These PRs are not counted in
 - **A reaction or Mark as seen** dismisses a thread until someone replies.
 - **Bots** write most review comments, so they stay hidden unless you turn
   them on.
+- **Split by whose PR it is.** Answers on threads you started on a teammate's
+  PR sit under Others' PRs; comments on your own PRs sit under Your PRs.
+- **Comments and stuck PRs point at each other.** A stuck row says **2 comments
+  wait on your reply** and jumps to them; a comment on a stuck PR is marked
+  **PR stuck**.
 
 ### Checks: tracked and ignored
 
@@ -133,11 +144,15 @@ Both live in this browser and cost nothing from GitHub.
 
 ### Looking back
 
-- **This week**, at the top of History: the median time people waited for your
-  review, how many reviews you gave and on how many PRs, and the one wait that
-  ran longest with a link to it — each beside the week before, plus a bar per
-  day. A mirror, not a score: no streaks, nothing about anyone else. It asks
-  GitHub once every half day, not on every refresh.
+- **Your reviewing**: the median time people waited for your review, how many
+  reviews you gave and on how many PRs, and the one wait that ran longest with
+  a link to it — each beside the week before, plus a bar per day.
+- **Your merged PRs**: how many you merged, the median time from open to merge
+  and to a first review, and how many went in with **no review** (linked) —
+  plus a bar per day.
+- One **This week / Last week** picker drives both. A mirror, not a score: no
+  streaks, nothing about anyone else. Each asks GitHub once every half day, not
+  on every refresh, and says so in a sentence when there is nothing to show.
 - **Recently reviewed** — PRs you reviewed, worded as what you did (**You
   requested changes**, **You approved**), with **Updated since** and a **See
   new commits** link when the author has answered.
@@ -172,7 +187,7 @@ signed in as you, so PRison is open about it:
 | --- | --- |
 | The new Waiting on others list | 2 points per refresh |
 | Review time estimates, snooze, wait limits | nothing extra |
-| The weekly look back | 1 point, twice a day at most |
+| The weekly look back | 2 points (reviews and merged PRs), twice a day at most |
 
 ### Fourteen themes
 

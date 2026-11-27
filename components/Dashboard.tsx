@@ -1178,12 +1178,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   const emptyText = (base: string) =>
     terms.length > 0 ? `Nothing here matches “${query.trim()}”` : base;
 
-  // Everything on the four queues, oldest wait first: the Next move strip
-  // points at the head of this, Skip steps along it. Built from the shown
-  // lists, so a search or the draft filter moves it too.
+  // Everything on the four queues: the Next move strip points at the head of
+  // this, Skip steps along it. Built from the shown lists, so a search or the
+  // draft filter moves it too.
   const owed =
     shownStuck.length + shownReviews.length + shownComments.length + shownReady.length;
-  const allMoves: NextMoveItem[] = sortByAgeAsc(
+  const byAge: NextMoveItem[] = sortByAgeAsc(
     [
       ...shownStuck.map((pr): NextMoveItem => ({
         id: pr.id, title: pr.title, repo: pr.repo, number: pr.number, url: pr.url,
@@ -1221,6 +1221,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     ],
     (item) => item.since,
   );
+  // A review or reply blocks a teammate, so it comes before any of your own
+  // PRs however old they are; oldest first within each half.
+  const blocksOthers = (m: NextMoveItem) => m.tone === "accent" || m.tone === "warning";
+  const allMoves = [...byAge.filter(blocksOthers), ...byAge.filter((m) => !blocksOthers(m))];
   const fitting = timeBudget === null ? allMoves : allMoves.filter((m) => m.minutes <= timeBudget);
   const fits = fitting.length > 0;
   const nextMoves = fits ? fitting : allMoves;
@@ -1580,484 +1584,504 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             Refresh
           </button>
         </div>
-        {/* Two groups, left to right. First your own PRs by stage: held back
-            (stuck), waiting on a reviewer, ready to merge. Then the queues where
-            someone waits on you: a review, a reply. At three columns the first
-            row is your PRs and the second is everyone else's.
+        {/* Two sections, in the order they should be worked. Teammates blocked
+            on you come first: an unanswered review or reply holds up someone
+            else's work, your own PRs only hold up yours. The Next move strip
+            follows the same order.
 
             Columns, not rows: a row is as tall as its tallest cell, and each
             queue grows on its own. Grouping by repo or check happens inside each
             column, so the queue a PR belongs to never changes with the view. */}
-        <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
-          <div className="flex flex-col gap-3">
-            {budgetSpent === undefined && stuckError && (
-              <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-                <span>{stuckError}</span>
-                <button
-                  onClick={() => fetchData(selectedOrg, selectedRepo)}
-                  className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
-                >
-                  Retry
-                </button>
-              </div>
-            )}
-            <PrList
-              title="Stuck on checks"
-              id="stuck-on-checks"
-              items={shownStuck}
-              emptyMessage={emptyText("No PRs stuck on checks 🎉")}
-              keyExtractor={(pr) => pr.id}
-              tone="danger"
-              caption={withLimit(caption(shownStuck.length, "PRs", shownStuck[0]?.stuckSince), limits.stuck)}
-              description="Your PRs that CI or reviewers are holding back."
-              footer={<SnoozedFold items={foldOf(visibleStuck, (pr) => pr.title)} onWake={wake} />}
-              highlighted={nextMove?.tone === "danger"}
-              groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
-              groupKeys={
-                groupBy === "check"
-                  ? (pr) => stuckGroupKeys(pr, tracked, ignored)
-                  : undefined
-              }
-              groupHref={
-                groupBy === "repo"
-                  ? (repo) => `https://github.com/${repo}`
-                  : undefined
-              }
-              renderRow={(pr) => {
-                const hasNames =
-                  pr.failing.length > 0 || pr.pending.length > 0;
-                const totalNames = pr.failing.length + pr.pending.length;
-                // Only truncate when there are more than 4 names total; otherwise
-                // show every name. The "+N more" count is derived from what is
-                // actually rendered so lopsided check lists never hide a chip
-                // without an indicator.
-                const truncate = totalNames > 4;
-                const showFailingNames = truncate
-                  ? pr.failing.slice(0, 2)
-                  : pr.failing;
-                const showPendingNames = truncate
-                  ? pr.pending.slice(0, 2)
-                  : pr.pending;
-                const overflow =
-                  totalNames -
-                  (showFailingNames.length + showPendingNames.length);
-                const awaiting = awaitingOn(pr.repo, pr.checkNames);
-                const hasAwaiting = awaiting.length > 0;
-                // A green PR can still be BLOCKED waiting on a code-owner review;
-                // surface that instead of mislabeling it as pending CI. Colour it
-                // with the repo's status vocabulary: CHANGES_REQUESTED is a negative
-                // signal (danger/red), REVIEW_REQUIRED is merely waiting (warning/amber).
-                const reviewNeeded = needsReview(pr.reviewDecision);
-                const changesRequested =
-                  pr.reviewDecision === "CHANGES_REQUESTED";
-                const reviewChip = reviewNeeded ? (
-                  <span
-                    key="review"
-                    className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
-                      changesRequested
-                        ? "bg-danger/10 text-danger"
-                        : "bg-warning/10 text-warning"
+        <section aria-labelledby="blocking-heading" className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <h2 id="blocking-heading" className="text-xs font-semibold tracking-[0.1em] text-foreground">
+              BLOCKING OTHERS
+            </h2>
+            <span aria-hidden="true" className="h-px flex-1 bg-border" />
+            <span className="text-[13px] text-muted">Teammates wait on you. Clear these first</span>
+          </div>
+          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+            <div className="flex flex-col gap-3">
+              {budgetSpent === undefined && reviewError && (
+                <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+                  <span>{reviewError}</span>
+                  <button
+                    onClick={() => fetchData(selectedOrg, selectedRepo)}
+                    className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+              <PrList
+                title="Waiting on your review"
+                id="waiting-on-your-review"
+                items={shownReviews}
+                emptyMessage={emptyText("No PRs waiting on your review 🎉")}
+                keyExtractor={(req) => req.id}
+                tone="accent"
+                caption={withLimit(caption(shownReviews.length, "PRs", shownReviews[0]?.requestedAt), limits.review)}
+                description="Teammates blocked until you review."
+                footer={<SnoozedFold items={foldOf(visibleReviews, (r) => r.title)} onWake={wake} />}
+                highlighted={nextMove?.tone === "accent"}
+                groupBy={groupBy === "repo" ? (req) => req.repo : undefined}
+                groupHref={
+                  groupBy === "repo"
+                    ? (repo) => `https://github.com/${repo}`
+                    : undefined
+                }
+                renderRow={(req) => (
+                  <PrRow
+                    title={req.title}
+                    repo={req.repo}
+                    number={req.number}
+                    url={req.url}
+                    since={req.requestedAt}
+                    now={new Date()}
+                    draft={req.isDraft}
+                    kind="review"
+                    byline={`@${req.author}`}
+                    marked={nextMove?.id === req.id}
+                    suggestion={suggestReview(req)}
+                    aside={<SnoozeMenu title={req.title} onSnooze={(c) => snooze(req.id, c)} />}
+                    limit={limitState(req.requestedAt, limits.review, limitNow)}
+                    detail={(() => {
+                      const minutes = reviewMinutes(req);
+                      return minutes === null ? undefined : (
+                        <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-semibold leading-[normal] ${SIZE[sizeTone(minutes)]}`}>
+                          {sizeText(req, minutes)}
+                        </span>
+                      );
+                    })()}
+                  />
+                )}
+              />
+            </div>
+            <div className="flex flex-col gap-3">
+              {budgetSpent === undefined && commentsError && (
+                <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+                  <span>{commentsError}</span>
+                  <button
+                    onClick={() => fetchData(selectedOrg, selectedRepo)}
+                    className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+              <PrList
+                title="Awaiting your reply"
+                id="comments-awaiting-reply"
+                items={shownComments}
+                emptyMessage={emptyText("No comments awaiting your reply 🎉")}
+                keyExtractor={(c) => c.id}
+                tone="warning"
+                caption={withLimit(caption(shownComments.length, "threads", shownComments[0]?.commentedAt), limits.reply)}
+                description="Someone asked you something. Answer or mark seen."
+                footer={<SnoozedFold items={foldOf(visibleComments, (c) => c.preview)} onWake={wake} />}
+                highlighted={nextMove?.tone === "warning"}
+                groupBy={groupBy === "repo" ? (c) => c.repo : undefined}
+                groupHref={
+                  groupBy === "repo"
+                    ? (repo) => `https://github.com/${repo}`
+                    : undefined
+                }
+                renderRow={(c) => (
+                  <PrRow
+                    title={c.preview}
+                    repo={c.repo}
+                    number={c.number}
+                    url={c.url}
+                    since={c.commentedAt}
+                    now={new Date()}
+                    suggestion={suggestComment(c)}
+                    kind="reply"
+                    byline={c.author}
+                    aside={
+                  <span className="flex gap-1.5">
+                  <SnoozeMenu title={c.preview} onSnooze={(choice) => snooze(c.id, choice)} />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSeen((prev) => {
+                        const next = { ...prev };
+                        if (isSeen(c, prev)) delete next[c.id];
+                        else next[c.id] = c.commentedAt;
+                        return next;
+                      })
+                    }
+                    aria-label={isSeen(c, seen) ? "Unmark as seen" : "Mark as seen"}
+                    title={isSeen(c, seen) ? "Seen — click to bring it back" : "Mark as seen — hides it until a new reply"}
+                    className={`inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                      isSeen(c, seen)
+                        ? "border-success/40 bg-success/15 text-success hover:bg-success/25"
+                        : "border-border bg-transparent text-muted hover:border-accent hover:text-accent"
                     }`}
                   >
-                    {reviewDecisionLabel(pr.reviewDecision)}
+                    {isSeen(c, seen) ? (
+                      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="m8 12.5 2.5 2.5L16 9.5" />
+                      </svg>
+                    ) : (
+                      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
                   </span>
-                ) : null;
-                const noteSpan = (text: string) => (
-                  <span className="text-sm text-muted">{text}</span>
-                );
-                // Conflicts used to be an either/or with the check chips — a
-                // muted sentence shown only when the PR had no check names at
-                // all. One red check was enough to hide the fact that the branch
-                // will not merge, which is the harder blocker of the two: a
-                // check can go green on its own, a conflict cannot. So it is a
-                // chip like the others, first in the row, in danger's colours.
-                const conflicted = pr.mergeState === "DIRTY";
-                const conflictChip = conflicted ? (
-                  <span
-                    key="conflict"
-                    className="inline-flex items-center gap-1 rounded-md bg-danger/[0.12] px-2 py-0.5 text-xs font-medium text-danger"
+                    }
+                    marked={nextMove?.id === c.id}
+                    limit={limitState(c.commentedAt, limits.reply, limitNow)}
+                    clampTitle
+                    detail={
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        {/* A review body has no file, so without this it would read
+                            as an inline thread whose path failed to load — and the
+                            two are answered in different places. */}
+                        {c.source === "review" && (
+                          <span className="rounded-md bg-border px-1.5 py-0.5 text-xs font-medium text-muted">
+                            Review comment
+                          </span>
+                        )}
+                        {c.source === "conversation" && (
+                          <span className="rounded-md bg-border px-1.5 py-0.5 text-xs font-medium text-muted">
+                            Conversation
+                          </span>
+                        )}
+                        {c.path && (
+                          <span className="min-w-0 truncate font-mono text-xs text-muted">
+                            {c.path}
+                          </span>
+                        )}
+
+                      </span>
+                    }
+                  />
+                )}
+              />
+            </div>
+          </div>
+        </section>
+        <section aria-labelledby="mine-heading" className="flex flex-col gap-4 pt-3">
+          <div className="flex items-center gap-3">
+            <h2 id="mine-heading" className="text-xs font-semibold tracking-[0.1em] text-muted">
+              YOUR PRS
+            </h2>
+            <span aria-hidden="true" className="h-px flex-1 bg-border" />
+            <span className="text-[13px] text-muted">Your own work, once nobody waits on you</span>
+          </div>
+          <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="flex flex-col gap-3">
+              {budgetSpent === undefined && stuckError && (
+                <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+                  <span>{stuckError}</span>
+                  <button
+                    onClick={() => fetchData(selectedOrg, selectedRepo)}
+                    className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
                   >
-                    {MERGE_CONFLICT_LABEL}
-                  </span>
-                ) : null;
-                let detail: React.ReactNode;
-                if (conflicted || hasNames || hasAwaiting || reviewNeeded) {
-                  detail = (
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {conflictChip}
-                      {showFailingNames.map((name, i) =>
-                        checkChip(
-                          pr.repo,
-                          name,
-                          "danger",
-                          `fail-${i}-${name}`,
-                        ),
-                      )}
-                      {showPendingNames.map((name, i) =>
-                        checkChip(
-                          pr.repo,
-                          name,
-                          "warning",
-                          `pend-${i}-${name}`,
-                        ),
-                      )}
-                      {overflow > 0 && (
-                        <span className="text-xs text-muted">
-                          +{overflow} more
-                        </span>
-                      )}
-                      {hasAwaiting &&
-                        awaiting.map(({ name, required }) => (
-                          <CheckChip
-                            key={`await-${name}`}
-                            name={name}
-                            tone={required ? "warning" : "muted"}
-                            ignored={false}
-                            description={
-                              required
-                                ? `Awaiting required check: ${name}`
-                                : `Awaiting: ${name}`
-                            }
-                            onToggleIgnore={() => toggleIgnore(pr.repo, name)}
-                          />
-                        ))}
-                      {reviewChip}
-                    </div>
-                  );
-                } else if (pr.blocked && pr.unresolvedThreads > 0) {
-                  // Named rather than guessed at: a repo with "require
-                  // conversation resolution" reports this as BLOCKED with
-                  // every check green, which is indistinguishable from a
-                  // hidden required check unless the threads are counted.
-                  detail = noteSpan(
-                    `${unresolvedLabel(pr.unresolvedThreads)} — GitHub won't merge until they're resolved.`,
-                  );
-                } else if (pr.blocked) {
-                  detail = noteSpan(
-                    "Some required checks run on GitHub and aren't shown here.",
-                  );
-                } else {
-                  // Nothing to say about a PR with no checks at all (a fresh draft):
-                  // "0 failing · 0 pending" is a line of noise.
-                  detail = pr.failingChecks || pr.pendingChecks
-                    ? `${pr.failingChecks} failing · ${pr.pendingChecks} pending`
-                    : undefined;
+                    Retry
+                  </button>
+                </div>
+              )}
+              <PrList
+                title="Stuck on checks"
+                id="stuck-on-checks"
+                items={shownStuck}
+                emptyMessage={emptyText("No PRs stuck on checks 🎉")}
+                keyExtractor={(pr) => pr.id}
+                tone="danger"
+                caption={withLimit(caption(shownStuck.length, "PRs", shownStuck[0]?.stuckSince), limits.stuck)}
+                description="Your PRs that CI or reviewers are holding back."
+                footer={<SnoozedFold items={foldOf(visibleStuck, (pr) => pr.title)} onWake={wake} />}
+                highlighted={nextMove?.tone === "danger"}
+                groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
+                groupKeys={
+                  groupBy === "check"
+                    ? (pr) => stuckGroupKeys(pr, tracked, ignored)
+                    : undefined
                 }
-                return (
+                groupHref={
+                  groupBy === "repo"
+                    ? (repo) => `https://github.com/${repo}`
+                    : undefined
+                }
+                renderRow={(pr) => {
+                  const hasNames =
+                    pr.failing.length > 0 || pr.pending.length > 0;
+                  const totalNames = pr.failing.length + pr.pending.length;
+                  // Only truncate when there are more than 4 names total; otherwise
+                  // show every name. The "+N more" count is derived from what is
+                  // actually rendered so lopsided check lists never hide a chip
+                  // without an indicator.
+                  const truncate = totalNames > 4;
+                  const showFailingNames = truncate
+                    ? pr.failing.slice(0, 2)
+                    : pr.failing;
+                  const showPendingNames = truncate
+                    ? pr.pending.slice(0, 2)
+                    : pr.pending;
+                  const overflow =
+                    totalNames -
+                    (showFailingNames.length + showPendingNames.length);
+                  const awaiting = awaitingOn(pr.repo, pr.checkNames);
+                  const hasAwaiting = awaiting.length > 0;
+                  // A green PR can still be BLOCKED waiting on a code-owner review;
+                  // surface that instead of mislabeling it as pending CI. Colour it
+                  // with the repo's status vocabulary: CHANGES_REQUESTED is a negative
+                  // signal (danger/red), REVIEW_REQUIRED is merely waiting (warning/amber).
+                  const reviewNeeded = needsReview(pr.reviewDecision);
+                  const changesRequested =
+                    pr.reviewDecision === "CHANGES_REQUESTED";
+                  const reviewChip = reviewNeeded ? (
+                    <span
+                      key="review"
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
+                        changesRequested
+                          ? "bg-danger/10 text-danger"
+                          : "bg-warning/10 text-warning"
+                      }`}
+                    >
+                      {reviewDecisionLabel(pr.reviewDecision)}
+                    </span>
+                  ) : null;
+                  const noteSpan = (text: string) => (
+                    <span className="text-sm text-muted">{text}</span>
+                  );
+                  // Conflicts used to be an either/or with the check chips — a
+                  // muted sentence shown only when the PR had no check names at
+                  // all. One red check was enough to hide the fact that the branch
+                  // will not merge, which is the harder blocker of the two: a
+                  // check can go green on its own, a conflict cannot. So it is a
+                  // chip like the others, first in the row, in danger's colours.
+                  const conflicted = pr.mergeState === "DIRTY";
+                  const conflictChip = conflicted ? (
+                    <span
+                      key="conflict"
+                      className="inline-flex items-center gap-1 rounded-md bg-danger/[0.12] px-2 py-0.5 text-xs font-medium text-danger"
+                    >
+                      {MERGE_CONFLICT_LABEL}
+                    </span>
+                  ) : null;
+                  let detail: React.ReactNode;
+                  if (conflicted || hasNames || hasAwaiting || reviewNeeded) {
+                    detail = (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {conflictChip}
+                        {showFailingNames.map((name, i) =>
+                          checkChip(
+                            pr.repo,
+                            name,
+                            "danger",
+                            `fail-${i}-${name}`,
+                          ),
+                        )}
+                        {showPendingNames.map((name, i) =>
+                          checkChip(
+                            pr.repo,
+                            name,
+                            "warning",
+                            `pend-${i}-${name}`,
+                          ),
+                        )}
+                        {overflow > 0 && (
+                          <span className="text-xs text-muted">
+                            +{overflow} more
+                          </span>
+                        )}
+                        {hasAwaiting &&
+                          awaiting.map(({ name, required }) => (
+                            <CheckChip
+                              key={`await-${name}`}
+                              name={name}
+                              tone={required ? "warning" : "muted"}
+                              ignored={false}
+                              description={
+                                required
+                                  ? `Awaiting required check: ${name}`
+                                  : `Awaiting: ${name}`
+                              }
+                              onToggleIgnore={() => toggleIgnore(pr.repo, name)}
+                            />
+                          ))}
+                        {reviewChip}
+                      </div>
+                    );
+                  } else if (pr.blocked && pr.unresolvedThreads > 0) {
+                    // Named rather than guessed at: a repo with "require
+                    // conversation resolution" reports this as BLOCKED with
+                    // every check green, which is indistinguishable from a
+                    // hidden required check unless the threads are counted.
+                    detail = noteSpan(
+                      `${unresolvedLabel(pr.unresolvedThreads)} — GitHub won't merge until they're resolved.`,
+                    );
+                  } else if (pr.blocked) {
+                    detail = noteSpan(
+                      "Some required checks run on GitHub and aren't shown here.",
+                    );
+                  } else {
+                    // Nothing to say about a PR with no checks at all (a fresh draft):
+                    // "0 failing · 0 pending" is a line of noise.
+                    detail = pr.failingChecks || pr.pendingChecks
+                      ? `${pr.failingChecks} failing · ${pr.pendingChecks} pending`
+                      : undefined;
+                  }
+                  return (
+                    <PrRow
+                      title={pr.title}
+                      repo={pr.repo}
+                      number={pr.number}
+                      url={pr.url}
+                      since={pr.stuckSince}
+                      now={new Date()}
+                      draft={pr.isDraft}
+                      kind={
+                        conflicted || pr.failing.length > 0 || changesRequested
+                          ? "fail"
+                          : pr.pending.length > 0 || hasAwaiting || reviewNeeded
+                            ? "pending"
+                            : "idle"
+                      }
+                      marked={nextMove?.id === pr.id}
+                      detail={detail}
+                      suggestion={suggestStuck(pr)}
+                      aside={<SnoozeMenu title={pr.title} onSnooze={(c) => snooze(pr.id, c)} />}
+                      limit={limitState(pr.stuckSince, limits.stuck, limitNow)}
+                    />
+                  );
+                }}
+              />
+            </div>
+            <div className="flex flex-col gap-3">
+              {budgetSpent === undefined && awaitingError && (
+                <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+                  <span>{awaitingError}</span>
+                  <button
+                    onClick={() => fetchData(selectedOrg, selectedRepo)}
+                    className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+              <PrList
+                title="Waiting on others"
+                id="waiting-on-others"
+                items={shownAwaiting}
+                emptyMessage={emptyText("None of your PRs is waiting on a reviewer")}
+                keyExtractor={(pr) => pr.id}
+                tone="accent"
+                caption={withLimit(caption(shownAwaiting.length, "PRs", shownAwaiting[0]?.waitingSince), limits.others)}
+                description="Your PRs that wait on someone else's review. The ball is in their court."
+                groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
+                groupHref={
+                  groupBy === "repo"
+                    ? (repo) => `https://github.com/${repo}`
+                    : undefined
+                }
+                renderRow={(pr) => (
                   <PrRow
                     title={pr.title}
                     repo={pr.repo}
                     number={pr.number}
                     url={pr.url}
-                    since={pr.stuckSince}
+                    since={pr.waitingSince}
                     now={new Date()}
                     draft={pr.isDraft}
-                    kind={
-                      conflicted || pr.failing.length > 0 || changesRequested
-                        ? "fail"
-                        : pr.pending.length > 0 || hasAwaiting || reviewNeeded
-                          ? "pending"
-                          : "idle"
+                    kind="others"
+                    suggestion={{ text: "Open on GitHub", href: pr.url }}
+                    limit={limitState(pr.waitingSince, limits.others, limitNow)}
+                    detail={
+                      <AwaitingDetail
+                        pr={pr}
+                        now={new Date()}
+                        copied={copiedId === pr.id}
+                        onCopy={() => {
+                          // A clipboard the browser refuses (an insecure origin,
+                          // a denied permission) leaves the button as it was.
+                          void navigator.clipboard
+                            ?.writeText(reminderText(pr, new Date()))
+                            .then(() => {
+                              setCopiedId(pr.id);
+                              setTimeout(() => setCopiedId((id) => (id === pr.id ? null : id)), 2000);
+                            })
+                            .catch(() => {});
+                        }}
+                      />
                     }
-                    marked={nextMove?.id === pr.id}
-                    detail={detail}
-                    suggestion={suggestStuck(pr)}
-                    aside={<SnoozeMenu title={pr.title} onSnooze={(c) => snooze(pr.id, c)} />}
-                    limit={limitState(pr.stuckSince, limits.stuck, limitNow)}
                   />
-                );
-              }}
-            />
-          </div>
-          <div className="flex flex-col gap-3">
-            {budgetSpent === undefined && awaitingError && (
-              <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-                <span>{awaitingError}</span>
-                <button
-                  onClick={() => fetchData(selectedOrg, selectedRepo)}
-                  className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
-                >
-                  Retry
-                </button>
-              </div>
-            )}
-            <PrList
-              title="Waiting on others"
-              id="waiting-on-others"
-              items={shownAwaiting}
-              emptyMessage={emptyText("None of your PRs is waiting on a reviewer")}
-              keyExtractor={(pr) => pr.id}
-              tone="accent"
-              caption={withLimit(caption(shownAwaiting.length, "PRs", shownAwaiting[0]?.waitingSince), limits.others)}
-              description="Your PRs that wait on someone else's review. The ball is in their court."
-              groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
-              groupHref={
-                groupBy === "repo"
-                  ? (repo) => `https://github.com/${repo}`
-                  : undefined
-              }
-              renderRow={(pr) => (
-                <PrRow
-                  title={pr.title}
-                  repo={pr.repo}
-                  number={pr.number}
-                  url={pr.url}
-                  since={pr.waitingSince}
-                  now={new Date()}
-                  draft={pr.isDraft}
-                  kind="others"
-                  suggestion={{ text: "Open on GitHub", href: pr.url }}
-                  limit={limitState(pr.waitingSince, limits.others, limitNow)}
-                  detail={
-                    <AwaitingDetail
-                      pr={pr}
-                      now={new Date()}
-                      copied={copiedId === pr.id}
-                      onCopy={() => {
-                        // A clipboard the browser refuses (an insecure origin,
-                        // a denied permission) leaves the button as it was.
-                        void navigator.clipboard
-                          ?.writeText(reminderText(pr, new Date()))
-                          .then(() => {
-                            setCopiedId(pr.id);
-                            setTimeout(() => setCopiedId((id) => (id === pr.id ? null : id)), 2000);
-                          })
-                          .catch(() => {});
-                      }}
-                    />
-                  }
-                />
+                )}
+              />
+            </div>
+            <div className="flex flex-col gap-3">
+              {budgetSpent === undefined && readyError && (
+                <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+                  <span>{readyError}</span>
+                  <button
+                    onClick={() => fetchData(selectedOrg, selectedRepo)}
+                    className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+                  >
+                    Retry
+                  </button>
+                </div>
               )}
-            />
+              <PrList
+                title="Ready to merge"
+                id="ready-to-merge"
+                items={shownReady}
+                emptyMessage={emptyText(
+                  draftFilter === "only"
+                    ? "Drafts are never ready to merge"
+                    : "Nothing ready to merge",
+                )}
+                keyExtractor={(pr) => pr.id}
+                tone="success"
+                caption={caption(shownReady.length, "PRs", shownReady[0]?.readySince)}
+                description="Approved, green, mergeable. One click each."
+                footer={<SnoozedFold items={foldOf(visibleReady, (pr) => pr.title)} onWake={wake} />}
+                highlighted={nextMove?.tone === "success"}
+                renderRow={(pr) => (
+                  <PrRow
+                    title={pr.title}
+                    repo={pr.repo}
+                    number={pr.number}
+                    url={pr.url}
+                    since={pr.readySince}
+                    now={new Date()}
+                    suggestion={suggestReady(pr)}
+                    kind="ready"
+                    marked={nextMove?.id === pr.id}
+                    aside={<SnoozeMenu title={pr.title} onSnooze={(c) => snooze(pr.id, c)} />}
+                    // A PR promoted here over a red check still says so — muted,
+                    // because the user already answered for it, but said: a card
+                    // with nothing on it would read as spotlessly green.
+                    detail={
+                      pr.needsUpdate || pr.ignoredChecks?.length ? (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {pr.needsUpdate && (
+                            <span className="rounded-md bg-warning/10 px-2 py-0.5 text-xs font-medium leading-[normal] text-warning">
+                              Needs update
+                            </span>
+                          )}
+                          {pr.ignoredChecks?.map((name) => (
+                            <CheckChip
+                              key={`ignored-${name}`}
+                              name={name}
+                              tone="muted"
+                              ignored
+                              onToggleIgnore={() => toggleIgnore(pr.repo, name)}
+                            />
+                          ))}
+                        </div>
+                      ) : undefined
+                    }
+                  />
+                )}
+              />
+            </div>
           </div>
-          <div className="flex flex-col gap-3">
-            {budgetSpent === undefined && readyError && (
-              <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-                <span>{readyError}</span>
-                <button
-                  onClick={() => fetchData(selectedOrg, selectedRepo)}
-                  className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
-                >
-                  Retry
-                </button>
-              </div>
-            )}
-            <PrList
-              title="Ready to merge"
-              id="ready-to-merge"
-              items={shownReady}
-              emptyMessage={emptyText(
-                draftFilter === "only"
-                  ? "Drafts are never ready to merge"
-                  : "Nothing ready to merge",
-              )}
-              keyExtractor={(pr) => pr.id}
-              tone="success"
-              caption={caption(shownReady.length, "PRs", shownReady[0]?.readySince)}
-              description="Approved, green, mergeable. One click each."
-              footer={<SnoozedFold items={foldOf(visibleReady, (pr) => pr.title)} onWake={wake} />}
-              highlighted={nextMove?.tone === "success"}
-              renderRow={(pr) => (
-                <PrRow
-                  title={pr.title}
-                  repo={pr.repo}
-                  number={pr.number}
-                  url={pr.url}
-                  since={pr.readySince}
-                  now={new Date()}
-                  suggestion={suggestReady(pr)}
-                  kind="ready"
-                  marked={nextMove?.id === pr.id}
-                  aside={<SnoozeMenu title={pr.title} onSnooze={(c) => snooze(pr.id, c)} />}
-                  // A PR promoted here over a red check still says so — muted,
-                  // because the user already answered for it, but said: a card
-                  // with nothing on it would read as spotlessly green.
-                  detail={
-                    pr.needsUpdate || pr.ignoredChecks?.length ? (
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {pr.needsUpdate && (
-                          <span className="rounded-md bg-warning/10 px-2 py-0.5 text-xs font-medium leading-[normal] text-warning">
-                            Needs update
-                          </span>
-                        )}
-                        {pr.ignoredChecks?.map((name) => (
-                          <CheckChip
-                            key={`ignored-${name}`}
-                            name={name}
-                            tone="muted"
-                            ignored
-                            onToggleIgnore={() => toggleIgnore(pr.repo, name)}
-                          />
-                        ))}
-                      </div>
-                    ) : undefined
-                  }
-                />
-              )}
-            />
-          </div>
-          <div className="flex flex-col gap-3">
-            {budgetSpent === undefined && reviewError && (
-              <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-                <span>{reviewError}</span>
-                <button
-                  onClick={() => fetchData(selectedOrg, selectedRepo)}
-                  className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
-                >
-                  Retry
-                </button>
-              </div>
-            )}
-            <PrList
-              title="Waiting on your review"
-              id="waiting-on-your-review"
-              items={shownReviews}
-              emptyMessage={emptyText("No PRs waiting on your review 🎉")}
-              keyExtractor={(req) => req.id}
-              tone="accent"
-              caption={withLimit(caption(shownReviews.length, "PRs", shownReviews[0]?.requestedAt), limits.review)}
-              description="Teammates blocked until you review."
-              footer={<SnoozedFold items={foldOf(visibleReviews, (r) => r.title)} onWake={wake} />}
-              highlighted={nextMove?.tone === "accent"}
-              groupBy={groupBy === "repo" ? (req) => req.repo : undefined}
-              groupHref={
-                groupBy === "repo"
-                  ? (repo) => `https://github.com/${repo}`
-                  : undefined
-              }
-              renderRow={(req) => (
-                <PrRow
-                  title={req.title}
-                  repo={req.repo}
-                  number={req.number}
-                  url={req.url}
-                  since={req.requestedAt}
-                  now={new Date()}
-                  draft={req.isDraft}
-                  kind="review"
-                  byline={`@${req.author}`}
-                  marked={nextMove?.id === req.id}
-                  suggestion={suggestReview(req)}
-                  aside={<SnoozeMenu title={req.title} onSnooze={(c) => snooze(req.id, c)} />}
-                  limit={limitState(req.requestedAt, limits.review, limitNow)}
-                  detail={(() => {
-                    const minutes = reviewMinutes(req);
-                    return minutes === null ? undefined : (
-                      <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-semibold leading-[normal] ${SIZE[sizeTone(minutes)]}`}>
-                        {sizeText(req, minutes)}
-                      </span>
-                    );
-                  })()}
-                />
-              )}
-            />
-          </div>
-          <div className="flex flex-col gap-3">
-            {budgetSpent === undefined && commentsError && (
-              <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-                <span>{commentsError}</span>
-                <button
-                  onClick={() => fetchData(selectedOrg, selectedRepo)}
-                  className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
-                >
-                  Retry
-                </button>
-              </div>
-            )}
-            <PrList
-              title="Awaiting your reply"
-              id="comments-awaiting-reply"
-              items={shownComments}
-              emptyMessage={emptyText("No comments awaiting your reply 🎉")}
-              keyExtractor={(c) => c.id}
-              tone="warning"
-              caption={withLimit(caption(shownComments.length, "threads", shownComments[0]?.commentedAt), limits.reply)}
-              description="Someone asked you something. Answer or mark seen."
-              footer={<SnoozedFold items={foldOf(visibleComments, (c) => c.preview)} onWake={wake} />}
-              highlighted={nextMove?.tone === "warning"}
-              groupBy={groupBy === "repo" ? (c) => c.repo : undefined}
-              groupHref={
-                groupBy === "repo"
-                  ? (repo) => `https://github.com/${repo}`
-                  : undefined
-              }
-              renderRow={(c) => (
-                <PrRow
-                  title={c.preview}
-                  repo={c.repo}
-                  number={c.number}
-                  url={c.url}
-                  since={c.commentedAt}
-                  now={new Date()}
-                  suggestion={suggestComment(c)}
-                  kind="reply"
-                  byline={c.author}
-                  aside={
-                <span className="flex gap-1.5">
-                <SnoozeMenu title={c.preview} onSnooze={(choice) => snooze(c.id, choice)} />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSeen((prev) => {
-                      const next = { ...prev };
-                      if (isSeen(c, prev)) delete next[c.id];
-                      else next[c.id] = c.commentedAt;
-                      return next;
-                    })
-                  }
-                  aria-label={isSeen(c, seen) ? "Unmark as seen" : "Mark as seen"}
-                  title={isSeen(c, seen) ? "Seen — click to bring it back" : "Mark as seen — hides it until a new reply"}
-                  className={`inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                    isSeen(c, seen)
-                      ? "border-success/40 bg-success/15 text-success hover:bg-success/25"
-                      : "border-border bg-transparent text-muted hover:border-accent hover:text-accent"
-                  }`}
-                >
-                  {isSeen(c, seen) ? (
-                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="9" />
-                      <path d="m8 12.5 2.5 2.5L16 9.5" />
-                    </svg>
-                  ) : (
-                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  )}
-                </button>
-                </span>
-                  }
-                  marked={nextMove?.id === c.id}
-                  limit={limitState(c.commentedAt, limits.reply, limitNow)}
-                  clampTitle
-                  detail={
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      {/* A review body has no file, so without this it would read
-                          as an inline thread whose path failed to load — and the
-                          two are answered in different places. */}
-                      {c.source === "review" && (
-                        <span className="rounded-md bg-border px-1.5 py-0.5 text-xs font-medium text-muted">
-                          Review comment
-                        </span>
-                      )}
-                      {c.source === "conversation" && (
-                        <span className="rounded-md bg-border px-1.5 py-0.5 text-xs font-medium text-muted">
-                          Conversation
-                        </span>
-                      )}
-                      {c.path && (
-                        <span className="min-w-0 truncate font-mono text-xs text-muted">
-                          {c.path}
-                        </span>
-                      )}
-
-                    </span>
-                  }
-                />
-              )}
-            />
-          </div>
-        </div>
+        </section>
         {/* History: looking back, not work to do. Your review verdicts beside
             your finished PRs, quieter than the columns above on purpose. */}
         <section aria-labelledby="history-heading" className="flex flex-col gap-4 pt-3">

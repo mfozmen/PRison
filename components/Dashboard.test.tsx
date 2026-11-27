@@ -1548,13 +1548,13 @@ describe("Dashboard", () => {
   });
 
   describe("prioritize-blocking", () => {
-    it("puts the stuck column first: your own blocked work leads", async () => {
+    it("puts the review column before your own PRs: blocked teammates lead", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       const stuck = document.getElementById("stuck-on-checks")!;
       const review = document.getElementById("waiting-on-your-review")!;
       expect(
-        stuck.compareDocumentPosition(review) & Node.DOCUMENT_POSITION_FOLLOWING,
+        review.compareDocumentPosition(stuck) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
 
@@ -2858,7 +2858,7 @@ describe("Dashboard", () => {
       ).toBeInTheDocument();
     });
 
-    it("puts the ready column last among your own PRs, before the review column", async () => {
+    it("puts the ready column last, after the review column and your other PRs", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("ready pr")).toBeInTheDocument();
       // Compare the sections themselves: the index above names them both, so a
@@ -2867,7 +2867,7 @@ describe("Dashboard", () => {
       const others = document.getElementById("waiting-on-others")!;
       const review = document.getElementById("waiting-on-your-review")!;
       expect(others.compareDocumentPosition(ready) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(ready.compareDocumentPosition(review) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(review.compareDocumentPosition(ready) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it("includes ready-to-merge in a Refresh", async () => {
@@ -4686,19 +4686,19 @@ describe("Dashboard — tier layout", () => {
     global.fetch = okFetch();
   });
 
-  // Your own PRs by stage — held back, waiting on a reviewer, ready — then the
-  // queues where someone waits on you, then the histories.
+  // The queues where someone waits on you, then your own PRs by stage — held
+  // back, waiting on a reviewer, ready — then the histories.
   const SECTIONS = [
+    "waiting-on-your-review",
+    "comments-awaiting-reply",
     "stuck-on-checks",
     "waiting-on-others",
     "ready-to-merge",
-    "waiting-on-your-review",
-    "comments-awaiting-reply",
     "recently-reviewed",
     "recently-closed",
   ];
 
-  it("orders your PRs by stage, then the queues waiting on you, then the histories", async () => {
+  it("orders the queues waiting on you, then your PRs by stage, then the histories", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("ready pr")).toBeInTheDocument();
     const els = SECTIONS.map((id) => document.getElementById(id)!);

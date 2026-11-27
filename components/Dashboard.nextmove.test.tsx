@@ -71,11 +71,18 @@ beforeEach(() => {
 });
 
 describe("Dashboard — Next move", () => {
-  it("points at the longest wait across the queues, whichever queue it is in", async () => {
+  it("points at the longest wait among the queues where a teammate waits on you", async () => {
     global.fetch = fetchLists([STUCK_PR], [REVIEW_PR]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await within(await screen.findByRole("region", { name: "Next move" })).findByText("review pr")).toBeInTheDocument();
     expect(within(strip()).getByText("blocking @alice")).toBeInTheDocument();
+  });
+
+  it("puts a blocked teammate before your own PR, even an older one", async () => {
+    const olderStuck = { ...STUCK_PR, stuckSince: "2026-06-01T00:00:00Z" };
+    global.fetch = fetchLists([olderStuck], [REVIEW_PR]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await within(await screen.findByRole("region", { name: "Next move" })).findByText("review pr")).toBeInTheDocument();
   });
 
   it("highlights the column the item sits in and marks the row there", async () => {

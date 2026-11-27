@@ -1359,7 +1359,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       {budgetSpent === undefined &&
         budget !== null &&
         budget.remaining <= budget.cost * 2 && (
-          <div className="mx-auto w-full max-w-[1424px] px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="mx-auto w-full px-4 sm:px-6 lg:px-8 pt-4">
             <div
               role="status"
               className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning"
@@ -1373,7 +1373,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           </div>
         )}
       {budgetSpent !== undefined && (
-        <div className="mx-auto w-full max-w-[1424px] px-4 sm:px-6 lg:px-8 pt-4">
+        <div className="mx-auto w-full px-4 sm:px-6 lg:px-8 pt-4">
           <div
             role="status"
             className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning"
@@ -1388,7 +1388,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         </div>
       )}
       {partial && (
-        <div className="mx-auto w-full max-w-[1424px] px-4 sm:px-6 lg:px-8 pt-4">
+        <div className="mx-auto w-full px-4 sm:px-6 lg:px-8 pt-4">
           <div
             role="status"
             className="flex items-center justify-between rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning"
@@ -1432,7 +1432,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         limits={limits}
         onLimitsChange={setLimits}
       />
-      <main className="mx-auto flex w-full max-w-[1424px] flex-1 flex-col gap-7 px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto flex w-full flex-1 flex-col gap-7 px-4 py-8 sm:px-6 lg:px-8">
         {isPending && (
           <p
             className="flex items-center gap-2 text-sm text-muted"

@@ -1221,15 +1221,15 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     ],
     (item) => item.since,
   );
-  // Work on a teammate's PR (a review, a reply on a thread you started there)
-  // blocks them, so it comes before any of your own PRs however old they are;
-  // oldest first within each half.
   // Comments on your own PRs, per PR, and which PRs are stuck: a reply owed on
   // a stuck PR is often the thing holding it (changes requested, conversation
   // resolution required), so each side of the board points at the other.
   const repliesOwed = new Map<string, number>();
   for (const c of shownComments) if (!c.viewerStarted) repliesOwed.set(c.prId, (repliesOwed.get(c.prId) ?? 0) + 1);
   const stuckIds = new Set(visibleStuck.map((pr) => pr.id));
+  // Work on a teammate's PR (a review, a reply on a thread you started there)
+  // blocks them, so it comes before any of your own PRs however old they are;
+  // oldest first within each half.
   const onTheirPrs = new Set(shownComments.filter((c) => c.viewerStarted).map((c) => c.id));
   const blocksOthers = (m: NextMoveItem) => m.tone === "accent" || onTheirPrs.has(m.id);
   const allMoves = [...byAge.filter(blocksOthers), ...byAge.filter((m) => !blocksOthers(m))];
@@ -1436,14 +1436,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             clampTitle
             detail={
               <span className="flex flex-wrap items-center gap-1.5">
-                {/* A review body has no file, so without this it would read
-                    as an inline thread whose path failed to load — and the
-                    two are answered in different places. */}
                 {stuckIds.has(c.prId) && (
                   <span className="rounded-md bg-danger/10 px-1.5 py-0.5 text-xs font-medium text-danger">
                     PR stuck
                   </span>
                 )}
+                {/* A review body has no file, so without this it would read
+                    as an inline thread whose path failed to load — and the
+                    two are answered in different places. */}
                 {c.source === "review" && (
                   <span className="rounded-md bg-border px-1.5 py-0.5 text-xs font-medium text-muted">
                     Review comment

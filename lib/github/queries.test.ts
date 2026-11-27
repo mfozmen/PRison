@@ -1201,6 +1201,22 @@ describe("parseReadyPrs", () => {
     expect(parseReadyPrs({ search: { nodes: [makePr()] } })[0].approvedBy).toEqual([]);
   });
 
+  it("skips null review nodes, as a partial GraphQL response can carry", () => {
+    const [pr] = parseReadyPrs({ search: { nodes: [makePr({
+      latestReviews: { nodes: [null, { state: "APPROVED", author: { login: "bob" } }] },
+    })] } });
+    expect(pr.approvedBy).toEqual(["bob"]);
+  });
+
+  // An approval later dismissed, or followed by a change request, is no
+  // longer an approval: latestReviews holds each reviewer's newest review.
+  it("does not count a dismissed approval", () => {
+    const [pr] = parseReadyPrs({ search: { nodes: [makePr({
+      latestReviews: { nodes: [{ state: "DISMISSED", author: { login: "carol" } }] },
+    })] } });
+    expect(pr.approvedBy).toEqual([]);
+  });
+
   it("CLEAN PR has needsUpdate: false", () => {
     const result = parseReadyPrs({ search: { nodes: [makePr()] } });
     expect(result).toHaveLength(1);

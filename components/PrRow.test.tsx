@@ -27,6 +27,11 @@ describe("PrRow", () => {
     expect(screen.getByText("No approvals yet")).toBeInTheDocument();
   });
 
+  it("keeps a long approver list whole", () => {
+    render(<PrRow {...base} approvedBy={["alice", "bob", "carol", "dave"]} />);
+    expect(screen.getByText("@alice, @bob, @carol, @dave")).toBeInTheDocument();
+  });
+
   it("says nothing about approvals when not given any", () => {
     render(<PrRow {...base} />);
     expect(screen.queryByText(/approv/i)).not.toBeInTheDocument();

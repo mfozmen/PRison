@@ -3259,8 +3259,11 @@ describe("Dashboard — awaiting your reply", () => {
     await waitFor(() =>
       expect(screen.getByTestId("closed-count-badge")).toHaveTextContent("3"),
     );
+    expect(screen.queryByTestId("side-history-count")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "HISTORY" }));
     expect(screen.queryByTestId("closed-count-badge")).not.toBeInTheDocument();
+    // Folded, the header carries the total: 3 closed + 0 reviewed.
+    expect(screen.getByTestId("side-history-count")).toHaveTextContent("3");
     await waitFor(() =>
       expect(localStorage.getItem("prison.foldedSides")).toBe('["history"]'),
     );

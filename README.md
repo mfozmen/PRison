@@ -17,7 +17,7 @@ anything back to GitHub.
 **[Controls](#controls)** ·
 **[Docs](#documentation)**
 
-![The PRison dashboard in dark mode. A Next move card on top points at a review a teammate is blocked on, 2d and slowing, with an I have choice of 5 min, 15 min, 1 hour or Any, a Review to unblock alice button and Skip. Under it, 12 things want you sits beside grouping and draft toggles, a search box and Refresh. The board is in two sections. Others' PRs comes first: Waiting on your review, with a size chip like ~15 min · 84 lines · 3 files on each row, beside Replies on their PRs. Your PRs follows, in stage order, each of its rows saying who approved it or No approvals yet: Stuck on checks, where a row can say 1 comment waits on your reply; Comments on your PRs, marking a comment whose PR is stuck; Waiting on others, where each PR lists its reviewers and where they stand, with a Copy reminder button; and Ready to merge last. Every row has a moon to snooze it. At the foot, History is split the same way, under one This week / Last week picker: Your reviewing with its tiles and a bar per day above the folded Recently reviewed panel, and Your merged PRs (PRs merged, median open to merge, median wait for a first review, merged with no review) above the folded Recently merged / closed panel](docs/screenshot.png)
+![The PRison dashboard in dark mode. A Next move card on top points at a review a teammate is blocked on, 2d and slowing, with an I have choice of 5 min, 15 min, 1 hour or Any, a Review to unblock alice button and Skip. Under it, 12 things want you sits beside grouping and draft toggles, a search box and Refresh. The board is in two sections. Others' PRs comes first: Waiting on your review, with a size chip like ~15 min · 84 lines · 3 files on each row, beside Replies on their PRs. Your PRs follows, in stage order, each of its rows saying who approved it or No approvals yet: Stuck on checks, where a row can say 1 comment waits on your reply; Comments on your PRs, marking a comment whose PR is stuck; Waiting on others, where each PR lists its reviewers and where they stand, with a Copy reminder button; and Ready to merge last. Every row has a moon to snooze it. Below, Insights is split the same way under one This week / Last week picker: Your reviewing with its tiles and a bar per day, and Your merged PRs (PRs merged, median open to merge, median wait for a first review, merged with no review). At the foot, History holds the folded Recently reviewed and Recently merged / closed panels](docs/screenshot.png)
 
 ## What it shows
 
@@ -37,10 +37,11 @@ or reply you owe holds up someone else's work. Oldest first within each column.
 Your PRs in Stuck and Ready say who approved them (**Approved by @alice**) or
 **No approvals yet**, also where no approval is required.
 
-Underneath, quieter on purpose, **History**, split the same way: your
-[reviewing](#looking-back) and the PRs you reviewed (with your verdict, and
-**Updated since** when the author pushed after it) on one side, your merged PRs
-and your merged or closed list on the other.
+Underneath, quieter on purpose, **Insights** and **History**, split the same
+way. Insights is the week in numbers: your [reviewing](#looking-back) on one
+side, your merged PRs on the other. History is the lists: the PRs you reviewed
+(with your verdict, and **Updated since** when the author pushed after it), and
+your merged or closed PRs.
 
 A PR is only ever in one column. Columns stack on a narrow screen.
 
@@ -144,6 +145,8 @@ Both live in this browser and cost nothing from GitHub.
 
 ### Looking back
 
+The **Insights** section:
+
 - **Your reviewing**: the median time people waited for your review, how many
   reviews you gave and on how many PRs, and the one wait that ran longest with
   a link to it — each beside the week before, plus a bar per day.
@@ -168,8 +171,9 @@ Both live in this browser and cost nothing from GitHub.
 - **Scope** to all of it, your personal account, one organization, or one
   repository. The scope narrows the GitHub search itself.
 - **Everything folds** by its header, keeping its count, for the sitting. The
-  three sections (**Others' PRs**, **Your PRs**, **History**) fold whole, and
-  stay folded across reloads.
+  sections (**Others' PRs**, **Your PRs**, **Insights**, **History**) fold
+  whole, show their total in the header while folded, and stay folded across
+  reloads.
 
 ### GitHub's API budget
 

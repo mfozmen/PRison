@@ -290,6 +290,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // and reveals a page at a time.
   const [reviewedOpen, setReviewedOpen] = useState(false);
   const [reviewedVisible, setReviewedVisible] = useState(ARCHIVE_PAGE_SIZE);
+  // The three board sides the user folded away ("others", "mine", "history").
+  const [foldedSides, setFoldedSides] = useState<string[]>([]);
   const [partial, setPartial] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -606,6 +608,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     const storedIgnored = localStorage.getItem("prison.ignoredChecks");
     const storedClosedOpen = localStorage.getItem("prison.closedOpen");
     const storedReviewedOpen = localStorage.getItem("prison.reviewedOpen");
+    const storedFoldedSides = localStorage.getItem("prison.foldedSides");
     const storedTimeBudget = localStorage.getItem("prison.timeBudget");
     const storedSnoozes = localStorage.getItem("prison.snoozes");
     const storedLimits = localStorage.getItem("prison.limits");
@@ -661,6 +664,10 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       if (storedClosedOpen === "true") {
         setClosedOpen(true);
       }
+      try {
+        const sides: unknown = JSON.parse(storedFoldedSides ?? "[]");
+        if (Array.isArray(sides)) setFoldedSides(sides.filter((x) => typeof x === "string"));
+      } catch {}
       if (storedReviewedOpen === "true") {
         setReviewedOpen(true);
       }
@@ -798,6 +805,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     if (!hydrated) return;
     localStorage.setItem("prison.reviewedOpen", String(reviewedOpen));
   }, [reviewedOpen, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("prison.foldedSides", JSON.stringify(foldedSides));
+  }, [foldedSides, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -1476,6 +1488,35 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       />
     </div>
   );
+  // Folds a whole side of the board, like the history panels' headers do.
+  const sideToggle = (key: string, title: string) => {
+    const open = !foldedSides.includes(key);
+    return (
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={`side-${key}`}
+        onClick={() => setFoldedSides((f) => (open ? [...f, key] : f.filter((k) => k !== key)))}
+        className="flex min-h-7 cursor-pointer items-center gap-1.5 rounded-md uppercase transition-colors hover:text-accent focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+      >
+        <svg
+          aria-hidden="true"
+          className={`shrink-0 transition-transform ${open ? "" : "-rotate-90"}`}
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+        {title}
+      </button>
+    );
+  };
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header
@@ -1730,12 +1771,13 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         <section aria-labelledby="others-heading" className="flex flex-col gap-4">
           <div className="flex items-center gap-3">
             <h2 id="others-heading" className="text-xs font-semibold tracking-[0.1em] text-foreground">
-              OTHERS&apos; PRS
+              {sideToggle("others", "OTHERS' PRS")}
             </h2>
             <span aria-hidden="true" className="h-px flex-1 bg-border" />
             <span className="text-[13px] text-muted">Teammates wait on you. Clear these first</span>
           </div>
-          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+          {!foldedSides.includes("others") && (
+          <div id="side-others" className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
             <div className="flex flex-col gap-3">
               {budgetSpent === undefined && reviewError && (
                 <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
@@ -1801,16 +1843,18 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               visible: visibleComments.filter((c) => c.viewerStarted),
             })}
           </div>
+          )}
         </section>
         <section aria-labelledby="mine-heading" className="flex flex-col gap-4 pt-3">
           <div className="flex items-center gap-3">
             <h2 id="mine-heading" className="text-xs font-semibold tracking-[0.1em] text-muted">
-              YOUR PRS
+              {sideToggle("mine", "YOUR PRS")}
             </h2>
             <span aria-hidden="true" className="h-px flex-1 bg-border" />
             <span className="text-[13px] text-muted">Your own work, once nobody waits on you</span>
           </div>
-          <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {!foldedSides.includes("mine") && (
+          <div id="side-mine" className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="flex flex-col gap-3">
               {budgetSpent === undefined && stuckError && (
                 <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
@@ -2147,13 +2191,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               />
             </div>
           </div>
+          )}
         </section>
         {/* History: looking back, not work to do, so it stays below the work and
             quieter than the columns above on purpose. */}
         <section aria-labelledby="history-heading" className="flex flex-col gap-4 pt-3">
           <div className="flex items-center gap-3">
             <h2 id="history-heading" className="text-xs font-semibold tracking-[0.1em] text-muted">
-              HISTORY
+              {sideToggle("history", "HISTORY")}
             </h2>
             <span aria-hidden="true" className="h-px flex-1 bg-border" />
             <span className="text-[13px] text-muted">Looking back, not work to do</span>
@@ -2175,7 +2220,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           </div>
           {/* Two sides, matching the board above: your reviewing on the left,
               your own PRs on the right. One week picker for both. */}
-          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+          {!foldedSides.includes("history") && (
+          <div id="side-history" className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
             <div className="flex flex-col gap-4">
               <WeekCard facts={week} now={new Date()} error={weekError} offset={weekOffset} />
               <ArchiveSection
@@ -2270,6 +2316,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
               </ArchiveSection>
             </div>
           </div>
+          )}
         </section>
       </main>
     </div>

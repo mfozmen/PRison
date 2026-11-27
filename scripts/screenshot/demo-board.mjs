@@ -176,11 +176,25 @@ const week = [
   review(49, "Drop the old cron", "globex/backend", "carol", 230, 14),
 ];
 
+// Two weeks of the viewer's own merged PRs, one of them merged unreviewed.
+const mergedPr = (n, repo, openedHours, mergedHours, reviewedHours) => ({
+  prId: `PR_m${n}`, title: `merged ${n}`, url: `https://github.com/${repo}/pull/${n}`, repo, number: n,
+  createdAt: ago(openedHours), mergedAt: ago(mergedHours), firstReviewAt: reviewedHours === null ? null : ago(reviewedHours),
+});
+const merged = [
+  mergedPr(470, "acme/api", 40, 8, 30),
+  mergedPr(55, "acme/web", 30, 20, 26),
+  mergedPr(14, "initech/worker", 80, 50, 70),
+  mergedPr(203, "widgets-inc/frontend", 12, 3, null),
+  mergedPr(466, "acme/api", 260, 190, 230),
+];
+
 // Keyed by the fragment of the route path that identifies it, longest first so
 // "pr-comments" is never matched by a shorter sibling.
 export const BOARD = {
   "awaiting-reviewers": awaiting,
   "my-week": week,
+  "my-merged": merged,
   "review-requests": reviews,
   "ready-to-merge": ready,
   "reviewed-prs": reviewed,

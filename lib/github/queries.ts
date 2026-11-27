@@ -2,7 +2,7 @@
 // Raw GraphQL responses are intentionally untyped at the boundary; parsers
 // convert them to domain types as the first step.
 import type { Org, StuckPr, ReviewRequest, ReadyPr, PrComment, ClosedPr, ReviewedPr, AwaitingPr, Reviewer } from "@/lib/types";
-import type { ReviewFact } from "@/lib/week";
+import type { MergedFact, ReviewFact } from "@/lib/week";
 
 // scope is optional: when omitted, the search spans every repo the token can
 // see (the user's personal account plus all accessible organizations).
@@ -905,6 +905,46 @@ export function parseMyWeek(raw: any, viewerLogin: string): ReviewFact[] {
         waitedMs: request ? new Date(r.submittedAt).getTime() - new Date(request).getTime() : null,
       });
     }
+  }
+  return out;
+}
+
+// Two weeks of the viewer's own merged PRs, for the authoring half of the look
+// back: how long each took and when someone first reviewed it.
+export const MY_MERGED_QUERY = `
+  query($q: String!) {
+    search(query: $q, type: ISSUE, first: 50) {
+      nodes { ... on PullRequest {
+        id title url number createdAt mergedAt
+        repository { nameWithOwner }
+        author { login }
+        reviews(first: 20) { nodes { submittedAt author { login } } }
+      } }
+    }
+      ${RATE_LIMIT}
+  }`;
+
+/** The viewer's PRs merged since `since` (a YYYY-MM-DD date), within the scope. */
+export function myMergedSearch(since: string, scope?: string): string {
+  const where = scope ? ` ${scope}` : "";
+  return `is:pr author:@me is:merged merged:>=${since}${where} sort:updated-desc`;
+}
+
+export function parseMyMerged(raw: any): MergedFact[] {
+  const out: MergedFact[] = [];
+  for (const n of searchNodes(raw)) {
+    if (!n?.id || !n.createdAt || !n.mergedAt) continue;
+    const author = n.author?.login;
+    // A self-review (a note left on your own PR) is not someone looking at it.
+    const firstReviewAt = (n.reviews?.nodes ?? [])
+      .filter((r: any) => r?.submittedAt && r.author?.login && r.author.login !== author)
+      .map((r: any) => r.submittedAt as string)
+      .sort()[0] ?? null;
+    out.push({
+      prId: n.id, title: n.title, url: n.url, number: n.number,
+      repo: n.repository?.nameWithOwner ?? "",
+      createdAt: n.createdAt, mergedAt: n.mergedAt, firstReviewAt,
+    });
   }
   return out;
 }

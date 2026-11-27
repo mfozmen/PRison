@@ -44,8 +44,8 @@ import {
 } from "@/lib/estimate";
 import { SnoozeMenu, SnoozedFold } from "./Snooze";
 import { limitState, limitLabel, parseLimits, type Limits } from "@/lib/limits";
-import { WeekCard } from "./WeekCard";
-import type { ReviewFact } from "@/lib/week";
+import { MergedCard, WeekCard } from "./WeekCard";
+import type { MergedFact, ReviewFact } from "@/lib/week";
 
 import { isSnoozed, parseSnoozes, pruneSnoozes, snoozeFor, type Snoozes, type SnoozeChoice } from "@/lib/snooze";
 import { ClosedPrRow } from "./ClosedPrRow";
@@ -101,6 +101,7 @@ import {
 // The look back is asked once in this long per scope, not on every refresh.
 const WEEK_TTL_MS = 12 * 3_600_000;
 const WEEK_KEY = "prison.week";
+const MERGED_KEY = "prison.merged";
 
 export interface DashboardProps {
   orgs: Org[];
@@ -281,6 +282,9 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   // The weekly look back; null until it has loaded.
   const [week, setWeek] = useState<ReviewFact[] | null>(null);
   const [weekError, setWeekError] = useState(false);
+  const [merged, setMerged] = useState<MergedFact[] | null>(null);
+  const [mergedError, setMergedError] = useState(false);
+  const [weekOffset, setWeekOffset] = useState<0 | 1>(0);
   const [closedVisible, setClosedVisible] = useState(ARCHIVE_PAGE_SIZE);
   // Same shape as the closed history: a look-back list, so it starts collapsed
   // and reveals a page at a time.
@@ -733,38 +737,43 @@ export function Dashboard({ orgs, login }: DashboardProps) {
   useEffect(() => {
     if (!hydrated) return;
     const qs = scopeQuery(selectedOrg, selectedRepo, login);
-    let cached: { login?: string; qs?: string; at?: number; facts?: ReviewFact[] } = {};
-    try {
-      cached = JSON.parse(localStorage.getItem(WEEK_KEY) ?? "{}");
-    } catch {
-      cached = {};
-    }
-    // Keyed by who as well as where: the all-organizations scope is the same empty
-    // string for every account, and one person must never see another’s reviews.
-    const fresh =
-      cached.login === login && cached.qs === qs && typeof cached.at === "number" && Date.now() - cached.at < WEEK_TTL_MS;
-    if (fresh && Array.isArray(cached.facts)) {
-      const facts = cached.facts;
-      startTransition(() => {
-        setWeek(facts);
-        setWeekError(false);
-      });
-      return;
-    }
     let live = true;
-    fetch(`/api/my-week${qs}`)
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const body = await r.json();
-        const facts = (Array.isArray(body) ? body : []) as ReviewFact[];
-        if (!live) return;
-        localStorage.setItem(WEEK_KEY, JSON.stringify({ login, qs, at: Date.now(), facts }));
-        setWeek(facts);
-        setWeekError(false);
-      })
-      .catch(() => {
-        if (live) setWeekError(true);
-      });
+    // Both halves of the look back load the same way, each with its own copy.
+    const load = <T,>(path: string, key: string, set: (v: T[]) => void, setError: (e: boolean) => void) => {
+      let cached: { login?: string; qs?: string; at?: number; facts?: T[] } = {};
+      try {
+        cached = JSON.parse(localStorage.getItem(key) ?? "{}");
+      } catch {
+        cached = {};
+      }
+      // Keyed by who as well as where: the all-organizations scope is the same empty
+      // string for every account, and one person must never see another’s copy.
+      const fresh =
+        cached.login === login && cached.qs === qs && typeof cached.at === "number" && Date.now() - cached.at < WEEK_TTL_MS;
+      if (fresh && Array.isArray(cached.facts)) {
+        const facts = cached.facts;
+        startTransition(() => {
+          set(facts);
+          setError(false);
+        });
+        return;
+      }
+      fetch(`${path}${qs}`)
+        .then(async (r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const body = await r.json();
+          const facts = (Array.isArray(body) ? body : []) as T[];
+          if (!live) return;
+          localStorage.setItem(key, JSON.stringify({ login, qs, at: Date.now(), facts }));
+          set(facts);
+          setError(false);
+        })
+        .catch(() => {
+          if (live) setError(true);
+        });
+    };
+    load<ReviewFact>("/api/my-week", WEEK_KEY, setWeek, setWeekError);
+    load<MergedFact>("/api/my-merged", MERGED_KEY, setMerged, setMergedError);
     return () => {
       live = false;
     };
@@ -2137,8 +2146,8 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             </div>
           </div>
         </section>
-        {/* History: looking back, not work to do. Your review verdicts beside
-            your finished PRs, quieter than the columns above on purpose. */}
+        {/* History: looking back, not work to do, so it stays below the work and
+            quieter than the columns above on purpose. */}
         <section aria-labelledby="history-heading" className="flex flex-col gap-4 pt-3">
           <div className="flex items-center gap-3">
             <h2 id="history-heading" className="text-xs font-semibold tracking-[0.1em] text-muted">
@@ -2146,96 +2155,118 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             </h2>
             <span aria-hidden="true" className="h-px flex-1 bg-border" />
             <span className="text-[13px] text-muted">Looking back, not work to do</span>
+            <div role="group" aria-label="Which week" className="flex rounded-full border border-border bg-background p-[3px]">
+              {(["This week", "Last week"] as const).map((label, i) => (
+                <button
+                  key={label}
+                  type="button"
+                  aria-pressed={weekOffset === i}
+                  onClick={() => setWeekOffset(i as 0 | 1)}
+                  className={`min-h-7 cursor-pointer rounded-full px-3 text-xs focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ${
+                    weekOffset === i ? "bg-foreground font-semibold text-background" : "font-medium text-muted hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-          <WeekCard facts={week} now={new Date()} error={weekError} />
+          {/* Two sides, matching the board above: your reviewing on the left,
+              your own PRs on the right. One week picker for both. */}
           <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-            <ArchiveSection
-              title="Recently reviewed"
-              id="recently-reviewed"
-              count={shownReviewed.length}
-              countTestId="reviewed-count-badge"
-              open={reviewedOpen}
-              onToggle={() => setReviewedOpen((o) => !o)}
-              error={budgetSpent === undefined ? reviewedError : null}
-              onRetry={() => fetchData(selectedOrg, selectedRepo)}
-              summary={
-                updatedSinceCount > 0 && (
-                  <span className="font-semibold text-accent">
-                    {updatedSinceCount} updated since
-                  </span>
-                )
-              }
-            >
-              {shownReviewed.length === 0 ? (
-                <p className="my-2 rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted">
-                  {emptyText("No PRs you have reviewed are still open")}
-                </p>
-              ) : (
-                <>
-                  <ul className="flex flex-col divide-y divide-border">
-                    {shownReviewed.slice(0, reviewedVisible).map((pr) => (
-                      <li key={pr.id}>
-                        <ReviewedPrRow pr={pr} now={new Date()} />
-                      </li>
-                    ))}
-                  </ul>
-                  {shownReviewed.length > reviewedVisible && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setReviewedVisible((v) => v + ARCHIVE_PAGE_SIZE)
-                      }
-                      className="mb-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-border px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-                    >
-                      Load more (showing {reviewedVisible} of{" "}
-                      {shownReviewed.length})
-                    </button>
-                  )}
-                </>
-              )}
-            </ArchiveSection>
-            <ArchiveSection
-              title="Recently merged / closed"
-              id="recently-closed"
-              count={shownClosed.length}
-              countTestId="closed-count-badge"
-              open={closedOpen}
-              onToggle={() => setClosedOpen((o) => !o)}
-              error={budgetSpent === undefined ? closedError : null}
-              onRetry={() => fetchData(selectedOrg, selectedRepo)}
-              summary={
-                shownClosed.length > 0 &&
-                `${mergedCount} merged · ${shownClosed.length - mergedCount} closed`
-              }
-            >
-              {shownClosed.length === 0 ? (
-                <p className="my-2 rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted">
-                  {emptyText("No closed PRs")}
-                </p>
-              ) : (
-                <>
-                  <ol className="flex flex-col pb-1 pt-3">
-                    {shownClosed.slice(0, closedVisible).map((pr, i, shown) => (
-                      <li key={pr.id}>
-                        <ClosedPrRow pr={pr} now={new Date()} last={i === shown.length - 1} />
-                      </li>
-                    ))}
-                  </ol>
-                  {shownClosed.length > closedVisible && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setClosedVisible((v) => v + ARCHIVE_PAGE_SIZE)
-                      }
-                      className="mb-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-border px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-                    >
-                      Load more (showing {closedVisible} of {shownClosed.length}
-                      )
-                    </button>
-                  )}
-                </>
-              )}
-            </ArchiveSection>
+            <div className="flex flex-col gap-4">
+              <WeekCard facts={week} now={new Date()} error={weekError} offset={weekOffset} />
+              <ArchiveSection
+                title="Recently reviewed"
+                id="recently-reviewed"
+                count={shownReviewed.length}
+                countTestId="reviewed-count-badge"
+                open={reviewedOpen}
+                onToggle={() => setReviewedOpen((o) => !o)}
+                error={budgetSpent === undefined ? reviewedError : null}
+                onRetry={() => fetchData(selectedOrg, selectedRepo)}
+                summary={
+                  updatedSinceCount > 0 && (
+                    <span className="font-semibold text-accent">
+                      {updatedSinceCount} updated since
+                    </span>
+                  )
+                }
+              >
+                {shownReviewed.length === 0 ? (
+                  <p className="my-2 rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted">
+                    {emptyText("No PRs you have reviewed are still open")}
+                  </p>
+                ) : (
+                  <>
+                    <ul className="flex flex-col divide-y divide-border">
+                      {shownReviewed.slice(0, reviewedVisible).map((pr) => (
+                        <li key={pr.id}>
+                          <ReviewedPrRow pr={pr} now={new Date()} />
+                        </li>
+                      ))}
+                    </ul>
+                    {shownReviewed.length > reviewedVisible && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setReviewedVisible((v) => v + ARCHIVE_PAGE_SIZE)
+                        }
+                        className="mb-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-border px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                      >
+                        Load more (showing {reviewedVisible} of{" "}
+                        {shownReviewed.length})
+                      </button>
+                    )}
+                  </>
+                )}
+              </ArchiveSection>
+            </div>
+            <div className="flex flex-col gap-4">
+              <MergedCard facts={merged} now={new Date()} error={mergedError} offset={weekOffset} />
+              <ArchiveSection
+                title="Recently merged / closed"
+                id="recently-closed"
+                count={shownClosed.length}
+                countTestId="closed-count-badge"
+                open={closedOpen}
+                onToggle={() => setClosedOpen((o) => !o)}
+                error={budgetSpent === undefined ? closedError : null}
+                onRetry={() => fetchData(selectedOrg, selectedRepo)}
+                summary={
+                  shownClosed.length > 0 &&
+                  `${mergedCount} merged · ${shownClosed.length - mergedCount} closed`
+                }
+              >
+                {shownClosed.length === 0 ? (
+                  <p className="my-2 rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted">
+                    {emptyText("No closed PRs")}
+                  </p>
+                ) : (
+                  <>
+                    <ol className="flex flex-col pb-1 pt-3">
+                      {shownClosed.slice(0, closedVisible).map((pr, i, shown) => (
+                        <li key={pr.id}>
+                          <ClosedPrRow pr={pr} now={new Date()} last={i === shown.length - 1} />
+                        </li>
+                      ))}
+                    </ol>
+                    {shownClosed.length > closedVisible && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setClosedVisible((v) => v + ARCHIVE_PAGE_SIZE)
+                        }
+                        className="mb-2 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-border px-4 text-sm font-medium text-foreground hover:brightness-[var(--hover-brightness)] focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                      >
+                        Load more (showing {closedVisible} of {shownClosed.length}
+                        )
+                      </button>
+                    )}
+                  </>
+                )}
+              </ArchiveSection>
+            </div>
           </div>
         </section>
       </main>

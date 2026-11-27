@@ -135,7 +135,7 @@ const ORPHAN_COMMENT = {
 /** Fetches to the board's list endpoints, leaving out the once-a-day look back. */
 function listCalls() {
   return (global.fetch as ReturnType<typeof vi.fn>).mock.calls.filter(
-    (c) => !String(c[0]).includes("/api/my-week"),
+    (c) => !/\/api\/my-(week|merged)/.test(String(c[0])),
   );
 }
 

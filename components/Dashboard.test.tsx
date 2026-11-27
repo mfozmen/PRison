@@ -1548,13 +1548,13 @@ describe("Dashboard", () => {
   });
 
   describe("prioritize-blocking", () => {
-    it("puts the stuck column first: your own blocked work leads", async () => {
+    it("puts the review column before your own PRs: blocked teammates lead", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("stuck pr")).toBeInTheDocument();
       const stuck = document.getElementById("stuck-on-checks")!;
       const review = document.getElementById("waiting-on-your-review")!;
       expect(
-        stuck.compareDocumentPosition(review) & Node.DOCUMENT_POSITION_FOLLOWING,
+        review.compareDocumentPosition(stuck) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
 
@@ -2858,7 +2858,7 @@ describe("Dashboard", () => {
       ).toBeInTheDocument();
     });
 
-    it("puts the ready column last among your own PRs, before the review column", async () => {
+    it("puts the ready column last, after the review column and your other PRs", async () => {
       render(<Dashboard orgs={ORGS} login="testuser" />);
       expect(await screen.findByText("ready pr")).toBeInTheDocument();
       // Compare the sections themselves: the index above names them both, so a
@@ -2867,7 +2867,7 @@ describe("Dashboard", () => {
       const others = document.getElementById("waiting-on-others")!;
       const review = document.getElementById("waiting-on-your-review")!;
       expect(others.compareDocumentPosition(ready) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(ready.compareDocumentPosition(review) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(review.compareDocumentPosition(ready) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it("includes ready-to-merge in a Refresh", async () => {
@@ -2970,6 +2970,54 @@ describe("Dashboard — awaiting your reply", () => {
     expect(
       await screen.findByText(/no comments awaiting your reply/i),
     ).toBeInTheDocument();
+  });
+
+  // A reply owed on a stuck PR is often what holds it, so each side points at
+  // the other.
+  it("tells a stuck PR how many comments wait on your reply, linking to them", async () => {
+    global.fetch = fetchWithComments([COMMENT, REVIEW_COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    const stuck = document.getElementById("stuck-on-checks")!;
+    const link = await within(stuck).findByRole("link", { name: /2 comments wait on your reply/i });
+    expect(link).toHaveAttribute("href", "#comments-awaiting-reply");
+  });
+
+  it("says it in the singular for one comment", async () => {
+    global.fetch = fetchWithComments([COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    const stuck = document.getElementById("stuck-on-checks")!;
+    expect(await within(stuck).findByRole("link", { name: /^1 comment waits on your reply$/i })).toBeInTheDocument();
+  });
+
+  // A reply on a thread you started on someone else's PR is not owed on yours.
+  it("does not count a reply on a teammate's PR against your stuck PR", async () => {
+    global.fetch = fetchWithComments([{ ...COMMENT, viewerStarted: true }]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("please fix the null check")).toBeInTheDocument();
+    const stuck = document.getElementById("stuck-on-checks")!;
+    expect(within(stuck).queryByText(/wait on your reply|waits on your reply/i)).not.toBeInTheDocument();
+  });
+
+  it("puts no stuck mark on a comment whose PR is ready to merge", async () => {
+    const onReady = { ...COMMENT, id: "t7", prId: READY_PR.id, preview: "nit: rename this" };
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        headers: { get: () => null },
+        json: () => Promise.resolve(url.includes("pr-comments") ? [onReady] : url.includes("ready") ? [READY_PR] : []),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    const column = document.getElementById("comments-awaiting-reply")!;
+    expect(await within(column).findByText("nit: rename this")).toBeInTheDocument();
+    expect(within(column).queryByText("PR stuck")).not.toBeInTheDocument();
+  });
+
+  it("marks a comment whose PR is stuck", async () => {
+    global.fetch = fetchWithComments([COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    const column = document.getElementById("comments-awaiting-reply")!;
+    expect(await within(column).findByText("PR stuck")).toBeInTheDocument();
   });
 
   it("renders a comment preview and links straight to the comment anchor", async () => {
@@ -3415,6 +3463,12 @@ describe("Dashboard — recently reviewed", () => {
     expect(
       await screen.findByText("done, took the fixed delay out"),
     ).toBeInTheDocument();
+    // It is part of reviewing a teammate's PR, so it sits with their PRs, not yours.
+    const theirs = document.getElementById("replies-on-their-prs")!;
+    expect(within(theirs).getByText("done, took the fixed delay out")).toBeInTheDocument();
+    expect(
+      within(document.getElementById("comments-awaiting-reply")!).queryByText("done, took the fixed delay out"),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps that reply when the reviewed list itself fails to load", async () => {
@@ -4686,19 +4740,20 @@ describe("Dashboard — tier layout", () => {
     global.fetch = okFetch();
   });
 
-  // Your own PRs by stage — held back, waiting on a reviewer, ready — then the
-  // queues where someone waits on you, then the histories.
+  // Teammates' PRs, then your own PRs by stage — held back, the comments that
+  // often hold them, waiting on a reviewer, ready last — then the histories.
   const SECTIONS = [
+    "waiting-on-your-review",
+    "replies-on-their-prs",
     "stuck-on-checks",
+    "comments-awaiting-reply",
     "waiting-on-others",
     "ready-to-merge",
-    "waiting-on-your-review",
-    "comments-awaiting-reply",
     "recently-reviewed",
     "recently-closed",
   ];
 
-  it("orders your PRs by stage, then the queues waiting on you, then the histories", async () => {
+  it("orders teammates' PRs, then your PRs by stage, then the histories", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("ready pr")).toBeInTheDocument();
     const els = SECTIONS.map((id) => document.getElementById(id)!);
@@ -4721,7 +4776,7 @@ describe("Dashboard — tier layout", () => {
   it("never nests one queue inside another", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("ready pr")).toBeInTheDocument();
-    const queues = SECTIONS.slice(0, 5).map((id) => document.getElementById(id)!);
+    const queues = SECTIONS.slice(0, 6).map((id) => document.getElementById(id)!);
     for (const a of queues) {
       for (const b of queues) if (a !== b) expect(a.contains(b)).toBe(false);
     }

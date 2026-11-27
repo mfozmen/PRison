@@ -71,11 +71,47 @@ beforeEach(() => {
 });
 
 describe("Dashboard — Next move", () => {
-  it("points at the longest wait across the queues, whichever queue it is in", async () => {
+  it("points at the longest wait among the queues where a teammate waits on you", async () => {
     global.fetch = fetchLists([STUCK_PR], [REVIEW_PR]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await within(await screen.findByRole("region", { name: "Next move" })).findByText("review pr")).toBeInTheDocument();
     expect(within(strip()).getByText("blocking @alice")).toBeInTheDocument();
+  });
+
+  it("puts a blocked teammate before your own PR, even an older one", async () => {
+    const olderStuck = { ...STUCK_PR, stuckSince: "2026-06-01T00:00:00Z" };
+    global.fetch = fetchLists([olderStuck], [REVIEW_PR]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await within(await screen.findByRole("region", { name: "Next move" })).findByText("review pr")).toBeInTheDocument();
+  });
+
+  describe("a reply", () => {
+    const comment = (viewerStarted: boolean) => ({
+      id: "c1", source: "thread", prId: "s1",
+      url: "https://github.com/acme/b/pull/2#discussion_r1", repo: "acme/b", number: 2,
+      author: "bob", isBot: false, path: "", preview: "why this way?",
+      commentedAt: "2026-06-25T00:00:00Z", viewerReacted: false, viewerStarted,
+    });
+    const fetchWith = (c: unknown) =>
+      vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          headers: { get: () => null },
+          json: () => Promise.resolve(url.includes("stuck") ? [STUCK_PR] : url.includes("pr-comments") ? [c] : []),
+        }),
+      ) as unknown as typeof fetch;
+
+    it("on your own PR waits its turn behind your older PR", async () => {
+      global.fetch = fetchWith(comment(false));
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await within(await screen.findByRole("region", { name: "Next move" })).findByText("stuck pr")).toBeInTheDocument();
+    });
+
+    it("on a teammate's PR goes first, however old your own PR is", async () => {
+      global.fetch = fetchWith(comment(true));
+      render(<Dashboard orgs={ORGS} login="testuser" />);
+      expect(await within(await screen.findByRole("region", { name: "Next move" })).findByText("why this way?")).toBeInTheDocument();
+    });
   });
 
   it("highlights the column the item sits in and marks the row there", async () => {

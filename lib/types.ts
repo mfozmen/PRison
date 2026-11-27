@@ -17,6 +17,7 @@ export type StuckPr = {
   reviewDecision: string;  // raw reviewDecision from GitHub, e.g. "REVIEW_REQUIRED", "CHANGES_REQUESTED", "APPROVED", ""; surfaces "waiting on review" vs "pending CI" in the card
   mergeState: string;   // raw mergeStateStatus from GitHub API, e.g. "BEHIND", "DIRTY", "BLOCKED", ""
   unresolvedThreads: number;  // open review conversations; a repo with requiredConversationResolution blocks the merge while any are open, and reports it as BLOCKED with every check green
+  approvedBy?: string[]; // logins whose latest review approves; tracked even where no approval is required
   stuckSince: string; // ISO
 };
 
@@ -50,6 +51,7 @@ export type ReadyPr = {
   needsUpdate: boolean;
   checkNames: string[];   // all DISTINCT context display names present in the rollup (any state)
   viaBlocked: boolean;    // true when qualified via isReadyViaBlocked (BLOCKED+APPROVED, no failing/pending check)
+  approvedBy?: string[];  // see StuckPr.approvedBy
   // Names that are red or still running on this PR and were ignored by the
   // user — which is why it is in this list at all. Set only by readyFromStuck;
   // the ready query never sees a PR like this, so nothing server-side fills it.

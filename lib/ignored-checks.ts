@@ -109,6 +109,7 @@ export function readyFromStuck(pr: StuckPr): ReadyPr {
     needsUpdate: pr.mergeState === "BEHIND",
     checkNames: pr.checkNames,
     viaBlocked: false,
+    approvedBy: pr.approvedBy,
     ignoredChecks: [...pr.failing, ...pr.pending],
   };
 }

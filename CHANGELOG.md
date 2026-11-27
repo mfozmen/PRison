@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.38.0](https://github.com/mfozmen/prison/compare/v1.37.0...v1.38.0) (2026-11-27)
+
+### Features
+
+* Ready by repo, folded section totals, an Insights section ([#127](https://github.com/mfozmen/prison/issues/127)) ([6125121](https://github.com/mfozmen/prison/commit/61251210380a253f44275b8f06393739d5ffb733))
+
 ## [1.37.0](https://github.com/mfozmen/prison/compare/v1.36.0...v1.37.0) (2026-11-27)
 
 ### Features

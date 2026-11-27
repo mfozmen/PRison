@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.37.0](https://github.com/mfozmen/prison/compare/v1.36.0...v1.37.0) (2026-11-27)
+
+### Features
+
+* fold the Others' PRs, Your PRs and History sections whole ([#126](https://github.com/mfozmen/prison/issues/126)) ([8060552](https://github.com/mfozmen/prison/commit/806055226a5a4cae75adbefed210092cbed0b8b6))
+
 ## [1.36.0](https://github.com/mfozmen/prison/compare/v1.35.0...v1.36.0) (2026-11-27)
 
 ### Features

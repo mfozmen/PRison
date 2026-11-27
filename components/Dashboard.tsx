@@ -1221,9 +1221,11 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     ],
     (item) => item.since,
   );
-  // A review or reply blocks a teammate, so it comes before any of your own
-  // PRs however old they are; oldest first within each half.
-  const blocksOthers = (m: NextMoveItem) => m.tone === "accent" || m.tone === "warning";
+  // Work on a teammate's PR (a review, a reply on a thread you started there)
+  // blocks them, so it comes before any of your own PRs however old they are;
+  // oldest first within each half.
+  const onTheirPrs = new Set(shownComments.filter((c) => c.viewerStarted).map((c) => c.id));
+  const blocksOthers = (m: NextMoveItem) => m.tone === "accent" || onTheirPrs.has(m.id);
   const allMoves = [...byAge.filter(blocksOthers), ...byAge.filter((m) => !blocksOthers(m))];
   const fitting = timeBudget === null ? allMoves : allMoves.filter((m) => m.minutes <= timeBudget);
   const fits = fitting.length > 0;
@@ -1341,6 +1343,119 @@ export function Dashboard({ orgs, login }: DashboardProps) {
     }
   });
 
+  // One reply column. Comments split by whose PR they sit on: a thread the
+  // viewer started on a teammate's PR is part of reviewing it, the rest are
+  // on the viewer's own PRs.
+  const replyColumn = (col: {
+    id: string; title: string; empty: string; description: string;
+    items: PrComment[]; visible: PrComment[]; showError?: boolean;
+  }) => (
+    <div className="flex flex-col gap-3">
+      {col.showError && budgetSpent === undefined && commentsError && (
+        <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+          <span>{commentsError}</span>
+          <button
+            onClick={() => fetchData(selectedOrg, selectedRepo)}
+            className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      <PrList
+        title={col.title}
+        id={col.id}
+        items={col.items}
+        emptyMessage={emptyText(col.empty)}
+        keyExtractor={(c) => c.id}
+        tone="warning"
+        caption={withLimit(caption(col.items.length, "threads", col.items[0]?.commentedAt), limits.reply)}
+        description={col.description}
+        footer={<SnoozedFold items={foldOf(col.visible, (c) => c.preview)} onWake={wake} />}
+        highlighted={col.items.some((c) => c.id === nextMove?.id)}
+        groupBy={groupBy === "repo" ? (c) => c.repo : undefined}
+        groupHref={
+          groupBy === "repo"
+            ? (repo) => `https://github.com/${repo}`
+            : undefined
+        }
+        renderRow={(c) => (
+          <PrRow
+            title={c.preview}
+            repo={c.repo}
+            number={c.number}
+            url={c.url}
+            since={c.commentedAt}
+            now={new Date()}
+            suggestion={suggestComment(c)}
+            kind="reply"
+            byline={c.author}
+            aside={
+          <span className="flex gap-1.5">
+          <SnoozeMenu title={c.preview} onSnooze={(choice) => snooze(c.id, choice)} />
+          <button
+            type="button"
+            onClick={() =>
+              setSeen((prev) => {
+                const next = { ...prev };
+                if (isSeen(c, prev)) delete next[c.id];
+                else next[c.id] = c.commentedAt;
+                return next;
+              })
+            }
+            aria-label={isSeen(c, seen) ? "Unmark as seen" : "Mark as seen"}
+            title={isSeen(c, seen) ? "Seen — click to bring it back" : "Mark as seen — hides it until a new reply"}
+            className={`inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+              isSeen(c, seen)
+                ? "border-success/40 bg-success/15 text-success hover:bg-success/25"
+                : "border-border bg-transparent text-muted hover:border-accent hover:text-accent"
+            }`}
+          >
+            {isSeen(c, seen) ? (
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="m8 12.5 2.5 2.5L16 9.5" />
+              </svg>
+            ) : (
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            )}
+          </button>
+          </span>
+            }
+            marked={nextMove?.id === c.id}
+            limit={limitState(c.commentedAt, limits.reply, limitNow)}
+            clampTitle
+            detail={
+              <span className="flex flex-wrap items-center gap-1.5">
+                {/* A review body has no file, so without this it would read
+                    as an inline thread whose path failed to load — and the
+                    two are answered in different places. */}
+                {c.source === "review" && (
+                  <span className="rounded-md bg-border px-1.5 py-0.5 text-xs font-medium text-muted">
+                    Review comment
+                  </span>
+                )}
+                {c.source === "conversation" && (
+                  <span className="rounded-md bg-border px-1.5 py-0.5 text-xs font-medium text-muted">
+                    Conversation
+                  </span>
+                )}
+                {c.path && (
+                  <span className="min-w-0 truncate font-mono text-xs text-muted">
+                    {c.path}
+                  </span>
+                )}
+
+              </span>
+            }
+          />
+        )}
+      />
+    </div>
+  );
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header
@@ -1584,18 +1699,18 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             Refresh
           </button>
         </div>
-        {/* Two sections, in the order they should be worked. Teammates blocked
-            on you come first: an unanswered review or reply holds up someone
-            else's work, your own PRs only hold up yours. The Next move strip
-            follows the same order.
+        {/* Two sections by whose PR it is, in the order they should be worked.
+            Teammates' PRs come first: an unanswered review or reply there holds
+            up someone else's work, your own PRs only hold up yours. The Next
+            move strip follows the same order.
 
             Columns, not rows: a row is as tall as its tallest cell, and each
             queue grows on its own. Grouping by repo or check happens inside each
             column, so the queue a PR belongs to never changes with the view. */}
-        <section aria-labelledby="blocking-heading" className="flex flex-col gap-4">
+        <section aria-labelledby="others-heading" className="flex flex-col gap-4">
           <div className="flex items-center gap-3">
-            <h2 id="blocking-heading" className="text-xs font-semibold tracking-[0.1em] text-foreground">
-              BLOCKING OTHERS
+            <h2 id="others-heading" className="text-xs font-semibold tracking-[0.1em] text-foreground">
+              OTHERS' PRS
             </h2>
             <span aria-hidden="true" className="h-px flex-1 bg-border" />
             <span className="text-[13px] text-muted">Teammates wait on you. Clear these first</span>
@@ -1657,111 +1772,14 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 )}
               />
             </div>
-            <div className="flex flex-col gap-3">
-              {budgetSpent === undefined && commentsError && (
-                <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-                  <span>{commentsError}</span>
-                  <button
-                    onClick={() => fetchData(selectedOrg, selectedRepo)}
-                    className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
-              <PrList
-                title="Awaiting your reply"
-                id="comments-awaiting-reply"
-                items={shownComments}
-                emptyMessage={emptyText("No comments awaiting your reply 🎉")}
-                keyExtractor={(c) => c.id}
-                tone="warning"
-                caption={withLimit(caption(shownComments.length, "threads", shownComments[0]?.commentedAt), limits.reply)}
-                description="Someone asked you something. Answer or mark seen."
-                footer={<SnoozedFold items={foldOf(visibleComments, (c) => c.preview)} onWake={wake} />}
-                highlighted={nextMove?.tone === "warning"}
-                groupBy={groupBy === "repo" ? (c) => c.repo : undefined}
-                groupHref={
-                  groupBy === "repo"
-                    ? (repo) => `https://github.com/${repo}`
-                    : undefined
-                }
-                renderRow={(c) => (
-                  <PrRow
-                    title={c.preview}
-                    repo={c.repo}
-                    number={c.number}
-                    url={c.url}
-                    since={c.commentedAt}
-                    now={new Date()}
-                    suggestion={suggestComment(c)}
-                    kind="reply"
-                    byline={c.author}
-                    aside={
-                  <span className="flex gap-1.5">
-                  <SnoozeMenu title={c.preview} onSnooze={(choice) => snooze(c.id, choice)} />
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setSeen((prev) => {
-                        const next = { ...prev };
-                        if (isSeen(c, prev)) delete next[c.id];
-                        else next[c.id] = c.commentedAt;
-                        return next;
-                      })
-                    }
-                    aria-label={isSeen(c, seen) ? "Unmark as seen" : "Mark as seen"}
-                    title={isSeen(c, seen) ? "Seen — click to bring it back" : "Mark as seen — hides it until a new reply"}
-                    className={`inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                      isSeen(c, seen)
-                        ? "border-success/40 bg-success/15 text-success hover:bg-success/25"
-                        : "border-border bg-transparent text-muted hover:border-accent hover:text-accent"
-                    }`}
-                  >
-                    {isSeen(c, seen) ? (
-                      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="9" />
-                        <path d="m8 12.5 2.5 2.5L16 9.5" />
-                      </svg>
-                    ) : (
-                      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
-                    )}
-                  </button>
-                  </span>
-                    }
-                    marked={nextMove?.id === c.id}
-                    limit={limitState(c.commentedAt, limits.reply, limitNow)}
-                    clampTitle
-                    detail={
-                      <span className="flex flex-wrap items-center gap-1.5">
-                        {/* A review body has no file, so without this it would read
-                            as an inline thread whose path failed to load — and the
-                            two are answered in different places. */}
-                        {c.source === "review" && (
-                          <span className="rounded-md bg-border px-1.5 py-0.5 text-xs font-medium text-muted">
-                            Review comment
-                          </span>
-                        )}
-                        {c.source === "conversation" && (
-                          <span className="rounded-md bg-border px-1.5 py-0.5 text-xs font-medium text-muted">
-                            Conversation
-                          </span>
-                        )}
-                        {c.path && (
-                          <span className="min-w-0 truncate font-mono text-xs text-muted">
-                            {c.path}
-                          </span>
-                        )}
-
-                      </span>
-                    }
-                  />
-                )}
-              />
-            </div>
+            {replyColumn({
+              id: "replies-on-their-prs",
+              title: "Replies on their PRs",
+              empty: "No replies waiting on you 🎉",
+              description: "You reviewed it, they answered. Your turn.",
+              items: shownComments.filter((c) => c.viewerStarted),
+              visible: visibleComments.filter((c) => c.viewerStarted),
+            })}
           </div>
         </section>
         <section aria-labelledby="mine-heading" className="flex flex-col gap-4 pt-3">
@@ -1772,7 +1790,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             <span aria-hidden="true" className="h-px flex-1 bg-border" />
             <span className="text-[13px] text-muted">Your own work, once nobody waits on you</span>
           </div>
-          <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="flex flex-col gap-3">
               {budgetSpent === undefined && stuckError && (
                 <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
@@ -2080,6 +2098,15 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 )}
               />
             </div>
+            {replyColumn({
+              id: "comments-awaiting-reply",
+              title: "Comments on your PRs",
+              empty: "No comments awaiting your reply 🎉",
+              description: "Someone asked you something. Answer or mark seen.",
+              items: shownComments.filter((c) => !c.viewerStarted),
+              visible: visibleComments.filter((c) => !c.viewerStarted),
+              showError: true,
+            })}
           </div>
         </section>
         {/* History: looking back, not work to do. Your review verdicts beside

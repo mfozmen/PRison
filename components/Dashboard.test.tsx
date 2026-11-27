@@ -3415,6 +3415,12 @@ describe("Dashboard — recently reviewed", () => {
     expect(
       await screen.findByText("done, took the fixed delay out"),
     ).toBeInTheDocument();
+    // It is part of reviewing a teammate's PR, so it sits with their PRs, not yours.
+    const theirs = document.getElementById("replies-on-their-prs")!;
+    expect(within(theirs).getByText("done, took the fixed delay out")).toBeInTheDocument();
+    expect(
+      within(document.getElementById("comments-awaiting-reply")!).queryByText("done, took the fixed delay out"),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps that reply when the reviewed list itself fails to load", async () => {
@@ -4686,19 +4692,20 @@ describe("Dashboard — tier layout", () => {
     global.fetch = okFetch();
   });
 
-  // The queues where someone waits on you, then your own PRs by stage — held
-  // back, waiting on a reviewer, ready — then the histories.
+  // Teammates' PRs, then your own PRs by stage — held back, waiting on a
+  // reviewer, ready, comments on them — then the histories.
   const SECTIONS = [
     "waiting-on-your-review",
-    "comments-awaiting-reply",
+    "replies-on-their-prs",
     "stuck-on-checks",
     "waiting-on-others",
     "ready-to-merge",
+    "comments-awaiting-reply",
     "recently-reviewed",
     "recently-closed",
   ];
 
-  it("orders the queues waiting on you, then your PRs by stage, then the histories", async () => {
+  it("orders teammates' PRs, then your PRs by stage, then the histories", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("ready pr")).toBeInTheDocument();
     const els = SECTIONS.map((id) => document.getElementById(id)!);
@@ -4721,7 +4728,7 @@ describe("Dashboard — tier layout", () => {
   it("never nests one queue inside another", async () => {
     render(<Dashboard orgs={ORGS} login="testuser" />);
     expect(await screen.findByText("ready pr")).toBeInTheDocument();
-    const queues = SECTIONS.slice(0, 5).map((id) => document.getElementById(id)!);
+    const queues = SECTIONS.slice(0, 6).map((id) => document.getElementById(id)!);
     for (const a of queues) {
       for (const b of queues) if (a !== b) expect(a.contains(b)).toBe(false);
     }

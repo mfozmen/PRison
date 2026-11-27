@@ -215,6 +215,12 @@ describe("readyFromStuck", () => {
   it("keeps the Needs update badge for a branch that is behind", () => {
     expect(readyFromStuck(stuckPr({ repo: "acme/api", mergeState: "BEHIND" })).needsUpdate).toBe(true);
   });
+
+  // The row must keep saying who approved, or a PR promoted over an ignored
+  // check would read "No approvals yet" just for having moved lists.
+  it("carries who approves it", () => {
+    expect(readyFromStuck(stuckPr({ repo: "acme/api", approvedBy: ["alice"] })).approvedBy).toEqual(["alice"]);
+  });
 });
 
 describe("readyDespiteIgnored — the edges", () => {

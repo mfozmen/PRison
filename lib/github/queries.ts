@@ -88,7 +88,7 @@ export const STUCK_PRS_QUERY = `
         # One entry per reviewer, their most recent review of any kind — which
         # is what the PR page's own reviewer list shows, and what reviewDecision
         # ignores. See supersededDecision.
-        latestReviews(first: 20) { nodes { state } }
+        latestReviews(first: 20) { nodes { state author { login } } }
         ${REVIEW_THREADS}
         commits(last: 1) { nodes { commit {
           pushedDate committedDate
@@ -301,6 +301,14 @@ function supersededDecision(node: any): string {
   return latest.some((r: any) => r?.state === "CHANGES_REQUESTED") ? decision : "REVIEW_REQUIRED";
 }
 
+/** Who approves the PR now: each reviewer's latest review, so an approval later
+ * followed by a change request no longer counts. */
+function approvers(node: any): string[] {
+  return (node.latestReviews?.nodes ?? [])
+    .filter((r: any) => r?.state === "APPROVED" && r.author?.login)
+    .map((r: any) => r.author.login);
+}
+
 export function parseStuckPrs(raw: any): StuckPr[] {
   return searchNodes(raw)
     .filter((n: any) => n?.id)
@@ -329,6 +337,7 @@ export function parseStuckPrs(raw: any): StuckPr[] {
         reviewDecision: supersededDecision(n),
         mergeState,
         unresolvedThreads: countUnresolvedThreads(n),
+        approvedBy: approvers(n),
         stuckSince: commit.pushedDate ?? commit.committedDate ?? "",
       } as StuckPr;
     })
@@ -603,6 +612,7 @@ export const READY_PRS_QUERY = `
         id title url number isDraft updatedAt
         mergeStateStatus reviewDecision
         repository { nameWithOwner }
+        latestReviews(first: 20) { nodes { state author { login } } }
         ${REVIEW_THREADS}
         commits(last: 1) { nodes { commit {
           pushedDate committedDate
@@ -761,6 +771,7 @@ export function parseReadyPrs(raw: any): ReadyPr[] {
         needsUpdate: n.mergeStateStatus !== "CLEAN",
         checkNames,
         viaBlocked: isReadyViaBlocked(n),
+        approvedBy: approvers(n),
       } as ReadyPr;
     });
 }

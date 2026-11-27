@@ -1186,6 +1186,37 @@ describe("parseReadyPrs", () => {
     });
   });
 
+  it("lists who approves now, from each reviewer's latest review", () => {
+    const [pr] = parseReadyPrs({ search: { nodes: [makePr({
+      latestReviews: { nodes: [
+        { state: "APPROVED", author: { login: "alice" } },
+        { state: "COMMENTED", author: { login: "bob" } },
+        { state: "APPROVED", author: null },
+      ] },
+    })] } });
+    expect(pr.approvedBy).toEqual(["alice"]);
+  });
+
+  it("has an empty approver list when nobody approved", () => {
+    expect(parseReadyPrs({ search: { nodes: [makePr()] } })[0].approvedBy).toEqual([]);
+  });
+
+  it("skips null review nodes, as a partial GraphQL response can carry", () => {
+    const [pr] = parseReadyPrs({ search: { nodes: [makePr({
+      latestReviews: { nodes: [null, { state: "APPROVED", author: { login: "bob" } }] },
+    })] } });
+    expect(pr.approvedBy).toEqual(["bob"]);
+  });
+
+  // An approval later dismissed, or followed by a change request, is no
+  // longer an approval: latestReviews holds each reviewer's newest review.
+  it("does not count a dismissed approval", () => {
+    const [pr] = parseReadyPrs({ search: { nodes: [makePr({
+      latestReviews: { nodes: [{ state: "DISMISSED", author: { login: "carol" } }] },
+    })] } });
+    expect(pr.approvedBy).toEqual([]);
+  });
+
   it("CLEAN PR has needsUpdate: false", () => {
     const result = parseReadyPrs({ search: { nodes: [makePr()] } });
     expect(result).toHaveLength(1);
@@ -2135,6 +2166,14 @@ describe("a changes-requested verdict that has been superseded", () => {
   it("is dropped when the reviewer's latest review is only a comment", () => {
     const pr = parse({ latestReviews: { nodes: [{ state: "COMMENTED" }] } });
     expect(pr.reviewDecision).toBe("REVIEW_REQUIRED");
+  });
+
+  it("carries who approves, even under a standing change request", () => {
+    const pr = parse({ latestReviews: { nodes: [
+      { state: "APPROVED", author: { login: "carol" } },
+      { state: "CHANGES_REQUESTED", author: { login: "dave" } },
+    ] } });
+    expect(pr.approvedBy).toEqual(["carol"]);
   });
 
   it("stands while any reviewer's latest review still asks for changes", () => {

@@ -2001,6 +2001,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                       marked={nextMove?.id === pr.id}
                       detail={detail}
                       suggestion={suggestStuck(pr)}
+                      approvedBy={pr.approvedBy}
                       aside={<SnoozeMenu title={pr.title} onSnooze={(c) => snooze(pr.id, c)} />}
                       limit={limitState(pr.stuckSince, limits.stuck, limitNow)}
                     />
@@ -2114,6 +2115,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                     since={pr.readySince}
                     now={new Date()}
                     suggestion={suggestReady(pr)}
+                    approvedBy={pr.approvedBy}
                     kind="ready"
                     marked={nextMove?.id === pr.id}
                     aside={<SnoozeMenu title={pr.title} onSnooze={(c) => snooze(pr.id, c)} />}

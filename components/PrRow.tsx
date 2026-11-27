@@ -29,6 +29,8 @@ export interface PrRowProps {
   clampTitle?: boolean;
   /** Where it stands against the user's wait limit for its queue, if any. */
   limit?: LimitState | null;
+  /** Who approves it now. Omitted on rows that are not the viewer's own PRs. */
+  approvedBy?: string[];
 }
 
 // An icon per state, so the column colour is never the only signal: a ✓, a
@@ -79,7 +81,7 @@ const AGE: Record<ReturnType<typeof ageBucket>, string> = {
 const LIMIT_BAR = { ok: "bg-success", due: "bg-warning", late: "bg-danger" } as const;
 const LIMIT_CHIP = { ok: "", due: "bg-warning/15 text-warning", late: "bg-danger/15 text-danger" } as const;
 
-export function PrRow({ title, repo, number, url, since, now, detail, suggestion, draft, kind, byline, aside, marked, clampTitle, limit }: PrRowProps) {
+export function PrRow({ title, repo, number, url, since, now, detail, suggestion, draft, kind, byline, aside, marked, clampTitle, limit, approvedBy }: PrRowProps) {
   const icon = kind ? ICONS[kind] : null;
   const bucket = ageBucket(since, now);
   return (
@@ -134,6 +136,21 @@ export function PrRow({ title, repo, number, url, since, now, detail, suggestion
             </span>
           )}
         </span>
+        {approvedBy && (
+          <span className={`mt-1 flex flex-wrap items-center gap-1 text-xs ${approvedBy.length ? "text-success" : "text-muted"}`}>
+            {approvedBy.length ? (
+              <>
+                <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                Approved by
+                <span className="break-all font-mono">{approvedBy.map((l) => `@${l}`).join(", ")}</span>
+              </>
+            ) : (
+              "No approvals yet"
+            )}
+          </span>
+        )}
         {detail && <div className="mt-1.5 text-sm text-muted">{detail}</div>}
         {limit?.label && (
           <span className={`mt-1.5 self-start rounded-md px-2 py-0.5 text-xs font-semibold leading-[normal] ${LIMIT_CHIP[limit.state]}`}>

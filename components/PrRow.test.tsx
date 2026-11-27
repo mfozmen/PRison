@@ -11,6 +11,32 @@ const suggestion: Suggestion = {
 };
 
 describe("PrRow", () => {
+  const base = {
+    title: "Fix the thing", repo: "org/repo", number: 42,
+    url: "https://github.com/org/repo/pull/42", since: "2026-06-25T00:00:00Z", now, suggestion,
+  };
+
+  it("names who approved", () => {
+    render(<PrRow {...base} approvedBy={["alice", "bob"]} />);
+    expect(screen.getByText("@alice, @bob")).toBeInTheDocument();
+    expect(screen.getByText(/Approved by/)).toBeInTheDocument();
+  });
+
+  it("says when nobody has approved yet", () => {
+    render(<PrRow {...base} approvedBy={[]} />);
+    expect(screen.getByText("No approvals yet")).toBeInTheDocument();
+  });
+
+  it("keeps a long approver list whole", () => {
+    render(<PrRow {...base} approvedBy={["alice", "bob", "carol", "dave"]} />);
+    expect(screen.getByText("@alice, @bob, @carol, @dave")).toBeInTheDocument();
+  });
+
+  it("says nothing about approvals when not given any", () => {
+    render(<PrRow {...base} />);
+    expect(screen.queryByText(/approv/i)).not.toBeInTheDocument();
+  });
+
   it("renders title", () => {
     render(
       <PrRow

@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.36.0](https://github.com/mfozmen/prison/compare/v1.35.0...v1.36.0) (2026-11-27)
+
+### Features
+
+* add your merged PRs to History, split it by side ([#124](https://github.com/mfozmen/prison/issues/124)) ([542b0f3](https://github.com/mfozmen/prison/commit/542b0f388588e8a41037cbcf39b20557dd6bb478))
+* let the board fill the window on desktop ([#121](https://github.com/mfozmen/prison/issues/121)) ([9c616b4](https://github.com/mfozmen/prison/commit/9c616b400b0ca5a34d93cb179f1c0b21601839a4))
+* show who approved your PRs in Stuck and Ready ([#122](https://github.com/mfozmen/prison/issues/122)) ([cca5bee](https://github.com/mfozmen/prison/commit/cca5beec157334e5183e70b298c2d3c61d80fd2d))
+* split the board into others' PRs and your PRs, others first ([#123](https://github.com/mfozmen/prison/issues/123)) ([37d8e5b](https://github.com/mfozmen/prison/commit/37d8e5b9541501d31c8d481d713002d18264498b))
+
 ## [1.35.0](https://github.com/mfozmen/PRison/compare/v1.34.1...v1.35.0) (2026-11-23)
 
 ### Features

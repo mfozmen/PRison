@@ -61,6 +61,21 @@ describe("parseMyMerged", () => {
     expect(f).toMatchObject({ prId: "PR_2", repo: "acme/api", firstReviewAt: "2026-11-11T09:00:00Z" });
   });
 
+  it("ignores a review left after the merge: the PR went in unreviewed", () => {
+    const [f] = parseMyMerged({ search: { nodes: [pr({ reviews: { nodes: [
+      { submittedAt: "2026-11-13T09:00:00Z", author: { login: "alice" } },
+    ] } })] } });
+    expect(f.firstReviewAt).toBeNull();
+  });
+
+  it("skips reviews with no author (a deleted account) and null nodes", () => {
+    const [f] = parseMyMerged({ search: { nodes: [pr({ reviews: { nodes: [
+      null,
+      { submittedAt: "2026-11-11T09:00:00Z", author: null },
+    ] } })] } });
+    expect(f.firstReviewAt).toBeNull();
+  });
+
   it("has no first review for a PR merged without one, and skips unmerged rows", () => {
     const facts = parseMyMerged({ search: { nodes: [pr(), pr({ id: "PR_3", mergedAt: null })] } });
     expect(facts.map((f) => [f.prId, f.firstReviewAt])).toEqual([["PR_2", null]]);

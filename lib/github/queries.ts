@@ -935,9 +935,10 @@ export function parseMyMerged(raw: any): MergedFact[] {
   for (const n of searchNodes(raw)) {
     if (!n?.id || !n.createdAt || !n.mergedAt) continue;
     const author = n.author?.login;
-    // A self-review (a note left on your own PR) is not someone looking at it.
+    // A self-review (a note left on your own PR) is not someone looking at it,
+    // and neither is one left after the merge: it went in unreviewed.
     const firstReviewAt = (n.reviews?.nodes ?? [])
-      .filter((r: any) => r?.submittedAt && r.author?.login && r.author.login !== author)
+      .filter((r: any) => r?.submittedAt && r.submittedAt <= n.mergedAt && r.author?.login && r.author.login !== author)
       .map((r: any) => r.submittedAt as string)
       .sort()[0] ?? null;
     out.push({

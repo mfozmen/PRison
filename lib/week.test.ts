@@ -61,6 +61,18 @@ describe("summarizeMerged", () => {
     expect(w.perDay.reduce((a, b) => a + b, 0)).toBe(3);
   });
 
+  it("has no first-review median when nothing this week was reviewed", () => {
+    const w = summarizeMerged([merged("e", 10, 2, null)], now);
+    expect(w).toMatchObject({ merged: 1, medianFirstReviewMs: null });
+    expect(w.medianToMergeMs).toBe(8 * H);
+  });
+
+  it("files a PR by when it merged, not when it opened", () => {
+    // Opened last week, merged this week.
+    expect(summarizeMerged([merged("f", 200, 5, 100)], now).merged).toBe(1);
+    expect(summarizeMerged([merged("f", 200, 5, 100)], now, 1).merged).toBe(0);
+  });
+
   it("looks at the week before with an offset, and is empty without merges", () => {
     expect(summarizeMerged(facts, now, 1).merged).toBe(1);
     expect(summarizeMerged([], now)).toMatchObject({ merged: 0, medianToMergeMs: null, medianFirstReviewMs: null, unreviewed: [] });

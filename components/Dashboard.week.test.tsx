@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within, waitFor } from "@testing-library/react";
+import { render, screen, within, waitFor, fireEvent } from "@testing-library/react";
 import { Dashboard } from "./Dashboard";
 
 // The weekly look back against the real Dashboard: what it says, and that it
@@ -93,6 +93,34 @@ describe("Weekly look back — your PRs", () => {
     await waitFor(() => expect(within(mine).getByText("PRs you merged")).toBeInTheDocument());
     expect(within(mine).getByText("merged with no review")).toBeInTheDocument();
     expect(within(mine).getByRole("link", { name: "acme/api #8" })).toHaveAttribute("href", "https://github.com/acme/api/pull/8");
+  });
+
+  it("switches both cards to last week with the one picker", async () => {
+    global.fetch = serveBoth(FACTS, [merged("7", 30, 2, 26), merged("9", 250, 200, 220), merged("10", 240, 190, null)]);
+    render(<Dashboard orgs={ORGS} login="me" />);
+    const mine = await screen.findByRole("region", { name: "Your merged PRs" });
+    await waitFor(() => expect(within(mine).getByText("PRs you merged")).toBeInTheDocument());
+    // This week: one merged, reviewed.
+    expect(within(mine).getByText("merged with no review").previousSibling).toHaveTextContent("0");
+    fireEvent.click(screen.getByRole("button", { name: "Last week" }));
+    expect(within(mine).getByText("PRs you merged").previousSibling).toHaveTextContent("2");
+    expect(within(mine).getByText("merged with no review").previousSibling).toHaveTextContent("1");
+    expect(within(card()).getByText("reviews you gave").previousSibling).toHaveTextContent("1");
+  });
+
+  it("says when your merged PRs could not load, and keeps the reviewing card", async () => {
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: !url.includes("my-merged"),
+        status: url.includes("my-merged") ? 502 : 200,
+        headers: { get: () => null },
+        json: () => Promise.resolve(url.includes("my-week") ? FACTS : []),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="me" />);
+    const mine = await screen.findByRole("region", { name: "Your merged PRs" });
+    expect(await within(mine).findByText(/couldn't load your merged PRs/i)).toBeInTheDocument();
+    expect(within(card()).getByText("reviews you gave")).toBeInTheDocument();
   });
 
   it("says plainly when there is nothing to show, instead of a grid of zeros", async () => {

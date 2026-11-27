@@ -1517,6 +1517,23 @@ export function Dashboard({ orgs, login }: DashboardProps) {
       </button>
     );
   };
+  // A folded side still says when one of its lists failed to load, the same
+  // as a folded history panel does.
+  const foldedErrors = (errors: (string | null)[]) => {
+    const failed = errors.filter(Boolean);
+    if (budgetSpent !== undefined || failed.length === 0) return null;
+    return (
+      <div className="flex items-center justify-between rounded-md border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+        <span>{failed.join(" · ")}</span>
+        <button
+          onClick={() => fetchData(selectedOrg, selectedRepo)}
+          className="ml-4 cursor-pointer rounded bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  };
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Header
@@ -1776,7 +1793,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             <span aria-hidden="true" className="h-px flex-1 bg-border" />
             <span className="text-[13px] text-muted">Teammates wait on you. Clear these first</span>
           </div>
-          {!foldedSides.includes("others") && (
+          {foldedSides.includes("others") ? foldedErrors([reviewError]) : (
           <div id="side-others" className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
             <div className="flex flex-col gap-3">
               {budgetSpent === undefined && reviewError && (
@@ -1853,7 +1870,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
             <span aria-hidden="true" className="h-px flex-1 bg-border" />
             <span className="text-[13px] text-muted">Your own work, once nobody waits on you</span>
           </div>
-          {!foldedSides.includes("mine") && (
+          {foldedSides.includes("mine") ? foldedErrors([stuckError, commentsError, awaitingError, readyError]) : (
           <div id="side-mine" className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="flex flex-col gap-3">
               {budgetSpent === undefined && stuckError && (
@@ -2150,6 +2167,12 @@ export function Dashboard({ orgs, login }: DashboardProps) {
                 description="Approved, green, mergeable. One click each."
                 footer={<SnoozedFold items={foldOf(visibleReady, (pr) => pr.title)} onWake={wake} />}
                 highlighted={nextMove?.tone === "success"}
+                groupBy={groupBy === "repo" ? (pr) => pr.repo : undefined}
+                groupHref={
+                  groupBy === "repo"
+                    ? (repo) => `https://github.com/${repo}`
+                    : undefined
+                }
                 renderRow={(pr) => (
                   <PrRow
                     title={pr.title}
@@ -2220,7 +2243,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
           </div>
           {/* Two sides, matching the board above: your reviewing on the left,
               your own PRs on the right. One week picker for both. */}
-          {!foldedSides.includes("history") && (
+          {foldedSides.includes("history") ? foldedErrors([reviewedError, closedError]) : (
           <div id="side-history" className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
             <div className="flex flex-col gap-4">
               <WeekCard facts={week} now={new Date()} error={weekError} offset={weekOffset} />

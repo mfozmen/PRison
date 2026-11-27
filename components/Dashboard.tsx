@@ -1721,7 +1721,7 @@ export function Dashboard({ orgs, login }: DashboardProps) {
         <section aria-labelledby="others-heading" className="flex flex-col gap-4">
           <div className="flex items-center gap-3">
             <h2 id="others-heading" className="text-xs font-semibold tracking-[0.1em] text-foreground">
-              OTHERS' PRS
+              OTHERS&apos; PRS
             </h2>
             <span aria-hidden="true" className="h-px flex-1 bg-border" />
             <span className="text-[13px] text-muted">Teammates wait on you. Clear these first</span>

@@ -2982,6 +2982,37 @@ describe("Dashboard — awaiting your reply", () => {
     expect(link).toHaveAttribute("href", "#comments-awaiting-reply");
   });
 
+  it("says it in the singular for one comment", async () => {
+    global.fetch = fetchWithComments([COMMENT]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    const stuck = document.getElementById("stuck-on-checks")!;
+    expect(await within(stuck).findByRole("link", { name: /^1 comment waits on your reply$/i })).toBeInTheDocument();
+  });
+
+  // A reply on a thread you started on someone else's PR is not owed on yours.
+  it("does not count a reply on a teammate's PR against your stuck PR", async () => {
+    global.fetch = fetchWithComments([{ ...COMMENT, viewerStarted: true }]);
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    expect(await screen.findByText("please fix the null check")).toBeInTheDocument();
+    const stuck = document.getElementById("stuck-on-checks")!;
+    expect(within(stuck).queryByText(/wait on your reply|waits on your reply/i)).not.toBeInTheDocument();
+  });
+
+  it("puts no stuck mark on a comment whose PR is ready to merge", async () => {
+    const onReady = { ...COMMENT, id: "t7", prId: READY_PR.id, preview: "nit: rename this" };
+    global.fetch = vi.fn((url: string) =>
+      Promise.resolve({
+        ok: true,
+        headers: { get: () => null },
+        json: () => Promise.resolve(url.includes("pr-comments") ? [onReady] : url.includes("ready") ? [READY_PR] : []),
+      }),
+    ) as unknown as typeof fetch;
+    render(<Dashboard orgs={ORGS} login="testuser" />);
+    const column = document.getElementById("comments-awaiting-reply")!;
+    expect(await within(column).findByText("nit: rename this")).toBeInTheDocument();
+    expect(within(column).queryByText("PR stuck")).not.toBeInTheDocument();
+  });
+
   it("marks a comment whose PR is stuck", async () => {
     global.fetch = fetchWithComments([COMMENT]);
     render(<Dashboard orgs={ORGS} login="testuser" />);
